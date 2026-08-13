@@ -1,0 +1,81 @@
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editor / IDE
+.idea/
+*.swp
+*.swo
+*~
+
+# Local runtime data (Harness sockets, session state, GUI compile output)
+/.cocode/
+
+# Local dev notes — only guide/ and rfc/ are versioned
+/.dev/
+!/.dev/
+/.dev/*
+!/.dev/guide/
+!/.dev/guide/**
+!/.dev/rfc/
+!/.dev/rfc/**
+
+# Root design dumps that are not part of the product
+/design-system.html
+/*.jpg
+/*.jpeg
+/*.png
+/*.webp
+/*.gif
+
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+out/
+release/
+*.tsbuildinfo
+
+# Vite / local overrides
+*.local
+
+# Expo / React Native
+.expo/
+.expo-shared/
+web-build/
+.metro-health-check*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+
+# Turbo
+.turbo/
+
+# Tests
+coverage/
+
+# Env and secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Electron / packaged binaries
+*.dmg
+*.exe
+*.AppImage
+*.snap
