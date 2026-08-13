@@ -9,17 +9,29 @@ Desktop.ini
 *.swo
 *~
 
-# Local runtime data (Harness sockets, session state, GUI compile output)
+# Local runtime data
 /.cocode/
+/cocode-gui/.cocode/
+/cocode-tui/.cocode/
 
-# Local dev notes — only guide/ and rfc/ are versioned
-/.dev/
-!/.dev/
-/.dev/*
-!/.dev/guide/
-!/.dev/guide/**
-!/.dev/rfc/
-!/.dev/rfc/**
+# Harness nested copy — prefer sibling clone at ~/www/cocode-harness
+/cocode-harness/
+
+# cocode-gui — local dev scratch ignored; guide/ and rfc/ are versioned
+/cocode-gui/.dev/
+!/cocode-gui/.dev/
+/cocode-gui/.dev/*
+!/cocode-gui/.dev/guide/
+!/cocode-gui/.dev/guide/**
+!/cocode-gui/.dev/rfc/
+!/cocode-gui/.dev/rfc/**
+
+# cocode-tui — local dev scratch ignored; rfc/ is versioned
+/cocode-tui/.dev/
+!/cocode-tui/.dev/
+/cocode-tui/.dev/*
+!/cocode-tui/.dev/rfc/
+!/cocode-tui/.dev/rfc/**
 
 # Root design dumps that are not part of the product
 /design-system.html

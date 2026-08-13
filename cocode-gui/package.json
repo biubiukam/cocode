@@ -1,0 +1,23 @@
+{
+  "name": "@cocode/gui-root",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "^22.19 || >=24"
+  },
+  "scripts": {
+    "dev": "node --import tsx/esm src/main.ts",
+    "typecheck": "tsc --noEmit && pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "build": "pnpm -r build"
+  },
+  "dependencies": {
+    "@cocode/gui-connection": "workspace:*",
+    "@cocode/ui": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  }
+}
