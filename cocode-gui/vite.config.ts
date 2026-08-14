@@ -1,7 +1,6 @@
 import { fileURLToPath } from 'node:url'
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite'
 
 const resolvePath = (relative: string): string => fileURLToPath(new URL(relative, import.meta.url))
 
@@ -15,7 +14,7 @@ export default defineConfig(({ mode }) => {
     root: '.',
     // Electron loads the build from the filesystem, so every asset URL must be relative.
     base: './',
-    plugins: [react(), tailwindcss()],
+    plugins: [react()],
     resolve: {
       // Exact matches only: a prefix alias would also swallow the CSS subpaths
       // (`@cocode/ui/tokens.css`), which resolve through the package's exports.

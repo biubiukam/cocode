@@ -4,10 +4,13 @@
  * those tokens into utilities.
  */
 
-@import 'tailwindcss';
 @import '@cocode/ui/tokens.css';
 @import '@cocode/ui/theme.css';
 @import '@cocode/ui/base.css';
 @import '@cocode/ui/design-system.css';
 @import './views/prose.css';
 @import '@xterm/xterm/css/xterm.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
