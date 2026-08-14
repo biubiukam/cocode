@@ -28,6 +28,7 @@ export type CommandContextOptions = {
   setModel?: TuiCommandCtx['setModel']
   locale?: UiLocale
   showResumePicker?: (sessions: readonly SessionSummary[]) => void
+  showSkillsPicker?: TuiCommandCtx['showSkillsPicker']
 }
 
 export type AppCommandContextOptions = {
@@ -53,6 +54,7 @@ export type AppCommandContextOptions = {
   setModel?: TuiCommandCtx['setModel']
   locale: UiLocale
   showResumePicker: (sessions: readonly SessionSummary[]) => void
+  showSkillsPicker: TuiCommandCtx['showSkillsPicker']
 }
 
 export function createCommandContext(options: CommandContextOptions): TuiCommandCtx {
@@ -101,6 +103,7 @@ export function createCommandContext(options: CommandContextOptions): TuiCommand
         options.notice('error', formatError('SESSION_ROOT_UNAVAILABLE'))
       }
     },
+    showSkillsPicker: options.showSkillsPicker,
   }
 }
 
@@ -137,5 +140,6 @@ export function createAppCommandContext(options: AppCommandContextOptions): TuiC
     setModel: options.setModel,
     locale: options.locale,
     showResumePicker: options.showResumePicker,
+    showSkillsPicker: options.showSkillsPicker,
   })
 }

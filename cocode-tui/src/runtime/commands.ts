@@ -118,6 +118,15 @@ export function createBuiltinCommands(): CommandRegistry {
   local('logout', 'Sign out of Cocode Cloud', (ctx) => {
     void ctx.logout()
   })
+  registry.register({
+    name: 'skills',
+    summary: 'Browse workspace skills available for user invocation',
+    kind: 'local',
+    available: (caps) => caps.skills,
+    run: (ctx) => {
+      ctx.showSkillsPicker?.()
+    },
+  })
 
   return registry
 }

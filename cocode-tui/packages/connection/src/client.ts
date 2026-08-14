@@ -4,6 +4,7 @@
 
 import type {
   SessionEvent,
+  SkillEntry,
   TuiInitialize,
   TuiLaunch,
   TuiNotification,
@@ -126,6 +127,13 @@ class SdkTuiRuntime implements TuiRuntime {
   ): Promise<{ sessionId: string; seedLength: number; seed: SessionEvent[] }> {
     const client = this.requireClient()
     return (client as CancelableHarnessClient).rewind(sourceSessionId, messageSeq, replaceSessionId)
+  }
+
+  async listSkills(sessionId: string): Promise<SkillEntry[]> {
+    const client = this.requireClient() as HarnessClient & {
+      listSkills(sessionId: string): Promise<SkillEntry[]>
+    }
+    return client.listSkills(sessionId)
   }
 
   subscribe(handler: (n: TuiNotification) => void): () => void {

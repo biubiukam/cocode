@@ -42,6 +42,7 @@ Set `COCODE_TUI_SCREEN=inline` (the default) to keep the main screen and scrollb
 - `Ctrl+L` redraws the screen without clearing the session.
 - Type `@` at any position in the message to search workspace files and directories; use `Tab`, `↑`, or `↓` to select, then Enter to insert the reference.
 - On send, selected files are appended with their contents and selected directories with a bounded listing; references must stay inside the workspace.
+- When the runtime exposes a Skills registry, `/skills` opens a searchable workspace catalog. Select a skill to insert `/skill-name ` into the composer, then edit the prompt before sending. The command stays hidden when the runtime does not mount a Skills registry.
 
 Tool output is truncated by display mode; while a node remains in the projection cache, its raw payload is retained in node state, and the complete event stays in the session log. When the transcript is tight, the composer stays visible.
 
@@ -67,6 +68,7 @@ Type `/` to open the command menu. Keep typing to filter by prefix. `Tab` or arr
 | `/lang zh` / `/lang en`        | Switch between Chinese and English UI                                       |
 | `/model <model-id>`            | Switch models and start a new session                                       |
 | `/resume`                      | Open the local session picker and replay a selected session                 |
+| `/skills`                      | Browse user-invocable skills from the current workspace                     |
 | `/use byok` / `/use cocode`    | Switch between your key and Cocode; switching starts a new session          |
 | `/login` / `/logout`           | Sign in or out of Cocode Cloud; logout keeps your key and stays in chat     |
 | `/exit`                        | Shut down TUI and restore the terminal                                      |
@@ -85,6 +87,6 @@ You can run several TUI windows against the same home and the same channels. Eac
 
 If another TUI window is still open, `/use`, `/login`, and `/logout` refuse so they cannot rewrite the machine-wide default channel or tear down the Cloud slot. Close the other windows, then switch or sign out in the one that remains. Different providers per window is not a current product capability.
 
-## Not wired yet
+## Runtime capability boundaries
 
-Steer, approvals, rewind, the skills menu, and copy selection are not bound in TUI. Those need additional harness wire, an explicit manifest, or later interaction work. The UI does not draw fake controls.
+The `/skills` command is enabled only after `skills/list` returns a real catalog from the harness. A composition without `@deepseek-ai/dsh-skill` (and a provider such as `@deepseek-ai/dsh-skill-filesystem`) keeps the command hidden; an empty or failed probe is not presented as a usable feature.

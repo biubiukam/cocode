@@ -17,6 +17,12 @@ export type SessionEvent = {
   ignorable?: true
 }
 
+export type SkillEntry = {
+  name: string
+  description: string
+  whenToUse?: string
+}
+
 export type TuiLaunch = {
   command: string
   args: string[]
@@ -70,6 +76,7 @@ export type TuiRuntime = {
     messageSeq: number,
     replaceSessionId?: string,
   ): Promise<{ sessionId: string; seedLength: number; seed: SessionEvent[] }>
+  listSkills?(sessionId: string): Promise<SkillEntry[]>
   subscribe(handler: (n: TuiNotification) => void): () => void
   onClose?: (handler: (error?: string) => void) => () => void
   close(): Promise<void>

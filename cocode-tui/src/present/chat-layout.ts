@@ -2,6 +2,7 @@
 
 import { RESUME_WINDOW_SIZE } from '../runtime/resume-picker.ts'
 import { REWIND_WINDOW_SIZE } from '../runtime/rewind-picker.ts'
+import { SKILLS_WINDOW_SIZE } from '../runtime/skills-picker.ts'
 import { listWindowStart } from './list-window.ts'
 
 const HEADER_ROWS = 3
@@ -32,6 +33,8 @@ export type ChatLayoutInput = {
   rewindItems?: number
   rewindSelected?: number
   rewindConfirming?: boolean
+  skillsItems?: number
+  skillsSelected?: number
 }
 
 export type ChatLayout = {
@@ -63,7 +66,8 @@ export function calculateChatLayout(input: ChatLayoutInput): ChatLayout {
     fileRows(input.fileItems, input.fileLoading) +
     historyRows(input.historyMatches) +
     resumeRows(input.resumeItems, input.resumeSelected) +
-    rewindRows(input.rewindItems, input.rewindSelected, input.rewindConfirming)
+    rewindRows(input.rewindItems, input.rewindSelected, input.rewindConfirming) +
+    skillsRows(input.skillsItems, input.skillsSelected)
   const availableRows = Math.max(0, viewportRows - baseRows)
   const minimumOverlayRows = minimumOverlayHeight(input)
   const minimumRows =
@@ -124,6 +128,7 @@ function resumeRows(items: number | undefined, selected = 0): number {
 function minimumOverlayHeight(input: ChatLayoutInput): number {
   if (input.resumeItems !== undefined) return MIN_RESUME_OVERLAY_ROWS
   if (input.rewindItems !== undefined) return MIN_REWIND_OVERLAY_ROWS
+  if (input.skillsItems !== undefined) return MIN_OVERLAY_ROWS
   if (input.historyMatches !== undefined) return MIN_OVERLAY_ROWS
   if (input.fileItems !== undefined || input.fileLoading === true) {
     return MIN_OVERLAY_ROWS + optionalRow(input.fileLoading)
@@ -141,6 +146,15 @@ function rewindRows(items: number | undefined, selected = 0, confirming = false)
   const start = listWindowStart(selected, count, REWIND_WINDOW_SIZE)
   const indicators = optionalRow(start > 0) + optionalRow(count - start - visible > 0)
   return visible + indicators + 6 + optionalRow(confirming)
+}
+
+function skillsRows(items: number | undefined, selected = 0): number {
+  if (items === undefined) return 0
+  const count = nonNegativeInteger(items)
+  const visible = Math.max(1, Math.min(count, SKILLS_WINDOW_SIZE))
+  const start = listWindowStart(selected, count, SKILLS_WINDOW_SIZE)
+  const indicators = optionalRow(start > 0) + optionalRow(count - start - visible > 0)
+  return visible + indicators + 6
 }
 
 function optionalRow(enabled = false): number {

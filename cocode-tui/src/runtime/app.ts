@@ -2,7 +2,7 @@
  * TuiApp owns session lifecycle, projection, and local queues.
  */
 
-import type { TuiNotification, TuiRuntime } from '@cocode/tui-connection'
+import type { SkillEntry, TuiNotification, TuiRuntime } from '@cocode/tui-connection'
 import type { SelectModeResult } from './auth/store.ts'
 import type { AuthSnapshot, ResolvedAuth } from './auth/types.ts'
 import { createAssembler, type Assembler } from './assembler.ts'
@@ -55,6 +55,14 @@ import {
   type RewindPickerState,
 } from './rewind-picker.ts'
 import {
+  closeSkillsPicker,
+  createSkillsPicker,
+  moveSkillsSelection,
+  selectedSkill,
+  setSkillsQuery,
+  type SkillsPickerState,
+} from './skills-picker.ts'
+import {
   logoutChannel,
   requestChannelSwitch,
   submitCapturedByok,
@@ -86,6 +94,10 @@ export type TuiAction =
   | { type: 'rewind.move'; delta: number }
   | { type: 'rewind.close' }
   | { type: 'rewind.confirm' }
+  | { type: 'skills.setQuery'; query: string }
+  | { type: 'skills.move'; delta: number }
+  | { type: 'skills.close' }
+  | { type: 'skills.confirm' }
   | { type: 'queuePrompt' }
 
 export type { TuiCapabilities }
@@ -131,6 +143,8 @@ export type TuiSnapshot = {
   commands: readonly { name: string; summary: string }[]
   resumePicker?: ResumePickerState
   rewindPicker?: RewindPickerState
+  skillsPicker?: SkillsPickerState
+  skills: readonly SkillEntry[]
   exiting: boolean
 }
 
@@ -173,6 +187,7 @@ export type TuiCommandCtx = {
   setLocale?: (value: string) => void
   setModel?: (value: string) => void
   resumeSessions?: () => Promise<void>
+  showSkillsPicker?: () => void
 }
 
 export type TuiApp = {
@@ -211,7 +226,7 @@ class TuiAppImpl implements TuiApp {
   private readonly cwd: string
   private provider: string
   private model: string
-  private readonly capabilities: TuiCapabilities
+  private capabilities: TuiCapabilities
   private readonly commands: CommandRegistry
   private assembler: Assembler
   private telemetry = createTelemetryProjector()
@@ -244,6 +259,8 @@ class TuiAppImpl implements TuiApp {
   private closePromise: Promise<void> | undefined
   private resumePicker: ResumePickerState | undefined
   private rewindPicker: RewindPickerState | undefined
+  private skillsPicker: SkillsPickerState | undefined
+  private skills: SkillEntry[] = []
 
   constructor(options: TuiAppOptions) {
     this.runtime = options.runtime
@@ -289,6 +306,7 @@ class TuiAppImpl implements TuiApp {
       this.initError = undefined
       this.notice = undefined
       this.workspaceBranch = (await resolveWorkspaceInfo(this.cwd)).branch
+      await this.loadSkills()
       if (this.exiting) return
     } catch (error) {
       if (this.exiting) return
@@ -389,6 +407,8 @@ class TuiAppImpl implements TuiApp {
       })),
       resumePicker: this.resumePicker,
       rewindPicker: this.rewindPicker,
+      skillsPicker: this.skillsPicker,
+      skills: this.skills,
       exiting: this.exiting,
     }
   }
@@ -535,6 +555,39 @@ class TuiAppImpl implements TuiApp {
           this.emit()
         }
         return
+      case 'skills.setQuery':
+        if (this.skillsPicker !== undefined) {
+          this.skillsPicker = setSkillsQuery(this.skillsPicker, action.query)
+          this.emit()
+        }
+        return
+      case 'skills.move':
+        if (this.skillsPicker !== undefined) {
+          this.skillsPicker = moveSkillsSelection(this.skillsPicker, action.delta)
+          this.emit()
+        }
+        return
+      case 'skills.close':
+        if (this.skillsPicker !== undefined) {
+          this.skillsPicker = closeSkillsPicker(this.skillsPicker)
+          this.emit()
+        }
+        return
+      case 'skills.confirm': {
+        if (this.skillsPicker === undefined) return
+        const skill = selectedSkill(this.skillsPicker)
+        this.skillsPicker = closeSkillsPicker(this.skillsPicker)
+        if (skill !== undefined) {
+          this.draft = replaceDraft(this.draft, `/${skill.name} `)
+          this.attachments = []
+          this.notice = {
+            tone: 'info',
+            message: text(this.locale, 'skillReady', { name: skill.name }),
+          }
+        }
+        this.emit()
+        return
+      }
       case 'queuePrompt':
         this.queueCurrentPrompt()
         return
@@ -701,7 +754,34 @@ class TuiAppImpl implements TuiApp {
         )
         this.emit()
       },
+      showSkillsPicker: () => {
+        if (!this.capabilities.skills) {
+          this.notice = { tone: 'info', message: text(this.locale, 'skillsUnavailable') }
+          this.emit()
+          return
+        }
+        this.helpOpen = false
+        this.notice = undefined
+        this.skillsPicker = createSkillsPicker(this.skills)
+        this.emit()
+      },
     })
+  }
+
+  private async loadSkills(): Promise<void> {
+    const listSkills = this.runtime.listSkills
+    if (listSkills === undefined) {
+      this.capabilities = { ...this.capabilities, skills: false }
+      this.skills = []
+      return
+    }
+    try {
+      this.skills = await listSkills.call(this.runtime, this.sessionId)
+      this.capabilities = { ...this.capabilities, skills: this.skills.length > 0 }
+    } catch {
+      this.skills = []
+      this.capabilities = { ...this.capabilities, skills: false }
+    }
   }
 
   private async switchModel(model: string): Promise<void> {

@@ -51,6 +51,12 @@ type UiKey =
   | 'resumeLoading'
   | 'resumeLoaded'
   | 'resumeUnavailable'
+  | 'skillsTitle'
+  | 'skillsHint'
+  | 'skillsQuery'
+  | 'skillsEmpty'
+  | 'skillsUnavailable'
+  | 'skillReady'
   | 'rewindTitle'
   | 'rewindHint'
   | 'rewindArm'
@@ -135,6 +141,12 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     resumeLoading: 'Loading session history…',
     resumeLoaded: 'Resumed session {session}.',
     resumeUnavailable: 'Cannot resume session {session}: the session file is unavailable.',
+    skillsTitle: 'Workspace skills',
+    skillsHint: 'type to filter · ↑↓ select · enter use · esc close',
+    skillsQuery: 'filter: {query}',
+    skillsEmpty: 'No user-invocable skills found.',
+    skillsUnavailable: 'Skills are unavailable in this runtime.',
+    skillReady: 'Skill /{name} is ready in the composer.',
     rewindTitle: 'Rewind conversation',
     rewindHint: '↑↓ select · enter review · esc close',
     rewindArm: 'Press Esc again to choose a rewind point.',
@@ -218,6 +230,12 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     resumeLoading: '正在加载会话历史…',
     resumeLoaded: '已恢复会话 {session}。',
     resumeUnavailable: '无法恢复会话 {session}：会话文件不可用。',
+    skillsTitle: '工作区技能',
+    skillsHint: '输入过滤 · ↑↓ 选择 · 回车使用 · Esc 关闭',
+    skillsQuery: '筛选：{query}',
+    skillsEmpty: '当前运行时没有可调用的技能。',
+    skillsUnavailable: '当前运行时未配置 Skills。',
+    skillReady: '技能 /{name} 已写入输入区。',
     rewindTitle: '回滚会话',
     rewindHint: '↑↓ 选择 · 回车预览 · Esc 关闭',
     rewindArm: '再次按 Esc 选择回滚位置。',

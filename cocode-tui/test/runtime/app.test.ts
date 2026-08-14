@@ -111,6 +111,30 @@ function fakeRuntime(): TuiRuntime & {
 }
 
 describe('TuiApp', () => {
+  it('loads a real skill catalog and inserts the selected invocation', async () => {
+    const runtime = fakeRuntime() as TuiRuntime & {
+      listSkills(sessionId: string): Promise<{ name: string; description: string }[]>
+    }
+    runtime.listSkills = async (sessionId) => {
+      expect(sessionId).toBe('s1')
+      return [{ name: 'review', description: 'Review a change' }]
+    }
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+    })
+    await app.start()
+    expect(app.snapshot().capabilities.skills).toBe(true)
+    expect(app.snapshot().skills).toEqual([{ name: 'review', description: 'Review a change' }])
+    app.dispatch({ type: 'command', line: '/skills' })
+    expect(app.snapshot().skillsPicker?.open).toBe(true)
+    app.dispatch({ type: 'skills.confirm' })
+    expect(app.snapshot().composer.text).toBe('/review ')
+  })
+
   it('switches interface language with /lang', async () => {
     const app = createTuiApp({
       runtime: fakeRuntime(),

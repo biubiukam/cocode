@@ -14,6 +14,7 @@ import { HistorySearch } from './components/HistorySearch.tsx'
 import { MessageList } from './components/MessageList.tsx'
 import { ResumePicker } from './components/ResumePicker.tsx'
 import { RewindPicker } from './components/RewindPicker.tsx'
+import { SkillsPicker } from './components/SkillsPicker.tsx'
 import { StatusLine } from './components/StatusLine.tsx'
 import {
   filterSlashItems,
@@ -59,8 +60,11 @@ export function Chat(props: { app: TuiApp }) {
   const resumeItems = snap.resumePicker === undefined ? [] : visibleResumeItems(snap.resumePicker)
   const rewindState = snap.rewindPicker
   const rewindOpen = rewindState?.open === true
+  const skillsState = snap.skillsPicker
+  const skillsOpen = skillsState?.open === true
   const slashOpen =
     !rewindOpen &&
+    !skillsOpen &&
     !resumeOpen &&
     !historySearchOpen &&
     !snap.helpOpen &&
@@ -72,6 +76,7 @@ export function Chat(props: { app: TuiApp }) {
   )
   const fileVisible =
     !rewindOpen &&
+    !skillsOpen &&
     !resumeOpen &&
     !historySearchOpen &&
     !snap.helpOpen &&
@@ -100,6 +105,8 @@ export function Chat(props: { app: TuiApp }) {
     rewindItems: rewindOpen ? rewindState.items.length : undefined,
     rewindSelected: rewindOpen ? rewindState.selected : undefined,
     rewindConfirming: rewindOpen ? rewindState.confirming : undefined,
+    skillsItems: skillsOpen ? skillsState.skills.length : undefined,
+    skillsSelected: skillsOpen ? skillsState.selected : undefined,
   })
   const messageMaxRows = layout.messageRows
   const selectableMessages = useMemo(
@@ -205,6 +212,34 @@ export function Chat(props: { app: TuiApp }) {
       if (key.return) {
         app.dispatch({ type: 'rewind.confirm' })
         return
+      }
+      return
+    }
+    if (skillsOpen) {
+      if (key.escape) {
+        app.dispatch({ type: 'skills.close' })
+        return
+      }
+      if (key.upArrow || key.downArrow) {
+        app.dispatch({ type: 'skills.move', delta: key.upArrow ? -1 : 1 })
+        return
+      }
+      if (key.return) {
+        app.dispatch({ type: 'skills.confirm' })
+        return
+      }
+      if (key.backspace || key.delete) {
+        app.dispatch({
+          type: 'skills.setQuery',
+          query: skillsState?.query.slice(0, -1) ?? '',
+        })
+        return
+      }
+      if (input !== '' && !key.ctrl) {
+        app.dispatch({
+          type: 'skills.setQuery',
+          query: (skillsState?.query ?? '') + input,
+        })
       }
       return
     }
@@ -482,6 +517,9 @@ export function Chat(props: { app: TuiApp }) {
       ) : null}
       {rewindOpen ? (
         <RewindPicker state={rewindState} locale={snap.locale} maxRows={layout.overlayRows} />
+      ) : null}
+      {skillsOpen && skillsState !== undefined ? (
+        <SkillsPicker state={skillsState} locale={snap.locale} maxRows={layout.overlayRows} />
       ) : null}
       {snap.helpOpen ? (
         <Help text={snap.helpText} locale={snap.locale} maxRows={layout.overlayRows} />

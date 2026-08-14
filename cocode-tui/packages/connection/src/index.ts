@@ -11,6 +11,7 @@ export type { EnvError } from './env.ts'
 export type {
   ContentBlock,
   SessionEvent,
+  SkillEntry,
   SubagentFinished,
   TuiInitialize,
   TuiLaunch,

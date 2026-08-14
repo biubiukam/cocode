@@ -42,6 +42,7 @@ DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 - `Ctrl+L` 重绘界面，不清除会话内容。
 - 在消息任意位置输入 `@` 可搜索工作区文件和目录；使用 `Tab`、`↑`、`↓` 选择，回车插入引用。
 - 发送时会在消息末尾附加选中文件内容，目录则附加受限的目录列表；文件必须位于当前工作区内。
+- 当 runtime 挂载 Skills registry 时，`/skills` 会打开可搜索的工作区技能目录。选择技能后会向输入区插入 `/技能名 `，可以继续编辑 prompt 再发送；未挂载 registry 时不会显示该命令。
 
 工具输出会按显示模式截断；未被投影缓存淘汰时，原始内容仍保留在节点状态，完整事件始终保存在 session log 中。对话区空间不足时，输入区保持可见。
 
@@ -67,6 +68,7 @@ DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 | `/lang zh` / `/lang en`        | 切换中英文界面                                            |
 | `/model <model-id>`            | 切换模型并创建新 session                                  |
 | `/resume`                      | 打开当前工作区的 session 选择器并回放选中会话             |
+| `/skills`                      | 浏览当前工作区中可由用户调用的技能                        |
 | `/use byok` / `/use cocode`    | 在自己的 Key 和 Cocode 之间切换；切换即新会话             |
 | `/login` / `/logout`           | 登录或退出 Cocode Cloud；退出时若还有 Key 则留在对话里    |
 | `/exit`                        | 关闭 TUI 并恢复终端                                       |
@@ -85,6 +87,6 @@ DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 
 若还有其它 TUI 窗口开着，`/use`、`/login`、`/logout` 会拒绝执行，避免改掉全机默认通道或拆掉 Cloud 槽。先关掉其它窗口，再在留下的那个窗口里切换或退出。多个窗口各用不同 provider 不是当前产品能力。
 
-## 当前未接入的交互
+## Runtime capability 边界
 
-steer、审批、rewind、技能菜单和复制选择尚未绑定到 TUI 交互。这些能力需要额外的 harness wire、显式 manifest 或后续交互接线；界面不会显示假控件。
+只有 harness 的 `skills/list` 返回真实目录后，TUI 才会启用 `/skills`。如果 composition 没有挂载 `@deepseek-ai/dsh-skill` 及其 provider（例如 `@deepseek-ai/dsh-skill-filesystem`），命令会保持隐藏；探测失败或目录为空不会被展示成可用能力。
