@@ -19,6 +19,7 @@
   "dependencies": {
     "@cocode/tui-connection": "workspace:*",
     "ink": "^5.2.1",
+    "marked": "^18.0.9",
     "react": "^18.3.1",
     "yaml": "^2.9.0"
   },

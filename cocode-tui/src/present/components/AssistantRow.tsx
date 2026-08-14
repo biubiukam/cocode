@@ -1,5 +1,6 @@
 import { Box, Text } from 'ink'
 import type { AssistantNode } from '../../runtime/nodes/types.ts'
+import { Markdown, StreamingMarkdown } from './Markdown.tsx'
 import { formatReasoning } from '../text-format.ts'
 import { theme } from '../theme.ts'
 
@@ -12,7 +13,13 @@ export function AssistantRow(props: { node: AssistantNode; verbose: boolean }) {
         cocode <Text color={theme.mute}>· {node.streaming ? 'working' : 'answer'}</Text>
       </Text>
       {reasoning !== undefined ? <Text color={theme.mute}> {reasoning}</Text> : null}
-      {node.text !== '' ? <Text color={theme.assistant}> {node.text}</Text> : null}
+      {node.text !== '' ? (
+        node.streaming ? (
+          <StreamingMarkdown text={node.text} />
+        ) : (
+          <Markdown text={node.text} />
+        )
+      ) : null}
     </Box>
   )
 }
