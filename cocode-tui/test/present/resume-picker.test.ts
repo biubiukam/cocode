@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { windowStart } from '../../src/present/components/ResumePicker.tsx'
+import { listWindowStart } from '../../src/present/list-window.ts'
 
 describe('resume picker window', () => {
   it('keeps the selected session inside a bounded window', () => {
-    expect(windowStart(0, 20, 8)).toBe(0)
-    expect(windowStart(10, 20, 8)).toBe(6)
-    expect(windowStart(19, 20, 8)).toBe(12)
+    expect(listWindowStart(0, 20, 8)).toBe(0)
+    expect(listWindowStart(10, 20, 8)).toBe(6)
+    expect(listWindowStart(19, 20, 8)).toBe(12)
   })
 })

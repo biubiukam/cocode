@@ -71,6 +71,8 @@ type UiKey =
   | 'transcriptTrimmed'
   | 'editorOpening'
   | 'editorUnavailable'
+  | 'terminalTooSmall'
+  | 'terminalResize'
 
 const TEXT: Record<UiLocale, Record<UiKey, string>> = {
   en: {
@@ -142,6 +144,8 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     transcriptTrimmed: 'older nodes hidden {count}',
     editorOpening: 'opening draft in $EDITOR…',
     editorUnavailable: 'external editor unavailable',
+    terminalTooSmall: 'terminal is too small',
+    terminalResize: 'resize from {current} to at least {required} rows · esc quit',
   },
   zh: {
     session: '会话',
@@ -212,6 +216,8 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     transcriptTrimmed: '已隐藏较早节点 {count} 个',
     editorOpening: '正在 $EDITOR 中编辑草稿…',
     editorUnavailable: '外部编辑器不可用',
+    terminalTooSmall: '终端高度不足',
+    terminalResize: '当前 {current} 行，至少需要 {required} 行 · Esc 退出',
   },
 }
 

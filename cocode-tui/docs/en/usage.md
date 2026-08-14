@@ -22,7 +22,8 @@ Set `COCODE_TUI_SCREEN=inline` (the default) to keep the main screen and scrollb
 - The transcript projects `you`, `cocode`, reasoning, and tool results as separate node groups.
 - The status bar shows runtime state, notices, and input/output token usage when supplied by the runtime.
 - The composer is a bordered `prompt` panel; a dead runtime is shown as `locked` instead of looking editable.
-- The `/` command menu and `?` help panel reserve their own rows, so the composer stays visible when the transcript is crowded.
+- The `/` command menu and `?` help panel appear between status and composer. The transcript shrinks first, then overlay height is bounded by the remaining rows.
+- A multiline draft shows at most six logical lines around the cursor without deleting the full draft. If the fixed chrome cannot fit, the TUI asks for a taller terminal and pauses ordinary input.
 
 ## Editing
 

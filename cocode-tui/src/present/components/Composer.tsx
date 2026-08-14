@@ -1,13 +1,24 @@
 import { Box, Text } from 'ink'
 import type { TuiSnapshot } from '../../runtime/app.ts'
 import { formatFileMention } from '../../runtime/file-mentions.ts'
+import { clipComposerRow, renderComposerRows, visibleComposerRows } from '../composer-layout.ts'
 import { theme } from '../theme.ts'
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
 
-export function Composer(props: { composer: TuiSnapshot['composer']; locale: UiLocale }) {
+export function Composer(props: {
+  composer: TuiSnapshot['composer']
+  locale: UiLocale
+  maxRows?: number
+  maxColumns?: number
+}) {
   const { composer } = props
   const empty = composer.text === ''
-  const rows = empty ? [] : renderRows(composer.text, composer.cursor)
+  const rows = empty
+    ? []
+    : visibleComposerRows(
+        renderComposerRows(composer.text, composer.cursor),
+        props.maxRows ?? 6,
+      ).map((row) => clipComposerRow(row, Math.max(1, (props.maxColumns ?? 80) - 6)))
   return (
     <Box
       flexDirection="column"
@@ -33,58 +44,30 @@ export function Composer(props: { composer: TuiSnapshot['composer']; locale: UiL
           </Box>
         ) : (
           rows.map((row, index) => (
-            <Box key={index}>
+            <Box key={index} width="100%" height={1} overflowY="hidden">
               <Text color={composer.disabled ? theme.mute : theme.brand}>
                 {index === 0 ? '> ' : '  '}
               </Text>
               <Text color={composer.disabled ? theme.mute : theme.text}>{row.before}</Text>
-              <Text
-                inverse={!composer.disabled}
-                color={composer.disabled ? theme.mute : theme.text}
-              >
-                {row.cursor}
-              </Text>
+              {row.cursor === undefined ? null : (
+                <Text
+                  inverse={!composer.disabled}
+                  color={composer.disabled ? theme.mute : theme.text}
+                >
+                  {row.cursor}
+                </Text>
+              )}
               <Text color={composer.disabled ? theme.mute : theme.text}>{row.after}</Text>
             </Box>
           ))
         )}
       </Box>
       {composer.attachments.length > 0 ? (
-        <Text color={theme.info}>
+        <Text color={theme.info} wrap="truncate-end">
           {text(props.locale, 'attached')} ·{' '}
           {composer.attachments.map(formatFileMention).join(' · ')}
         </Text>
       ) : null}
     </Box>
   )
-}
-
-function renderRows(
-  text: string,
-  cursor: number,
-): Array<{
-  before: string
-  cursor: string
-  after: string
-}> {
-  const safeCursor = Math.max(0, Math.min(cursor, text.length))
-  const rows: Array<{ before: string; cursor: string; after: string }> = []
-  let cursorRendered = false
-  let offset = 0
-  for (const line of text.split('\n')) {
-    const lineEnd = offset + line.length
-    if (!cursorRendered && safeCursor <= lineEnd) {
-      const position = safeCursor - offset
-      rows.push({
-        before: line.slice(0, position),
-        cursor: line[position] ?? ' ',
-        after: line.slice(position + (position < line.length ? 1 : 0)),
-      })
-      cursorRendered = true
-    } else {
-      rows.push({ before: line, cursor: ' ', after: '' })
-    }
-    offset = lineEnd + 1
-  }
-  return rows
 }

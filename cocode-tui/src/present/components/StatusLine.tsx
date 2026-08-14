@@ -70,20 +70,20 @@ export function StatusLine(props: {
         </Text>
         <Box flexShrink={0}>
           {props.status.tokens !== undefined ? (
-            <Text color={theme.mute}>
+            <Text color={theme.mute} wrap="truncate-end">
               {text(props.locale, 'tokensIn')} {props.status.tokens.input} ·{' '}
               {text(props.locale, 'tokensOut')} {props.status.tokens.output}
             </Text>
           ) : null}
           {props.status.subagents !== undefined && props.status.subagents.running > 0 ? (
-            <Text color={theme.info}>
+            <Text color={theme.info} wrap="truncate-end">
               {' · '}
               {text(props.locale, 'subagentsRunning', {
                 count: String(props.status.subagents.running),
               })}
             </Text>
           ) : props.status.subagents?.last?.event === 'finished' ? (
-            <Text color={theme.mute}>
+            <Text color={theme.mute} wrap="truncate-end">
               {' · '}
               {text(props.locale, 'subagentFinished', {
                 id: props.status.subagents.last.id,
@@ -91,7 +91,7 @@ export function StatusLine(props: {
             </Text>
           ) : null}
           {props.status.queueCount > 0 ? (
-            <Text color={theme.info}>
+            <Text color={theme.info} wrap="truncate-end">
               {' · '}
               {text(props.locale, 'queueCount', { count: String(props.status.queueCount) })}
             </Text>
@@ -118,5 +118,9 @@ function hasContextSegments(telemetry: TuiSnapshot['status']['telemetry']): bool
 
 function Notice(props: { notice: NonNullable<TuiSnapshot['notice']> }) {
   const color = props.notice.tone === 'error' ? theme.error : theme.info
-  return <Text color={color}>! {props.notice.message}</Text>
+  return (
+    <Text color={color} wrap="truncate-end">
+      ! {props.notice.message}
+    </Text>
+  )
 }

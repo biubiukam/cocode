@@ -29,6 +29,7 @@ import { visibleTail } from './visible-tail.ts'
 import { text } from '../runtime/ui-locale.ts'
 import { visibleResumeItems } from '../runtime/resume-picker.ts'
 import { editDraft } from '../runtime/external-editor.ts'
+import { calculateChatLayout } from './chat-layout.ts'
 
 export function Chat(props: { app: TuiApp }) {
   const { app } = props
@@ -55,32 +56,40 @@ export function Chat(props: { app: TuiApp }) {
   )
   const resumeOpen = snap.resumePicker?.open === true
   const resumeItems = snap.resumePicker === undefined ? [] : visibleResumeItems(snap.resumePicker)
-  const slashOpen = !resumeOpen && !historySearchOpen && !slashDismissed && slashItems.length > 0
+  const slashOpen =
+    !resumeOpen && !historySearchOpen && !snap.helpOpen && !slashDismissed && slashItems.length > 0
   const fileMention = useMemo(
     () => findFileMentionAtCursor(snap.composer.text, snap.composer.cursor),
     [snap.composer.cursor, snap.composer.text],
   )
   const fileVisible =
-    !resumeOpen && !historySearchOpen && !slashOpen && !fileDismissed && fileMention !== undefined
+    !resumeOpen &&
+    !historySearchOpen &&
+    !snap.helpOpen &&
+    !slashOpen &&
+    !fileDismissed &&
+    fileMention !== undefined
   const fileOpen = fileVisible && (fileLoading || fileItems.length > 0)
   const historyItems = useMemo(
     () => searchHistory(snap.history, historyQuery, 8),
     [historyQuery, snap.history],
   )
-  const composerRows = Math.max(1, snap.composer.text.split('\n').length)
-  const reservedRows =
-    11 +
-    composerRows +
-    (snap.composer.attachments.length > 0 ? 1 : 0) +
-    (snap.notice ? 1 : 0) +
-    (hasStatusDetails(snap.status) ? 1 : 0) +
-    (snap.helpOpen ? snap.helpText.split('\n').length + 4 : 0) +
-    (slashOpen ? slashItems.length + 4 : 0) +
-    (fileOpen ? fileItems.length + (fileLoading ? 5 : 4) : 0) +
-    (historySearchOpen ? historyItems.length + 5 : 0) +
-    (resumeOpen ? Math.min(resumeItems.length, 8) + 7 : 0) +
-    (editorBusy || editorError !== undefined ? 1 : 0)
-  const messageMaxRows = Math.max(0, stdout.rows - reservedRows)
+  const layout = calculateChatLayout({
+    viewportRows: stdout.rows,
+    composerLines: snap.composer.text.split('\n').length,
+    hasAttachments: snap.composer.attachments.length > 0,
+    hasNotice: snap.notice !== undefined,
+    hasStatusDetails: hasStatusDetails(snap.status),
+    editorFeedbackRows: Number(editorBusy) + Number(editorError !== undefined),
+    helpLines: snap.helpOpen ? snap.helpText.split('\n').length : undefined,
+    slashItems: slashOpen ? slashItems.length : undefined,
+    fileItems: fileOpen ? fileItems.length : undefined,
+    fileLoading: fileOpen && fileLoading,
+    historyMatches: historySearchOpen ? historyItems.length : undefined,
+    resumeItems: resumeOpen ? resumeItems.length : undefined,
+    resumeSelected: resumeOpen ? snap.resumePicker?.selected : undefined,
+  })
+  const messageMaxRows = layout.messageRows
   const selectableMessages = useMemo(
     () =>
       selectableMessageKeys(
@@ -172,6 +181,12 @@ export function Chat(props: { app: TuiApp }) {
 
   useInput((input, key) => {
     if (editorBusy) return
+    if (layout.tooSmall) {
+      if (key.escape || (key.ctrl && (input === 'c' || input === 'd'))) {
+        app.dispatch({ type: 'quit' })
+      }
+      return
+    }
     if (snap.composer.disabled && !key.ctrl && input !== 'c') {
       if (key.escape || (key.ctrl && input === 'c')) {
         app.dispatch({ type: 'quit' })
@@ -376,6 +391,67 @@ export function Chat(props: { app: TuiApp }) {
     app.dispatch({ type: 'insertDraft', text: input })
   })
 
+  if (layout.tooSmall) {
+    return (
+      <Box flexDirection="column" height={stdout.rows} overflowY="hidden">
+        <Text color={theme.brand} bold wrap="truncate-end">
+          cocode · {text(snap.locale, 'terminalTooSmall')}
+        </Text>
+        {stdout.rows > 1 ? (
+          <Text color={theme.mute} wrap="truncate-end">
+            {text(snap.locale, 'terminalResize', {
+              current: String(stdout.rows),
+              required: String(layout.minimumRows),
+            })}
+          </Text>
+        ) : null}
+      </Box>
+    )
+  }
+
+  const overlays = (
+    <>
+      {slashOpen ? (
+        <SlashMenu
+          items={slashItems}
+          selectedIndex={slashIndex}
+          locale={snap.locale}
+          maxRows={layout.overlayRows}
+        />
+      ) : null}
+      {fileOpen ? (
+        <FileMenu
+          items={fileItems}
+          selectedIndex={fileIndex}
+          query={fileMention?.query ?? ''}
+          loading={fileLoading}
+          locale={snap.locale}
+          maxRows={layout.overlayRows}
+        />
+      ) : null}
+      {historySearchOpen ? (
+        <HistorySearch
+          query={historyQuery}
+          matches={historyItems}
+          selectedIndex={historyIndex}
+          locale={snap.locale}
+          maxRows={layout.overlayRows}
+        />
+      ) : null}
+      {snap.resumePicker?.open === true ? (
+        <ResumePicker
+          state={snap.resumePicker}
+          currentSessionId={snap.header.sessionId}
+          locale={snap.locale}
+          maxRows={layout.overlayRows}
+        />
+      ) : null}
+      {snap.helpOpen ? (
+        <Help text={snap.helpText} locale={snap.locale} maxRows={layout.overlayRows} />
+      ) : null}
+    </>
+  )
+
   return (
     <Box flexDirection="column" height={stdout.rows}>
       <Header
@@ -399,54 +475,44 @@ export function Chat(props: { app: TuiApp }) {
         notice={snap.notice}
         locale={snap.locale}
       />
-      {editorBusy ? <Text color={theme.info}>{text(snap.locale, 'editorOpening')}</Text> : null}
-      {editorError !== undefined ? <Text color={theme.error}>{editorError}</Text> : null}
-      <Composer composer={snap.composer} locale={snap.locale} />
+      {editorBusy ? (
+        <Text color={theme.info} wrap="truncate-end">
+          {text(snap.locale, 'editorOpening')}
+        </Text>
+      ) : null}
+      {editorError !== undefined ? (
+        <Text color={theme.error} wrap="truncate-end">
+          {editorError}
+        </Text>
+      ) : null}
+      {layout.overlayRows > 0 ? (
+        <Box flexDirection="column" height={layout.overlayRows} overflowY="hidden">
+          {overlays}
+        </Box>
+      ) : null}
+      <Composer
+        composer={snap.composer}
+        locale={snap.locale}
+        maxRows={layout.composerRows}
+        maxColumns={stdout.columns}
+      />
       <Box width="100%" marginTop={1} justifyContent="space-between">
         {messageSelectionActive ? (
-          <Text color={theme.brand}>
+          <Text color={theme.brand} wrap="truncate-end">
             {text(snap.locale, 'messageMode')} · {text(snap.locale, 'messageModeHint')}
           </Text>
         ) : (
           <>
-            <Text color={theme.mute}>
+            <Text color={theme.mute} wrap="truncate-end">
               {text(snap.locale, 'footerHistory')} · {text(snap.locale, 'footerMessages')} ·{' '}
               {text(snap.locale, 'footerDetails')} · {text(snap.locale, 'footerHelp')}
             </Text>
-            <Text color={theme.mute}>
+            <Text color={theme.mute} wrap="truncate-end">
               {text(snap.locale, 'footerQuit')} · {text(snap.locale, 'footerRedraw')}
             </Text>
           </>
         )}
       </Box>
-      {slashOpen ? (
-        <SlashMenu items={slashItems} selectedIndex={slashIndex} locale={snap.locale} />
-      ) : null}
-      {fileOpen ? (
-        <FileMenu
-          items={fileItems}
-          selectedIndex={fileIndex}
-          query={fileMention?.query ?? ''}
-          loading={fileLoading}
-          locale={snap.locale}
-        />
-      ) : null}
-      {historySearchOpen ? (
-        <HistorySearch
-          query={historyQuery}
-          matches={historyItems}
-          selectedIndex={historyIndex}
-          locale={snap.locale}
-        />
-      ) : null}
-      {snap.resumePicker?.open === true ? (
-        <ResumePicker
-          state={snap.resumePicker}
-          currentSessionId={snap.header.sessionId}
-          locale={snap.locale}
-        />
-      ) : null}
-      {snap.helpOpen ? <Help text={snap.helpText} locale={snap.locale} /> : null}
     </Box>
   )
 }

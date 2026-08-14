@@ -15,6 +15,8 @@ export type ResumePickerState = {
   open: boolean
 }
 
+export const RESUME_WINDOW_SIZE = 8
+
 export function createResumePicker(items: readonly ResumePickerItem[]): ResumePickerState {
   return { items: [...items], query: '', selected: 0, open: true }
 }
