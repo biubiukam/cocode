@@ -24,6 +24,7 @@ export type CommandContextOptions = {
   sessionRoot?: string
   setTheme?: TuiCommandCtx['setTheme']
   setLocale?: TuiCommandCtx['setLocale']
+  setModel?: TuiCommandCtx['setModel']
 }
 
 export type AppCommandContextOptions = {
@@ -46,6 +47,7 @@ export type AppCommandContextOptions = {
   nodes: readonly ConversationNode[]
   setTheme?: TuiCommandCtx['setTheme']
   setLocale?: TuiCommandCtx['setLocale']
+  setModel?: TuiCommandCtx['setModel']
 }
 
 export function createCommandContext(options: CommandContextOptions): TuiCommandCtx {
@@ -60,6 +62,7 @@ export function createCommandContext(options: CommandContextOptions): TuiCommand
     showDoctor: options.showDoctor,
     setTheme: options.setTheme,
     setLocale: options.setLocale,
+    setModel: options.setModel,
     exportTranscript: async () => {
       const path = await writeSessionExport(options.cwd, options.sessionId, options.nodes)
       options.notice('info', `Exported ${path}`)
@@ -125,5 +128,6 @@ export function createAppCommandContext(options: AppCommandContextOptions): TuiC
     sessionRoot: options.diagnostics.sessionRoot,
     setTheme: options.setTheme,
     setLocale: options.setLocale,
+    setModel: options.setModel,
   })
 }

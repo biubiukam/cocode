@@ -22,6 +22,7 @@ describe('commands', () => {
       'doctor',
       'theme',
       'lang',
+      'model',
       'export',
       'init',
       'new',
@@ -80,6 +81,13 @@ describe('commands', () => {
     command?.run(commandCtx({ setLocale: (value) => locales.push(value) }), 'zh')
     expect(locales).toEqual(['zh'])
   })
+
+  it('/model delegates the requested model', () => {
+    const models: string[] = []
+    const command = createBuiltinCommands().find('model', P0_CAPABILITIES)
+    command?.run(commandCtx({ setModel: (value) => models.push(value) }), 'm2')
+    expect(models).toEqual(['m2'])
+  })
 })
 
 function commandCtx(
@@ -88,6 +96,7 @@ function commandCtx(
     notice: (tone: 'info' | 'error', message: string) => void
     useAuth: (target: 'byok' | 'cocode' | 'login') => void
     setLocale: (value: string) => void
+    setModel: (value: string) => void
   }> = {},
 ) {
   return {
@@ -99,5 +108,6 @@ function commandCtx(
     logout: async () => {},
     useAuth: overrides.useAuth,
     setLocale: overrides.setLocale,
+    setModel: overrides.setModel,
   }
 }

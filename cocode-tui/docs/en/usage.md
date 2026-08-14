@@ -32,6 +32,7 @@ Set `COCODE_TUI_SCREEN=inline` (the default) to keep the main screen and scrollb
 - `Ctrl+R` opens history search; type to filter recent messages, use `↑` `↓` to select, Enter to restore the draft, and `Esc` to close.
 - `Shift+↑` enters message selection; use `↑` `↓` to move, Enter to expand or collapse the current message, and `Esc` to exit.
 - `/lang zh` or `/lang en` switches the interface immediately; startup language follows `COCODE_LANG`, `LANG`, and related locale variables.
+- `/model <model-id>` restarts the runtime with a new model and starts a new session; a failed switch attempts to restore the previous model.
 - `Ctrl+O` toggles verbose mode for full reasoning and tool I/O.
 - `Esc` closes overlays (help, command menu) first; in the normal view, press twice to quit.
 - `Ctrl+L` redraws the screen without clearing the session.
@@ -57,6 +58,7 @@ Type `/` to open the command menu. Keep typing to filter by prefix. `Tab` or arr
 | `/init`                        | Create a minimal `AGENTS.md` only when the workspace has none               |
 | `/theme dark` / `/theme light` | Switch the display theme                                                    |
 | `/lang zh` / `/lang en`        | Switch between Chinese and English UI                                       |
+| `/model <model-id>`            | Switch models and start a new session                                       |
 | `/resume`                      | List local session history for this workspace                               |
 | `/use byok` / `/use cocode`    | Switch between your key and Cocode; switching starts a new session          |
 | `/login` / `/logout`           | Sign in or out of Cocode Cloud; logout keeps your key and stays in chat     |

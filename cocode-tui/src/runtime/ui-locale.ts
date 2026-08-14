@@ -37,6 +37,11 @@ type UiKey =
   | 'agentDead'
   | 'langChanged'
   | 'langUsage'
+  | 'modelUsage'
+  | 'modelBusy'
+  | 'modelSwitching'
+  | 'modelChanged'
+  | 'modelRestored'
 
 const TEXT: Record<UiLocale, Record<UiKey, string>> = {
   en: {
@@ -74,6 +79,11 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     agentDead: 'dead',
     langChanged: 'Language: {lang}',
     langUsage: 'Use /lang zh or /lang en.',
+    modelUsage: 'Use /model <model-id>.',
+    modelBusy: 'Turn in progress. Wait before changing model.',
+    modelSwitching: 'Switching model to {model}…',
+    modelChanged: 'Model changed to {model}; new session started.',
+    modelRestored: 'Model switch failed; restored {model}.',
   },
   zh: {
     session: '会话',
@@ -110,6 +120,11 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     agentDead: '已停止',
     langChanged: '界面语言：{lang}',
     langUsage: '使用 /lang zh 或 /lang en。',
+    modelUsage: '使用 /model <model-id>。',
+    modelBusy: '当前任务仍在运行，请等待任务结束后再切换模型。',
+    modelSwitching: '正在切换模型到 {model}…',
+    modelChanged: '已切换到 {model}，并创建新会话。',
+    modelRestored: '模型切换失败，已恢复为 {model}。',
   },
 }
 

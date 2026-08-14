@@ -12,6 +12,7 @@ function fakeRuntime(): TuiRuntime & {
   closeCount: number
   restarts: { provider: string; model: string }[]
   failStart?: Error
+  failRestartModels: Set<string>
 } {
   const handlers = new Set<(n: TuiNotification) => void>()
   const closeHandlers = new Set<(error?: string) => void>()
@@ -23,6 +24,7 @@ function fakeRuntime(): TuiRuntime & {
     prompts: [],
     closeCount: 0,
     restarts: [],
+    failRestartModels: new Set(),
     emit(n) {
       for (const handler of handlers) handler(n)
     },
@@ -38,6 +40,9 @@ function fakeRuntime(): TuiRuntime & {
         provider: init.provider,
         model: init.model,
       })
+      if (runtime.failRestartModels.delete(init.model)) {
+        throw new Error(`failed to start ${init.model}`)
+      }
       await runtime.close()
       return runtime.start()
     },
@@ -77,6 +82,46 @@ describe('TuiApp', () => {
     app.dispatch({ type: 'command', line: '/lang zh' })
     expect(app.snapshot().locale).toBe('zh')
     expect(app.snapshot().composer.placeholder).toContain('输入消息')
+  })
+
+  it('switches model through runtime restart and starts a new session', async () => {
+    const runtime = fakeRuntime()
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'deepseek-official',
+      model: 'm1',
+      sessionId: 's1',
+    })
+    await app.start()
+    app.dispatch({ type: 'command', line: '/model m2' })
+    await expect.poll(() => app.snapshot().header.model).toBe('m2')
+    expect(runtime.restarts).toEqual([{ provider: 'deepseek-official', model: 'm2' }])
+    expect(app.snapshot().header.sessionId).not.toBe('s1')
+    expect(app.snapshot().agent).toBe('idle')
+  })
+
+  it('restores the previous model when switching fails', async () => {
+    const runtime = fakeRuntime()
+    runtime.failRestartModels.add('m2')
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'deepseek-official',
+      model: 'm1',
+      sessionId: 's1',
+      locale: 'zh',
+    })
+    await app.start()
+    app.dispatch({ type: 'command', line: '/model m2' })
+    await expect.poll(() => app.snapshot().agent).toBe('idle')
+    expect(runtime.restarts).toEqual([
+      { provider: 'deepseek-official', model: 'm2' },
+      { provider: 'deepseek-official', model: 'm1' },
+    ])
+    expect(app.snapshot().header.model).toBe('m1')
+    expect(app.snapshot().header.sessionId).toBe('s1')
+    expect(app.snapshot().notice?.message).toBe('模型切换失败，已恢复为 m1。')
   })
 
   it('prompts only when idle', async () => {

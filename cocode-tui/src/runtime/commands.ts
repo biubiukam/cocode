@@ -80,6 +80,9 @@ export function createBuiltinCommands(): CommandRegistry {
     }
     ctx.setLocale?.(value)
   })
+  local('model', 'Switch the active model and start a new session', (ctx, args) => {
+    ctx.setModel?.(args)
+  })
   local('export', 'Export the projected session as Markdown', (ctx) => {
     void ctx.exportTranscript?.()
   })

@@ -119,6 +119,7 @@ export type TuiCommandCtx = {
   initWorkspace?: () => Promise<void>
   setTheme?: (name: 'dark' | 'light') => void
   setLocale?: (value: string) => void
+  setModel?: (value: string) => void
   resumeSessions?: () => Promise<void>
 }
 
@@ -485,7 +486,63 @@ class TuiAppImpl implements TuiApp {
         }
         this.emit()
       },
+      setModel: (value) => {
+        const model = value.trim()
+        if (model === '') {
+          this.notice = { tone: 'info', message: text(this.locale, 'modelUsage') }
+          this.emit()
+          return
+        }
+        if (this.agent === 'running' || this.agent === 'starting') {
+          this.notice = { tone: 'info', message: text(this.locale, 'modelBusy') }
+          this.emit()
+          return
+        }
+        void this.switchModel(model)
+      },
     })
+  }
+
+  private async switchModel(model: string): Promise<void> {
+    const previous = this.model
+    this.agent = 'starting'
+    this.notice = {
+      tone: 'info',
+      message: text(this.locale, 'modelSwitching', { model }),
+    }
+    this.emit()
+    try {
+      const info = await this.runtime.restart({ cwd: this.cwd, provider: this.provider, model })
+      this.model = model
+      this.runtimeName = info.name
+      this.sessionId = crypto.randomUUID()
+      this.assembler.reset()
+      this.agent = 'idle'
+      this.notice = {
+        tone: 'info',
+        message: text(this.locale, 'modelChanged', { model }),
+      }
+    } catch (error) {
+      this.agent = 'dead'
+      this.notice = { tone: 'error', message: errorMessage(error) }
+      try {
+        const info = await this.runtime.restart({
+          cwd: this.cwd,
+          provider: this.provider,
+          model: previous,
+        })
+        this.model = previous
+        this.runtimeName = info.name
+        this.agent = 'idle'
+        this.notice = {
+          tone: 'error',
+          message: text(this.locale, 'modelRestored', { model: previous }),
+        }
+      } catch (restoreError) {
+        this.notice = { tone: 'error', message: startErrorMessage(restoreError) }
+      }
+    }
+    this.emit()
   }
 
   private submit(text: string): void {

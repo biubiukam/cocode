@@ -32,6 +32,7 @@ DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 - `Ctrl+R` 打开历史搜索；输入文字过滤最近消息，使用 `↑` `↓` 选择，回车回填到输入区，`Esc` 关闭。
 - `Shift+↑` 进入消息选择模式；使用 `↑` `↓` 移动，回车展开或收起当前消息，`Esc` 退出。
 - `/lang zh` 或 `/lang en` 立即切换界面语言；未指定时启动语言由 `COCODE_LANG`、`LANG` 等环境变量决定。
+- `/model <model-id>` 通过 runtime restart 切换当前模型，并创建新 session；切换失败会尝试恢复原模型。
 - `Ctrl+O` 切换详细模式，查看完整思考内容和工具输入输出。
 - `Esc` 在帮助、命令菜单等弹层中先关闭弹层；普通状态下按两次退出或结束当前 TUI。
 - `Ctrl+L` 重绘界面，不清除会话内容。
@@ -57,6 +58,7 @@ DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 | `/init`                        | 仅在缺少 `AGENTS.md` 时创建最小工作区模板                 |
 | `/theme dark` / `/theme light` | 切换显示主题                                              |
 | `/lang zh` / `/lang en`        | 切换中英文界面                                            |
+| `/model <model-id>`            | 切换模型并创建新 session                                  |
 | `/resume`                      | 列出当前工作区的本地 session 历史                         |
 | `/use byok` / `/use cocode`    | 在自己的 Key 和 Cocode 之间切换；切换即新会话             |
 | `/login` / `/logout`           | 登录或退出 Cocode Cloud；退出时若还有 Key 则留在对话里    |
