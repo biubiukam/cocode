@@ -6,16 +6,25 @@
     "node": "^22.19 || >=24"
   },
   "scripts": {
+    "prepare": "cd .. && husky",
     "dev": "node --import tsx/esm src/main.ts",
     "typecheck": "tsc --noEmit && pnpm -r typecheck",
-    "lint": "pnpm -r lint",
+    "lint": "eslint --ext .js,.cjs,.mjs,.ts,.tsx src packages",
+    "lint:fix": "pnpm run lint -- --fix",
+    "format": "prettier --write src packages package.json",
+    "format:check": "prettier --check src packages package.json",
     "build": "pnpm -r build"
   },
   "dependencies": {
     "@cocode/tui-connection": "workspace:*"
   },
   "devDependencies": {
+    "@dtyq/eslint-config": "0.0.11",
     "@types/node": "^22.20.1",
+    "eslint": "8.57.1",
+    "husky": "9.1.7",
+    "lint-staged": "15.5.2",
+    "prettier": "2.8.8",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2"
   }

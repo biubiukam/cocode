@@ -7,6 +7,7 @@
     "node": "^22.19 || >=24"
   },
   "scripts": {
+    "prepare": "cd .. && husky",
     "dev": "node scripts/dev-electron.mjs",
     "dev:web": "vite",
     "build": "pnpm run build:web && pnpm run build:electron",
@@ -15,7 +16,11 @@
     "package": "pnpm run build && electron-builder",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit && pnpm -r typecheck",
-    "lint": "pnpm run check:layers && pnpm run check:design && pnpm run check:design-system && pnpm -r lint",
+    "lint": "pnpm run check:layers && pnpm run check:design && pnpm run check:design-system && pnpm run lint:eslint",
+    "lint:eslint": "eslint --ext .js,.cjs,.mjs,.ts,.tsx src electron packages scripts vite.config.ts",
+    "lint:fix": "pnpm run lint:eslint -- --fix",
+    "format": "prettier --write src electron packages scripts package.json vite.config.ts postcss.config.cjs tailwind.config.cjs",
+    "format:check": "prettier --check src electron packages scripts package.json vite.config.ts postcss.config.cjs tailwind.config.cjs",
     "check:layers": "node scripts/check-layers.mjs",
     "check:design": "node scripts/check-design-tokens.mjs",
     "check:design-system": "node scripts/port-design-system.mjs --check",
@@ -52,6 +57,7 @@
     "zustand": "^5.0.8"
   },
   "devDependencies": {
+    "@dtyq/eslint-config": "0.0.11",
     "@types/node": "^22.20.1",
     "@types/react": "^19.1.13",
     "@types/react-dom": "^19.1.9",
@@ -60,7 +66,11 @@
     "electron": "^38.1.2",
     "electron-builder": "^26.0.12",
     "esbuild": "^0.28.2",
+    "eslint": "8.57.1",
+    "husky": "9.1.7",
+    "lint-staged": "15.5.2",
     "postcss": "^8.5.6",
+    "prettier": "2.8.8",
     "tailwindcss": "^3.4.17",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",

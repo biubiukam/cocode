@@ -1,0 +1,2 @@
+pnpm --dir cocode-gui exec lint-staged --cwd . --config lint-staged.config.mjs
+pnpm --dir cocode-tui exec lint-staged --cwd . --config lint-staged.config.mjs

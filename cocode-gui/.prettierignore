@@ -1,0 +1,5 @@
+vendor/
+dist/
+dist-electron/
+release/
+.dev/

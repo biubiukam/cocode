@@ -53,7 +53,7 @@ export function AddWorkspaceDialog({ open, onOpenChange }: { open: boolean; onOp
     onOpenChange(false)
   }
 
-  const useNativePicker = async () => {
+  const openNativePicker = async () => {
     const transport = connectionService.activeTransport
     if (transport === undefined) return
     const result = await transport.call('host.pickDirectory', {})
@@ -80,7 +80,7 @@ export function AddWorkspaceDialog({ open, onOpenChange }: { open: boolean; onOp
           <p className="min-w-0 flex-1 truncate rounded-sm bg-surface-sunken px-2 py-1.5 font-mono text-[11px]">
             {path ?? '…'}
           </p>
-          <Button size="sm" variant="secondary" onClick={() => { void useNativePicker() }}>
+          <Button size="sm" variant="secondary" onClick={() => { void openNativePicker() }}>
             <FolderOpen />
             系统对话框
           </Button>
