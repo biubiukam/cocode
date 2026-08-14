@@ -63,6 +63,9 @@ type UiKey =
   | 'telemetryReasoning'
   | 'telemetryActivity'
   | 'telemetrySegments'
+  | 'todoProgress'
+  | 'goalPhase'
+  | 'agentPreset'
 
 const TEXT: Record<UiLocale, Record<UiKey, string>> = {
   en: {
@@ -126,6 +129,9 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     telemetryReasoning: 'reasoning {value}',
     telemetryActivity: '{phase}: {line}',
     telemetrySegments: 'segments S{system} P{prompt} A{assistant} T{thinking} X{tools}',
+    todoProgress: 'todos {done}/{total}',
+    goalPhase: 'goal {phase}',
+    agentPreset: 'preset {name}',
   },
   zh: {
     session: '会话',
@@ -188,6 +194,9 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     telemetryReasoning: '推理 {value}',
     telemetryActivity: '{phase}：{line}',
     telemetrySegments: '分段 系统{system} 输入{prompt} 回复{assistant} 思考{thinking} 工具{tools}',
+    todoProgress: '待办 {done}/{total}',
+    goalPhase: '目标 {phase}',
+    agentPreset: '预设 {name}',
   },
 }
 

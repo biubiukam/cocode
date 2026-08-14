@@ -550,6 +550,62 @@ describe('TuiApp', () => {
     })
   })
 
+  it('projects goal and todo events into status', async () => {
+    const runtime = fakeRuntime()
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+    })
+    await app.start()
+    runtime.emit({
+      method: 'session.event',
+      params: {
+        sessionId: 's1',
+        event: {
+          type: 'todo/write',
+          seq: 1,
+          time: 1,
+          data: {
+            todos: [
+              { content: 'one', status: 'completed' },
+              { content: 'two', status: 'pending' },
+            ],
+          },
+        },
+      },
+    })
+    runtime.emit({
+      method: 'session.event',
+      params: {
+        sessionId: 's1',
+        event: {
+          type: 'goal/change',
+          seq: 2,
+          time: 2,
+          data: {
+            operation: 'create',
+            goal: {
+              id: 'g1',
+              revision: 1,
+              objective: 'ship',
+              phase: 'active',
+              maxGoalRounds: 3,
+              roundsStarted: 0,
+            },
+          },
+        },
+      },
+    })
+    expect(app.snapshot().status.todos).toEqual([
+      { content: 'one', status: 'completed' },
+      { content: 'two', status: 'pending' },
+    ])
+    expect(app.snapshot().status.goal?.phase).toBe('active')
+  })
+
   it('projects subagent lifecycle into status without leaking other sessions', async () => {
     const runtime = fakeRuntime()
     const app = createTuiApp({

@@ -44,6 +44,18 @@ export function StatusLine(props: {
           tools: String(telemetry.contextSegments.tools),
         })
       : undefined,
+    props.status.todos.length > 0
+      ? text(props.locale, 'todoProgress', {
+          done: String(props.status.todos.filter((todo) => todo.status === 'completed').length),
+          total: String(props.status.todos.length),
+        })
+      : undefined,
+    props.status.goal === undefined
+      ? undefined
+      : text(props.locale, 'goalPhase', { phase: props.status.goal.phase }),
+    props.status.agentPreset === undefined
+      ? undefined
+      : text(props.locale, 'agentPreset', { name: props.status.agentPreset }),
   ].filter((value): value is string => value !== undefined)
   return (
     <Box flexDirection="column" marginBottom={1}>

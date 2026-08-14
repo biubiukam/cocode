@@ -21,6 +21,7 @@ import {
 } from './draft.ts'
 import { buildPromptBlocks, loadFileContext } from './file-context.ts'
 import { readSessionEvents } from './sessions-fs.ts'
+import { createSessionStateProjector, type SessionGoal, type SessionTodo } from './session-state.ts'
 import { formatFileMention } from './file-mentions.ts'
 import { resolveWorkspaceInfo } from './workspace.ts'
 import { createAppCommandContext } from './command-context.ts'
@@ -102,6 +103,10 @@ export type TuiSnapshot = {
     line: string
     tokens?: { input: number; output: number }
     telemetry: TelemetrySnapshot
+    todos: readonly SessionTodo[]
+    goal?: SessionGoal
+    sessionTitle?: string
+    agentPreset?: string
     subagents?: TuiSubagentActivity
     queueCount: number
   }
@@ -196,6 +201,7 @@ class TuiAppImpl implements TuiApp {
   private readonly commands: CommandRegistry
   private readonly assembler: Assembler
   private readonly telemetry = createTelemetryProjector()
+  private readonly sessionState = createSessionStateProjector()
   private readonly history = new InputHistory()
   private readonly listeners = new Set<() => void>()
   private unsubscribeRuntime: (() => void) | undefined
@@ -306,6 +312,7 @@ class TuiAppImpl implements TuiApp {
   snapshot(): TuiSnapshot {
     const disabled = this.agent === 'dead' || this.exiting
     const telemetry = this.telemetry.snapshot()
+    const sessionState = this.sessionState.snapshot()
     return {
       header: {
         product: 'Cocode',
@@ -339,6 +346,12 @@ class TuiAppImpl implements TuiApp {
                 output: telemetry.usage.output,
               },
         telemetry,
+        todos: sessionState.todos,
+        ...(sessionState.goal === undefined ? {} : { goal: sessionState.goal }),
+        ...(sessionState.title === undefined ? {} : { sessionTitle: sessionState.title }),
+        ...(sessionState.agentPreset === undefined
+          ? {}
+          : { agentPreset: sessionState.agentPreset }),
         subagents: {
           running: this.activeSubagents.size,
           ...(this.lastSubagent === undefined ? {} : { last: this.lastSubagent }),
@@ -496,6 +509,7 @@ class TuiAppImpl implements TuiApp {
         this.sessionId = crypto.randomUUID()
         this.assembler.reset()
         this.telemetry.reset()
+        this.sessionState.reset()
         this.resetSubagentActivity()
         this.queuedPrompts.length = 0
         this.attachments = []
@@ -508,6 +522,7 @@ class TuiAppImpl implements TuiApp {
       clearTranscript: () => {
         this.assembler.reset()
         this.telemetry.reset()
+        this.sessionState.reset()
         this.attachments = []
         this.notice = { tone: 'info', message: 'Transcript cleared' }
         this.emit()
@@ -622,6 +637,7 @@ class TuiAppImpl implements TuiApp {
       this.sessionId = crypto.randomUUID()
       this.assembler.reset()
       this.telemetry.reset()
+      this.sessionState.reset()
       this.resetSubagentActivity()
       this.queuedPrompts.length = 0
       this.agent = 'idle'
@@ -669,7 +685,11 @@ class TuiAppImpl implements TuiApp {
       this.sessionId = sessionId
       this.assembler.replaceWindow(events)
       this.telemetry.reset()
-      for (const event of events) this.telemetry.ingest(event)
+      this.sessionState.reset()
+      for (const event of events) {
+        this.telemetry.ingest(event)
+        this.sessionState.ingest(event)
+      }
       this.resetSubagentActivity()
       this.queuedPrompts.length = 0
       this.attachments = []
@@ -811,6 +831,7 @@ class TuiAppImpl implements TuiApp {
       sessionId: this.sessionId,
       ingest: (event) => {
         this.telemetry.ingest(event)
+        this.sessionState.ingest(event)
         this.assembler.ingest(event)
       },
       isDeadOrExiting: () => this.agent === 'dead' || this.exiting,
@@ -851,6 +872,10 @@ class TuiAppImpl implements TuiApp {
 
   private resetTelemetry(): void {
     this.telemetry.reset()
+  }
+
+  private resetSessionState(): void {
+    this.sessionState.reset()
   }
 
   private switchHost(): ChannelSwitchHost {

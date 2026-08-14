@@ -69,7 +69,7 @@ export function Chat(props: { app: TuiApp }) {
     composerRows +
     (snap.composer.attachments.length > 0 ? 1 : 0) +
     (snap.notice ? 1 : 0) +
-    (hasTelemetry(snap.status.telemetry) ? 1 : 0) +
+    (hasStatusDetails(snap.status) ? 1 : 0) +
     (snap.helpOpen ? snap.helpText.split('\n').length + 4 : 0) +
     (slashOpen ? slashItems.length + 4 : 0) +
     (fileOpen ? fileItems.length + (fileLoading ? 5 : 4) : 0) +
@@ -409,6 +409,15 @@ function hasTelemetry(telemetry: TuiSnapshot['status']['telemetry']): boolean {
     telemetry.reasoningEffort !== undefined ||
     telemetry.activity !== undefined ||
     Object.values(telemetry.contextSegments).some((value) => value > 0)
+  )
+}
+
+function hasStatusDetails(status: TuiSnapshot['status']): boolean {
+  return (
+    hasTelemetry(status.telemetry) ||
+    status.todos.length > 0 ||
+    status.goal !== undefined ||
+    status.agentPreset !== undefined
   )
 }
 
