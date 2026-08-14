@@ -5,6 +5,7 @@ export type ResumePickerItem = {
   createdAt?: number
   label?: string
   preview?: string
+  path?: string
 }
 
 export type ResumePickerState = {

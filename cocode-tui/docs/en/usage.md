@@ -62,12 +62,12 @@ Type `/` to open the command menu. Keep typing to filter by prefix. `Tab` or arr
 | `/theme dark` / `/theme light` | Switch the display theme                                                    |
 | `/lang zh` / `/lang en`        | Switch between Chinese and English UI                                       |
 | `/model <model-id>`            | Switch models and start a new session                                       |
-| `/resume`                      | Open the read-only local session picker for this workspace                  |
+| `/resume`                      | Open the local session picker and replay a selected session                 |
 | `/use byok` / `/use cocode`    | Switch between your key and Cocode; switching starts a new session          |
 | `/login` / `/logout`           | Sign in or out of Cocode Cloud; logout keeps your key and stays in chat     |
 | `/exit`                        | Shut down TUI and restore the terminal                                      |
 
-`/resume` reads local session headers and supports text filtering plus `↑` `↓` selection. Enter only explains that the current harness SDK has no `session/open` or `session/resume` wire; it does not change the active session.
+`/resume` reads local session headers, supports text filtering plus `↑` `↓` selection, and replays the selected JSONL event log into the current TUI. Follow-up prompts use the selected session id. The TUI does not claim cross-process locking; avoid resuming a session that another client is currently writing.
 
 `/compact` sends the literal `/compact` prompt to the current session. A host compaction plugin must recognize that prompt; the TUI does not claim compaction succeeded without a corresponding event.
 

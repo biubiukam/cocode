@@ -125,7 +125,7 @@ describe('TuiApp', () => {
     expect(app.snapshot().notice?.message).toBe('模型切换失败，已恢复为 m1。')
   })
 
-  it('opens a searchable read-only picker for local sessions', async () => {
+  it('resumes a searchable local session from its event log', async () => {
     const root = await mkdtemp(join(tmpdir(), 'cocode-resume-root-'))
     const cwd = await mkdtemp(join(tmpdir(), 'cocode-resume-cwd-'))
     try {
@@ -138,6 +138,16 @@ describe('TuiApp', () => {
           id: 'old-session',
           createdAt: 1_700_000_000_000,
           cwd,
+        })}\n${JSON.stringify({
+          type: 'user/message',
+          seq: 1,
+          time: 1_700_000_000_001,
+          data: {
+            id: 'old-user',
+            role: 'user',
+            content: [{ type: 'text', text: 'continue this session' }],
+            source: { kind: 'user' },
+          },
         })}\n`,
       )
       const app = createTuiApp({
@@ -163,8 +173,12 @@ describe('TuiApp', () => {
       expect(app.snapshot().resumePicker?.query).toBe('old')
       app.dispatch({ type: 'resume.confirm' })
       expect(app.snapshot().resumePicker?.open).toBe(false)
-      expect(app.snapshot().header.sessionId).toBe('current-session')
-      expect(app.snapshot().notice?.message).toMatch(/没有 session\/open 或 session\/resume/)
+      await expect.poll(() => app.snapshot().header.sessionId).toBe('old-session')
+      expect(app.snapshot().nodes[0]).toMatchObject({
+        kind: 'user',
+        text: 'continue this session',
+      })
+      expect(app.snapshot().notice?.message).toBe('已恢复会话 old-sess。')
     } finally {
       await rm(root, { recursive: true, force: true })
       await rm(cwd, { recursive: true, force: true })

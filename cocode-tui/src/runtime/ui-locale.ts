@@ -46,6 +46,8 @@ type UiKey =
   | 'resumeHint'
   | 'resumeQuery'
   | 'resumeEmpty'
+  | 'resumeLoading'
+  | 'resumeLoaded'
   | 'resumeUnavailable'
   | 'subagentsRunning'
   | 'subagentStarted'
@@ -107,8 +109,9 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     resumeHint: 'type to filter · ↑↓ select · enter choose · esc close',
     resumeQuery: 'filter: {query}',
     resumeEmpty: 'No sessions found for this workspace.',
-    resumeUnavailable:
-      'Cannot resume {session}: the current harness connection has no session/open or session/resume method.',
+    resumeLoading: 'Loading session history…',
+    resumeLoaded: 'Resumed session {session}.',
+    resumeUnavailable: 'Cannot resume session {session}: the session file is unavailable.',
     subagentsRunning: '{count} subagents running',
     subagentStarted: 'subagent {id} started',
     subagentFinished: 'subagent {id} finished',
@@ -168,8 +171,9 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     resumeHint: '输入关键词过滤 · ↑↓ 选择 · 回车确认 · Esc 关闭',
     resumeQuery: '筛选：{query}',
     resumeEmpty: '当前工作区没有可用的历史会话。',
-    resumeUnavailable:
-      '无法恢复会话 {session}：当前 harness 连接没有 session/open 或 session/resume 方法。',
+    resumeLoading: '正在加载会话历史…',
+    resumeLoaded: '已恢复会话 {session}。',
+    resumeUnavailable: '无法恢复会话 {session}：会话文件不可用。',
     subagentsRunning: '{count} 个子代理运行中',
     subagentStarted: '子代理 {id} 已启动',
     subagentFinished: '子代理 {id} 已完成',

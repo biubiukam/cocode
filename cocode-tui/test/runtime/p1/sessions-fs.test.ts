@@ -3,7 +3,11 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { zstdCompressSync } from 'node:zlib'
-import { listSessionSummaries, samePath } from '../../../src/runtime/sessions-fs.ts'
+import {
+  listSessionSummaries,
+  readSessionEvents,
+  samePath,
+} from '../../../src/runtime/sessions-fs.ts'
 
 describe('listSessionSummaries', () => {
   it('compares Windows paths case-insensitively', () => {
@@ -82,6 +86,45 @@ describe('listSessionSummaries', () => {
   it('returns an empty list for a missing root', async () => {
     const result = await listSessionSummaries({ root: '/tmp/no-such-cocode-root', cwd: '/work' })
     expect(result).toEqual({ sessions: [], skipped: 0 })
+  })
+
+  it('replays raw and zstd event logs without returning the session header', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'cocode-session-read-'))
+    const event = JSON.stringify({
+      type: 'user/message',
+      seq: 1,
+      time: 2,
+      data: { id: 'u1', content: [{ type: 'text', text: 'hello' }] },
+    })
+    try {
+      await writeSession(
+        root,
+        'raw',
+        's1',
+        `${JSON.stringify({ type: 'session', id: 's1', createdAt: 1 })}\n${event}\n`,
+      )
+      await writeSession(
+        root,
+        'zstd',
+        's2',
+        zstdCompressSync(
+          Buffer.from(`${JSON.stringify({ type: 'session', id: 's2', createdAt: 1 })}\n${event}\n`),
+        ),
+      )
+      const raw = await readSessionEvents(join(root, 'raw', 's1', 'session.jsonl'))
+      const compressed = await readSessionEvents(join(root, 'zstd', 's2', 'session.jsonl.zstd'))
+      expect(raw).toEqual(compressed)
+      expect(raw).toEqual([
+        {
+          type: 'user/message',
+          seq: 1,
+          time: 2,
+          data: { id: 'u1', content: [{ type: 'text', text: 'hello' }] },
+        },
+      ])
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 })
 

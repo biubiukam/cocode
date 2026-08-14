@@ -62,12 +62,12 @@ DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 | `/theme dark` / `/theme light` | 切换显示主题                                              |
 | `/lang zh` / `/lang en`        | 切换中英文界面                                            |
 | `/model <model-id>`            | 切换模型并创建新 session                                  |
-| `/resume`                      | 打开当前工作区的本地 session 选择器（只读）               |
+| `/resume`                      | 打开当前工作区的 session 选择器并回放选中会话             |
 | `/use byok` / `/use cocode`    | 在自己的 Key 和 Cocode 之间切换；切换即新会话             |
 | `/login` / `/logout`           | 登录或退出 Cocode Cloud；退出时若还有 Key 则留在对话里    |
 | `/exit`                        | 关闭 TUI 并恢复终端                                       |
 
-`/resume` 会读取本地 session header，支持输入关键词过滤和 `↑` `↓` 选择。按回车只会说明当前缺少 `session/open` 或 `session/resume` wire，不会修改当前会话。
+`/resume` 会读取本地 session header，支持关键词过滤和 `↑` `↓` 选择，并将选中 JSONL 的事件回放到当前 TUI。后续输入会继续使用选中的 session id。TUI 不负责跨进程写入锁；如果其它客户端正在写同一 session，请不要同时恢复。
 
 `/compact` 会向当前 session 发送字面量 `/compact` prompt。只有 host 的 compaction 插件识别该 prompt 时才会执行压缩；TUI 不会在缺少对应事件时宣称压缩成功。
 

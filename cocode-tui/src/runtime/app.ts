@@ -20,6 +20,7 @@ import {
   type DraftState,
 } from './draft.ts'
 import { buildPromptBlocks, loadFileContext } from './file-context.ts'
+import { readSessionEvents } from './sessions-fs.ts'
 import { formatFileMention } from './file-mentions.ts'
 import { resolveWorkspaceInfo } from './workspace.ts'
 import { createAppCommandContext } from './command-context.ts'
@@ -457,12 +458,7 @@ class TuiAppImpl implements TuiApp {
         const selected = selectedResumeItem(this.resumePicker)
         this.resumePicker = closeResumePicker(this.resumePicker)
         if (selected !== undefined) {
-          this.notice = {
-            tone: 'info',
-            message: text(this.locale, 'resumeUnavailable', {
-              session: selected.id.slice(0, 8),
-            }),
-          }
+          void this.resumeSession(selected.id, selected.path)
         }
         this.emit()
         return
@@ -603,6 +599,7 @@ class TuiAppImpl implements TuiApp {
             id: session.id,
             createdAt: session.createdAt,
             preview: session.cwd,
+            path: session.path,
           })),
         )
         this.emit()
@@ -651,6 +648,39 @@ class TuiAppImpl implements TuiApp {
       } catch (restoreError) {
         this.notice = { tone: 'error', message: startErrorMessage(restoreError) }
       }
+    }
+    this.emit()
+  }
+
+  private async resumeSession(sessionId: string, path: string | undefined): Promise<void> {
+    if (path === undefined) {
+      this.notice = {
+        tone: 'error',
+        message: text(this.locale, 'resumeUnavailable', { session: sessionId.slice(0, 8) }),
+      }
+      this.emit()
+      return
+    }
+    this.agent = 'starting'
+    this.notice = { tone: 'info', message: text(this.locale, 'resumeLoading') }
+    this.emit()
+    try {
+      const events = await readSessionEvents(path)
+      this.sessionId = sessionId
+      this.assembler.replaceWindow(events)
+      this.telemetry.reset()
+      for (const event of events) this.telemetry.ingest(event)
+      this.resetSubagentActivity()
+      this.queuedPrompts.length = 0
+      this.attachments = []
+      this.agent = 'idle'
+      this.notice = {
+        tone: 'info',
+        message: text(this.locale, 'resumeLoaded', { session: sessionId.slice(0, 8) }),
+      }
+    } catch (error) {
+      this.agent = 'idle'
+      this.notice = { tone: 'error', message: errorMessage(error) }
     }
     this.emit()
   }

@@ -2,8 +2,10 @@
 
 import { createReadStream } from 'node:fs'
 import { readdir, stat } from 'node:fs/promises'
+import { createInterface } from 'node:readline'
 import { createZstdDecompress } from 'node:zlib'
 import { join, posix, resolve, win32 } from 'node:path'
+import type { SessionEvent } from '@cocode/tui-connection'
 
 export type SessionSummary = {
   id: string
@@ -15,6 +17,25 @@ export type SessionSummary = {
 export type SessionListResult = {
   sessions: SessionSummary[]
   skipped: number
+}
+
+export async function readSessionEvents(path: string): Promise<SessionEvent[]> {
+  const compressed = path.endsWith('.zstd')
+  const source = createReadStream(path)
+  const output = compressed ? source.pipe(createZstdDecompress()) : source
+  const lines = createInterface({ input: output })
+  const events: SessionEvent[] = []
+  try {
+    for await (const line of lines) {
+      const event = parseEvent(line)
+      if (event !== undefined) events.push(event)
+    }
+  } finally {
+    lines.close()
+    source.destroy()
+    if (compressed) output.destroy()
+  }
+  return events
 }
 
 type SessionHeader = {
@@ -154,6 +175,35 @@ function parseHeader(line: string): SessionHeader | undefined {
     id: record.id,
     createdAt: record.createdAt,
     ...(record.cwd === undefined ? {} : { cwd: record.cwd }),
+  }
+}
+
+function parseEvent(line: string): SessionEvent | undefined {
+  let value: unknown
+  try {
+    value = JSON.parse(line)
+  } catch {
+    return undefined
+  }
+  if (typeof value !== 'object' || value === null) return undefined
+  const record = value as Record<string, unknown>
+  if (
+    typeof record.type !== 'string' ||
+    record.type === 'session' ||
+    typeof record.seq !== 'number' ||
+    !Number.isSafeInteger(record.seq) ||
+    typeof record.time !== 'number' ||
+    !Number.isFinite(record.time) ||
+    !('data' in record)
+  ) {
+    return undefined
+  }
+  return {
+    type: record.type,
+    seq: record.seq,
+    time: record.time,
+    data: record.data,
+    ...(record.ignorable === true ? { ignorable: true } : {}),
   }
 }
 
