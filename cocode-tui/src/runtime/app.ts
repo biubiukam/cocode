@@ -37,6 +37,14 @@ import { errorNotice } from './errors/index.ts'
 import { redactSecrets } from './diagnostics.ts'
 import { localeName, parseUiLocale, text, type UiLocale } from './ui-locale.ts'
 import {
+  closeResumePicker,
+  createResumePicker,
+  moveResumeSelection,
+  selectedResumeItem,
+  setResumeQuery,
+  type ResumePickerState,
+} from './resume-picker.ts'
+import {
   logoutChannel,
   requestChannelSwitch,
   submitCapturedByok,
@@ -58,6 +66,10 @@ export type TuiAction =
   | { type: 'interruptOrQuit' }
   | { type: 'quit' }
   | { type: 'redraw' }
+  | { type: 'resume.setQuery'; query: string }
+  | { type: 'resume.move'; delta: number }
+  | { type: 'resume.close' }
+  | { type: 'resume.confirm' }
 
 export type { TuiCapabilities }
 
@@ -89,6 +101,7 @@ export type TuiSnapshot = {
   notice?: { tone: 'info' | 'error'; message: string }
   helpText: string
   commands: readonly { name: string; summary: string }[]
+  resumePicker?: ResumePickerState
   exiting: boolean
 }
 
@@ -184,6 +197,7 @@ class TuiAppImpl implements TuiApp {
   private readonly auth: TuiAuthInfo | undefined
   private capturingByok = false
   private closePromise: Promise<void> | undefined
+  private resumePicker: ResumePickerState | undefined
 
   constructor(options: TuiAppOptions) {
     this.runtime = options.runtime
@@ -303,6 +317,7 @@ class TuiAppImpl implements TuiApp {
         name,
         summary,
       })),
+      resumePicker: this.resumePicker,
       exiting: this.exiting,
     }
   }
@@ -380,6 +395,39 @@ class TuiAppImpl implements TuiApp {
       case 'redraw':
         this.emit()
         return
+      case 'resume.setQuery':
+        if (this.resumePicker !== undefined) {
+          this.resumePicker = setResumeQuery(this.resumePicker, action.query)
+          this.emit()
+        }
+        return
+      case 'resume.move':
+        if (this.resumePicker !== undefined) {
+          this.resumePicker = moveResumeSelection(this.resumePicker, action.delta)
+          this.emit()
+        }
+        return
+      case 'resume.close':
+        if (this.resumePicker !== undefined) {
+          this.resumePicker = closeResumePicker(this.resumePicker)
+          this.emit()
+        }
+        return
+      case 'resume.confirm': {
+        if (this.resumePicker === undefined) return
+        const selected = selectedResumeItem(this.resumePicker)
+        this.resumePicker = closeResumePicker(this.resumePicker)
+        if (selected !== undefined) {
+          this.notice = {
+            tone: 'info',
+            message: text(this.locale, 'resumeUnavailable', {
+              session: selected.id.slice(0, 8),
+            }),
+          }
+        }
+        this.emit()
+        return
+      }
     }
   }
 
@@ -499,6 +547,19 @@ class TuiAppImpl implements TuiApp {
           return
         }
         void this.switchModel(model)
+      },
+      locale: this.locale,
+      showResumePicker: (sessions) => {
+        this.helpOpen = false
+        this.notice = undefined
+        this.resumePicker = createResumePicker(
+          sessions.map((session) => ({
+            id: session.id,
+            createdAt: session.createdAt,
+            preview: session.cwd,
+          })),
+        )
+        this.emit()
       },
     })
   }

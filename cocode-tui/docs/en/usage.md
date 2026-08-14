@@ -12,7 +12,7 @@ COCODE_HARNESS_ARGS=--import,tsx/esm,../../cocode-harness/packages/examples/json
 DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 ```
 
-Configure a key on the first-run gate, or set `DEEPSEEK_API_KEY` for this process. For development, point `COCODE_HOME` at a separate directory. Sessions default to `sessions` under that home; `DSH_SESSION_ROOT` can override it.
+Configure a key on the first-run gate, or set `DEEPSEEK_API_KEY` for this process. For development, point `COCODE_HOME` at a separate config directory. Sessions default to `$DSH_HOME/sessions`, or `~/.dsh/sessions` when `DSH_HOME` is unset; `DSH_SESSION_ROOT` can override it.
 
 ## Screen regions
 

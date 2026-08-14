@@ -5,9 +5,10 @@ import type { TuiCapabilities } from './capabilities.ts'
 import { formatDoctor } from './diagnostics.ts'
 import { formatError } from './errors/index.ts'
 import { writeSessionExport } from './export-file.ts'
-import { listSessionSummaries } from './sessions-fs.ts'
+import { listSessionSummaries, type SessionSummary } from './sessions-fs.ts'
 import { ensureAgentsFile } from './workspace-init.ts'
 import type { ConversationNode } from './nodes/types.ts'
+import { text, type UiLocale } from './ui-locale.ts'
 
 export type CommandContextOptions = {
   dispatch: TuiCommandCtx['dispatch']
@@ -25,6 +26,8 @@ export type CommandContextOptions = {
   setTheme?: TuiCommandCtx['setTheme']
   setLocale?: TuiCommandCtx['setLocale']
   setModel?: TuiCommandCtx['setModel']
+  locale?: UiLocale
+  showResumePicker?: (sessions: readonly SessionSummary[]) => void
 }
 
 export type AppCommandContextOptions = {
@@ -48,6 +51,8 @@ export type AppCommandContextOptions = {
   setTheme?: TuiCommandCtx['setTheme']
   setLocale?: TuiCommandCtx['setLocale']
   setModel?: TuiCommandCtx['setModel']
+  locale: UiLocale
+  showResumePicker: (sessions: readonly SessionSummary[]) => void
 }
 
 export function createCommandContext(options: CommandContextOptions): TuiCommandCtx {
@@ -81,19 +86,20 @@ export function createCommandContext(options: CommandContextOptions): TuiCommand
         options.notice('error', formatError('SESSION_ROOT_UNAVAILABLE'))
         return
       }
-      const result = await listSessionSummaries({
-        root: options.sessionRoot,
-        cwd: options.cwd,
-        limit: 8,
-      })
-      if (result.sessions.length === 0) {
-        options.notice('info', 'No sessions found for this workspace.')
-        return
+      try {
+        const result = await listSessionSummaries({
+          root: options.sessionRoot,
+          cwd: options.cwd,
+          limit: 50,
+        })
+        if (result.sessions.length === 0) {
+          options.notice('info', text(options.locale ?? 'en', 'resumeEmpty'))
+          return
+        }
+        options.showResumePicker?.(result.sessions)
+      } catch {
+        options.notice('error', formatError('SESSION_ROOT_UNAVAILABLE'))
       }
-      const summary = result.sessions
-        .map((session) => `${session.id} (${new Date(session.createdAt).toISOString()})`)
-        .join(' · ')
-      options.notice('info', `${summary} · history is read-only until session/open wire exists`)
     },
   }
 }
@@ -129,5 +135,7 @@ export function createAppCommandContext(options: AppCommandContextOptions): TuiC
     setTheme: options.setTheme,
     setLocale: options.setLocale,
     setModel: options.setModel,
+    locale: options.locale,
+    showResumePicker: options.showResumePicker,
   })
 }

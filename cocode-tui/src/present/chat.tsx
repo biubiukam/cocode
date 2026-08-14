@@ -12,6 +12,7 @@ import { Header } from './components/Header.tsx'
 import { Help } from './components/Help.tsx'
 import { HistorySearch } from './components/HistorySearch.tsx'
 import { MessageList } from './components/MessageList.tsx'
+import { ResumePicker } from './components/ResumePicker.tsx'
 import { StatusLine } from './components/StatusLine.tsx'
 import {
   filterSlashItems,
@@ -26,6 +27,7 @@ import { listWorkspaceEntries, rankFileMatches } from '../runtime/workspace-file
 import { moveMessageSelection, selectableMessageKeys } from './message-selection.ts'
 import { visibleTail } from './visible-tail.ts'
 import { text } from '../runtime/ui-locale.ts'
+import { visibleResumeItems } from '../runtime/resume-picker.ts'
 
 export function Chat(props: { app: TuiApp }) {
   const { app } = props
@@ -47,13 +49,15 @@ export function Chat(props: { app: TuiApp }) {
     () => filterSlashItems(snap.commands, snap.composer.text),
     [snap.commands, snap.composer.text],
   )
-  const slashOpen = !historySearchOpen && !slashDismissed && slashItems.length > 0
+  const resumeOpen = snap.resumePicker?.open === true
+  const resumeItems = snap.resumePicker === undefined ? [] : visibleResumeItems(snap.resumePicker)
+  const slashOpen = !resumeOpen && !historySearchOpen && !slashDismissed && slashItems.length > 0
   const fileMention = useMemo(
     () => findFileMentionAtCursor(snap.composer.text, snap.composer.cursor),
     [snap.composer.cursor, snap.composer.text],
   )
   const fileVisible =
-    !historySearchOpen && !slashOpen && !fileDismissed && fileMention !== undefined
+    !resumeOpen && !historySearchOpen && !slashOpen && !fileDismissed && fileMention !== undefined
   const fileOpen = fileVisible && (fileLoading || fileItems.length > 0)
   const historyItems = useMemo(
     () => searchHistory(snap.history, historyQuery, 8),
@@ -68,7 +72,8 @@ export function Chat(props: { app: TuiApp }) {
     (snap.helpOpen ? snap.helpText.split('\n').length + 4 : 0) +
     (slashOpen ? slashItems.length + 4 : 0) +
     (fileOpen ? fileItems.length + (fileLoading ? 3 : 4) : 0) +
-    (historySearchOpen ? historyItems.length + 4 : 0)
+    (historySearchOpen ? historyItems.length + 4 : 0) +
+    (resumeOpen ? Math.min(resumeItems.length, 8) + 5 : 0)
   const messageMaxRows = Math.max(0, stdout.rows - reservedRows)
   const selectableMessages = useMemo(
     () =>
@@ -132,6 +137,35 @@ export function Chat(props: { app: TuiApp }) {
     if (snap.composer.disabled && !key.ctrl && input !== 'c') {
       if (key.escape || (key.ctrl && input === 'c')) {
         app.dispatch({ type: 'quit' })
+      }
+      return
+    }
+
+    if (snap.resumePicker?.open === true) {
+      if (key.escape) {
+        app.dispatch({ type: 'resume.close' })
+        return
+      }
+      if (key.upArrow || key.downArrow) {
+        app.dispatch({ type: 'resume.move', delta: key.upArrow ? -1 : 1 })
+        return
+      }
+      if (key.return) {
+        app.dispatch({ type: 'resume.confirm' })
+        return
+      }
+      if (key.backspace || key.delete) {
+        app.dispatch({
+          type: 'resume.setQuery',
+          query: snap.resumePicker.query.slice(0, -1),
+        })
+        return
+      }
+      if (input !== '' && !key.ctrl) {
+        app.dispatch({
+          type: 'resume.setQuery',
+          query: snap.resumePicker.query + input,
+        })
       }
       return
     }
@@ -346,6 +380,13 @@ export function Chat(props: { app: TuiApp }) {
           query={historyQuery}
           matches={historyItems}
           selectedIndex={historyIndex}
+          locale={snap.locale}
+        />
+      ) : null}
+      {snap.resumePicker?.open === true ? (
+        <ResumePicker
+          state={snap.resumePicker}
+          currentSessionId={snap.header.sessionId}
           locale={snap.locale}
         />
       ) : null}

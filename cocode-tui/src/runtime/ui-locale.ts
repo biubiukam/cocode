@@ -42,6 +42,11 @@ type UiKey =
   | 'modelSwitching'
   | 'modelChanged'
   | 'modelRestored'
+  | 'resumeTitle'
+  | 'resumeHint'
+  | 'resumeQuery'
+  | 'resumeEmpty'
+  | 'resumeUnavailable'
 
 const TEXT: Record<UiLocale, Record<UiKey, string>> = {
   en: {
@@ -84,6 +89,12 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     modelSwitching: 'Switching model to {model}…',
     modelChanged: 'Model changed to {model}; new session started.',
     modelRestored: 'Model switch failed; restored {model}.',
+    resumeTitle: 'Recent sessions',
+    resumeHint: 'type to filter · ↑↓ select · enter choose · esc close',
+    resumeQuery: 'filter: {query}',
+    resumeEmpty: 'No sessions found for this workspace.',
+    resumeUnavailable:
+      'Cannot resume {session}: the current harness connection has no session/open or session/resume method.',
   },
   zh: {
     session: '会话',
@@ -125,6 +136,12 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     modelSwitching: '正在切换模型到 {model}…',
     modelChanged: '已切换到 {model}，并创建新会话。',
     modelRestored: '模型切换失败，已恢复为 {model}。',
+    resumeTitle: '最近会话',
+    resumeHint: '输入关键词过滤 · ↑↓ 选择 · 回车确认 · Esc 关闭',
+    resumeQuery: '筛选：{query}',
+    resumeEmpty: '当前工作区没有可用的历史会话。',
+    resumeUnavailable:
+      '无法恢复会话 {session}：当前 harness 连接没有 session/open 或 session/resume 方法。',
   },
 }
 

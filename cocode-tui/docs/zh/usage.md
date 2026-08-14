@@ -12,7 +12,7 @@ COCODE_HARNESS_ARGS=--import,tsx/esm,../../cocode-harness/packages/examples/json
 DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 ```
 
-密钥可以通过首屏登录配置，也可以临时设置 `DEEPSEEK_API_KEY`。开发环境可用 `COCODE_HOME` 指向单独目录；会话目录默认使用该目录下的 `sessions`，也可以用 `DSH_SESSION_ROOT` 覆盖。
+密钥可以通过首屏登录配置，也可以临时设置 `DEEPSEEK_API_KEY`。开发环境可用 `COCODE_HOME` 指向单独的配置目录。会话目录默认使用 `$DSH_HOME/sessions`；未设置 `DSH_HOME` 时使用 `~/.dsh/sessions`，也可以用 `DSH_SESSION_ROOT` 覆盖。
 
 ## 界面分区
 

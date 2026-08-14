@@ -2,6 +2,7 @@
 
 export type ResumePickerItem = {
   id: string
+  createdAt?: number
   label?: string
   preview?: string
 }
@@ -40,6 +41,8 @@ export function visibleResumeItems(state: ResumePickerState): ResumePickerItem[]
   const query = state.query.trim().toLocaleLowerCase()
   if (query === '') return [...state.items]
   return state.items.filter((item) =>
-    `${item.id} ${item.label ?? ''} ${item.preview ?? ''}`.toLocaleLowerCase().includes(query),
+    `${item.id} ${item.label ?? ''} ${item.preview ?? ''} ${item.createdAt ?? ''}`
+      .toLocaleLowerCase()
+      .includes(query),
   )
 }

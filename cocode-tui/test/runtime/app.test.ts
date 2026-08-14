@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { TuiNotification, TuiRuntime } from '@cocode/tui-connection'
 import { createTuiApp } from '../../src/runtime/app.ts'
+import { P0_CAPABILITIES } from '../../src/runtime/capabilities.ts'
 
 function fakeRuntime(): TuiRuntime & {
   prompts: { sessionId: string; text: string }[]
@@ -122,6 +123,52 @@ describe('TuiApp', () => {
     expect(app.snapshot().header.model).toBe('m1')
     expect(app.snapshot().header.sessionId).toBe('s1')
     expect(app.snapshot().notice?.message).toBe('模型切换失败，已恢复为 m1。')
+  })
+
+  it('opens a searchable read-only picker for local sessions', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'cocode-resume-root-'))
+    const cwd = await mkdtemp(join(tmpdir(), 'cocode-resume-cwd-'))
+    try {
+      const sessionDir = join(root, 'project', 'old-session')
+      await mkdir(sessionDir, { recursive: true })
+      await writeFile(
+        join(sessionDir, 'session.jsonl'),
+        `${JSON.stringify({
+          type: 'session',
+          id: 'old-session',
+          createdAt: 1_700_000_000_000,
+          cwd,
+        })}\n`,
+      )
+      const app = createTuiApp({
+        runtime: fakeRuntime(),
+        cwd,
+        provider: 'p',
+        model: 'm',
+        sessionId: 'current-session',
+        capabilities: { ...P0_CAPABILITIES, sessionList: 'jsonl' },
+        diagnostics: {
+          tty: true,
+          launchConfigured: true,
+          argsConfigured: true,
+          sessionRoot: root,
+        },
+        locale: 'zh',
+      })
+      await app.start()
+      app.dispatch({ type: 'command', line: '/resume' })
+      await expect.poll(() => app.snapshot().resumePicker?.open).toBe(true)
+      expect(app.snapshot().resumePicker?.items.map((item) => item.id)).toEqual(['old-session'])
+      app.dispatch({ type: 'resume.setQuery', query: 'old' })
+      expect(app.snapshot().resumePicker?.query).toBe('old')
+      app.dispatch({ type: 'resume.confirm' })
+      expect(app.snapshot().resumePicker?.open).toBe(false)
+      expect(app.snapshot().header.sessionId).toBe('current-session')
+      expect(app.snapshot().notice?.message).toMatch(/没有 session\/open 或 session\/resume/)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+      await rm(cwd, { recursive: true, force: true })
+    }
   })
 
   it('prompts only when idle', async () => {
