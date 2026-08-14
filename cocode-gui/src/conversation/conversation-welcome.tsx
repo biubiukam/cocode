@@ -51,9 +51,10 @@ export function ConversationWelcome({ onSuggestionSelect }: ConversationWelcomeP
       </div>
 
       <p className="conversation-welcome-hints">
+        <kbd>@</kbd>
+        {' 提及文件 · '}
         <kbd>/</kbd>
-        {' '}
-        唤出命令 · Enter 发送 · ⌘Enter 引导
+        {' 唤起命令与技能'}
       </p>
     </div>
   )
