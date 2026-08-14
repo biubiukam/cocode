@@ -107,6 +107,7 @@ export type TuiSnapshot = {
     goal?: SessionGoal
     sessionTitle?: string
     agentPreset?: string
+    transcript?: { evicted: number }
     subagents?: TuiSubagentActivity
     queueCount: number
   }
@@ -314,6 +315,7 @@ class TuiAppImpl implements TuiApp {
     const disabled = this.agent === 'dead' || this.exiting
     const telemetry = this.telemetry.snapshot()
     const sessionState = this.sessionState.snapshot()
+    const assemblerStats = this.assembler.stats()
     return {
       header: {
         product: 'Cocode',
@@ -353,6 +355,9 @@ class TuiAppImpl implements TuiApp {
         ...(sessionState.agentPreset === undefined
           ? {}
           : { agentPreset: sessionState.agentPreset }),
+        ...(assemblerStats.evictedNodes === 0
+          ? {}
+          : { transcript: { evicted: assemblerStats.evictedNodes } }),
         subagents: {
           running: this.activeSubagents.size,
           ...(this.lastSubagent === undefined ? {} : { last: this.lastSubagent }),

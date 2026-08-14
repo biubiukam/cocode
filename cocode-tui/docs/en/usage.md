@@ -41,7 +41,9 @@ Set `COCODE_TUI_SCREEN=inline` (the default) to keep the main screen and scrollb
 - Type `@` at any position in the message to search workspace files and directories; use `Tab`, `↑`, or `↓` to select, then Enter to insert the reference.
 - On send, selected files are appended with their contents and selected directories with a bounded listing; references must stay inside the workspace.
 
-Tool output is truncated by display mode; the raw payload stays in the session projection. When the transcript is tight, the composer stays visible.
+Tool output is truncated by display mode; while a node remains in the projection cache, its raw payload is retained in node state, and the complete event stays in the session log. When the transcript is tight, the composer stays visible.
+
+Long sessions use a bounded projection cache: by default it retains up to 2,048 completed nodes and about 8 MiB of node state. A streaming assistant node or a tool waiting for its result is kept until it is complete; once a budget is exceeded, the oldest completed nodes are evicted first and the status line reports the hidden count. The persisted JSONL remains the full source of truth, and `/resume` replays hidden history again.
 
 Assistant messages render common Markdown including headings, lists, quotes, inline code, fenced code, tables, and links. During streaming, completed Markdown blocks stay stable and only the growing final block is reparsed, so long replies do not reparse their full history for every token.
 

@@ -56,6 +56,11 @@ export function StatusLine(props: {
     props.status.agentPreset === undefined
       ? undefined
       : text(props.locale, 'agentPreset', { name: props.status.agentPreset }),
+    props.status.transcript === undefined
+      ? undefined
+      : text(props.locale, 'transcriptTrimmed', {
+          count: String(props.status.transcript.evicted),
+        }),
   ].filter((value): value is string => value !== undefined)
   return (
     <Box flexDirection="column" marginBottom={1}>

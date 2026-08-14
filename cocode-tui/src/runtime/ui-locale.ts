@@ -68,6 +68,7 @@ type UiKey =
   | 'todoProgress'
   | 'goalPhase'
   | 'agentPreset'
+  | 'transcriptTrimmed'
 
 const TEXT: Record<UiLocale, Record<UiKey, string>> = {
   en: {
@@ -136,6 +137,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     todoProgress: 'todos {done}/{total}',
     goalPhase: 'goal {phase}',
     agentPreset: 'preset {name}',
+    transcriptTrimmed: 'older nodes hidden {count}',
   },
   zh: {
     session: '会话',
@@ -203,6 +205,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     todoProgress: '待办 {done}/{total}',
     goalPhase: '目标 {phase}',
     agentPreset: '预设 {name}',
+    transcriptTrimmed: '已隐藏较早节点 {count} 个',
   },
 }
 

@@ -424,7 +424,8 @@ function hasStatusDetails(status: TuiSnapshot['status']): boolean {
     hasTelemetry(status.telemetry) ||
     status.todos.length > 0 ||
     status.goal !== undefined ||
-    status.agentPreset !== undefined
+    status.agentPreset !== undefined ||
+    status.transcript !== undefined
   )
 }
 

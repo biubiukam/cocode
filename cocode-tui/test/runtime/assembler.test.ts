@@ -1,238 +1,295 @@
-import { describe, expect, it } from "vitest";
-import type { SessionEvent } from "@cocode/tui-connection";
-import { createAssembler } from "../../src/runtime/assembler.ts";
-import { createBuiltinRegistry } from "../../src/runtime/nodes/builtins.ts";
+import { describe, expect, it } from 'vitest'
+import type { SessionEvent } from '@cocode/tui-connection'
+import { createAssembler } from '../../src/runtime/assembler.ts'
+import { createBuiltinRegistry } from '../../src/runtime/nodes/builtins.ts'
 
 function ev(type: string, seq: number, data: unknown): SessionEvent {
-  return { type, seq, time: seq * 1000, data };
+  return { type, seq, time: seq * 1000, data }
 }
 
 function assembler() {
-  return createAssembler(createBuiltinRegistry());
+  return createAssembler(createBuiltinRegistry())
 }
 
-describe("Assembler", () => {
-  it("projects user/message into a user node", () => {
-    const a = assembler();
+describe('Assembler', () => {
+  it('projects user/message into a user node', () => {
+    const a = assembler()
     a.ingest(
-      ev("user/message", 1, {
-        id: "m1",
-        role: "user",
-        content: [{ type: "text", text: "hello" }],
-        source: { kind: "user" },
+      ev('user/message', 1, {
+        id: 'm1',
+        role: 'user',
+        content: [{ type: 'text', text: 'hello' }],
+        source: { kind: 'user' },
       }),
-    );
-    const nodes = a.snapshot();
-    expect(nodes).toHaveLength(1);
+    )
+    const nodes = a.snapshot()
+    expect(nodes).toHaveLength(1)
     expect(nodes[0]).toMatchObject({
-      kind: "user",
-      id: "m1",
-      text: "hello",
-    });
-  });
+      kind: 'user',
+      id: 'm1',
+      text: 'hello',
+    })
+  })
 
-  it("merges assistant chunks then seals on message", () => {
-    const a = assembler();
+  it('merges assistant chunks then seals on message', () => {
+    const a = assembler()
     a.ingest(
-      ev("assistant/chunk", 1, {
+      ev('assistant/chunk', 1, {
         turn: 1,
         step: 0,
-        chunk: { type: "text-delta", index: 0, text: "Hel" },
+        chunk: { type: 'text-delta', index: 0, text: 'Hel' },
       }),
-    );
+    )
     a.ingest(
-      ev("assistant/chunk", 2, {
+      ev('assistant/chunk', 2, {
         turn: 1,
         step: 0,
-        chunk: { type: "reasoning-delta", index: 1, text: "think" },
+        chunk: { type: 'reasoning-delta', index: 1, text: 'think' },
       }),
-    );
+    )
     a.ingest(
-      ev("assistant/chunk", 3, {
+      ev('assistant/chunk', 3, {
         turn: 1,
         step: 0,
-        chunk: { type: "text-delta", index: 0, text: "lo" },
+        chunk: { type: 'text-delta', index: 0, text: 'lo' },
       }),
-    );
+    )
     expect(a.snapshot()[0]).toMatchObject({
-      kind: "assistant",
-      id: "1:0",
-      text: "Hello",
-      reasoning: "think",
+      kind: 'assistant',
+      id: '1:0',
+      text: 'Hello',
+      reasoning: 'think',
       streaming: true,
-    });
+    })
     a.ingest(
-      ev("assistant/message", 4, {
+      ev('assistant/message', 4, {
         turn: 1,
         step: 0,
         message: {
-          id: "a1",
-          role: "assistant",
+          id: 'a1',
+          role: 'assistant',
           content: [
-            { type: "reasoning", text: "think" },
-            { type: "text", text: "Hello" },
+            { type: 'reasoning', text: 'think' },
+            { type: 'text', text: 'Hello' },
           ],
-          source: { kind: "model", provider: "p", model: "m" },
+          source: { kind: 'model', provider: 'p', model: 'm' },
         },
         usage: { inputTokens: 10, outputTokens: 2 },
       }),
-    );
+    )
     expect(a.snapshot()[0]).toMatchObject({
-      kind: "assistant",
-      text: "Hello",
-      reasoning: "think",
+      kind: 'assistant',
+      text: 'Hello',
+      reasoning: 'think',
       streaming: false,
       usage: { input: 10, output: 2 },
-    });
-  });
+    })
+  })
 
-  it("pairs tool/call and tool/result by callId", () => {
-    const a = assembler();
+  it('pairs tool/call and tool/result by callId', () => {
+    const a = assembler()
     a.ingest(
-      ev("tool/call", 1, {
+      ev('tool/call', 1, {
         turn: 1,
         step: 0,
-        callId: "c1",
-        name: "bash",
+        callId: 'c1',
+        name: 'bash',
         arguments: '{"command":"ls"}',
       }),
-    );
+    )
     expect(a.snapshot()[0]).toMatchObject({
-      kind: "tool",
-      id: "c1",
-      name: "bash",
-      status: "running",
-    });
+      kind: 'tool',
+      id: 'c1',
+      name: 'bash',
+      status: 'running',
+    })
     a.ingest(
-      ev("tool/result", 2, {
+      ev('tool/result', 2, {
         turn: 1,
         step: 0,
         message: {
-          id: "r1",
-          role: "user",
+          id: 'r1',
+          role: 'user',
           content: [
             {
-              type: "tool-result",
-              toolCallId: "c1",
-              content: [{ type: "text", text: "ok" }],
+              type: 'tool-result',
+              toolCallId: 'c1',
+              content: [{ type: 'text', text: 'ok' }],
             },
           ],
-          source: { kind: "tool", callId: "c1" },
+          source: { kind: 'tool', callId: 'c1' },
         },
       }),
-    );
+    )
     expect(a.snapshot()[0]).toMatchObject({
-      kind: "tool",
-      id: "c1",
-      status: "success",
-      result: "ok",
-    });
-  });
+      kind: 'tool',
+      id: 'c1',
+      status: 'success',
+      result: 'ok',
+    })
+  })
 
-  it("marks tool error from error field", () => {
-    const a = assembler();
+  it('marks tool error from error field', () => {
+    const a = assembler()
     a.ingest(
-      ev("tool/call", 1, {
+      ev('tool/call', 1, {
         turn: 1,
         step: 0,
-        callId: "c2",
-        name: "bash",
-        arguments: "{}",
+        callId: 'c2',
+        name: 'bash',
+        arguments: '{}',
       }),
-    );
+    )
     a.ingest(
-      ev("tool/result", 2, {
+      ev('tool/result', 2, {
         turn: 1,
         step: 0,
         message: {
-          id: "r2",
-          role: "user",
+          id: 'r2',
+          role: 'user',
           content: [
             {
-              type: "tool-result",
-              toolCallId: "c2",
+              type: 'tool-result',
+              toolCallId: 'c2',
               isError: true,
-              content: [{ type: "text", text: "boom" }],
+              content: [{ type: 'text', text: 'boom' }],
             },
           ],
-          source: { kind: "tool", callId: "c2" },
+          source: { kind: 'tool', callId: 'c2' },
         },
-        error: { name: "BashError", code: "EXIT" },
+        error: { name: 'BashError', code: 'EXIT' },
       }),
-    );
+    )
     expect(a.snapshot()[0]).toMatchObject({
-      kind: "tool",
-      status: "error",
-      error: { name: "BashError", code: "EXIT" },
-    });
-  });
+      kind: 'tool',
+      status: 'error',
+      error: { name: 'BashError', code: 'EXIT' },
+    })
+  })
 
-  it("ignores replayed or out-of-order seq", () => {
-    const a = assembler();
+  it('ignores replayed or out-of-order seq', () => {
+    const a = assembler()
     a.ingest(
-      ev("user/message", 2, {
-        id: "m2",
-        role: "user",
-        content: [{ type: "text", text: "second" }],
-        source: { kind: "user" },
+      ev('user/message', 2, {
+        id: 'm2',
+        role: 'user',
+        content: [{ type: 'text', text: 'second' }],
+        source: { kind: 'user' },
       }),
-    );
+    )
     a.ingest(
-      ev("user/message", 1, {
-        id: "m1",
-        role: "user",
-        content: [{ type: "text", text: "first" }],
-        source: { kind: "user" },
+      ev('user/message', 1, {
+        id: 'm1',
+        role: 'user',
+        content: [{ type: 'text', text: 'first' }],
+        source: { kind: 'user' },
       }),
-    );
-    expect(a.snapshot()).toHaveLength(1);
-    expect(a.snapshot()[0]).toMatchObject({ id: "m2" });
-  });
+    )
+    expect(a.snapshot()).toHaveLength(1)
+    expect(a.snapshot()[0]).toMatchObject({ id: 'm2' })
+  })
 
-  it("routes unknown types to fallback notice", () => {
-    const a = assembler();
-    a.ingest(ev("turn/start", 1, { turn: 1 }));
+  it('routes unknown types to fallback notice', () => {
+    const a = assembler()
+    a.ingest(ev('turn/start', 1, { turn: 1 }))
     expect(a.snapshot()[0]).toMatchObject({
-      kind: "notice",
-      tone: "info",
+      kind: 'notice',
+      tone: 'info',
       verboseOnly: true,
-      message: "turn/start",
-    });
-  });
+      message: 'turn/start',
+    })
+  })
 
-  it("replaceWindow rebuilds from a full list", () => {
-    const a = assembler();
+  it('replaceWindow rebuilds from a full list', () => {
+    const a = assembler()
     a.ingest(
-      ev("user/message", 1, {
-        id: "old",
-        role: "user",
-        content: [{ type: "text", text: "old" }],
-        source: { kind: "user" },
+      ev('user/message', 1, {
+        id: 'old',
+        role: 'user',
+        content: [{ type: 'text', text: 'old' }],
+        source: { kind: 'user' },
       }),
-    );
+    )
     a.replaceWindow([
-      ev("user/message", 10, {
-        id: "new",
-        role: "user",
-        content: [{ type: "text", text: "new" }],
-        source: { kind: "user" },
+      ev('user/message', 10, {
+        id: 'new',
+        role: 'user',
+        content: [{ type: 'text', text: 'new' }],
+        source: { kind: 'user' },
       }),
-    ]);
-    expect(a.snapshot()).toHaveLength(1);
-    expect(a.snapshot()[0]).toMatchObject({ id: "new", text: "new" });
-  });
+    ])
+    expect(a.snapshot()).toHaveLength(1)
+    expect(a.snapshot()[0]).toMatchObject({ id: 'new', text: 'new' })
+  })
 
-  it("reset clears projected nodes", () => {
-    const a = assembler();
+  it('reset clears projected nodes', () => {
+    const a = assembler()
     a.ingest(
-      ev("user/message", 1, {
-        id: "m1",
-        role: "user",
-        content: [{ type: "text", text: "x" }],
-        source: { kind: "user" },
+      ev('user/message', 1, {
+        id: 'm1',
+        role: 'user',
+        content: [{ type: 'text', text: 'x' }],
+        source: { kind: 'user' },
       }),
-    );
-    a.reset();
-    expect(a.snapshot()).toEqual([]);
-  });
-});
+    )
+    a.reset()
+    expect(a.snapshot()).toEqual([])
+  })
+
+  it('evicts completed nodes within the configured budgets', () => {
+    const a = createAssembler(createBuiltinRegistry(), { maxNodes: 2, maxStateBytes: 1024 })
+    for (let index = 0; index < 4; index += 1) {
+      a.ingest(
+        ev('user/message', index + 1, {
+          id: `m${index}`,
+          role: 'user',
+          content: [{ type: 'text', text: `message ${index}` }],
+          source: { kind: 'user' },
+        }),
+      )
+    }
+    expect(a.snapshot()).toHaveLength(2)
+    expect(a.snapshot()[0]).toMatchObject({ id: 'm2' })
+    expect(a.stats()).toMatchObject({ retainedNodes: 2, evictedNodes: 2 })
+  })
+
+  it('keeps an active streaming node until it is sealed', () => {
+    const a = createAssembler(createBuiltinRegistry(), { maxNodes: 1 })
+    a.ingest(
+      ev('assistant/chunk', 1, {
+        turn: 1,
+        step: 0,
+        chunk: { type: 'text-delta', text: 'streaming' },
+      }),
+    )
+    a.ingest(
+      ev('user/message', 2, {
+        id: 'm2',
+        role: 'user',
+        content: [{ type: 'text', text: 'new' }],
+        source: { kind: 'user' },
+      }),
+    )
+    expect(a.snapshot()).toHaveLength(1)
+    expect(a.snapshot()[0]).toMatchObject({ kind: 'assistant', id: '1:0' })
+    expect(a.stats().evictedNodes).toBe(1)
+    a.ingest(
+      ev('assistant/message', 3, {
+        turn: 1,
+        step: 0,
+        message: { content: [{ type: 'text', text: 'streaming' }] },
+      }),
+    )
+    a.ingest(
+      ev('user/message', 4, {
+        id: 'm4',
+        role: 'user',
+        content: [{ type: 'text', text: 'latest' }],
+        source: { kind: 'user' },
+      }),
+    )
+    expect(a.snapshot()).toHaveLength(1)
+    expect(a.snapshot()[0]).toMatchObject({ id: 'm4' })
+    expect(a.stats().evictedNodes).toBe(2)
+  })
+})
