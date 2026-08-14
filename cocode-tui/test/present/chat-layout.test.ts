@@ -114,6 +114,26 @@ describe('chat layout rows', () => {
     })
   })
 
+  it('enters the size fallback when the overlay cannot show its title and selection', () => {
+    const layout = calculateChatLayout({
+      viewportRows: 17,
+      composerLines: 1,
+      slashItems: 8,
+    })
+    expect(layout.tooSmall).toBe(true)
+    expect(layout.overlayRows).toBe(0)
+  })
+
+  it('reserves enough rows for the resume picker selection', () => {
+    const layout = calculateChatLayout({
+      viewportRows: 19,
+      composerLines: 1,
+      resumeItems: 4,
+    })
+    expect(layout.tooSmall).toBe(true)
+    expect(layout.overlayRows).toBe(0)
+  })
+
   it('counts only the visible resume indicators', () => {
     expect(
       calculateChatLayout({

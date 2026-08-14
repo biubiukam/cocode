@@ -10,10 +10,33 @@ export function handleInterrupt(options: {
   setArmed: (armed: boolean) => void
   notice: (message: string) => void
   emit: () => void
+  cancel?: () => Promise<boolean>
+  cancelAccepted?: (wasRunning: boolean) => void
+  cancelFailed?: (error: unknown) => void
 }): void {
   if (options.helpOpen) {
     options.setHelpOpen(false)
     options.emit()
+    return
+  }
+  if (options.agentRunning && options.canCancel && !options.armed) {
+    options.setArmed(true)
+    if (options.cancel === undefined) {
+      options.notice('Cancel is unavailable.')
+      options.emit()
+      return
+    }
+    void options.cancel().then(
+      (wasRunning) => {
+        options.cancelAccepted?.(wasRunning)
+        options.emit()
+      },
+      (error: unknown) => {
+        if (options.cancelFailed !== undefined) options.cancelFailed(error)
+        else options.notice(error instanceof Error ? error.message : String(error))
+        options.emit()
+      },
+    )
     return
   }
   if (options.agentRunning && !options.canCancel) {

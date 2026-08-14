@@ -38,7 +38,7 @@ Set `COCODE_TUI_SCREEN=inline` (the default) to keep the main screen and scrollb
 - `Ctrl+O` toggles verbose mode for full reasoning and tool I/O.
 - The status line shows the latest assistant input/output usage and current subagent activity when the wire reports it. When optional events are present, it also shows decode TPS, cache hit rate, context-window percentage, reasoning effort, current working activity, compact context segments (`S/P/A/T/X` for system, prompt, assistant, thinking, and tools), todo progress, goal phase, and the active agent preset. Segment values are estimates based on text length, not provider billing data.
 - While a turn is running, press `Tab` to queue the current draft. Up to eight queued prompts are sent in order after `session.status=idle`; this is local queuing, not steer or cancellation.
-- `Esc` closes overlays (help, command menu) first; in the normal view, press twice to quit.
+- `Esc` closes overlays (help, command menu) first; while a turn is running, the first press requests cancellation and the second exits. When idle, press twice to quit.
 - `Ctrl+L` redraws the screen without clearing the session.
 - Type `@` at any position in the message to search workspace files and directories; use `Tab`, `↑`, or `↓` to select, then Enter to insert the reference.
 - On send, selected files are appended with their contents and selected directories with a bounded listing; references must stay inside the workspace.

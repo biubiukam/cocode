@@ -504,6 +504,22 @@ class TuiAppImpl implements TuiApp {
       notice: (message) => {
         this.notice = { tone: 'info', message }
       },
+      cancel: () => this.runtime.cancel(this.sessionId),
+      cancelAccepted: (wasRunning) => {
+        this.notice = {
+          tone: 'info',
+          message: wasRunning
+            ? text(this.locale, 'cancelRequested')
+            : text(this.locale, 'cancelNotRunning'),
+        }
+        if (!wasRunning) this.interruptArmed = false
+      },
+      cancelFailed: (error) => {
+        this.notice = {
+          tone: 'error',
+          message: `${text(this.locale, 'cancelFailed')}: ${errorMessage(error)}`,
+        }
+      },
       emit: () => this.emit(),
     })
   }

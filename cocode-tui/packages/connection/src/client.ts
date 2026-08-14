@@ -12,6 +12,9 @@ import type {
 
 type SdkClient = typeof import('@deepseek-ai/dsh-sdk-client')
 type HarnessClient = InstanceType<SdkClient['HarnessClient']>
+type CancelableHarnessClient = HarnessClient & {
+  cancel(sessionId: string, keepInbox?: boolean): Promise<boolean>
+}
 
 export function createTuiRuntime(launch: TuiLaunch): TuiRuntime {
   return new SdkTuiRuntime(launch)
@@ -84,6 +87,11 @@ class SdkTuiRuntime implements TuiRuntime {
   async prompt(sessionId: string, blocks: { type: string; text?: string }[]): Promise<string> {
     const client = this.requireClient()
     return client.prompt(sessionId, blocks as never)
+  }
+
+  async cancel(sessionId: string, keepInbox = false): Promise<boolean> {
+    const client = this.requireClient()
+    return (client as CancelableHarnessClient).cancel(sessionId, keepInbox)
   }
 
   subscribe(handler: (n: TuiNotification) => void): () => void {

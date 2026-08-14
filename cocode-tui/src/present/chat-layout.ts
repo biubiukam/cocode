@@ -8,7 +8,8 @@ const STATUS_ROWS = 2
 const COMPOSER_CHROME_ROWS = 4
 const FOOTER_ROWS = 2
 const MIN_MESSAGE_ROWS_WITH_OVERLAY = 1
-const MIN_OVERLAY_ROWS = 6
+const MIN_OVERLAY_ROWS = 5
+const MIN_RESUME_OVERLAY_ROWS = 8
 
 export const MAX_COMPOSER_ROWS = 6
 
@@ -57,8 +58,10 @@ export function calculateChatLayout(input: ChatLayoutInput): ChatLayout {
     fileRows(input.fileItems, input.fileLoading) +
     historyRows(input.historyMatches) +
     resumeRows(input.resumeItems, input.resumeSelected)
-  const minimumRows = baseRows + (requestedOverlayRows > 0 ? MIN_OVERLAY_ROWS : 0)
   const availableRows = Math.max(0, viewportRows - baseRows)
+  const minimumOverlayRows = minimumOverlayHeight(input)
+  const minimumRows =
+    baseRows + (requestedOverlayRows > 0 ? minimumOverlayRows + MIN_MESSAGE_ROWS_WITH_OVERLAY : 0)
   const tooSmall = viewportRows < minimumRows
   const messageFloor =
     requestedOverlayRows > 0 && availableRows > 0 ? MIN_MESSAGE_ROWS_WITH_OVERLAY : 0
@@ -110,6 +113,18 @@ function resumeRows(items: number | undefined, selected = 0): number {
   const start = listWindowStart(selected, count, RESUME_WINDOW_SIZE)
   const indicators = optionalRow(start > 0) + optionalRow(count - start - visible > 0)
   return visible + indicators + 5
+}
+
+function minimumOverlayHeight(input: ChatLayoutInput): number {
+  if (input.resumeItems !== undefined) return MIN_RESUME_OVERLAY_ROWS
+  if (input.historyMatches !== undefined) return MIN_OVERLAY_ROWS
+  if (input.fileItems !== undefined || input.fileLoading === true) {
+    return MIN_OVERLAY_ROWS + optionalRow(input.fileLoading)
+  }
+  if (input.helpLines !== undefined || input.slashItems !== undefined) {
+    return MIN_OVERLAY_ROWS
+  }
+  return MIN_OVERLAY_ROWS
 }
 
 function optionalRow(enabled = false): number {

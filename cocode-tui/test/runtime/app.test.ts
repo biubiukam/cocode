@@ -12,7 +12,9 @@ function fakeRuntime(): TuiRuntime & {
   emitClose: (error?: string) => void
   closeCount: number
   restarts: { provider: string; model: string }[]
+  cancels: { sessionId: string; keepInbox: boolean }[]
   failStart?: Error
+  cancelError?: Error
   failRestartModels: Set<string>
 } {
   const handlers = new Set<(n: TuiNotification) => void>()
@@ -25,6 +27,7 @@ function fakeRuntime(): TuiRuntime & {
     prompts: [],
     closeCount: 0,
     restarts: [],
+    cancels: [],
     failRestartModels: new Set(),
     emit(n) {
       for (const handler of handlers) handler(n)
@@ -51,6 +54,11 @@ function fakeRuntime(): TuiRuntime & {
       const text = typeof blocks[0]?.text === 'string' ? blocks[0].text : ''
       runtime.prompts.push({ sessionId, text })
       return 'mid-1'
+    },
+    async cancel(sessionId, keepInbox = false) {
+      if (runtime.cancelError !== undefined) throw runtime.cancelError
+      runtime.cancels.push({ sessionId, keepInbox })
+      return true
     },
     subscribe(handler) {
       handlers.add(handler)
@@ -354,7 +362,7 @@ describe('TuiApp', () => {
     expect(app.snapshot().nodes).toEqual([])
   })
 
-  it('arms interrupt then quits on the second press', async () => {
+  it('requests cancellation then quits on the second press', async () => {
     const runtime = fakeRuntime()
     const app = createTuiApp({
       runtime,
@@ -370,7 +378,8 @@ describe('TuiApp', () => {
     })
     app.dispatch({ type: 'interruptOrQuit' })
     expect(app.snapshot().exiting).toBe(false)
-    expect(app.snapshot().notice?.message).toMatch(/cannot cancel/)
+    await expect.poll(() => runtime.cancels).toEqual([{ sessionId: 's1', keepInbox: false }])
+    expect(app.snapshot().notice?.message).toMatch(/Cancel requested/)
     app.dispatch({ type: 'interruptOrQuit' })
     expect(app.snapshot().exiting).toBe(true)
   })
@@ -388,6 +397,28 @@ describe('TuiApp', () => {
     app.dispatch({ type: 'interruptOrQuit' })
     expect(app.snapshot().exiting).toBe(false)
     expect(app.snapshot().notice?.message).toMatch(/Press again/)
+    app.dispatch({ type: 'interruptOrQuit' })
+    expect(app.snapshot().exiting).toBe(true)
+  })
+
+  it('reports a failed cancellation request without claiming completion', async () => {
+    const runtime = fakeRuntime()
+    runtime.cancelError = new Error('wire unavailable')
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+    })
+    await app.start()
+    runtime.emit({
+      method: 'session.status',
+      params: { sessionId: 's1', status: 'running' },
+    })
+    app.dispatch({ type: 'interruptOrQuit' })
+    await expect.poll(() => app.snapshot().notice?.message).toContain('Cancel request failed')
+    expect(app.snapshot().exiting).toBe(false)
     app.dispatch({ type: 'interruptOrQuit' })
     expect(app.snapshot().exiting).toBe(true)
   })

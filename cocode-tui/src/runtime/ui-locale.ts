@@ -59,6 +59,9 @@ type UiKey =
   | 'queueFull'
   | 'queueSending'
   | 'turnBusy'
+  | 'cancelRequested'
+  | 'cancelNotRunning'
+  | 'cancelFailed'
   | 'telemetryTps'
   | 'telemetryCache'
   | 'telemetryContext'
@@ -132,6 +135,9 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     queueFull: 'Prompt queue is full (8).',
     queueSending: 'Sending queued prompt…',
     turnBusy: 'Turn in progress. Press Tab to queue this prompt.',
+    cancelRequested: 'Cancel requested; waiting for the runtime to become idle.',
+    cancelNotRunning: 'No active turn to cancel.',
+    cancelFailed: 'Cancel request failed',
     telemetryTps: 'TPS {value}',
     telemetryCache: 'cache {value}%',
     telemetryContext: 'context {value}%',
@@ -204,6 +210,9 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     queueFull: '输入队列已满（最多 8 条）。',
     queueSending: '正在发送队列中的输入…',
     turnBusy: '当前任务仍在运行，按 Tab 可将输入加入队列。',
+    cancelRequested: '已请求取消，等待运行时进入空闲状态。',
+    cancelNotRunning: '当前没有可取消的任务。',
+    cancelFailed: '取消请求失败',
     telemetryTps: 'TPS {value}',
     telemetryCache: '缓存命中 {value}%',
     telemetryContext: '上下文 {value}%',

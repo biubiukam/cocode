@@ -3,19 +3,19 @@
  */
 
 export type TuiCapabilities = {
-  cancel: boolean;
-  approval: boolean;
-  promptMode: boolean;
-  rewind: boolean;
-  sessionList: "none" | "jsonl" | "rpc";
-  skills: boolean;
-};
+  cancel: boolean
+  approval: boolean
+  promptMode: boolean
+  rewind: boolean
+  sessionList: 'none' | 'jsonl' | 'rpc'
+  skills: boolean
+}
 
 export const P0_CAPABILITIES: TuiCapabilities = {
-  cancel: false,
+  cancel: true,
   approval: false,
   promptMode: false,
   rewind: false,
-  sessionList: "none",
+  sessionList: 'none',
   skills: false,
-};
+}
