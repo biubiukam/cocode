@@ -51,6 +51,8 @@ DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 
 助手消息支持标题、列表、引用、行内代码、代码块、表格和链接等常用 Markdown。流式输出时，已经结束的 Markdown 块会保持稳定，只有最后一个正在增长的块重新解析，避免长回复每个 token 都重算全文。
 
+助手消息支持标题、列表、引用、行内代码、代码块、表格和链接等常用 Markdown。流式输出时，已经结束的 Markdown 块会保持稳定，只有最后一个正在增长的块重新解析，避免长回复每个 token 都重算全文。
+
 ## Slash 命令
 
 输入 `/` 会打开命令菜单。继续输入可按前缀过滤，使用 `Tab` 或方向键选择，回车执行；输入空格后回到普通文本编辑。

@@ -51,6 +51,8 @@ Long sessions use a bounded projection cache: by default it retains up to 2,048 
 
 Assistant messages render common Markdown including headings, lists, quotes, inline code, fenced code, tables, and links. During streaming, completed Markdown blocks stay stable and only the growing final block is reparsed, so long replies do not reparse their full history for every token.
 
+Assistant messages render common Markdown including headings, lists, quotes, inline code, fenced code, tables, and links. During streaming, completed Markdown blocks stay stable and only the growing final block is reparsed, so long replies do not reparse their full history for every token.
+
 ## Slash commands
 
 Type `/` to open the command menu. Keep typing to filter by prefix. `Tab` or arrows select; Enter runs the command. A space returns you to ordinary text editing.
