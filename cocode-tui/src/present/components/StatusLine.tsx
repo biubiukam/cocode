@@ -35,6 +35,15 @@ export function StatusLine(props: {
           phase: telemetry.activity.phase,
           line: telemetry.activity.line,
         }),
+    hasContextSegments(telemetry)
+      ? text(props.locale, 'telemetrySegments', {
+          system: String(telemetry.contextSegments.system),
+          prompt: String(telemetry.contextSegments.prompt),
+          assistant: String(telemetry.contextSegments.assistant),
+          thinking: String(telemetry.contextSegments.thinking),
+          tools: String(telemetry.contextSegments.tools),
+        })
+      : undefined,
   ].filter((value): value is string => value !== undefined)
   return (
     <Box flexDirection="column" marginBottom={1}>
@@ -82,6 +91,10 @@ export function StatusLine(props: {
 
 function formatMetric(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1)
+}
+
+function hasContextSegments(telemetry: TuiSnapshot['status']['telemetry']): boolean {
+  return Object.values(telemetry.contextSegments).some((value) => value > 0)
 }
 
 function Notice(props: { notice: NonNullable<TuiSnapshot['notice']> }) {

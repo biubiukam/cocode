@@ -34,7 +34,7 @@ DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 - `/lang zh` 或 `/lang en` 立即切换界面语言；未指定时启动语言由 `COCODE_LANG`、`LANG` 等环境变量决定。
 - `/model <model-id>` 通过 runtime restart 切换当前模型，并创建新 session；切换失败会尝试恢复原模型。
 - `Ctrl+O` 切换详细模式，查看完整思考内容和工具输入输出。
-- 状态栏会显示最近一次 assistant 的输入/输出 token，以及 wire 已报告的当前子代理活动。收到可选事件后，还会显示解码 TPS、缓存命中率、上下文窗口占用比例、推理等级和当前工作状态。上下文分段已保存在 runtime snapshot 中，数值按文本长度估算，不代表 provider 的计费数据。
+- 状态栏会显示最近一次 assistant 的输入/输出 token，以及 wire 已报告的当前子代理活动。收到可选事件后，还会显示解码 TPS、缓存命中率、上下文窗口占用比例、推理等级、当前工作状态，以及紧凑的上下文分段（`S/P/A/T/X` 分别表示系统、输入、回复、思考和工具）。分段数值按文本长度估算，不代表 provider 的计费数据。
 - 当前任务运行时按 `Tab` 可将输入加入队列，最多 8 条；收到 `session.status=idle` 后按顺序自动发送。这是本地排队，不会打断当前任务，也不是 steer。
 - `Esc` 在帮助、命令菜单等弹层中先关闭弹层；普通状态下按两次退出或结束当前 TUI。
 - `Ctrl+L` 重绘界面，不清除会话内容。

@@ -407,7 +407,8 @@ function hasTelemetry(telemetry: TuiSnapshot['status']['telemetry']): boolean {
     telemetry.cacheHitRate !== undefined ||
     telemetry.contextPercent !== undefined ||
     telemetry.reasoningEffort !== undefined ||
-    telemetry.activity !== undefined
+    telemetry.activity !== undefined ||
+    Object.values(telemetry.contextSegments).some((value) => value > 0)
   )
 }
 

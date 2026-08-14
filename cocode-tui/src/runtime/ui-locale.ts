@@ -60,6 +60,7 @@ type UiKey =
   | 'telemetryContext'
   | 'telemetryReasoning'
   | 'telemetryActivity'
+  | 'telemetrySegments'
 
 const TEXT: Record<UiLocale, Record<UiKey, string>> = {
   en: {
@@ -121,6 +122,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     telemetryContext: 'context {value}%',
     telemetryReasoning: 'reasoning {value}',
     telemetryActivity: '{phase}: {line}',
+    telemetrySegments: 'segments S{system} P{prompt} A{assistant} T{thinking} X{tools}',
   },
   zh: {
     session: '会话',
@@ -181,6 +183,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     telemetryContext: '上下文 {value}%',
     telemetryReasoning: '推理 {value}',
     telemetryActivity: '{phase}：{line}',
+    telemetrySegments: '分段 系统{system} 输入{prompt} 回复{assistant} 思考{thinking} 工具{tools}',
   },
 }
 
