@@ -13,6 +13,7 @@ function fakeRuntime(): TuiRuntime & {
   closeCount: number
   restarts: { provider: string; model: string }[]
   cancels: { sessionId: string; keepInbox: boolean }[]
+  opens: { sessionId: string; replaceSessionId?: string }[]
   failStart?: Error
   cancelError?: Error
   failRestartModels: Set<string>
@@ -28,6 +29,7 @@ function fakeRuntime(): TuiRuntime & {
     closeCount: 0,
     restarts: [],
     cancels: [],
+    opens: [],
     failRestartModels: new Set(),
     emit(n) {
       for (const handler of handlers) handler(n)
@@ -58,6 +60,13 @@ function fakeRuntime(): TuiRuntime & {
     async cancel(sessionId, keepInbox = false) {
       if (runtime.cancelError !== undefined) throw runtime.cancelError
       runtime.cancels.push({ sessionId, keepInbox })
+      return true
+    },
+    async open(sessionId, replaceSessionId) {
+      runtime.opens.push({
+        sessionId,
+        ...(replaceSessionId === undefined ? {} : { replaceSessionId }),
+      })
       return true
     },
     subscribe(handler) {
@@ -158,8 +167,9 @@ describe('TuiApp', () => {
           },
         })}\n`,
       )
+      const runtime = fakeRuntime()
       const app = createTuiApp({
-        runtime: fakeRuntime(),
+        runtime,
         cwd,
         provider: 'p',
         model: 'm',
@@ -186,6 +196,9 @@ describe('TuiApp', () => {
         kind: 'user',
         text: 'continue this session',
       })
+      expect(runtime.opens).toEqual([
+        { sessionId: 'old-session', replaceSessionId: 'current-session' },
+      ])
       expect(app.snapshot().notice?.message).toBe('已恢复会话 old-sess。')
     } finally {
       await rm(root, { recursive: true, force: true })

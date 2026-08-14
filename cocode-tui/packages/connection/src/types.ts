@@ -59,6 +59,7 @@ export type TuiRuntime = {
   restart(init: TuiInitialize, env?: NodeJS.ProcessEnv): Promise<{ name: string; version: string }>
   prompt(sessionId: string, blocks: ContentBlock[]): Promise<string>
   cancel(sessionId: string, keepInbox?: boolean): Promise<boolean>
+  open(sessionId: string, replaceSessionId?: string): Promise<boolean>
   subscribe(handler: (n: TuiNotification) => void): () => void
   onClose?: (handler: (error?: string) => void) => () => void
   close(): Promise<void>

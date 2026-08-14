@@ -703,6 +703,7 @@ class TuiAppImpl implements TuiApp {
     this.notice = { tone: 'info', message: text(this.locale, 'resumeLoading') }
     this.emit()
     try {
+      const previousSessionId = this.sessionId
       const nextAssembler = createAssembler()
       const nextTelemetry = createTelemetryProjector()
       const nextSessionState = createSessionStateProjector()
@@ -711,6 +712,7 @@ class TuiAppImpl implements TuiApp {
         nextTelemetry.ingest(event)
         nextSessionState.ingest(event)
       })
+      await this.runtime.open(sessionId, previousSessionId)
       this.sessionId = sessionId
       this.assembler = nextAssembler
       this.telemetry = nextTelemetry

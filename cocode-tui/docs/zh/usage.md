@@ -71,7 +71,7 @@ DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 | `/login` / `/logout`           | 登录或退出 Cocode Cloud；退出时若还有 Key 则留在对话里    |
 | `/exit`                        | 关闭 TUI 并恢复终端                                       |
 
-`/resume` 会读取本地 session header，支持关键词过滤和 `↑` `↓` 选择，并以流式方式将选中 JSONL 的事件回放到临时投影，再一次性替换当前 TUI。后续输入会继续使用选中的 session id。TUI 不负责跨进程写入锁；如果其它客户端正在写同一 session，请不要同时恢复。
+`/resume` 会读取本地 session header，支持关键词过滤和 `↑` `↓` 选择，以流式方式将选中 JSONL 的事件回放到临时投影，并要求 runtime 重新打开同一个持久化 session 后再替换当前 TUI。后续输入会继续写入选中的 session id。TUI 不负责跨进程写入锁；如果其它客户端正在写同一 session，请不要同时恢复。
 
 `/compact` 会向当前 session 发送字面量 `/compact` prompt。只有 host 的 compaction 插件识别该 prompt 时才会执行压缩；TUI 不会在缺少对应事件时宣称压缩成功。
 
@@ -87,4 +87,4 @@ DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 
 ## 当前未接入的交互
 
-取消/steer、审批、rewind、技能菜单和复制选择尚未绑定到 TUI 交互。这些能力需要对应的 harness wire、显式 manifest 或后续交互接线；界面不会显示假控件。
+steer、审批、rewind、技能菜单和复制选择尚未绑定到 TUI 交互。这些能力需要额外的 harness wire、显式 manifest 或后续交互接线；界面不会显示假控件。
