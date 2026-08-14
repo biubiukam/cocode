@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle, Input, cn } from
 import type { LucideIcon } from 'lucide-react'
 import { useSlotContributions } from '../../boot/slot-renderer.tsx'
 import { useLayoutActions, useSessions } from '../runtime-context.tsx'
+import { useDeepCompareEffect } from "ahooks"
 
 type PaletteInject = {
   id?: string
@@ -59,7 +60,7 @@ export function CommandPalette({
     if (!open) setQuery('')
   }, [open])
 
-  useEffect(() => {
+  useDeepCompareEffect(() => {
     const trimmed = query.trim()
     if (!open || trimmed.length < 2) {
       setMatches([])
@@ -73,7 +74,7 @@ export function CommandPalette({
       controller.abort()
       clearTimeout(timer)
     }
-  }, [query, open, sessions])
+  }, [query, open])
 
   const items = contributed.flatMap(item => {
     if (typeof item.id !== 'string' || typeof item.label !== 'string' || typeof item.run !== 'function') return []
