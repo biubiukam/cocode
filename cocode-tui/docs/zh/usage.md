@@ -30,6 +30,7 @@ DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 - `←` `→` 移动光标，`Backspace` 删除光标前的字符。
 - `↑` `↓` 查看本地输入历史。
 - `Ctrl+R` 打开历史搜索；输入文字过滤最近消息，使用 `↑` `↓` 选择，回车回填到输入区，`Esc` 关闭。
+- `Ctrl+G` 使用 `$VISUAL` 或 `$EDITOR` 打开临时 Markdown 草稿；退出编辑器后内容回填到输入区。编辑器退出码非 0、草稿不是 UTF-8 或超过 256 KiB 时会显示错误。
 - `Shift+↑` 进入消息选择模式；使用 `↑` `↓` 移动，回车展开或收起当前消息，`Esc` 退出。
 - `/lang zh` 或 `/lang en` 立即切换界面语言；未指定时启动语言由 `COCODE_LANG`、`LANG` 等环境变量决定。
 - `/model <model-id>` 通过 runtime restart 切换当前模型，并创建新 session；切换失败会尝试恢复原模型。
@@ -85,4 +86,4 @@ DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 
 ## 当前未接入的交互
 
-取消/steer、审批、rewind、技能菜单、复制选择和 `Ctrl+G` 外部编辑器尚未绑定到 TUI 交互。这些能力需要对应的 harness wire、显式 manifest 或后续交互接线；界面不会显示假控件。
+取消/steer、审批、rewind、技能菜单和复制选择尚未绑定到 TUI 交互。这些能力需要对应的 harness wire、显式 manifest 或后续交互接线；界面不会显示假控件。

@@ -30,6 +30,7 @@ Set `COCODE_TUI_SCREEN=inline` (the default) to keep the main screen and scrollb
 - `←` `→` move the cursor; `Backspace` deletes the character before it.
 - `↑` `↓` walk local input history.
 - `Ctrl+R` opens history search; type to filter recent messages, use `↑` `↓` to select, Enter to restore the draft, and `Esc` to close.
+- `Ctrl+G` opens the draft in `$VISUAL` or `$EDITOR`; the edited Markdown is restored to the composer when the editor exits. Non-zero exits, invalid UTF-8, and drafts over 256 KiB are reported as errors.
 - `Shift+↑` enters message selection; use `↑` `↓` to move, Enter to expand or collapse the current message, and `Esc` to exit.
 - `/lang zh` or `/lang en` switches the interface immediately; startup language follows `COCODE_LANG`, `LANG`, and related locale variables.
 - `/model <model-id>` restarts the runtime with a new model and starts a new session; a failed switch attempts to restore the previous model.
@@ -85,4 +86,4 @@ If another TUI window is still open, `/use`, `/login`, and `/logout` refuse so t
 
 ## Not wired yet
 
-Cancel/steer, approvals, rewind, the skills menu, copy selection, and `Ctrl+G` external editor are not bound in TUI. Those need a harness wire, an explicit manifest, or later interaction work. The UI does not draw fake controls.
+Cancel/steer, approvals, rewind, the skills menu, and copy selection are not bound in TUI. Those need a harness wire, an explicit manifest, or later interaction work. The UI does not draw fake controls.

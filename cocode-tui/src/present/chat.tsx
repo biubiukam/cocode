@@ -2,7 +2,7 @@
  * Single chat layout. Components only see Snapshot + dispatch.
  */
 
-import { Box, Text, useInput, useStdout } from 'ink'
+import { Box, Text, useInput, useStdout, useStdin } from 'ink'
 import { useEffect, useMemo, useState } from 'react'
 import type { TuiApp, TuiSnapshot } from '../runtime/app.ts'
 import { matchKey } from '../runtime/keymap.ts'
@@ -28,6 +28,7 @@ import { moveMessageSelection, selectableMessageKeys } from './message-selection
 import { visibleTail } from './visible-tail.ts'
 import { text } from '../runtime/ui-locale.ts'
 import { visibleResumeItems } from '../runtime/resume-picker.ts'
+import { editDraft } from '../runtime/external-editor.ts'
 
 export function Chat(props: { app: TuiApp }) {
   const { app } = props
@@ -44,7 +45,10 @@ export function Chat(props: { app: TuiApp }) {
   const [messageSelectionActive, setMessageSelectionActive] = useState(false)
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null)
   const [expandedMessageIds, setExpandedMessageIds] = useState<ReadonlySet<string>>(() => new Set())
+  const [editorBusy, setEditorBusy] = useState(false)
+  const [editorError, setEditorError] = useState<string | undefined>()
   const { stdout } = useStdout()
+  const { isRawModeSupported, setRawMode } = useStdin()
   const slashItems = useMemo<readonly SlashMenuItem[]>(
     () => filterSlashItems(snap.commands, snap.composer.text),
     [snap.commands, snap.composer.text],
@@ -74,7 +78,8 @@ export function Chat(props: { app: TuiApp }) {
     (slashOpen ? slashItems.length + 4 : 0) +
     (fileOpen ? fileItems.length + (fileLoading ? 5 : 4) : 0) +
     (historySearchOpen ? historyItems.length + 5 : 0) +
-    (resumeOpen ? Math.min(resumeItems.length, 8) + 7 : 0)
+    (resumeOpen ? Math.min(resumeItems.length, 8) + 7 : 0) +
+    (editorBusy || editorError !== undefined ? 1 : 0)
   const messageMaxRows = Math.max(0, stdout.rows - reservedRows)
   const selectableMessages = useMemo(
     () =>
@@ -134,7 +139,39 @@ export function Chat(props: { app: TuiApp }) {
     }
   }, [fileMention, fileVisible, snap.header.cwd])
 
+  function openExternalEditor(): void {
+    if (!isRawModeSupported) {
+      setEditorError(text(snap.locale, 'editorUnavailable'))
+      return
+    }
+    setEditorBusy(true)
+    setEditorError(undefined)
+    try {
+      setRawMode(false)
+    } catch {
+      setEditorBusy(false)
+      setEditorError(text(snap.locale, 'editorUnavailable'))
+      return
+    }
+    void editDraft({ text: snap.composer.text })
+      .then((edited) => {
+        app.dispatch({ type: 'setDraft', text: edited })
+      })
+      .catch((error: unknown) => {
+        setEditorError(error instanceof Error ? error.message : String(error))
+      })
+      .finally(() => {
+        try {
+          setRawMode(true)
+        } catch {
+          // The terminal may already be closing.
+        }
+        setEditorBusy(false)
+      })
+  }
+
   useInput((input, key) => {
+    if (editorBusy) return
     if (snap.composer.disabled && !key.ctrl && input !== 'c') {
       if (key.escape || (key.ctrl && input === 'c')) {
         app.dispatch({ type: 'quit' })
@@ -311,6 +348,10 @@ export function Chat(props: { app: TuiApp }) {
 
     if (matched !== undefined) {
       if (matched.emptyOnly === true && snap.composer.text !== '') return
+      if (matched.id === 'editor.open') {
+        openExternalEditor()
+        return
+      }
       runCommand(app, matched.id, snap.composer.text)
       return
     }
@@ -358,6 +399,8 @@ export function Chat(props: { app: TuiApp }) {
         notice={snap.notice}
         locale={snap.locale}
       />
+      {editorBusy ? <Text color={theme.info}>{text(snap.locale, 'editorOpening')}</Text> : null}
+      {editorError !== undefined ? <Text color={theme.error}>{editorError}</Text> : null}
       <Composer composer={snap.composer} locale={snap.locale} />
       <Box width="100%" marginTop={1} justifyContent="space-between">
         {messageSelectionActive ? (

@@ -69,6 +69,8 @@ type UiKey =
   | 'goalPhase'
   | 'agentPreset'
   | 'transcriptTrimmed'
+  | 'editorOpening'
+  | 'editorUnavailable'
 
 const TEXT: Record<UiLocale, Record<UiKey, string>> = {
   en: {
@@ -138,6 +140,8 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     goalPhase: 'goal {phase}',
     agentPreset: 'preset {name}',
     transcriptTrimmed: 'older nodes hidden {count}',
+    editorOpening: 'opening draft in $EDITOR…',
+    editorUnavailable: 'external editor unavailable',
   },
   zh: {
     session: '会话',
@@ -206,6 +210,8 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     goalPhase: '目标 {phase}',
     agentPreset: '预设 {name}',
     transcriptTrimmed: '已隐藏较早节点 {count} 个',
+    editorOpening: '正在 $EDITOR 中编辑草稿…',
+    editorUnavailable: '外部编辑器不可用',
   },
 }
 
