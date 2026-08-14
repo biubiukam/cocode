@@ -337,12 +337,13 @@
   .timeline { display: grid; gap: 0; }
   .timeline-item { position: relative; display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 10px; align-items: center; min-height: 58px; padding: 10px 8px; border-radius: var(--radius-sm); }
   .timeline-item + .timeline-item { margin-top: 4px; }
-  .timeline-item::before { position: absolute; top: 31px; left: 10px; bottom: -10px; width: 1px; background: var(--border-strong); content: ""; }
-  .timeline-item:last-child::before { display: none; }
-  .timeline-node { position: relative; z-index: 1; display: grid; width: 20px; height: 20px; place-items: center; border: 1px solid var(--border-strong); border-radius: 999px; background: var(--surface-raised); color: var(--muted-foreground); font: 10px ui-monospace, monospace; }
+  .timeline-item:not(:first-child)::after { position: absolute; z-index: 1; top: calc(-4px - 50% + 10px); bottom: calc(50% + 10px); left: calc(8px + 11px); width: 1px; background: var(--border-strong); content: ""; transform: translateX(-50%); pointer-events: none; }
+  .timeline-item:not(:last-child)::before { position: absolute; z-index: 1; top: calc(50% + 10px); left: calc(8px + 11px); bottom: calc(-50% + 6px); width: 1px; background: var(--border-strong); content: ""; transform: translateX(-50%); pointer-events: none; }
+  .timeline-node { position: relative; z-index: 2; justify-self: center; display: grid; width: 20px; height: 20px; place-items: center; border: 1px solid var(--border-strong); border-radius: 999px; background: var(--surface-raised); color: var(--muted-foreground); font: 10px ui-monospace, monospace; }
   .timeline-item.is-complete .timeline-node { border-color: color-mix(in srgb, var(--success) 35%, var(--border)); background: var(--success-soft); color: var(--success); }
   .timeline-item.is-active .timeline-node { border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); background: var(--accent-soft); color: var(--accent-ink); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent); }
   .timeline-item.is-active { background: var(--accent-soft); }
+  .timeline-item.is-active > * { position: relative; z-index: 2; }
   .timeline-item.is-active .timeline-copy strong { color: var(--accent-ink); }
   .timeline-copy { min-width: 0; }
   .timeline-copy strong { display: block; font-size: 12px; }
@@ -390,12 +391,11 @@
   .artifact-copy strong { display: block; overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
   .artifact-copy small { display: block; margin-top: 2px; color: var(--muted-foreground); font-size: 10px; }
   .artifact-card .button { min-height: 28px; padding: 0 9px; font-size: 10px; }
-  .evidence-list { display: grid; gap: 6px; }
-  .evidence-item { display: flex; min-width: 0; align-items: center; gap: 9px; min-height: 38px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-sunken); color: var(--muted-foreground); font-size: 10px; }
-  .evidence-item .file-icon { width: 34px; height: 34px; border-radius: 9px; font-size: 12px; }
-  .evidence-item:last-child .file-icon { border-color: color-mix(in srgb, var(--success) 30%, var(--border)); background: var(--success-soft); color: var(--success); font-size: 16px; }
-  .evidence-item strong { min-width: 0; overflow: hidden; color: var(--foreground); text-overflow: ellipsis; white-space: nowrap; }
-  .evidence-item code { margin-left: auto; color: var(--accent-ink); font-size: 10px; white-space: nowrap; }
+  .evidence-list { display: grid; gap: 8px; }
+  .evidence-item { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 9px; align-items: center; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-sunken); color: var(--muted-foreground); font-size: 10px; }
+  .evidence-item:last-child .artifact-icon { border-color: color-mix(in srgb, var(--success) 30%, var(--border)); background: var(--success-soft); color: var(--success); font-size: 14px; }
+  .evidence-item strong { min-width: 0; overflow: hidden; color: var(--foreground); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+  .evidence-item code { color: var(--accent-ink); font-size: 10px; white-space: nowrap; }
   .recovery-card { display: grid; gap: 10px; padding: 12px; border: 1px solid color-mix(in srgb, var(--warning) 28%, var(--border)); border-radius: var(--radius); background: var(--warning-soft); }
   .recovery-head { display: flex; align-items: center; gap: 8px; }
   .recovery-head strong { font-size: 12px; }
