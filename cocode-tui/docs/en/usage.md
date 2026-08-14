@@ -56,6 +56,7 @@ Type `/` to open the command menu. Keep typing to filter by prefix. `Tab` or arr
 | `/doctor`                      | TTY, launch flags, initialize result, session root, and closed capabilities |
 | `/clear`                       | Clear the on-screen projection; does not delete the session log             |
 | `/new`                         | Start a new session id (not a fork)                                         |
+| `/compact`                     | Request host conversation compaction through the prompt path                |
 | `/export`                      | Export the current projection as Markdown                                   |
 | `/init`                        | Create a minimal `AGENTS.md` only when the workspace has none               |
 | `/theme dark` / `/theme light` | Switch the display theme                                                    |
@@ -67,6 +68,8 @@ Type `/` to open the command menu. Keep typing to filter by prefix. `Tab` or arr
 | `/exit`                        | Shut down TUI and restore the terminal                                      |
 
 `/resume` reads local session headers and supports text filtering plus `↑` `↓` selection. Enter only explains that the current harness SDK has no `session/open` or `session/resume` wire; it does not change the active session.
+
+`/compact` sends the literal `/compact` prompt to the current session. A host compaction plugin must recognize that prompt; the TUI does not claim compaction succeeded without a corresponding event.
 
 ## Errors
 

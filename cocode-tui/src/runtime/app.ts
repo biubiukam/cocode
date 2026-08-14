@@ -54,6 +54,7 @@ import { createTelemetryProjector, type TelemetrySnapshot } from './telemetry.ts
 
 export type TuiAction =
   | { type: 'submit'; text: string }
+  | { type: 'compact' }
   | { type: 'command'; line: string }
   | { type: 'setDraft'; text: string }
   | { type: 'insertDraft'; text: string }
@@ -398,6 +399,9 @@ class TuiAppImpl implements TuiApp {
       case 'submit':
         this.submit(action.text)
         return
+      case 'compact':
+        this.requestCompact()
+        return
       case 'command':
         this.runCommand(action.line)
         return
@@ -679,6 +683,21 @@ class TuiAppImpl implements TuiApp {
     void this.promptWithAttachments(trimmed, attachments).catch((error: unknown) => {
       this.notice = { tone: 'error', message: errorMessage(error) }
       if (this.agent === 'running') this.agent = 'idle'
+      this.emit()
+    })
+    this.emit()
+  }
+
+  private requestCompact(): void {
+    if (this.agent !== 'idle') {
+      this.notice = { tone: 'info', message: text(this.locale, 'turnBusy') }
+      this.emit()
+      return
+    }
+    this.notice = undefined
+    this.interruptArmed = false
+    void this.promptWithAttachments('/compact', []).catch((error: unknown) => {
+      this.notice = { tone: 'error', message: errorMessage(error) }
       this.emit()
     })
     this.emit()

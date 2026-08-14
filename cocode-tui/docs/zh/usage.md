@@ -56,6 +56,7 @@ DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 | `/doctor`                      | 查看 TTY、启动参数、初始化结果、会话根和关闭的 capability |
 | `/clear`                       | 清除当前屏幕投影，不删除 session log                      |
 | `/new`                         | 创建新的 session id，不复制旧会话                         |
+| `/compact`                     | 通过 prompt 路径请求 host 压缩当前会话                    |
 | `/export`                      | 将当前投影导出为 Markdown 文件                            |
 | `/init`                        | 仅在缺少 `AGENTS.md` 时创建最小工作区模板                 |
 | `/theme dark` / `/theme light` | 切换显示主题                                              |
@@ -67,6 +68,8 @@ DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 | `/exit`                        | 关闭 TUI 并恢复终端                                       |
 
 `/resume` 会读取本地 session header，支持输入关键词过滤和 `↑` `↓` 选择。按回车只会说明当前缺少 `session/open` 或 `session/resume` wire，不会修改当前会话。
+
+`/compact` 会向当前 session 发送字面量 `/compact` prompt。只有 host 的 compaction 插件识别该 prompt 时才会执行压缩；TUI 不会在缺少对应事件时宣称压缩成功。
 
 ## 错误
 

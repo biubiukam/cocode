@@ -192,6 +192,21 @@ describe('TuiApp', () => {
     expect(app.snapshot().notice?.message).toMatch(/Turn in progress/)
   })
 
+  it('sends /compact through the prompt path', async () => {
+    const runtime = fakeRuntime()
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+    })
+    await app.start()
+    app.dispatch({ type: 'command', line: '/compact' })
+    await vi.waitFor(() => expect(runtime.prompts).toHaveLength(1))
+    expect(runtime.prompts[0]).toEqual({ sessionId: 's1', text: '/compact' })
+  })
+
   it('queues a follow-up while running and sends it after idle', async () => {
     const runtime = fakeRuntime()
     const app = createTuiApp({

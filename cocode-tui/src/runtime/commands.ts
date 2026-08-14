@@ -101,6 +101,9 @@ export function createBuiltinCommands(): CommandRegistry {
   local('new', 'Start a new session id (not a fork)', (ctx) => {
     ctx.newSession()
   })
+  local('compact', 'Request host compaction through the prompt path', (ctx) => {
+    ctx.dispatch({ type: 'compact' })
+  })
   local('use', 'Switch between API Key and Cocode', (ctx, args) => {
     const target = args.trim().toLowerCase()
     if (target !== 'byok' && target !== 'cocode') {

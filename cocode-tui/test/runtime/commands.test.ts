@@ -26,6 +26,7 @@ describe('commands', () => {
       'export',
       'init',
       'new',
+      'compact',
       'use',
       'login',
       'logout',
@@ -87,6 +88,13 @@ describe('commands', () => {
     const command = createBuiltinCommands().find('model', P0_CAPABILITIES)
     command?.run(commandCtx({ setModel: (value) => models.push(value) }), 'm2')
     expect(models).toEqual(['m2'])
+  })
+
+  it('/compact sends a prompt-path request', () => {
+    const actions: TuiAction[] = []
+    const command = createBuiltinCommands().find('compact', P0_CAPABILITIES)
+    command?.run(commandCtx({ dispatch: (action) => actions.push(action) }), '')
+    expect(actions).toEqual([{ type: 'compact' }])
   })
 })
 
