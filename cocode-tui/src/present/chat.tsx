@@ -23,6 +23,8 @@ import { theme } from './theme.ts'
 import { findFileMentionAtCursor } from '../runtime/file-mentions.ts'
 import { searchHistory } from '../runtime/history-search.ts'
 import { listWorkspaceEntries, rankFileMatches } from '../runtime/workspace-files.ts'
+import { moveMessageSelection, selectableMessageKeys } from './message-selection.ts'
+import { visibleTail } from './visible-tail.ts'
 
 export function Chat(props: { app: TuiApp }) {
   const { app } = props
@@ -36,6 +38,9 @@ export function Chat(props: { app: TuiApp }) {
   const [historySearchOpen, setHistorySearchOpen] = useState(false)
   const [historyQuery, setHistoryQuery] = useState('')
   const [historyIndex, setHistoryIndex] = useState(0)
+  const [messageSelectionActive, setMessageSelectionActive] = useState(false)
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null)
+  const [expandedMessageIds, setExpandedMessageIds] = useState<ReadonlySet<string>>(() => new Set())
   const { stdout } = useStdout()
   const slashItems = useMemo<readonly SlashMenuItem[]>(
     () => filterSlashItems(snap.commands, snap.composer.text),
@@ -63,6 +68,14 @@ export function Chat(props: { app: TuiApp }) {
     (slashOpen ? slashItems.length + 4 : 0) +
     (fileOpen ? fileItems.length + (fileLoading ? 3 : 4) : 0) +
     (historySearchOpen ? historyItems.length + 4 : 0)
+  const messageMaxRows = Math.max(0, stdout.rows - reservedRows)
+  const selectableMessages = useMemo(
+    () =>
+      selectableMessageKeys(
+        visibleTail(snap.nodes, messageMaxRows, snap.verbose, expandedMessageIds),
+      ),
+    [expandedMessageIds, messageMaxRows, snap.nodes, snap.verbose],
+  )
 
   useEffect(
     () =>
@@ -78,6 +91,17 @@ export function Chat(props: { app: TuiApp }) {
     setFileDismissed(false)
     setFileIndex(0)
   }, [snap.composer.text])
+
+  useEffect(() => {
+    if (!messageSelectionActive) return
+    if (selectableMessages.length === 0) {
+      setSelectedMessageId(null)
+      return
+    }
+    if (selectedMessageId === null || !selectableMessages.includes(selectedMessageId)) {
+      setSelectedMessageId(selectableMessages[selectableMessages.length - 1] ?? null)
+    }
+  }, [messageSelectionActive, selectableMessages, selectedMessageId])
 
   useEffect(() => {
     if (!fileVisible || fileMention === undefined) {
@@ -146,10 +170,41 @@ export function Chat(props: { app: TuiApp }) {
       return
     }
 
+    if (messageSelectionActive) {
+      if (key.escape) {
+        setMessageSelectionActive(false)
+        setSelectedMessageId(null)
+        return
+      }
+      if (key.upArrow || key.downArrow) {
+        setSelectedMessageId((current) =>
+          moveMessageSelection(selectableMessages, current, key.upArrow ? -1 : 1),
+        )
+        return
+      }
+      if (key.return && selectedMessageId !== null) {
+        setExpandedMessageIds((current) => {
+          const next = new Set(current)
+          if (next.has(selectedMessageId)) next.delete(selectedMessageId)
+          else next.add(selectedMessageId)
+          return next
+        })
+        return
+      }
+      return
+    }
+
     if (key.ctrl && input === 'r') {
       setHistorySearchOpen(true)
       setHistoryQuery('')
       setHistoryIndex(0)
+      return
+    }
+
+    if (key.shift && key.upArrow) {
+      if (selectableMessages.length === 0) return
+      setMessageSelectionActive(true)
+      setSelectedMessageId(selectableMessages[selectableMessages.length - 1] ?? null)
       return
     }
 
@@ -245,13 +300,21 @@ export function Chat(props: { app: TuiApp }) {
       <MessageList
         nodes={snap.nodes}
         verbose={snap.verbose}
-        maxRows={Math.max(0, stdout.rows - reservedRows)}
+        maxRows={messageMaxRows}
+        selectedNodeId={messageSelectionActive ? selectedMessageId : undefined}
+        expandedNodeIds={expandedMessageIds}
       />
       <StatusLine status={snap.status} agent={snap.agent} notice={snap.notice} />
       <Composer composer={snap.composer} />
       <Box width="100%" marginTop={1} justifyContent="space-between">
-        <Text color={theme.mute}>↑↓ history · ctrl+o details · ? help</Text>
-        <Text color={theme.mute}>esc quit · ctrl+l redraw</Text>
+        {messageSelectionActive ? (
+          <Text color={theme.brand}>message mode · ↑↓ move · enter expand · esc close</Text>
+        ) : (
+          <>
+            <Text color={theme.mute}>↑↓ history · shift+↑ messages · ctrl+o details · ? help</Text>
+            <Text color={theme.mute}>esc quit · ctrl+l redraw</Text>
+          </>
+        )}
       </Box>
       {slashOpen ? <SlashMenu items={slashItems} selectedIndex={slashIndex} /> : null}
       {fileOpen ? (

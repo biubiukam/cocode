@@ -28,6 +28,7 @@ Configure a key on the first-run gate, or set `DEEPSEEK_API_KEY` for this proces
 - `←` `→` move the cursor; `Backspace` deletes the character before it.
 - `↑` `↓` walk local input history.
 - `Ctrl+R` opens history search; type to filter recent messages, use `↑` `↓` to select, Enter to restore the draft, and `Esc` to close.
+- `Shift+↑` enters message selection; use `↑` `↓` to move, Enter to expand or collapse the current message, and `Esc` to exit.
 - `Ctrl+O` toggles verbose mode for full reasoning and tool I/O.
 - `Esc` closes overlays (help, command menu) first; in the normal view, press twice to quit.
 - `Ctrl+L` redraws the screen without clearing the session.
@@ -71,4 +72,4 @@ If another TUI window is still open, `/use`, `/login`, and `/logout` refuse so t
 
 ## Not wired yet
 
-Cancel/steer, approvals, rewind, the skills menu, and `Ctrl+G` external editor are not bound in TUI. Those need a harness wire, an explicit manifest, or later interaction work. The UI does not draw fake controls.
+Cancel/steer, approvals, rewind, the skills menu, copy selection, and `Ctrl+G` external editor are not bound in TUI. Those need a harness wire, an explicit manifest, or later interaction work. The UI does not draw fake controls.

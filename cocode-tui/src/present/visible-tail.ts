@@ -3,12 +3,14 @@
  */
 
 import type { ConversationNode } from '../runtime/nodes/types.ts'
+import { nodeKey } from '../runtime/nodes/types.ts'
 import { formatReasoning, formatToolResult } from './text-format.ts'
 
 export function visibleTail(
   nodes: readonly ConversationNode[],
   maxRows: number,
   verbose = false,
+  expandedNodeIds: ReadonlySet<string> = EMPTY_EXPANDED_NODES,
 ): readonly ConversationNode[] {
   const budget = Math.max(0, Math.trunc(maxRows))
   if (budget === 0 || nodes.length === 0) return []
@@ -18,7 +20,7 @@ export function visibleTail(
   for (let index = nodes.length - 1; index >= 0; index -= 1) {
     const node = nodes[index]
     if (node === undefined) continue
-    const rows = estimateNodeRows(node, verbose)
+    const rows = estimateNodeRows(node, verbose, expandedNodeIds.has(nodeKey(node.kind, node.id)))
     if (rows === 0) {
       start = index
       continue
@@ -31,17 +33,22 @@ export function visibleTail(
   return nodes.slice(start)
 }
 
-export function estimateNodeRows(node: ConversationNode, verbose = false): number {
+export function estimateNodeRows(
+  node: ConversationNode,
+  verbose = false,
+  expanded = false,
+): number {
+  const detailed = verbose || expanded
   switch (node.kind) {
     case 'user':
       return 2 + lineCount(node.text)
     case 'assistant': {
-      const reasoning = formatReasoning(node.reasoning, verbose, node.streaming)
+      const reasoning = formatReasoning(node.reasoning, detailed, node.streaming)
       return 2 + lineCount(reasoning) + lineCount(node.text)
     }
     case 'tool': {
-      const result = formatToolResult(node.result, verbose)
-      if (!verbose) return 2
+      const result = formatToolResult(node.result, detailed)
+      if (!detailed) return 2
       return 2 + lineCount(node.args) + lineCount(result) + (node.error === undefined ? 0 : 1)
     }
     case 'notice':
@@ -49,6 +56,8 @@ export function estimateNodeRows(node: ConversationNode, verbose = false): numbe
       return lineCount(node.message)
   }
 }
+
+const EMPTY_EXPANDED_NODES: ReadonlySet<string> = new Set()
 
 function lineCount(text: string | undefined): number {
   if (text === undefined || text === '') return 0

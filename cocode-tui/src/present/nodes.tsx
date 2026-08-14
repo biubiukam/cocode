@@ -9,14 +9,26 @@ import { NoticeRow } from './components/NoticeRow.tsx'
 import { ToolCard } from './components/ToolCard.tsx'
 import { UserRow } from './components/UserRow.tsx'
 
-export type NodeView = (node: ConversationNode, verbose: boolean) => ReactElement | null
+export type NodeRenderOptions = {
+  expanded?: boolean
+}
+
+export type NodeView = (
+  node: ConversationNode,
+  verbose: boolean,
+  options: NodeRenderOptions,
+) => ReactElement | null
 
 const views: Record<string, NodeView> = {
-  user: (node, _verbose) => (node.kind === 'user' ? <UserRow node={node} /> : null),
-  assistant: (node, verbose) =>
-    node.kind === 'assistant' ? <AssistantRow node={node} verbose={verbose} /> : null,
-  tool: (node, verbose) =>
-    node.kind === 'tool' ? <ToolCard node={node} verbose={verbose} /> : null,
+  user: (node) => (node.kind === 'user' ? <UserRow node={node} /> : null),
+  assistant: (node, verbose, options) =>
+    node.kind === 'assistant' ? (
+      <AssistantRow node={node} verbose={verbose || options.expanded === true} />
+    ) : null,
+  tool: (node, verbose, options) =>
+    node.kind === 'tool' ? (
+      <ToolCard node={node} verbose={verbose || options.expanded === true} />
+    ) : null,
   notice: (node, verbose) => {
     if (node.kind !== 'notice') return null
     if (node.verboseOnly === true && !verbose) return null
@@ -24,8 +36,12 @@ const views: Record<string, NodeView> = {
   },
 }
 
-export function renderNode(node: ConversationNode, verbose: boolean): ReactElement | null {
+export function renderNode(
+  node: ConversationNode,
+  verbose: boolean,
+  options: NodeRenderOptions = {},
+): ReactElement | null {
   const view = views[node.kind]
   if (view === undefined) return null
-  return view(node, verbose)
+  return view(node, verbose, options)
 }

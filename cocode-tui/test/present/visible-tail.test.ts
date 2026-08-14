@@ -26,4 +26,20 @@ describe('visibleTail', () => {
     }
     expect(visibleTail([hidden, notice('2')], 1)).toEqual([notice('2')])
   })
+
+  it('budgets expanded tool rows as detailed content', () => {
+    const tool: ConversationNode = {
+      kind: 'tool',
+      id: 'tool-1',
+      seq: 1,
+      time: 1,
+      callId: 'call-1',
+      name: 'read',
+      args: '{"path":"README.md"}',
+      status: 'success',
+      result: 'line one\nline two',
+    }
+    expect(visibleTail([tool, notice('2')], 6, false, new Set(['tool:tool-1']))).toHaveLength(2)
+    expect(visibleTail([tool, notice('2')], 2)).toEqual([notice('2')])
+  })
 })
