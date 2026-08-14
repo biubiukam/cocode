@@ -3,6 +3,7 @@
  */
 
 import { DEFAULT_ORIGIN } from './types.ts'
+import { TuiError } from '../errors/index.ts'
 
 export function agencyOrigin(env: NodeJS.ProcessEnv = process.env): string {
   const configured = env.COCODE_AGENCY_ORIGIN?.trim()
@@ -15,7 +16,7 @@ export function normalizeAgencyOrigin(value: string): string {
   try {
     parsed = new URL(value)
   } catch {
-    throw new Error('agency origin is not a URL')
+    throw new TuiError('AUTH_ORIGIN_INVALID')
   }
   if (
     parsed.username !== '' ||
@@ -23,10 +24,10 @@ export function normalizeAgencyOrigin(value: string): string {
     parsed.search !== '' ||
     parsed.hash !== ''
   ) {
-    throw new Error('agency origin must not contain credentials or query parameters')
+    throw new TuiError('AUTH_ORIGIN_CREDENTIALS')
   }
   if (parsed.pathname !== '/' && parsed.pathname !== '') {
-    throw new Error('agency origin must not contain a path')
+    throw new TuiError('AUTH_ORIGIN_PATH')
   }
   const local =
     parsed.hostname === '127.0.0.1' ||
@@ -35,7 +36,7 @@ export function normalizeAgencyOrigin(value: string): string {
     parsed.hostname === '[::1]'
   if (parsed.protocol === 'https:') return parsed.origin
   if (parsed.protocol === 'http:' && local) return parsed.origin
-  throw new Error('agency origin must be https')
+  throw new TuiError('AUTH_ORIGIN_HTTPS')
 }
 
 export function validateVerificationUrl(value: string, field: string): string {
@@ -43,7 +44,7 @@ export function validateVerificationUrl(value: string, field: string): string {
   try {
     parsed = new URL(value)
   } catch {
-    throw new Error(`${field} is not a URL`)
+    throw new TuiError('AUTH_VERIFY_URL_INVALID', { field })
   }
   const local =
     parsed.hostname === '127.0.0.1' ||
@@ -51,10 +52,10 @@ export function validateVerificationUrl(value: string, field: string): string {
     parsed.hostname === '::1' ||
     parsed.hostname === '[::1]'
   if (parsed.username !== '' || parsed.password !== '') {
-    throw new Error(`${field} must not contain credentials`)
+    throw new TuiError('AUTH_VERIFY_URL_CREDENTIALS', { field })
   }
   if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && local)) {
-    throw new Error(`${field} must use https`)
+    throw new TuiError('AUTH_VERIFY_URL_HTTPS', { field })
   }
   return parsed.toString()
 }

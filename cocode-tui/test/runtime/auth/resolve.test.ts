@@ -126,6 +126,49 @@ describe('resolveAuth', () => {
     expect(result.auth.provider).toBe('ai-gateway')
   })
 
+  it('prefers agent-default-model when both channels are configured', async () => {
+    const home = await tempHome()
+    await patchCredential(home, 'DEEPSEEK_API_KEY', 'sk-file')
+    await patchCredential(home, 'COCODE_CLOUD_API_KEY', 'ck_live_x')
+    await writeFile(
+      join(home, 'settings.yaml'),
+      [
+        'agent-default-model:',
+        '  provider: deepseek-official',
+        '  model: deepseek-v4-flash',
+        'llm-pi-ai:',
+        '  providers:',
+        '    cocode-cloud:',
+        '      apiKeyEnv: COCODE_CLOUD_API_KEY',
+        '      baseURL: https://cocode.agency/v1',
+      ].join('\n'),
+    )
+    const result = await resolveAuth({
+      home,
+      env: { DEEPSEEK_API_KEY: 'sk-env', COCODE_CLOUD_API_KEY: 'ck_env' },
+      cwd: '/work',
+    })
+    expect(result.status).toBe('ready')
+    if (result.status !== 'ready') return
+    expect(result.auth.mode).toBe('byok')
+    expect(result.auth.provider).toBe('deepseek-official')
+    expect(result.auth.env.DEEPSEEK_API_KEY).toBe('sk-env')
+    expect(result.auth.env.COCODE_CLOUD_API_KEY).toBeUndefined()
+  })
+
+  it('falls back to BYOK when the preferred Cloud channel is gone', async () => {
+    const home = await tempHome()
+    await patchCredential(home, 'DEEPSEEK_API_KEY', 'sk-file')
+    await writeFile(
+      join(home, 'settings.yaml'),
+      'agent-default-model:\n  provider: cocode-cloud\n  model: cloud-1\n',
+    )
+    const result = await resolveAuth({ home, env: {}, cwd: '/work' })
+    expect(result.status).toBe('ready')
+    if (result.status !== 'ready') return
+    expect(result.auth.mode).toBe('byok')
+  })
+
   it('fails explicitly for an invalid agency origin', async () => {
     const home = await tempHome()
     await expect(
@@ -134,6 +177,6 @@ describe('resolveAuth', () => {
         env: { COCODE_AGENCY_ORIGIN: 'http://evil.example' },
         cwd: '/work',
       }),
-    ).rejects.toThrow(/agency origin must be https/)
+    ).rejects.toThrow(/AUTH_ORIGIN_HTTPS/)
   })
 })

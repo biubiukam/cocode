@@ -3,6 +3,8 @@
  */
 
 import type { TuiNotification, TuiRuntime } from '@cocode/tui-connection'
+import type { SelectModeResult } from './auth/store.ts'
+import type { AuthSnapshot, ResolvedAuth } from './auth/types.ts'
 import { createAssembler, type Assembler } from './assembler.ts'
 import { P0_CAPABILITIES, type TuiCapabilities } from './capabilities.ts'
 import { CommandRegistry, createBuiltinCommands, helpText, parseSlash } from './commands.ts'
@@ -28,6 +30,14 @@ import {
 import { handleInterrupt } from './interrupt.ts'
 import { closeRuntime } from './lifecycle.ts'
 import { handleNotification } from './notification.ts'
+import { errorNotice } from './errors/index.ts'
+import { redactSecrets } from './diagnostics.ts'
+import {
+  logoutChannel,
+  requestChannelSwitch,
+  submitCapturedByok,
+  type ChannelSwitchHost,
+} from './channel-switch.ts'
 
 export type TuiAction =
   | { type: 'submit'; text: string }
@@ -62,6 +72,7 @@ export type TuiSnapshot = {
     cursor: number
     placeholder: string
     disabled: boolean
+    mask?: boolean
   }
   status: { line: string; tokens?: { input: number; output: number } }
   helpOpen: boolean
@@ -78,6 +89,13 @@ export type TuiAuthInfo = {
   envLocked: boolean
   accountLabel?: string
   logout: () => Promise<void>
+  selectMode?: (mode: 'byok' | 'cocode') => Promise<SelectModeResult>
+  exclusiveHome?: () => Promise<boolean>
+  login?: () => void
+  submitByok?: (key: string) => Promise<void>
+  resolved?: () => ResolvedAuth
+  snapshot?: () => AuthSnapshot
+  subscribe?: (listener: () => void) => () => void
 }
 
 export type TuiCommandCtx = {
@@ -87,6 +105,7 @@ export type TuiCommandCtx = {
   showStatus: () => void
   notice: (tone: 'info' | 'error', message: string) => void
   logout: () => Promise<void>
+  useAuth?: (target: 'byok' | 'cocode' | 'login') => void
   showDoctor?: () => void
   exportTranscript?: () => Promise<void>
   initWorkspace?: () => Promise<void>
@@ -127,8 +146,8 @@ export function createTuiApp(options: TuiAppOptions): TuiApp {
 class TuiAppImpl implements TuiApp {
   private readonly runtime: TuiRuntime
   private readonly cwd: string
-  private readonly provider: string
-  private readonly model: string
+  private provider: string
+  private model: string
   private readonly capabilities: TuiCapabilities
   private readonly commands: CommandRegistry
   private readonly assembler: Assembler
@@ -150,6 +169,7 @@ class TuiAppImpl implements TuiApp {
   private readonly diagnostics: NonNullable<TuiAppOptions['diagnostics']>
   private readonly themeSetter: TuiAppOptions['setTheme']
   private readonly auth: TuiAuthInfo | undefined
+  private capturingByok = false
   private closePromise: Promise<void> | undefined
 
   constructor(options: TuiAppOptions) {
@@ -177,10 +197,10 @@ class TuiAppImpl implements TuiApp {
     this.unsubscribeRuntimeClose = this.runtime.onClose?.((error) => {
       if (this.exiting) return
       this.agent = 'dead'
-      this.notice = {
-        tone: 'error',
-        message: `Runtime stopped${error === undefined ? '' : `: ${error}`}`,
-      }
+      this.notice = errorNotice(
+        'RUNTIME_STOPPED',
+        error === undefined ? {} : { detail: redactSecrets(error) },
+      )
       this.emit()
     })
     try {
@@ -245,10 +265,13 @@ class TuiAppImpl implements TuiApp {
       agent: this.agent,
       nodes: this.assembler.snapshot(),
       composer: {
-        text: this.draft.text,
+        text: this.capturingByok ? '*'.repeat(this.draft.text.length) : this.draft.text,
         cursor: this.draft.cursor,
-        placeholder: composerPlaceholder(this.agent),
+        placeholder: this.capturingByok
+          ? '粘贴 API Key，回车确认'
+          : composerPlaceholder(this.agent),
         disabled,
+        ...(this.capturingByok ? { mask: true } : {}),
       },
       status: {
         line: statusLine(this.agent, this.runtimeName),
@@ -377,6 +400,8 @@ class TuiAppImpl implements TuiApp {
                 this.auth.accountLabel === undefined
                   ? undefined
                   : `account: ${this.auth.accountLabel}`,
+                this.auth.snapshot?.()?.channels?.byok === true ? 'byok-configured' : undefined,
+                this.auth.snapshot?.()?.channels?.cocode === true ? 'cocode-configured' : undefined,
               ].filter((bit): bit is string => bit !== undefined)
         this.notice = {
           tone: 'info',
@@ -394,8 +419,8 @@ class TuiAppImpl implements TuiApp {
         this.notice = { tone, message }
         this.emit()
       },
-      logout: () => this.auth?.logout() ?? Promise.resolve(),
-      beginQuit: () => this.beginQuit(),
+      logout: () => logoutChannel(this.switchHost()),
+      useAuth: (target) => requestChannelSwitch(this.switchHost(), target),
       initError: this.initError,
       capabilities: this.capabilities,
       cwd: this.cwd,
@@ -421,6 +446,10 @@ class TuiAppImpl implements TuiApp {
   private submit(text: string): void {
     const trimmed = text.trim()
     if (trimmed === '') return
+    if (this.capturingByok) {
+      void submitCapturedByok(this.switchHost(), trimmed)
+      return
+    }
     if (trimmed.startsWith('/')) {
       this.runCommand(trimmed)
       return
@@ -450,16 +479,13 @@ class TuiAppImpl implements TuiApp {
   private runCommand(line: string): void {
     const parsed = parseSlash(line)
     if (parsed === null) {
-      this.notice = { tone: 'error', message: 'Not a command' }
+      this.notice = errorNotice('COMMAND_INVALID')
       this.emit()
       return
     }
     const command = this.commands.find(parsed.name, this.capabilities)
     if (command === undefined) {
-      this.notice = {
-        tone: 'error',
-        message: `Unknown command /${parsed.name}`,
-      }
+      this.notice = errorNotice('COMMAND_UNKNOWN', { name: parsed.name })
       this.emit()
       return
     }
@@ -484,6 +510,10 @@ class TuiAppImpl implements TuiApp {
       },
       emit: () => this.emit(),
     })
+  }
+
+  private switchHost(): ChannelSwitchHost {
+    return this as unknown as ChannelSwitchHost
   }
 
   private beginQuit(): void {

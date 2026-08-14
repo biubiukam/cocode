@@ -1,5 +1,7 @@
 # Cocode TUI 使用指南
 
+[中文](./usage.md) · [English](../en/usage.md)
+
 ## 启动前
 
 先准备 sibling `cocode-harness`，然后在 `cocode-tui/.env` 中设置：
@@ -7,7 +9,7 @@
 ```dotenv
 COCODE_HARNESS_CMD=node
 COCODE_HARNESS_ARGS=--import,tsx/esm,../../cocode-harness/packages/examples/jsonrpc-demo/src/bin.ts
-DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.yml
+DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 ```
 
 密钥可以通过首屏登录配置，也可以临时设置 `DEEPSEEK_API_KEY`。开发环境可用 `COCODE_HOME` 指向单独目录；会话目录默认使用该目录下的 `sessions`，也可以用 `DSH_SESSION_ROOT` 覆盖。
@@ -38,10 +40,21 @@ DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.yml
 | `/init`                        | 仅在缺少 `AGENTS.md` 时创建最小工作区模板                 |
 | `/theme dark` / `/theme light` | 切换显示主题                                              |
 | `/resume`                      | 列出当前工作区的本地 session 历史                         |
-| `/login` / `/logout`           | 登录或退出 Cocode Cloud；退出后 TUI 会关闭                |
+| `/use byok` / `/use cocode`    | 在自己的 Key 和 Cocode 之间切换；切换即新会话             |
+| `/login` / `/logout`           | 登录或退出 Cocode Cloud；退出时若还有 Key 则留在对话里    |
 | `/exit`                        | 关闭 TUI 并恢复终端                                       |
 
 `/resume` 当前只读取并列出历史。现有 harness SDK 没有 `session/open` 或 `session/resume` wire，因此不会伪装成可以继续旧会话。
+
+## 错误
+
+失败时状态栏显示 `CODE · 解释`。语言由 `COCODE_LANG` 决定，未设置时跟随 `LANG` / `LC_MESSAGES`。完整目录见 [错误码](./errors.md)。
+
+## 多个终端
+
+可以同时开多个 TUI，共用同一份家目录和同一套通道。每个窗口是独立进程、独立 `sessionId`，互不影响正在进行的对话。
+
+若还有其它 TUI 窗口开着，`/use`、`/login`、`/logout` 会拒绝执行，避免改掉全机默认通道或拆掉 Cloud 槽。先关掉其它窗口，再在留下的那个窗口里切换或退出。多个窗口各用不同 provider 不是当前产品能力。
 
 ## 当前未接入的交互
 

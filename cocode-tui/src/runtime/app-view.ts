@@ -3,6 +3,7 @@
 import type { ConversationNode } from './nodes/types.ts'
 import type { TuiSnapshot } from './app.ts'
 import { redactSecrets } from './diagnostics.ts'
+import { displayError, formatError } from './errors/index.ts'
 
 export function composerPlaceholder(agent: TuiSnapshot['agent']): string {
   if (agent === 'starting') return 'Connecting…'
@@ -32,13 +33,11 @@ export function latestUsage(
 }
 
 export function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
+  return displayError(error)
 }
 
 export function startErrorMessage(error: unknown): string {
-  return [
-    'Initialize failed. Build sibling cocode-harness (pnpm run build),',
-    'set COCODE_HARNESS_ARGS, then /exit.',
-    redactSecrets(errorMessage(error)),
-  ].join(' ')
+  return formatError('RUNTIME_INIT_FAILED', {
+    detail: redactSecrets(error instanceof Error ? error.message : String(error)),
+  })
 }

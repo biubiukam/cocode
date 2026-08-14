@@ -48,9 +48,7 @@ describe('credentials', () => {
     const home = await tempHome()
     const path = join(home, '.credentials.yaml')
     await writeFile(path, '[[[\n', { mode: 0o600 })
-    await expect(patchCredential(home, 'DEEPSEEK_API_KEY', 'sk-new')).rejects.toThrow(
-      /could not parse/,
-    )
+    await expect(patchCredential(home, 'DEEPSEEK_API_KEY', 'sk-new')).rejects.toThrow(/IO_PARSE/)
     expect(await readFile(path, 'utf8')).toBe('[[[\n')
   })
 
@@ -59,19 +57,21 @@ describe('credentials', () => {
     await writeFile(join(home, '.credentials.yaml'), '[[[\n', {
       mode: 0o600,
     })
-    await expect(readCredentials(home)).rejects.toThrow(/could not parse/)
+    await expect(readCredentials(home)).rejects.toThrow(/IO_PARSE/)
   })
 
   it('rejects empty values and illegal refs', async () => {
     const home = await tempHome()
-    await expect(patchCredential(home, 'DEEPSEEK_API_KEY', '  ')).rejects.toThrow(/empty/)
-    await expect(patchCredential(home, 'not a ref', 'sk-x')).rejects.toThrow(/ref/)
+    await expect(patchCredential(home, 'DEEPSEEK_API_KEY', '  ')).rejects.toThrow(
+      /AUTH_CREDENTIAL_EMPTY/,
+    )
+    await expect(patchCredential(home, 'not a ref', 'sk-x')).rejects.toThrow(/AUTH_CREDENTIAL_REF/)
   })
 
   it('rejects a world-readable file instead of reading it', async () => {
     const home = await tempHome()
     const path = join(home, '.credentials.yaml')
     await writeFile(path, 'DEEPSEEK_API_KEY: sk-old\n', { mode: 0o644 })
-    await expect(patchCredential(home, 'OPENAI_API_KEY', 'sk-new')).rejects.toThrow(/0600/)
+    await expect(patchCredential(home, 'OPENAI_API_KEY', 'sk-new')).rejects.toThrow(/IO_MODE/)
   })
 })

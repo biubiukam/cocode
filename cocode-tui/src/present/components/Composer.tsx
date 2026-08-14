@@ -7,21 +7,36 @@ export function Composer(props: { composer: TuiSnapshot['composer'] }) {
   const empty = composer.text === ''
   const rows = empty ? [] : renderRows(composer.text, composer.cursor)
   return (
-    <Box flexDirection="column">
-      <Box>
-        <Text color={theme.brand}>{'> '}</Text>
-        {empty ? <Text color={theme.mute}>{composer.placeholder}</Text> : null}
+    <Box
+      flexDirection="column"
+      borderStyle="round"
+      borderColor={composer.disabled ? theme.border : theme.brand}
+      paddingX={1}
+    >
+      <Box width="100%" justifyContent="space-between">
+        <Text color={composer.disabled ? theme.mute : theme.brand} bold>
+          {composer.mask ? 'secret' : 'prompt'}
+        </Text>
+        <Text color={theme.mute}>{composer.disabled ? 'locked' : 'enter to send'}</Text>
       </Box>
-      {rows.map((row, index) => (
-        <Box key={index}>
-          <Text color={theme.brand}>{index === 0 ? '> ' : '  '}</Text>
-          <Text color={theme.text}>{row.before}</Text>
-          <Text inverse color={theme.text}>
-            {row.cursor}
-          </Text>
-          <Text color={theme.text}>{row.after}</Text>
+      <Box flexDirection="column" marginTop={1}>
+        <Box>
+          <Text color={composer.disabled ? theme.mute : theme.brand}>{'> '}</Text>
+          {empty ? <Text color={theme.mute}>{composer.placeholder}</Text> : null}
         </Box>
-      ))}
+        {rows.map((row, index) => (
+          <Box key={index}>
+            <Text color={composer.disabled ? theme.mute : theme.brand}>
+              {index === 0 ? '> ' : '  '}
+            </Text>
+            <Text color={composer.disabled ? theme.mute : theme.text}>{row.before}</Text>
+            <Text inverse color={composer.disabled ? theme.mute : theme.text}>
+              {row.cursor}
+            </Text>
+            <Text color={composer.disabled ? theme.mute : theme.text}>{row.after}</Text>
+          </Box>
+        ))}
+      </Box>
     </Box>
   )
 }

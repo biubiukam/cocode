@@ -8,10 +8,19 @@ import { resolve } from 'node:path'
 import { render } from 'ink'
 import { parseInitFromEnv, parseLaunchFromEnv } from '@cocode/tui-connection'
 import { createTuiApp } from './runtime/app.ts'
+import { displayError, formatError } from './runtime/errors/index.ts'
 import { P0_CAPABILITIES } from './runtime/capabilities.ts'
 import { resolveSessionRoot } from './runtime/sessions-root.ts'
 import { setTheme } from './present/theme.ts'
-import { createAuthStore, type AuthStore } from './runtime/auth/index.ts'
+import {
+  createAuthStore,
+  saveByokKey,
+  otherLiveCount,
+  registerLiveInstance,
+  releaseLiveInstance,
+  releaseLiveInstanceSync,
+  type AuthStore,
+} from './runtime/auth/index.ts'
 import { AuthGate } from './present/auth-gate.tsx'
 import { Chat } from './present/chat.tsx'
 import { clearScreen } from './present/clear-screen.ts'
@@ -27,8 +36,8 @@ if (process.stdin.isTTY !== true || process.stdout.isTTY !== true) {
 
 async function main(): Promise<void> {
   const launch = parseLaunchFromEnv()
-  if ('error' in launch) {
-    process.stderr.write(`${launch.error}\n`)
+  if ('code' in launch) {
+    process.stderr.write(`${formatError(launch.code)}\n`)
     process.exitCode = 1
     return
   }
@@ -43,6 +52,10 @@ async function main(): Promise<void> {
   }
 
   const resolved = auth.resolved()
+  await registerLiveInstance(resolved.home)
+  process.on('exit', () => {
+    releaseLiveInstanceSync(resolved.home)
+  })
   const init = parseInitFromEnv({
     ...process.env,
     COCODE_PROVIDER: resolved.provider,
@@ -73,6 +86,13 @@ async function main(): Promise<void> {
       envLocked: auth.snapshot().envLocked,
       accountLabel: auth.snapshot().profile?.displayName,
       logout: () => auth.logout(),
+      exclusiveHome: async () => (await otherLiveCount(resolved.home)) === 0,
+      selectMode: (mode) => auth.selectMode(mode),
+      login: () => auth.dispatch({ type: 'chooseCocode' }),
+      submitByok: (key) => saveByokKey(resolved.home, key),
+      resolved: () => auth.resolved(),
+      snapshot: () => auth.snapshot(),
+      subscribe: (listener) => auth.subscribe(listener),
     },
     capabilities: { ...P0_CAPABILITIES, sessionList },
     diagnostics: {
@@ -93,10 +113,12 @@ async function main(): Promise<void> {
     stop()
     await screen.unmount()
     try {
+      await releaseLiveInstance(resolved.home)
       await app.close()
       process.exit(0)
     } catch (error) {
-      process.stderr.write(`Cocode TUI shutdown failed: ${errorMessage(error)}\n`)
+      await releaseLiveInstance(resolved.home).catch(() => undefined)
+      process.stderr.write(`Cocode TUI shutdown failed: ${displayError(error)}\n`)
       process.exit(1)
     }
   }
@@ -179,8 +201,4 @@ async function directoryExists(path: string): Promise<boolean> {
 
 function nonempty(value: string | undefined): boolean {
   return value?.trim() !== undefined && value.trim() !== ''
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
 }

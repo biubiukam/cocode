@@ -15,24 +15,45 @@ import {
   type AgencyClient,
 } from './device-flow.ts'
 import { openExternal } from './open-url.ts'
+import {
+  defaultLiveContext,
+  HomeBusyError,
+  otherLiveCount,
+  type LiveInstanceContext,
+} from './live-instances.ts'
+import { displayError, formatError, TuiError } from '../errors/index.ts'
 import { agencyOrigin } from './origin.ts'
 import { defaultHomeContext, productHome } from './paths.ts'
-import { apiKeyEnvFor, resolveAuth, saveByokKey } from './resolve.ts'
+import { apiKeyEnvFor, channelAvailability, resolveAuth, saveByokKey } from './resolve.ts'
 import {
   captureCloudSettings,
+  patchAgentDefaultModel,
   patchCloudRoute,
   restoreCloudSettings,
   unsetCloudRoute,
+  readSettings,
 } from './settings.ts'
 import {
   CLOUD_KEY_REF,
+  CLOUD_PROVIDER,
+  DEFAULT_MODEL,
+  DEFAULT_PROVIDER,
+  DEEPSEEK_KEY_REF,
   KEY_NAME,
   type AccountRecord,
   type AuthAction,
+  type AuthMode,
   type AuthSnapshot,
   type MeProfile,
   type ResolvedAuth,
 } from './types.ts'
+
+export type SelectModeResult =
+  | { status: 'ready' }
+  | { status: 'need-byok' }
+  | { status: 'need-login' }
+  | { status: 'env-locked' }
+  | { status: 'home-busy' }
 
 export type AuthStore = {
   snapshot(): AuthSnapshot
@@ -40,6 +61,7 @@ export type AuthStore = {
   dispatch(action: AuthAction): void
   resolved(): ResolvedAuth
   waitUntilReady(): Promise<ResolvedAuth>
+  selectMode(mode: AuthMode): Promise<SelectModeResult>
   logout(): Promise<void>
 }
 
@@ -49,12 +71,20 @@ export type AuthStoreOptions = {
   cwd?: string
   client?: AgencyClient
   openUrl?: (url: string) => void
+  live?: LiveInstanceContext
 }
 
 export async function createAuthStore(options: AuthStoreOptions = {}): Promise<AuthStore> {
   const env = options.env ?? process.env
   const home = options.home ?? productHome(defaultHomeContext(env))
-  const store = new AuthStoreImpl(home, env, options.cwd, options.client, options.openUrl)
+  const store = new AuthStoreImpl(
+    home,
+    env,
+    options.cwd,
+    options.client,
+    options.openUrl,
+    options.live ?? defaultLiveContext,
+  )
   await store.hydrate()
   return store
 }
@@ -78,7 +108,12 @@ class AuthStoreImpl implements AuthStore {
     private readonly cwd: string | undefined,
     private readonly client: AgencyClient | undefined,
     private readonly openUrl: ((url: string) => void) | undefined,
+    private readonly live: LiveInstanceContext,
   ) {}
+
+  private async homeIsBusy(): Promise<boolean> {
+    return (await otherLiveCount(this.home, this.live)) > 0
+  }
 
   async hydrate(signal?: AbortSignal): Promise<void> {
     try {
@@ -92,10 +127,14 @@ class AuthStoreImpl implements AuthStore {
       if (signal?.aborted) return
       if (resolved.status === 'ready') {
         this.auth = resolved.auth
+        const credentials = await readCredentials(this.home)
+        const settings = await readSettings(this.home)
         this.snap = {
           phase: 'ready',
           mode: resolved.auth.mode,
           envLocked: this.envLocked(resolved.auth.mode),
+          channels: channelAvailability(credentials, settings, this.env),
+          ...(this.profile === undefined ? {} : { profile: this.profile }),
         }
         this.flushReady()
         return
@@ -108,7 +147,7 @@ class AuthStoreImpl implements AuthStore {
       this.snap = {
         phase: 'failed',
         envLocked: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: displayError(error),
       }
     }
   }
@@ -152,7 +191,7 @@ class AuthStoreImpl implements AuthStore {
   }
 
   resolved(): ResolvedAuth {
-    if (this.auth === undefined) throw new Error('auth is not ready')
+    if (this.auth === undefined) throw new TuiError('AUTH_NOT_READY')
     return this.auth
   }
 
@@ -163,7 +202,33 @@ class AuthStoreImpl implements AuthStore {
     })
   }
 
+  async selectMode(mode: AuthMode): Promise<SelectModeResult> {
+    if (nonempty(this.env.COCODE_PROVIDER) !== undefined) {
+      return { status: 'env-locked' }
+    }
+    if (await this.homeIsBusy()) return { status: 'home-busy' }
+    const settings = await readSettings(this.home)
+    const credentials = await readCredentials(this.home)
+    if (mode === 'byok') {
+      const has =
+        nonempty(this.env[DEEPSEEK_KEY_REF]) !== undefined ||
+        nonempty(credentials[DEEPSEEK_KEY_REF]) !== undefined
+      if (!has) return { status: 'need-byok' }
+      await patchAgentDefaultModel(this.home, DEFAULT_PROVIDER, DEFAULT_MODEL)
+    } else {
+      const has =
+        (nonempty(this.env[CLOUD_KEY_REF]) !== undefined ||
+          nonempty(credentials[CLOUD_KEY_REF]) !== undefined) &&
+        settings.hasCloudRoute
+      if (!has) return { status: 'need-login' }
+      await patchAgentDefaultModel(this.home, CLOUD_PROVIDER, settings.cloudModel ?? settings.model)
+    }
+    await this.hydrate()
+    return { status: 'ready' }
+  }
+
   async logout(): Promise<void> {
+    if (await this.homeIsBusy()) throw new HomeBusyError()
     const operation = this.beginOperation()
     let firstError: unknown
     let account: AccountRecord | undefined
@@ -186,9 +251,8 @@ class AuthStoreImpl implements AuthStore {
         firstError ??= error
       }
     }
-    this.auth = undefined
     this.profile = undefined
-    this.snap = { phase: 'gate', envLocked: false }
+    await this.hydrate()
     this.emit()
     if (firstError !== undefined) throw firstError
   }
@@ -206,7 +270,7 @@ class AuthStoreImpl implements AuthStore {
       this.snap = {
         phase: 'byok',
         envLocked: false,
-        error: '请粘贴 API Key。',
+        error: formatError('AUTH_BYOK_EMPTY'),
       }
       this.emit()
       return
@@ -235,13 +299,22 @@ class AuthStoreImpl implements AuthStore {
       this.snap = {
         phase: 'failed',
         envLocked: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: displayError(error),
       }
       this.emit()
     }
   }
 
   private async signInDevice(operation: Operation): Promise<void> {
+    if (await this.homeIsBusy()) {
+      this.snap = {
+        phase: 'failed',
+        envLocked: false,
+        error: formatError('AUTH_HOME_BUSY'),
+      }
+      this.emit()
+      return
+    }
     const poll = operation.controller
     this.poll = poll
     this.snap = { phase: 'busy', envLocked: false }
@@ -305,7 +378,7 @@ class AuthStoreImpl implements AuthStore {
       const models = await listHostedModels(origin, secret, this.client, poll.signal)
       this.ensureCurrent(operation)
       if (models.length === 0) {
-        throw new Error('这个账号还没有可用的托管模型。')
+        throw new TuiError('AUTH_NO_HOSTED_MODELS')
       }
       const settingsBackup = await captureCloudSettings(this.home)
       const previousCloudKey = credentials[CLOUD_KEY_REF]
@@ -342,7 +415,7 @@ class AuthStoreImpl implements AuthStore {
       this.snap = {
         phase: 'failed',
         envLocked: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: displayError(error),
       }
       this.emit()
     }

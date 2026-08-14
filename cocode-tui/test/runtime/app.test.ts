@@ -1,338 +1,583 @@
-import { describe, expect, it } from "vitest";
-import type { TuiNotification, TuiRuntime } from "@cocode/tui-connection";
-import { createTuiApp } from "../../src/runtime/app.ts";
+import { describe, expect, it } from 'vitest'
+import type { TuiNotification, TuiRuntime } from '@cocode/tui-connection'
+import { createTuiApp } from '../../src/runtime/app.ts'
 
 function fakeRuntime(): TuiRuntime & {
-  prompts: { sessionId: string; text: string }[];
-  emit: (n: TuiNotification) => void;
-  emitClose: (error?: string) => void;
-  closeCount: number;
-  failStart?: Error;
+  prompts: { sessionId: string; text: string }[]
+  emit: (n: TuiNotification) => void
+  emitClose: (error?: string) => void
+  closeCount: number
+  restarts: { provider: string; model: string }[]
+  failStart?: Error
 } {
-  const handlers = new Set<(n: TuiNotification) => void>();
-  const closeHandlers = new Set<(error?: string) => void>();
+  const handlers = new Set<(n: TuiNotification) => void>()
+  const closeHandlers = new Set<(error?: string) => void>()
   const runtime: TuiRuntime & {
-    prompts: { sessionId: string; text: string }[];
-    emit: (n: TuiNotification) => void;
-    failStart?: Error;
+    prompts: { sessionId: string; text: string }[]
+    emit: (n: TuiNotification) => void
+    failStart?: Error
   } = {
     prompts: [],
     closeCount: 0,
+    restarts: [],
     emit(n) {
-      for (const handler of handlers) handler(n);
+      for (const handler of handlers) handler(n)
     },
     emitClose(error) {
-      for (const handler of closeHandlers) handler(error);
+      for (const handler of closeHandlers) handler(error)
     },
     async start() {
-      if (runtime.failStart) throw runtime.failStart;
-      return { name: "fake-runtime", version: "0" };
+      if (runtime.failStart) throw runtime.failStart
+      return { name: 'fake-runtime', version: '0' }
+    },
+    async restart(init) {
+      runtime.restarts.push({
+        provider: init.provider,
+        model: init.model,
+      })
+      await runtime.close()
+      return runtime.start()
     },
     async prompt(sessionId, blocks) {
-      const text = typeof blocks[0]?.text === "string" ? blocks[0].text : "";
-      runtime.prompts.push({ sessionId, text });
-      return "mid-1";
+      const text = typeof blocks[0]?.text === 'string' ? blocks[0].text : ''
+      runtime.prompts.push({ sessionId, text })
+      return 'mid-1'
     },
     subscribe(handler) {
-      handlers.add(handler);
+      handlers.add(handler)
       return () => {
-        handlers.delete(handler);
-      };
+        handlers.delete(handler)
+      }
     },
     onClose(handler) {
-      closeHandlers.add(handler);
-      return () => closeHandlers.delete(handler);
+      closeHandlers.add(handler)
+      return () => closeHandlers.delete(handler)
     },
     async close() {
-      runtime.closeCount += 1;
+      runtime.closeCount += 1
     },
-  };
-  return runtime;
+  }
+  return runtime
 }
 
-describe("TuiApp", () => {
-  it("prompts only when idle", async () => {
-    const runtime = fakeRuntime();
+describe('TuiApp', () => {
+  it('prompts only when idle', async () => {
+    const runtime = fakeRuntime()
     const app = createTuiApp({
       runtime,
-      cwd: "/tmp",
-      provider: "deepseek-official",
-      model: "deepseek-v4-flash",
-      sessionId: "s1",
-    });
-    await app.start();
-    app.dispatch({ type: "submit", text: "hello" });
-    expect(runtime.prompts).toEqual([{ sessionId: "s1", text: "hello" }]);
+      cwd: '/tmp',
+      provider: 'deepseek-official',
+      model: 'deepseek-v4-flash',
+      sessionId: 's1',
+    })
+    await app.start()
+    app.dispatch({ type: 'submit', text: 'hello' })
+    expect(runtime.prompts).toEqual([{ sessionId: 's1', text: 'hello' }])
     runtime.emit({
-      method: "session.status",
-      params: { sessionId: "s1", status: "running" },
-    });
-    app.dispatch({ type: "submit", text: "again" });
-    expect(runtime.prompts).toHaveLength(1);
-    expect(app.snapshot().notice?.message).toMatch(/Turn in progress/);
-  });
+      method: 'session.status',
+      params: { sessionId: 's1', status: 'running' },
+    })
+    app.dispatch({ type: 'submit', text: 'again' })
+    expect(runtime.prompts).toHaveLength(1)
+    expect(app.snapshot().notice?.message).toMatch(/Turn in progress/)
+  })
 
-  it("ingests session.event into nodes", async () => {
-    const runtime = fakeRuntime();
+  it('ingests session.event into nodes', async () => {
+    const runtime = fakeRuntime()
     const app = createTuiApp({
       runtime,
-      cwd: "/tmp",
-      provider: "p",
-      model: "m",
-      sessionId: "s1",
-    });
-    await app.start();
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+    })
+    await app.start()
     runtime.emit({
-      method: "session.event",
+      method: 'session.event',
       params: {
-        sessionId: "s1",
+        sessionId: 's1',
         event: {
-          type: "user/message",
+          type: 'user/message',
           seq: 1,
           time: 1,
           data: {
-            id: "u1",
-            role: "user",
-            content: [{ type: "text", text: "hi" }],
-            source: { kind: "user" },
+            id: 'u1',
+            role: 'user',
+            content: [{ type: 'text', text: 'hi' }],
+            source: { kind: 'user' },
           },
         },
       },
-    });
-    expect(app.snapshot().nodes[0]).toMatchObject({ kind: "user", text: "hi" });
-  });
+    })
+    expect(app.snapshot().nodes[0]).toMatchObject({ kind: 'user', text: 'hi' })
+  })
 
-  it("ignores events for other sessions", async () => {
-    const runtime = fakeRuntime();
+  it('ignores events for other sessions', async () => {
+    const runtime = fakeRuntime()
     const app = createTuiApp({
       runtime,
-      cwd: "/tmp",
-      provider: "p",
-      model: "m",
-      sessionId: "s1",
-    });
-    await app.start();
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+    })
+    await app.start()
     runtime.emit({
-      method: "session.event",
+      method: 'session.event',
       params: {
-        sessionId: "other",
+        sessionId: 'other',
         event: {
-          type: "user/message",
+          type: 'user/message',
           seq: 1,
           time: 1,
           data: {
-            id: "u1",
-            content: [{ type: "text", text: "nope" }],
+            id: 'u1',
+            content: [{ type: 'text', text: 'nope' }],
           },
         },
       },
-    });
-    expect(app.snapshot().nodes).toEqual([]);
-  });
+    })
+    expect(app.snapshot().nodes).toEqual([])
+  })
 
-  it("arms interrupt then quits on the second press", async () => {
-    const runtime = fakeRuntime();
+  it('arms interrupt then quits on the second press', async () => {
+    const runtime = fakeRuntime()
     const app = createTuiApp({
       runtime,
-      cwd: "/tmp",
-      provider: "p",
-      model: "m",
-      sessionId: "s1",
-    });
-    await app.start();
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+    })
+    await app.start()
     runtime.emit({
-      method: "session.status",
-      params: { sessionId: "s1", status: "running" },
-    });
-    app.dispatch({ type: "interruptOrQuit" });
-    expect(app.snapshot().exiting).toBe(false);
-    expect(app.snapshot().notice?.message).toMatch(/cannot cancel/);
-    app.dispatch({ type: "interruptOrQuit" });
-    expect(app.snapshot().exiting).toBe(true);
-  });
+      method: 'session.status',
+      params: { sessionId: 's1', status: 'running' },
+    })
+    app.dispatch({ type: 'interruptOrQuit' })
+    expect(app.snapshot().exiting).toBe(false)
+    expect(app.snapshot().notice?.message).toMatch(/cannot cancel/)
+    app.dispatch({ type: 'interruptOrQuit' })
+    expect(app.snapshot().exiting).toBe(true)
+  })
 
-  it("requires two idle interrupts to quit", async () => {
-    const runtime = fakeRuntime();
+  it('requires two idle interrupts to quit', async () => {
+    const runtime = fakeRuntime()
     const app = createTuiApp({
       runtime,
-      cwd: "/tmp",
-      provider: "p",
-      model: "m",
-      sessionId: "s1",
-    });
-    await app.start();
-    app.dispatch({ type: "interruptOrQuit" });
-    expect(app.snapshot().exiting).toBe(false);
-    expect(app.snapshot().notice?.message).toMatch(/Press again/);
-    app.dispatch({ type: "interruptOrQuit" });
-    expect(app.snapshot().exiting).toBe(true);
-  });
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+    })
+    await app.start()
+    app.dispatch({ type: 'interruptOrQuit' })
+    expect(app.snapshot().exiting).toBe(false)
+    expect(app.snapshot().notice?.message).toMatch(/Press again/)
+    app.dispatch({ type: 'interruptOrQuit' })
+    expect(app.snapshot().exiting).toBe(true)
+  })
 
-  it("marks dead when initialize fails", async () => {
-    const runtime = fakeRuntime();
-    runtime.failStart = new Error("no lib/");
+  it('marks dead when initialize fails', async () => {
+    const runtime = fakeRuntime()
+    runtime.failStart = new Error('no lib/')
     const app = createTuiApp({
       runtime,
-      cwd: "/tmp",
-      provider: "p",
-      model: "m",
-    });
-    await app.start();
-    expect(app.snapshot().agent).toBe("dead");
-    expect(app.snapshot().notice?.tone).toBe("error");
-  });
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+    })
+    await app.start()
+    expect(app.snapshot().agent).toBe('dead')
+    expect(app.snapshot().notice?.tone).toBe('error')
+  })
 
-  it("/new changes session id and clears nodes", async () => {
-    const runtime = fakeRuntime();
+  it('/new changes session id and clears nodes', async () => {
+    const runtime = fakeRuntime()
     const app = createTuiApp({
       runtime,
-      cwd: "/tmp",
-      provider: "p",
-      model: "m",
-      sessionId: "s1",
-    });
-    await app.start();
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+    })
+    await app.start()
     runtime.emit({
-      method: "session.event",
+      method: 'session.event',
       params: {
-        sessionId: "s1",
+        sessionId: 's1',
         event: {
-          type: "user/message",
+          type: 'user/message',
           seq: 1,
           time: 1,
-          data: { id: "u1", content: [{ type: "text", text: "x" }] },
+          data: { id: 'u1', content: [{ type: 'text', text: 'x' }] },
         },
       },
-    });
-    app.dispatch({ type: "command", line: "/new" });
-    const snap = app.snapshot();
-    expect(snap.header.sessionId).not.toBe("s1");
-    expect(snap.nodes).toEqual([]);
-  });
+    })
+    app.dispatch({ type: 'command', line: '/new' })
+    const snap = app.snapshot()
+    expect(snap.header.sessionId).not.toBe('s1')
+    expect(snap.nodes).toEqual([])
+  })
 
-  it("edits the draft around a cursor", async () => {
-    const runtime = fakeRuntime();
+  it('edits the draft around a cursor', async () => {
+    const runtime = fakeRuntime()
     const app = createTuiApp({
       runtime,
-      cwd: "/tmp",
-      provider: "p",
-      model: "m",
-    });
-    await app.start();
-    app.dispatch({ type: "setDraft", text: "ac" });
-    app.dispatch({ type: "moveCursor", delta: -1 });
-    app.dispatch({ type: "insertDraft", text: "b" });
-    expect(app.snapshot().composer).toMatchObject({ text: "abc", cursor: 2 });
-    app.dispatch({ type: "deleteBackward" });
-    expect(app.snapshot().composer).toMatchObject({ text: "ac", cursor: 1 });
-  });
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+    })
+    await app.start()
+    app.dispatch({ type: 'setDraft', text: 'ac' })
+    app.dispatch({ type: 'moveCursor', delta: -1 })
+    app.dispatch({ type: 'insertDraft', text: 'b' })
+    expect(app.snapshot().composer).toMatchObject({ text: 'abc', cursor: 2 })
+    app.dispatch({ type: 'deleteBackward' })
+    expect(app.snapshot().composer).toMatchObject({ text: 'ac', cursor: 1 })
+  })
 
-  it("marks the app dead when the runtime transport closes", async () => {
-    const runtime = fakeRuntime();
+  it('marks the app dead when the runtime transport closes', async () => {
+    const runtime = fakeRuntime()
     const app = createTuiApp({
       runtime,
-      cwd: "/tmp",
-      provider: "p",
-      model: "m",
-    });
-    await app.start();
-    runtime.emitClose("stderr tail");
-    expect(app.snapshot().agent).toBe("dead");
-    expect(app.snapshot().composer.disabled).toBe(true);
-    expect(app.snapshot().notice?.message).toMatch(/stderr tail/);
-  });
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+    })
+    await app.start()
+    runtime.emitClose('stderr tail')
+    expect(app.snapshot().agent).toBe('dead')
+    expect(app.snapshot().composer.disabled).toBe(true)
+    expect(app.snapshot().notice?.message).toMatch(/stderr tail/)
+  })
 
-  it("closes the runtime once for repeated quit actions", async () => {
-    const runtime = fakeRuntime();
+  it('closes the runtime once for repeated quit actions', async () => {
+    const runtime = fakeRuntime()
     const app = createTuiApp({
       runtime,
-      cwd: "/tmp",
-      provider: "p",
-      model: "m",
-    });
-    await app.start();
-    app.dispatch({ type: "quit" });
-    app.dispatch({ type: "quit" });
-    await app.close();
-    expect(runtime.closeCount).toBe(1);
-    expect(app.snapshot().exiting).toBe(true);
-  });
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+    })
+    await app.start()
+    app.dispatch({ type: 'quit' })
+    app.dispatch({ type: 'quit' })
+    await app.close()
+    expect(runtime.closeCount).toBe(1)
+    expect(app.snapshot().exiting).toBe(true)
+  })
 
-  it("shows the latest assistant usage without inventing zeroes", async () => {
-    const runtime = fakeRuntime();
+  it('shows the latest assistant usage without inventing zeroes', async () => {
+    const runtime = fakeRuntime()
     const app = createTuiApp({
       runtime,
-      cwd: "/tmp",
-      provider: "p",
-      model: "m",
-      sessionId: "s1",
-    });
-    await app.start();
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+    })
+    await app.start()
     runtime.emit({
-      method: "session.event",
+      method: 'session.event',
       params: {
-        sessionId: "s1",
+        sessionId: 's1',
         event: {
-          type: "assistant/message",
+          type: 'assistant/message',
           seq: 1,
           time: 1,
           data: {
             turn: 1,
             step: 1,
-            message: { content: [{ type: "text", text: "done" }] },
+            message: { content: [{ type: 'text', text: 'done' }] },
             usage: { inputTokens: 12, outputTokens: 4 },
           },
         },
       },
-    });
-    expect(app.snapshot().status.tokens).toEqual({ input: 12, output: 4 });
-  });
+    })
+    expect(app.snapshot().status.tokens).toEqual({ input: 12, output: 4 })
+  })
 
-  it("doctor redacts credentials and reports launch state", async () => {
-    const runtime = fakeRuntime();
-    runtime.failStart = new Error("API_KEY=sk-secret");
+  it('doctor redacts credentials and reports launch state', async () => {
+    const runtime = fakeRuntime()
+    runtime.failStart = new Error('API_KEY=sk-secret')
     const app = createTuiApp({
       runtime,
-      cwd: "/tmp",
-      provider: "p",
-      model: "m",
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
       diagnostics: {
         tty: true,
         launchConfigured: false,
         argsConfigured: true,
-        sessionRoot: "/tmp/sessions",
+        sessionRoot: '/tmp/sessions',
       },
-    });
-    await app.start();
-    app.dispatch({ type: "command", line: "/doctor" });
-    const message = app.snapshot().notice?.message ?? "";
-    expect(message).toMatch(/tty yes/);
-    expect(message).toMatch(/launch unset/);
-    expect(message).toMatch(/initialize error/);
-    expect(message).not.toMatch(/sk-|API_KEY=|ck_live_/);
-  });
+    })
+    await app.start()
+    app.dispatch({ type: 'command', line: '/doctor' })
+    const message = app.snapshot().notice?.message ?? ''
+    expect(message).toMatch(/tty yes/)
+    expect(message).toMatch(/launch unset/)
+    expect(message).toMatch(/initialize error/)
+    expect(message).not.toMatch(/sk-|API_KEY=|ck_live_/)
+  })
 
-  it("/status mentions auth mode and never prints a key", async () => {
-    const runtime = fakeRuntime();
+  it('/status mentions auth mode and never prints a key', async () => {
+    const runtime = fakeRuntime()
     const app = createTuiApp({
       runtime,
-      cwd: "/tmp",
-      provider: "deepseek-official",
-      model: "deepseek-v4-flash",
-      sessionId: "s1",
+      cwd: '/tmp',
+      provider: 'deepseek-official',
+      model: 'deepseek-v4-flash',
+      sessionId: 's1',
       auth: {
-        mode: "byok",
+        mode: 'byok',
         envLocked: true,
-        accountLabel: "Ada",
+        accountLabel: 'Ada',
         logout: async () => {},
       },
-    });
-    await app.start();
-    app.dispatch({ type: "command", line: "/status" });
-    const message = app.snapshot().notice?.message ?? "";
-    expect(message).toMatch(/auth: byok/);
-    expect(message).toMatch(/env-locked/);
-    expect(message).toMatch(/account: Ada/);
-    expect(message).not.toMatch(/sk-|ck_live_|API_KEY=/);
-  });
-});
+    })
+    await app.start()
+    app.dispatch({ type: 'command', line: '/status' })
+    const message = app.snapshot().notice?.message ?? ''
+    expect(message).toMatch(/auth: byok/)
+    expect(message).toMatch(/env-locked/)
+    expect(message).toMatch(/account: Ada/)
+    expect(message).not.toMatch(/sk-|ck_live_|API_KEY=/)
+  })
+
+  it('/use byok restarts the runtime as a new session', async () => {
+    const runtime = fakeRuntime()
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'cocode-cloud',
+      model: 'cloud-1',
+      sessionId: 's1',
+      auth: {
+        mode: 'cocode',
+        envLocked: false,
+        logout: async () => {},
+        selectMode: async () => ({ status: 'ready' }),
+        resolved: () => ({
+          mode: 'byok',
+          provider: 'deepseek-official',
+          model: 'deepseek-v4-flash',
+          cwd: '/tmp',
+          origin: 'https://cocode.agency',
+          home: '/tmp/home',
+          env: { DEEPSEEK_API_KEY: 'sk-x', DSH_HOME: '/tmp/home' },
+        }),
+      },
+    })
+    await app.start()
+    runtime.emit({
+      method: 'session.event',
+      params: {
+        sessionId: 's1',
+        event: {
+          type: 'assistant/message',
+          seq: 1,
+          time: 1,
+          data: {
+            turn: 1,
+            step: 1,
+            message: { content: [{ type: 'text', text: 'old' }] },
+          },
+        },
+      },
+    })
+    expect(app.snapshot().nodes.length).toBeGreaterThan(0)
+    app.dispatch({ type: 'command', line: '/use byok' })
+    await expect.poll(() => app.snapshot().header.provider).toBe('deepseek-official')
+    expect(runtime.restarts).toEqual([
+      { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+    ])
+    expect(app.snapshot().header.sessionId).not.toBe('s1')
+    expect(app.snapshot().nodes).toEqual([])
+    expect(app.snapshot().notice?.message).toMatch(/API Key/)
+    expect(app.snapshot().notice?.message).toMatch(/新会话/)
+    expect(app.snapshot().notice?.message).not.toMatch(/sk-|ck_/)
+    expect(app.snapshot().agent).toBe('idle')
+  })
+
+  it('/use byok without a key captures a masked paste', async () => {
+    const runtime = fakeRuntime()
+    const keys: string[] = []
+    let modeCalls = 0
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'cocode-cloud',
+      model: 'cloud-1',
+      sessionId: 's1',
+      auth: {
+        mode: 'cocode',
+        envLocked: false,
+        logout: async () => {},
+        selectMode: async () => {
+          modeCalls += 1
+          return modeCalls === 1 ? { status: 'need-byok' } : { status: 'ready' }
+        },
+        submitByok: async (key) => {
+          keys.push(key)
+        },
+        resolved: () => ({
+          mode: 'byok',
+          provider: 'deepseek-official',
+          model: 'deepseek-v4-flash',
+          cwd: '/tmp',
+          origin: 'https://cocode.agency',
+          home: '/tmp/home',
+          env: { DEEPSEEK_API_KEY: 'sk-new', DSH_HOME: '/tmp/home' },
+        }),
+      },
+    })
+    await app.start()
+    app.dispatch({ type: 'command', line: '/use byok' })
+    await expect.poll(() => app.snapshot().composer.mask).toBe(true)
+    app.dispatch({ type: 'submit', text: '   ' })
+    expect(app.snapshot().composer.mask).toBe(true)
+    expect(runtime.restarts).toEqual([])
+    app.dispatch({ type: 'submit', text: 'sk-new' })
+    await expect.poll(() => app.snapshot().header.provider).toBe('deepseek-official')
+    expect(keys).toEqual(['sk-new'])
+    expect(app.snapshot().composer.mask).toBeUndefined()
+    expect(app.snapshot().exiting).toBe(false)
+  })
+
+  it('/logout keeps the TUI when BYOK remains', async () => {
+    const runtime = fakeRuntime()
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'cocode-cloud',
+      model: 'cloud-1',
+      sessionId: 's1',
+      auth: {
+        mode: 'cocode',
+        envLocked: false,
+        logout: async () => {},
+        snapshot: () => ({
+          phase: 'ready',
+          mode: 'byok',
+          envLocked: false,
+          channels: { byok: true, cocode: false },
+        }),
+        resolved: () => ({
+          mode: 'byok',
+          provider: 'deepseek-official',
+          model: 'deepseek-v4-flash',
+          cwd: '/tmp',
+          origin: 'https://cocode.agency',
+          home: '/tmp/home',
+          env: { DEEPSEEK_API_KEY: 'sk-x', DSH_HOME: '/tmp/home' },
+        }),
+      },
+    })
+    await app.start()
+    app.dispatch({ type: 'command', line: '/logout' })
+    await expect.poll(() => app.snapshot().header.provider).toBe('deepseek-official')
+    expect(app.snapshot().exiting).toBe(false)
+    expect(app.snapshot().header.sessionId).not.toBe('s1')
+  })
+
+  it('refuses /use while a turn is running', async () => {
+    const runtime = fakeRuntime()
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+      auth: {
+        mode: 'byok',
+        envLocked: false,
+        logout: async () => {},
+        selectMode: async () => ({ status: 'ready' }),
+      },
+    })
+    await app.start()
+    runtime.emit({
+      method: 'session.status',
+      params: { sessionId: 's1', status: 'running' },
+    })
+    app.dispatch({ type: 'command', line: '/use cocode' })
+    expect(runtime.restarts).toEqual([])
+    expect(app.snapshot().notice?.message).toMatch(/Turn in progress|先等|Esc/)
+  })
+
+  it('refuses /use when another TUI shares the home', async () => {
+    const runtime = fakeRuntime()
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'cocode-cloud',
+      model: 'cloud-1',
+      sessionId: 's1',
+      auth: {
+        mode: 'cocode',
+        envLocked: false,
+        logout: async () => {},
+        exclusiveHome: async () => false,
+        selectMode: async () => ({ status: 'ready' }),
+        resolved: () => ({
+          mode: 'byok',
+          provider: 'deepseek-official',
+          model: 'deepseek-v4-flash',
+          cwd: '/tmp',
+          origin: 'https://cocode.agency',
+          home: '/tmp/home',
+          env: { DEEPSEEK_API_KEY: 'sk-x', DSH_HOME: '/tmp/home' },
+        }),
+      },
+    })
+    await app.start()
+    app.dispatch({ type: 'command', line: '/use byok' })
+    await expect.poll(() => app.snapshot().notice?.message ?? '').toMatch(/AUTH_HOME_BUSY/)
+    expect(runtime.restarts).toEqual([])
+    expect(app.snapshot().header.provider).toBe('cocode-cloud')
+    expect(app.snapshot().header.sessionId).toBe('s1')
+  })
+
+  it('refuses /logout when another TUI shares the home', async () => {
+    const runtime = fakeRuntime()
+    let loggedOut = false
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'cocode-cloud',
+      model: 'cloud-1',
+      sessionId: 's1',
+      auth: {
+        mode: 'cocode',
+        envLocked: false,
+        exclusiveHome: async () => false,
+        logout: async () => {
+          loggedOut = true
+        },
+        snapshot: () => ({
+          phase: 'ready',
+          mode: 'byok',
+          envLocked: false,
+          channels: { byok: true, cocode: false },
+        }),
+        resolved: () => ({
+          mode: 'byok',
+          provider: 'deepseek-official',
+          model: 'deepseek-v4-flash',
+          cwd: '/tmp',
+          origin: 'https://cocode.agency',
+          home: '/tmp/home',
+          env: { DEEPSEEK_API_KEY: 'sk-x', DSH_HOME: '/tmp/home' },
+        }),
+      },
+    })
+    await app.start()
+    app.dispatch({ type: 'command', line: '/logout' })
+    await expect.poll(() => app.snapshot().notice?.message ?? '').toMatch(/AUTH_HOME_BUSY/)
+    expect(loggedOut).toBe(false)
+    expect(app.snapshot().exiting).toBe(false)
+    expect(runtime.restarts).toEqual([])
+  })
+})

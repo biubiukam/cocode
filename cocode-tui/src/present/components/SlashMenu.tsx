@@ -36,12 +36,22 @@ export function SlashMenu(props: { items: readonly SlashMenuItem[]; selectedInde
   if (props.items.length === 0) return null
   const selected = moveSlashSelection(props.selectedIndex, 0, props.items.length)
   return (
-    <Box flexDirection="column" marginLeft={2}>
+    <Box
+      flexDirection="column"
+      marginTop={1}
+      borderStyle="round"
+      borderColor={theme.border}
+      paddingX={1}
+    >
+      <Text color={theme.dim} bold>
+        commands <Text color={theme.mute}>· tab / ↑↓ select</Text>
+      </Text>
       {props.items.map((item, index) => {
         const active = index === selected
         return (
-          <Text key={item.name} color={active ? theme.text : theme.mute}>
-            {active ? '>' : ' '} /{item.name} · {item.summary}
+          <Text key={item.name} color={active ? theme.text : theme.mute} inverse={active}>
+            {active ? '›' : ' '} /{item.name}{' '}
+            <Text color={active ? theme.text : theme.dim}>· {item.summary}</Text>
           </Text>
         )
       })}

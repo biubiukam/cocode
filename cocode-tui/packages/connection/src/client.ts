@@ -19,7 +19,7 @@ export function createTuiRuntime(launch: TuiLaunch): TuiRuntime {
 
 class SdkTuiRuntime implements TuiRuntime {
   private client: HarnessClient | undefined
-  private readonly launch: TuiLaunch
+  private launch: TuiLaunch
   private readonly handlers = new Set<(n: TuiNotification) => void>()
   private readonly closeHandlers = new Set<(error?: string) => void>()
   private pump: Promise<void> | undefined
@@ -50,6 +50,33 @@ class SdkTuiRuntime implements TuiRuntime {
     } catch (error) {
       this.closing = true
       await this.close().catch(() => undefined)
+      throw error
+    }
+  }
+
+  async restart(
+    init: TuiInitialize,
+    env?: NodeJS.ProcessEnv,
+  ): Promise<{ name: string; version: string }> {
+    await this.close()
+    this.closing = false
+    this.client = undefined
+    this.pump = undefined
+    const previousLaunch = this.launch
+    if (env !== undefined) {
+      const sessionRoot = this.launch.env?.DSH_SESSION_ROOT
+      this.launch = {
+        ...this.launch,
+        env: {
+          ...env,
+          ...(sessionRoot === undefined ? {} : { DSH_SESSION_ROOT: sessionRoot }),
+        },
+      }
+    }
+    try {
+      return await this.start(init)
+    } catch (error) {
+      this.launch = previousLaunch
       throw error
     }
   }

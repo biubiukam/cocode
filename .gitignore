@@ -30,12 +30,15 @@ Desktop.ini
 !/cocode-gui/.dev/rfc/
 !/cocode-gui/.dev/rfc/**
 
-# cocode-tui — local dev scratch ignored; rfc/ is versioned
+# cocode-tui — local dev scratch ignored; rfc/ and home README are versioned
 /cocode-tui/.dev/
 !/cocode-tui/.dev/
 /cocode-tui/.dev/*
 !/cocode-tui/.dev/rfc/
 !/cocode-tui/.dev/rfc/**
+!/cocode-tui/.dev/home/
+/cocode-tui/.dev/home/*
+!/cocode-tui/.dev/home/README.md
 
 # Root design dumps that are not part of the product
 /design-system.html
@@ -47,6 +50,7 @@ Desktop.ini
 
 # Dependencies
 node_modules/
+.pnpm-store/
 
 # Build outputs
 dist/

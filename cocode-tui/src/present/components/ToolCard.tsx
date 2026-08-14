@@ -11,14 +11,14 @@ export function ToolCard(props: { node: ToolNode; verbose: boolean }) {
   const result = formatToolResult(node.result, verbose)
   const summary = !verbose ? result ?? node.error?.code : undefined
   return (
-    <Box flexDirection="column" marginTop={1}>
+    <Box flexDirection="column" marginTop={1} paddingLeft={1}>
       <Text color={color}>
-        {mark} {node.name}
+        {mark} <Text bold>{node.name}</Text>
         {summary ? ` · ${summary}` : ''}
       </Text>
-      {verbose && node.args !== '' ? <Text color={theme.mute}>{node.args}</Text> : null}
-      {verbose && result !== undefined ? <Text color={theme.tool}>{result}</Text> : null}
-      {verbose && node.error ? <Text color={theme.error}>{node.error.code}</Text> : null}
+      {verbose && node.args !== '' ? <Text color={theme.mute}> args {node.args}</Text> : null}
+      {verbose && result !== undefined ? <Text color={theme.tool}> {result}</Text> : null}
+      {verbose && node.error ? <Text color={theme.error}> {node.error.code}</Text> : null}
     </Box>
   )
 }

@@ -3,6 +3,7 @@
 import type { TuiAuthInfo, TuiCommandCtx } from './app.ts'
 import type { TuiCapabilities } from './capabilities.ts'
 import { formatDoctor } from './diagnostics.ts'
+import { formatError } from './errors/index.ts'
 import { writeSessionExport } from './export-file.ts'
 import { listSessionSummaries } from './sessions-fs.ts'
 import { ensureAgentsFile } from './workspace-init.ts'
@@ -15,6 +16,7 @@ export type CommandContextOptions = {
   showStatus: TuiCommandCtx['showStatus']
   notice: TuiCommandCtx['notice']
   logout: TuiCommandCtx['logout']
+  useAuth?: TuiCommandCtx['useAuth']
   showDoctor: NonNullable<TuiCommandCtx['showDoctor']>
   cwd: string
   sessionId: string
@@ -30,7 +32,7 @@ export type AppCommandContextOptions = {
   clearTranscript: TuiCommandCtx['clearTranscript']
   notice: TuiCommandCtx['notice']
   logout: () => Promise<void>
-  beginQuit: () => void
+  useAuth?: TuiCommandCtx['useAuth']
   showStatus: () => void
   initError?: string
   capabilities: TuiCapabilities
@@ -52,6 +54,7 @@ export function createCommandContext(options: CommandContextOptions): TuiCommand
     showStatus: options.showStatus,
     notice: options.notice,
     logout: options.logout,
+    useAuth: options.useAuth,
     showDoctor: options.showDoctor,
     setTheme: options.setTheme,
     exportTranscript: async () => {
@@ -69,7 +72,7 @@ export function createCommandContext(options: CommandContextOptions): TuiCommand
     },
     resumeSessions: async () => {
       if (options.sessionRoot === undefined) {
-        options.notice('error', 'Session root is unavailable.')
+        options.notice('error', formatError('SESSION_ROOT_UNAVAILABLE'))
         return
       }
       const result = await listSessionSummaries({
@@ -96,15 +99,8 @@ export function createAppCommandContext(options: AppCommandContextOptions): TuiC
     clearTranscript: options.clearTranscript,
     showStatus: options.showStatus,
     notice: options.notice,
-    logout: async () => {
-      if (options.auth === undefined) {
-        options.notice('info', 'Not signed in to Cocode.')
-        return
-      }
-      await options.logout()
-      options.notice('info', 'Signed out.')
-      options.beginQuit()
-    },
+    logout: options.logout,
+    useAuth: options.useAuth,
     showDoctor: () => {
       options.notice(
         'info',

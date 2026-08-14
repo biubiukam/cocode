@@ -2,132 +2,130 @@
  * Local slash table. Missing wire capabilities stay off the menu.
  */
 
-import type { TuiCapabilities } from "./capabilities.ts";
-import type { TuiCommandCtx } from "./app.ts";
+import type { TuiCapabilities } from './capabilities.ts'
+import type { TuiCommandCtx } from './app.ts'
 
 export type Command = {
-  name: string;
-  summary: string;
-  kind: "local" | "prompt-text";
-  available: (caps: TuiCapabilities) => boolean;
-  run: (app: TuiCommandCtx, args: string) => void;
-};
+  name: string
+  summary: string
+  kind: 'local' | 'prompt-text'
+  available: (caps: TuiCapabilities) => boolean
+  run: (app: TuiCommandCtx, args: string) => void
+}
 
 export class CommandRegistry {
-  private readonly commands: Command[] = [];
+  private readonly commands: Command[] = []
 
   register(command: Command): void {
-    this.commands.push(command);
+    this.commands.push(command)
   }
 
   list(caps: TuiCapabilities): Command[] {
-    return this.commands.filter((command) => command.available(caps));
+    return this.commands.filter((command) => command.available(caps))
   }
 
   find(name: string, caps: TuiCapabilities): Command | undefined {
-    const needle = name.replace(/^\//, "").toLowerCase();
-    return this.list(caps).find((command) => command.name === needle);
+    const needle = name.replace(/^\//, '').toLowerCase()
+    return this.list(caps).find((command) => command.name === needle)
   }
 }
 
-export function filterCommands(
-  commands: readonly Command[],
-  draft: string,
-): readonly Command[] {
-  if (!/^\/\S*$/.test(draft)) return [];
-  const prefix = draft.slice(1).toLowerCase();
-  return commands.filter((command) =>
-    command.name.toLowerCase().startsWith(prefix),
-  );
+export function filterCommands(commands: readonly Command[], draft: string): readonly Command[] {
+  if (!/^\/\S*$/.test(draft)) return []
+  const prefix = draft.slice(1).toLowerCase()
+  return commands.filter((command) => command.name.toLowerCase().startsWith(prefix))
 }
 
 export function createBuiltinCommands(): CommandRegistry {
-  const registry = new CommandRegistry();
-  const local = (name: string, summary: string, run: Command["run"]): void => {
+  const registry = new CommandRegistry()
+  const local = (name: string, summary: string, run: Command['run']): void => {
     registry.register({
       name,
       summary,
-      kind: "local",
+      kind: 'local',
       available: () => true,
       run,
-    });
-  };
+    })
+  }
 
-  local("help", "Show keyboard and command help", (ctx) => {
-    ctx.dispatch({ type: "toggleHelp" });
-  });
-  local("exit", "Shut down the runtime and leave", (ctx) => {
-    ctx.dispatch({ type: "quit" });
-  });
-  local("clear", "Clear the projected transcript", (ctx) => {
-    ctx.clearTranscript();
-  });
-  local("status", "Show session, model, and agent state", (ctx) => {
-    ctx.showStatus();
-  });
-  local("doctor", "Show safe launch and initialize diagnostics", (ctx) => {
-    ctx.showDoctor?.();
-  });
-  local("theme", "Switch the terminal theme", (ctx, args) => {
-    const name = args.trim().toLowerCase();
-    if (name !== "dark" && name !== "light") {
-      ctx.notice("info", "Use /theme dark or /theme light.");
-      return;
+  local('help', 'Show keyboard and command help', (ctx) => {
+    ctx.dispatch({ type: 'toggleHelp' })
+  })
+  local('exit', 'Shut down the runtime and leave', (ctx) => {
+    ctx.dispatch({ type: 'quit' })
+  })
+  local('clear', 'Clear the projected transcript', (ctx) => {
+    ctx.clearTranscript()
+  })
+  local('status', 'Show session, model, and agent state', (ctx) => {
+    ctx.showStatus()
+  })
+  local('doctor', 'Show safe launch and initialize diagnostics', (ctx) => {
+    ctx.showDoctor?.()
+  })
+  local('theme', 'Switch the terminal theme', (ctx, args) => {
+    const name = args.trim().toLowerCase()
+    if (name !== 'dark' && name !== 'light') {
+      ctx.notice('info', 'Use /theme dark or /theme light.')
+      return
     }
-    ctx.setTheme?.(name);
-  });
-  local("export", "Export the projected session as Markdown", (ctx) => {
-    void ctx.exportTranscript?.();
-  });
-  local("init", "Create AGENTS.md when the workspace has none", (ctx) => {
-    void ctx.initWorkspace?.();
-  });
+    ctx.setTheme?.(name)
+  })
+  local('export', 'Export the projected session as Markdown', (ctx) => {
+    void ctx.exportTranscript?.()
+  })
+  local('init', 'Create AGENTS.md when the workspace has none', (ctx) => {
+    void ctx.initWorkspace?.()
+  })
   registry.register({
-    name: "resume",
-    summary: "List local session history for this workspace",
-    kind: "local",
-    available: (caps) => caps.sessionList === "jsonl",
+    name: 'resume',
+    summary: 'List local session history for this workspace',
+    kind: 'local',
+    available: (caps) => caps.sessionList === 'jsonl',
     run: (ctx) => {
-      void ctx.resumeSessions?.();
+      void ctx.resumeSessions?.()
     },
-  });
-  local("new", "Start a new session id (not a fork)", (ctx) => {
-    ctx.newSession();
-  });
-  local("login", "Sign in with Cocode (restart after logout)", (ctx) => {
-    ctx.notice("info", "换账号请先 /logout，然后重新启动。");
-  });
-  local("logout", "Sign out of Cocode Cloud and quit", (ctx) => {
-    void ctx.logout();
-  });
+  })
+  local('new', 'Start a new session id (not a fork)', (ctx) => {
+    ctx.newSession()
+  })
+  local('use', 'Switch between API Key and Cocode', (ctx, args) => {
+    const target = args.trim().toLowerCase()
+    if (target !== 'byok' && target !== 'cocode') {
+      ctx.notice('info', 'Use /use byok or /use cocode.')
+      return
+    }
+    ctx.useAuth?.(target)
+  })
+  local('login', 'Sign in with Cocode', (ctx) => {
+    ctx.useAuth?.('login')
+  })
+  local('logout', 'Sign out of Cocode Cloud', (ctx) => {
+    void ctx.logout()
+  })
 
-  return registry;
+  return registry
 }
 
-export function parseSlash(
-  line: string,
-): { name: string; args: string } | null {
-  const trimmed = line.trim();
-  if (!trimmed.startsWith("/")) return null;
-  const match = /^\/(\S+)(?:\s+([\s\S]*))?$/.exec(trimmed);
-  if (match === null) return null;
-  return { name: match[1] ?? "", args: (match[2] ?? "").trim() };
+export function parseSlash(line: string): { name: string; args: string } | null {
+  const trimmed = line.trim()
+  if (!trimmed.startsWith('/')) return null
+  const match = /^\/(\S+)(?:\s+([\s\S]*))?$/.exec(trimmed)
+  if (match === null) return null
+  return { name: match[1] ?? '', args: (match[2] ?? '').trim() }
 }
 
-export function helpText(
-  caps: TuiCapabilities,
-  registry: CommandRegistry,
-): string {
+export function helpText(caps: TuiCapabilities, registry: CommandRegistry): string {
   const commands = registry
     .list(caps)
     .map((command) => `/${command.name}  ${command.summary}`)
-    .join("\n");
+    .join('\n')
   return [
-    "Cocode TUI",
-    "enter send · esc/ctrl+c interrupt-or-quit · ? help",
-    "ctrl+o verbose · up/down history",
-    "",
-    "Local commands (not the GUI command registry):",
+    'Cocode TUI',
+    'enter send · esc/ctrl+c interrupt-or-quit · ? help',
+    'ctrl+o verbose · up/down history',
+    '',
+    'Local commands (not the GUI command registry):',
     commands,
-  ].join("\n");
+  ].join('\n')
 }

@@ -58,6 +58,7 @@ export type AuthSnapshot = {
   }
   error?: string
   envLocked: boolean
+  channels?: { byok: boolean; cocode: boolean }
 }
 
 export type AuthAction =

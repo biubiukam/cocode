@@ -8,16 +8,30 @@ export function StatusLine(props: {
 }) {
   const notice = props.notice
   return (
-    <Box flexDirection="column">
-      <Text color={theme.mute}>
-        {props.status.line}
-        {props.status.tokens === undefined
-          ? ''
-          : ` · in ${props.status.tokens.input} / out ${props.status.tokens.output}`}
-      </Text>
-      {notice ? (
-        <Text color={notice.tone === 'error' ? theme.error : theme.info}>{notice.message}</Text>
-      ) : null}
+    <Box flexDirection="column" marginBottom={1}>
+      <Box width="100%" justifyContent="space-between">
+        <Text color={theme.dim}>
+          {statusMark(props.status.line)} {props.status.line}
+        </Text>
+        {props.status.tokens !== undefined ? (
+          <Text color={theme.mute}>
+            tokens in {props.status.tokens.input} · out {props.status.tokens.output}
+          </Text>
+        ) : null}
+      </Box>
+      {notice ? <Notice notice={notice} /> : null}
     </Box>
   )
+}
+
+function statusMark(line: string): string {
+  if (line.includes('running')) return '◐'
+  if (line.includes('dead')) return '×'
+  if (line.includes('starting')) return '○'
+  return '●'
+}
+
+function Notice(props: { notice: NonNullable<TuiSnapshot['notice']> }) {
+  const color = props.notice.tone === 'error' ? theme.error : theme.info
+  return <Text color={color}>! {props.notice.message}</Text>
 }

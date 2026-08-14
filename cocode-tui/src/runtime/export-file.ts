@@ -4,6 +4,7 @@ import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { ConversationNode } from './nodes/types.ts'
 import { nodesToMarkdown } from './export-markdown.ts'
+import { TuiError } from './errors/index.ts'
 
 export async function writeSessionExport(
   cwd: string,
@@ -28,5 +29,5 @@ export async function writeSessionExport(
       throw error
     }
   }
-  throw new Error('could not allocate a session export filename')
+  throw new TuiError('SESSION_EXPORT_FAILED')
 }

@@ -113,17 +113,18 @@ export function Chat(props: { app: TuiApp }) {
 
   return (
     <Box flexDirection="column" height={stdout.rows}>
-      <Header header={snap.header} />
+      <Header header={snap.header} agent={snap.agent} />
       <MessageList
         nodes={snap.nodes}
         verbose={snap.verbose}
-        maxRows={Math.max(0, stdout.rows - (snap.helpOpen ? 8 : 6))}
+        maxRows={Math.max(0, stdout.rows - (snap.helpOpen ? 11 : 9))}
       />
-      <Box marginTop={1}>
-        <StatusLine status={snap.status} notice={snap.notice} />
-      </Box>
+      <StatusLine status={snap.status} notice={snap.notice} />
       <Composer composer={snap.composer} />
-      <Text color={theme.mute}>enter send · esc quit-or-interrupt · ? help</Text>
+      <Box width="100%" marginTop={1} justifyContent="space-between">
+        <Text color={theme.mute}>↑↓ history · ctrl+o details · ? help</Text>
+        <Text color={theme.mute}>esc quit · ctrl+l redraw</Text>
+      </Box>
       {slashOpen ? <SlashMenu items={slashItems} selectedIndex={slashIndex} /> : null}
       {snap.helpOpen ? <Help text={snap.helpText} /> : null}
     </Box>

@@ -88,7 +88,7 @@ describe('device-flow', () => {
         delay: async () => undefined,
         fetch: async () => json(400, { code: 'authorization_pending' }),
       }),
-    ).rejects.toThrow(/expired/)
+    ).rejects.toThrow(/AUTH_DEVICE_EXPIRED/)
   })
 
   it('returns the minted secret once', async () => {
@@ -111,7 +111,7 @@ describe('device-flow', () => {
             interval: 1,
           }),
       }),
-    ).rejects.toThrow(/verification_uri must use https/)
+    ).rejects.toThrow(/AUTH_VERIFY_URL_HTTPS/)
   })
 
   it('revoke failures still resolve', async () => {

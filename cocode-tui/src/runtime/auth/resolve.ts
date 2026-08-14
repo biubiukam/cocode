@@ -4,7 +4,7 @@
 
 import { patchCredential, readCredentials } from './credentials.ts'
 import { agencyOrigin } from './origin.ts'
-import { readSettings } from './settings.ts'
+import { readSettings, type ProductSettings } from './settings.ts'
 import {
   CLOUD_KEY_REF,
   CLOUD_PROVIDER,
@@ -31,50 +31,59 @@ export async function resolveAuth(input: ResolveInput): Promise<ResolveResult> {
   const cwd = input.cwd?.trim() || process.cwd()
   const origin = agencyOrigin(env)
   const settings = await readSettings(home)
-  const provider = nonempty(env.COCODE_PROVIDER) ?? settings.provider ?? DEFAULT_PROVIDER
-  const model = nonempty(env.COCODE_MODEL) ?? settings.model ?? DEFAULT_MODEL
   const credentials = await readCredentials(home)
+  const envProvider = nonempty(env.COCODE_PROVIDER)
+  const preferred = envProvider ?? settings.provider ?? DEFAULT_PROVIDER
 
-  const cloudEnv = nonempty(env[CLOUD_KEY_REF])
-  if (cloudEnv !== undefined) {
-    return ready('cocode', CLOUD_PROVIDER, model, cwd, origin, home, env, {
-      [CLOUD_KEY_REF]: cloudEnv,
-    })
-  }
+  const preferredReady = tryChannel(preferred, true, {
+    env,
+    home,
+    cwd,
+    origin,
+    settings,
+    credentials,
+  })
+  if (preferredReady !== undefined) return preferredReady
 
-  const providerSettings = settings.providerCredentials[provider]
-  const providerRef = apiKeyEnvFor(provider, providerSettings?.apiKeyEnv)
-  const byokEnv = providerRef === undefined ? undefined : nonempty(env[providerRef])
-  if (providerRef !== undefined && byokEnv !== undefined) {
-    return ready('byok', provider, model, cwd, origin, home, env, envOverlay(providerRef, byokEnv))
-  }
-
-  const cloudFile = nonempty(credentials[CLOUD_KEY_REF])
-  if (cloudFile !== undefined && settings.hasCloudRoute) {
-    return ready('cocode', CLOUD_PROVIDER, model, cwd, origin, home, env, {
-      [CLOUD_KEY_REF]: cloudFile,
-    })
-  }
-
-  const byokFile = providerRef === undefined ? undefined : nonempty(credentials[providerRef])
-  if (providerRef !== undefined && byokFile !== undefined) {
-    return ready('byok', provider, model, cwd, origin, home, env, envOverlay(providerRef, byokFile))
-  }
-
-  if (providerSettings?.writable === false) {
-    return ready(
-      provider === CLOUD_PROVIDER ? 'cocode' : 'byok',
-      provider,
-      model,
+  if (preferred === CLOUD_PROVIDER) {
+    const byok = tryChannel(DEFAULT_PROVIDER, false, {
+      env,
+      home,
       cwd,
       origin,
-      home,
+      settings,
+      credentials,
+    })
+    if (byok !== undefined) return byok
+  } else if (preferred === DEFAULT_PROVIDER) {
+    const cloud = tryChannel(CLOUD_PROVIDER, false, {
       env,
-      {},
-    )
+      home,
+      cwd,
+      origin,
+      settings,
+      credentials,
+    })
+    if (cloud !== undefined) return cloud
   }
 
-  return { status: 'gate', envLocked: false, home }
+  return { status: 'gate', envLocked: envProvider !== undefined, home }
+}
+
+export function channelAvailability(
+  credentials: Record<string, string>,
+  settings: { hasCloudRoute: boolean },
+  env: NodeJS.ProcessEnv = {},
+): { byok: boolean; cocode: boolean } {
+  return {
+    byok:
+      nonempty(env[DEEPSEEK_KEY_REF]) !== undefined ||
+      nonempty(credentials[DEEPSEEK_KEY_REF]) !== undefined,
+    cocode:
+      (nonempty(env[CLOUD_KEY_REF]) !== undefined ||
+        nonempty(credentials[CLOUD_KEY_REF]) !== undefined) &&
+      settings.hasCloudRoute,
+  }
 }
 
 export function apiKeyEnvFor(provider: string, configured?: string): string | undefined {
@@ -90,6 +99,51 @@ export async function saveByokKey(home: string, key: string): Promise<void> {
   await patchCredential(home, DEEPSEEK_KEY_REF, key)
 }
 
+type ChannelInput = {
+  env: NodeJS.ProcessEnv
+  home: string
+  cwd: string
+  origin: string
+  settings: ProductSettings
+  credentials: Record<string, string>
+}
+
+function tryChannel(
+  provider: string,
+  isPreferred: boolean,
+  input: ChannelInput,
+): { status: 'ready'; auth: ResolvedAuth } | undefined {
+  const { env, home, cwd, origin, settings, credentials } = input
+  const providerSettings = settings.providerCredentials[provider]
+  const ref = apiKeyEnvFor(provider, providerSettings?.apiKeyEnv)
+  const value = ref === undefined ? undefined : nonempty(env[ref]) ?? nonempty(credentials[ref])
+  const model = channelModel(provider, isPreferred, env, settings)
+  const mode: AuthMode = provider === CLOUD_PROVIDER ? 'cocode' : 'byok'
+
+  if (provider === CLOUD_PROVIDER && value !== undefined && !settings.hasCloudRoute) {
+    return undefined
+  }
+  if (value !== undefined && ref !== undefined) {
+    return ready(mode, provider, model, cwd, origin, home, env, { [ref]: value })
+  }
+  if (providerSettings?.writable === false) {
+    return ready(mode, provider, model, cwd, origin, home, env, {})
+  }
+  return undefined
+}
+
+function channelModel(
+  provider: string,
+  isPreferred: boolean,
+  env: NodeJS.ProcessEnv,
+  settings: ProductSettings,
+): string {
+  if (isPreferred) {
+    return nonempty(env.COCODE_MODEL) ?? settings.model ?? DEFAULT_MODEL
+  }
+  return DEFAULT_MODEL
+}
+
 function ready(
   mode: AuthMode,
   provider: string,
@@ -100,6 +154,13 @@ function ready(
   env: NodeJS.ProcessEnv,
   extra: NodeJS.ProcessEnv,
 ): { status: 'ready'; auth: ResolvedAuth } {
+  const spawn: NodeJS.ProcessEnv = { ...env }
+  delete spawn[CLOUD_KEY_REF]
+  delete spawn[DEEPSEEK_KEY_REF]
+  Object.assign(spawn, extra)
+  spawn.DSH_HOME = home
+  spawn.COCODE_PROVIDER = provider
+  spawn.COCODE_MODEL = model
   return {
     status: 'ready',
     auth: {
@@ -109,7 +170,7 @@ function ready(
       cwd,
       origin,
       home,
-      env: { ...env, ...extra, DSH_HOME: home },
+      env: spawn,
     },
   }
 }
@@ -117,8 +178,4 @@ function ready(
 function nonempty(value: string | undefined): string | undefined {
   const trimmed = value?.trim()
   return trimmed === undefined || trimmed === '' ? undefined : trimmed
-}
-
-function envOverlay(ref: string, value: string): NodeJS.ProcessEnv {
-  return { [ref]: value }
 }

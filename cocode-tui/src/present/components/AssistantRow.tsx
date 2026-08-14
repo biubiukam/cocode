@@ -7,14 +7,12 @@ export function AssistantRow(props: { node: AssistantNode; verbose: boolean }) {
   const { node, verbose } = props
   const reasoning = formatReasoning(node.reasoning, verbose, node.streaming)
   return (
-    <Box flexDirection="column" marginTop={1}>
-      <Text color={theme.brand}>{node.streaming ? 'cocode …' : 'cocode'}</Text>
-      {reasoning !== undefined ? (
-        <Text color={theme.mute} italic>
-          {reasoning}
-        </Text>
-      ) : null}
-      {node.text !== '' ? <Text color={theme.assistant}>{node.text}</Text> : null}
+    <Box flexDirection="column" marginTop={1} paddingLeft={1}>
+      <Text color={theme.info} bold>
+        cocode <Text color={theme.mute}>· {node.streaming ? 'working' : 'answer'}</Text>
+      </Text>
+      {reasoning !== undefined ? <Text color={theme.mute}> {reasoning}</Text> : null}
+      {node.text !== '' ? <Text color={theme.assistant}> {node.text}</Text> : null}
     </Box>
   )
 }

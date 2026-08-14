@@ -11,11 +11,13 @@ import {
 } from './types.ts'
 import { settingsPath } from './paths.ts'
 import { readYamlUnknown, writeYamlFile } from './io.ts'
+import { TuiError } from '../errors/index.ts'
 
 export type ProductSettings = {
   provider: string
   model: string
   hasCloudRoute: boolean
+  cloudModel?: string
   providerCredentials: Record<string, { apiKeyEnv?: string; writable?: boolean }>
 }
 
@@ -75,7 +77,7 @@ export async function readSettings(home: string): Promise<ProductSettings> {
     const apiKeyEnv =
       typeof value.apiKeyEnv === 'string' && value.apiKeyEnv !== '' ? value.apiKeyEnv : undefined
     if (apiKeyEnv !== undefined && !/^[A-Za-z_][A-Za-z0-9_]*$/.test(apiKeyEnv)) {
-      throw new Error(`invalid credential ref for provider ${provider}`)
+      throw new TuiError('CONFIG_PROVIDER_REF', { provider })
     }
     const writable = typeof value.writable === 'boolean' ? value.writable : undefined
     providerCredentials[provider] = {
@@ -83,6 +85,12 @@ export async function readSettings(home: string): Promise<ProductSettings> {
       ...(writable === undefined ? {} : { writable }),
     }
   }
+  const cloudRoute = providers[CLOUD_PROVIDER]
+  const cloudModels =
+    isRecord(cloudRoute) && Array.isArray(cloudRoute.models) ? cloudRoute.models : []
+  const firstCloud = isRecord(cloudModels[0]) ? cloudModels[0] : undefined
+  const cloudModel =
+    typeof firstCloud?.id === 'string' && firstCloud.id !== '' ? firstCloud.id : undefined
   return {
     provider:
       typeof agent.provider === 'string' && agent.provider !== ''
@@ -90,6 +98,7 @@ export async function readSettings(home: string): Promise<ProductSettings> {
         : DEFAULT_PROVIDER,
     model: typeof agent.model === 'string' && agent.model !== '' ? agent.model : DEFAULT_MODEL,
     hasCloudRoute: isRecord(providers[CLOUD_PROVIDER]),
+    ...(cloudModel === undefined ? {} : { cloudModel }),
     providerCredentials,
   }
 }
@@ -118,6 +127,19 @@ export async function patchCloudRoute(
   await writeYamlFile(settingsPath(home), root, 0o600)
 }
 
+export async function patchAgentDefaultModel(
+  home: string,
+  provider: string,
+  model: string,
+): Promise<void> {
+  const root = await loadRoot(home)
+  const agent = isRecord(root['agent-default-model']) ? root['agent-default-model'] : {}
+  agent.provider = provider
+  agent.model = model
+  root['agent-default-model'] = agent
+  await writeYamlFile(settingsPath(home), root, 0o600)
+}
+
 export async function unsetCloudRoute(home: string): Promise<void> {
   const root = await loadRoot(home)
   const llm = isRecord(root['llm-pi-ai']) ? root['llm-pi-ai'] : {}
@@ -138,7 +160,7 @@ async function loadRoot(home: string): Promise<Record<string, unknown>> {
   const loaded = await readYamlUnknown(settingsPath(home))
   if (loaded.missing) return {}
   if (!isRecord(loaded.value)) {
-    throw new Error('could not parse settings.yaml')
+    throw new TuiError('AUTH_SETTINGS_PARSE')
   }
   return loaded.value
 }

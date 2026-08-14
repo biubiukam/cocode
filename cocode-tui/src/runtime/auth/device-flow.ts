@@ -2,7 +2,8 @@
  * RFC 8628 device authorization against the Cocode agency.
  */
 
-import { jsonRequest, problemCode, problemTitle } from './agency.ts'
+import { jsonRequest, problemCode } from './agency.ts'
+import { TuiError } from '../errors/index.ts'
 import { normalizeAgencyOrigin, validateVerificationUrl } from './origin.ts'
 import { DEVICE_SCOPES, KEY_NAME, type CloudModel, type MeProfile } from './types.ts'
 
@@ -52,11 +53,11 @@ export async function startDeviceAuthorization(
     },
   )
   if (created.status !== 200 && created.status !== 201) {
-    throw new Error(problemTitle(created.value, 'could not start device login'))
+    throw new TuiError('AUTH_DEVICE_START_FAILED')
   }
   const value = created.value
   if (!isRecord(value)) {
-    throw new Error('agency returned an invalid device authorization')
+    throw new TuiError('AUTH_DEVICE_INVALID')
   }
   if (
     !isNonempty(value.device_code) ||
@@ -64,7 +65,7 @@ export async function startDeviceAuthorization(
     !isPositiveFinite(value.expires_in) ||
     !isPositiveFinite(value.interval)
   ) {
-    throw new Error('agency returned an invalid device authorization')
+    throw new TuiError('AUTH_DEVICE_INVALID')
   }
   const verificationUri = validateVerificationUrl(value.verification_uri, 'verification_uri')
   const verificationUriComplete = validateVerificationUrl(
@@ -91,12 +92,12 @@ export async function pollDeviceToken(
   const deadline = now() + expiresInSec * 1000
   let waitSec = Math.max(1, intervalSec)
   for (;;) {
-    if (signal.aborted) throw new Error('login cancelled')
+    if (signal.aborted) throw new TuiError('AUTH_LOGIN_CANCELLED')
     const remaining = deadline - now()
-    if (remaining <= 0) throw new Error('device authorization expired')
+    if (remaining <= 0) throw new TuiError('AUTH_DEVICE_EXPIRED')
     await delay(Math.min(waitSec * 1000, remaining))
-    if (signal.aborted) throw new Error('login cancelled')
-    if (deadline - now() <= 0) throw new Error('device authorization expired')
+    if (signal.aborted) throw new TuiError('AUTH_LOGIN_CANCELLED')
+    if (deadline - now() <= 0) throw new TuiError('AUTH_DEVICE_EXPIRED')
     const polled = await jsonRequest<TokenPair>(
       `${normalizeAgencyOrigin(origin)}/v1/auth/device/token`,
       {
@@ -115,7 +116,7 @@ export async function pollDeviceToken(
       waitSec += 5
       continue
     }
-    throw new Error(problemTitle(polled.value, 'device login was not approved'))
+    throw new TuiError('AUTH_DEVICE_DENIED')
   }
 }
 
@@ -134,14 +135,14 @@ export async function loadProfile(
     signal,
   })
   if (me.status !== 200) {
-    throw new Error(problemTitle(me.value, 'could not load account'))
+    throw new TuiError('AUTH_ACCOUNT_LOAD_FAILED')
   }
   if (!isRecord(me.value)) {
-    throw new Error('agency returned an invalid account')
+    throw new TuiError('AUTH_ACCOUNT_INVALID')
   }
   const user = me.value.user
   if (user !== undefined && (typeof user !== 'object' || user === null)) {
-    throw new Error('agency returned an invalid account')
+    throw new TuiError('AUTH_ACCOUNT_INVALID')
   }
   const displayName = typeof user?.display_name === 'string' ? user.display_name.trim() : ''
   const email = typeof user?.email === 'string' ? user.email : undefined
@@ -173,7 +174,7 @@ export async function mintPersonalKey(
     !isNonempty(created.value.secret) ||
     !isNonempty(created.value.id)
   ) {
-    throw new Error(problemTitle(created.value, 'could not create an API key'))
+    throw new TuiError('AUTH_KEY_CREATE_FAILED')
   }
   return { secret: created.value.secret.trim(), id: created.value.id.trim() }
 }
@@ -193,13 +194,13 @@ export async function listHostedModels(
     signal,
   })
   if (listed.status !== 200) {
-    throw new Error(problemTitle(listed.value, 'could not list hosted models'))
+    throw new TuiError('AUTH_MODELS_LIST_FAILED')
   }
   if (!isRecord(listed.value)) {
-    throw new Error('agency returned an invalid model catalog')
+    throw new TuiError('AUTH_MODELS_INVALID')
   }
   if (!Array.isArray(listed.value.data)) {
-    throw new Error('agency returned an invalid model catalog')
+    throw new TuiError('AUTH_MODELS_INVALID')
   }
   return listed.value.data
     .filter(
@@ -247,7 +248,7 @@ export async function refreshAccess(
     },
   )
   if (refreshed.status !== 200 || !isTokenPair(refreshed.value)) {
-    throw new Error('session expired')
+    throw new TuiError('AUTH_SESSION_EXPIRED')
   }
   return refreshed.value
 }
