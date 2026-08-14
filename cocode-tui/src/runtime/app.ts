@@ -20,7 +20,7 @@ import {
   type DraftState,
 } from './draft.ts'
 import { buildPromptBlocks, loadFileContext } from './file-context.ts'
-import { readSessionEvents } from './sessions-fs.ts'
+import { replaySessionEvents } from './sessions-fs.ts'
 import { createSessionStateProjector, type SessionGoal, type SessionTodo } from './session-state.ts'
 import { formatFileMention } from './file-mentions.ts'
 import { resolveWorkspaceInfo } from './workspace.ts'
@@ -200,9 +200,9 @@ class TuiAppImpl implements TuiApp {
   private model: string
   private readonly capabilities: TuiCapabilities
   private readonly commands: CommandRegistry
-  private readonly assembler: Assembler
-  private readonly telemetry = createTelemetryProjector()
-  private readonly sessionState = createSessionStateProjector()
+  private assembler: Assembler
+  private telemetry = createTelemetryProjector()
+  private sessionState = createSessionStateProjector()
   private readonly history = new InputHistory()
   private readonly listeners = new Set<() => void>()
   private unsubscribeRuntime: (() => void) | undefined
@@ -687,15 +687,18 @@ class TuiAppImpl implements TuiApp {
     this.notice = { tone: 'info', message: text(this.locale, 'resumeLoading') }
     this.emit()
     try {
-      const events = await readSessionEvents(path)
+      const nextAssembler = createAssembler()
+      const nextTelemetry = createTelemetryProjector()
+      const nextSessionState = createSessionStateProjector()
+      await replaySessionEvents(path, (event) => {
+        nextAssembler.ingest(event)
+        nextTelemetry.ingest(event)
+        nextSessionState.ingest(event)
+      })
       this.sessionId = sessionId
-      this.assembler.replaceWindow(events)
-      this.telemetry.reset()
-      this.sessionState.reset()
-      for (const event of events) {
-        this.telemetry.ingest(event)
-        this.sessionState.ingest(event)
-      }
+      this.assembler = nextAssembler
+      this.telemetry = nextTelemetry
+      this.sessionState = nextSessionState
       this.resetSubagentActivity()
       this.queuedPrompts.length = 0
       this.attachments = []

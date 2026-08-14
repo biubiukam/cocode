@@ -70,7 +70,7 @@ Type `/` to open the command menu. Keep typing to filter by prefix. `Tab` or arr
 | `/login` / `/logout`           | Sign in or out of Cocode Cloud; logout keeps your key and stays in chat     |
 | `/exit`                        | Shut down TUI and restore the terminal                                      |
 
-`/resume` reads local session headers, supports text filtering plus `↑` `↓` selection, and replays the selected JSONL event log into the current TUI. Follow-up prompts use the selected session id. The TUI does not claim cross-process locking; avoid resuming a session that another client is currently writing.
+`/resume` reads local session headers, supports text filtering plus `↑` `↓` selection, and streams the selected JSONL into a temporary projection before swapping it into the current TUI. Follow-up prompts use the selected session id. The TUI does not claim cross-process locking; avoid resuming a session that another client is currently writing.
 
 `/compact` sends the literal `/compact` prompt to the current session. A host compaction plugin must recognize that prompt; the TUI does not claim compaction succeeded without a corresponding event.
 

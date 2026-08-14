@@ -6,6 +6,7 @@ import { zstdCompressSync } from 'node:zlib'
 import {
   listSessionSummaries,
   readSessionEvents,
+  replaySessionEvents,
   samePath,
 } from '../../../src/runtime/sessions-fs.ts'
 
@@ -122,6 +123,13 @@ describe('listSessionSummaries', () => {
           data: { id: 'u1', content: [{ type: 'text', text: 'hello' }] },
         },
       ])
+      const streamed: string[] = []
+      const count = await replaySessionEvents(
+        join(root, 'zstd', 's2', 'session.jsonl.zstd'),
+        (next) => streamed.push(next.type),
+      )
+      expect(count).toBe(1)
+      expect(streamed).toEqual(['user/message'])
     } finally {
       await rm(root, { recursive: true, force: true })
     }

@@ -20,22 +20,33 @@ export type SessionListResult = {
 }
 
 export async function readSessionEvents(path: string): Promise<SessionEvent[]> {
+  const events: SessionEvent[] = []
+  await replaySessionEvents(path, (event) => events.push(event))
+  return events
+}
+
+export async function replaySessionEvents(
+  path: string,
+  onEvent: (event: SessionEvent) => void,
+): Promise<number> {
   const compressed = path.endsWith('.zstd')
   const source = createReadStream(path)
   const output = compressed ? source.pipe(createZstdDecompress()) : source
   const lines = createInterface({ input: output })
-  const events: SessionEvent[] = []
+  let count = 0
   try {
     for await (const line of lines) {
       const event = parseEvent(line)
-      if (event !== undefined) events.push(event)
+      if (event === undefined) continue
+      onEvent(event)
+      count += 1
     }
   } finally {
     lines.close()
     source.destroy()
     if (compressed) output.destroy()
   }
-  return events
+  return count
 }
 
 type SessionHeader = {
