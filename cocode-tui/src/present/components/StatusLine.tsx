@@ -11,40 +11,77 @@ export function StatusLine(props: {
   locale: UiLocale
 }) {
   const notice = props.notice
+  const telemetry = props.status.telemetry
+  const telemetryBits = [
+    telemetry.tps === undefined
+      ? undefined
+      : text(props.locale, 'telemetryTps', { value: formatMetric(telemetry.tps) }),
+    telemetry.cacheHitRate === undefined
+      ? undefined
+      : text(props.locale, 'telemetryCache', {
+          value: formatMetric(telemetry.cacheHitRate),
+        }),
+    telemetry.contextPercent === undefined
+      ? undefined
+      : text(props.locale, 'telemetryContext', {
+          value: formatMetric(telemetry.contextPercent),
+        }),
+    telemetry.reasoningEffort === undefined
+      ? undefined
+      : text(props.locale, 'telemetryReasoning', { value: telemetry.reasoningEffort }),
+    telemetry.activity === undefined
+      ? undefined
+      : text(props.locale, 'telemetryActivity', {
+          phase: telemetry.activity.phase,
+          line: telemetry.activity.line,
+        }),
+  ].filter((value): value is string => value !== undefined)
   return (
     <Box flexDirection="column" marginBottom={1}>
       <Box width="100%" justifyContent="space-between">
         <Text color={theme.dim}>
           {agentMark(props.agent)} {props.status.line}
         </Text>
-        {props.status.tokens !== undefined ? (
-          <Text color={theme.mute}>
-            {text(props.locale, 'tokensIn')} {props.status.tokens.input} ·{' '}
-            {text(props.locale, 'tokensOut')} {props.status.tokens.output}
-          </Text>
-        ) : null}
-        {props.status.subagents !== undefined && props.status.subagents.running > 0 ? (
-          <Text color={theme.info}>
-            {text(props.locale, 'subagentsRunning', {
-              count: String(props.status.subagents.running),
-            })}
-          </Text>
-        ) : props.status.subagents?.last?.event === 'finished' ? (
-          <Text color={theme.mute}>
-            {text(props.locale, 'subagentFinished', {
-              id: props.status.subagents.last.id,
-            })}
-          </Text>
-        ) : null}
-        {props.status.queueCount > 0 ? (
-          <Text color={theme.info}>
-            {text(props.locale, 'queueCount', { count: String(props.status.queueCount) })}
-          </Text>
-        ) : null}
+        <Box>
+          {props.status.tokens !== undefined ? (
+            <Text color={theme.mute}>
+              {text(props.locale, 'tokensIn')} {props.status.tokens.input} ·{' '}
+              {text(props.locale, 'tokensOut')} {props.status.tokens.output}
+            </Text>
+          ) : null}
+          {props.status.subagents !== undefined && props.status.subagents.running > 0 ? (
+            <Text color={theme.info}>
+              {' · '}
+              {text(props.locale, 'subagentsRunning', {
+                count: String(props.status.subagents.running),
+              })}
+            </Text>
+          ) : props.status.subagents?.last?.event === 'finished' ? (
+            <Text color={theme.mute}>
+              {' · '}
+              {text(props.locale, 'subagentFinished', {
+                id: props.status.subagents.last.id,
+              })}
+            </Text>
+          ) : null}
+          {props.status.queueCount > 0 ? (
+            <Text color={theme.info}>
+              {' · '}
+              {text(props.locale, 'queueCount', { count: String(props.status.queueCount) })}
+            </Text>
+          ) : null}
+        </Box>
       </Box>
+      {telemetryBits.length > 0 ? (
+        <Text color={theme.mute}>{telemetryBits.join(' · ')}</Text>
+      ) : null}
       {notice ? <Notice notice={notice} /> : null}
     </Box>
   )
+}
+
+function formatMetric(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1)
 }
 
 function Notice(props: { notice: NonNullable<TuiSnapshot['notice']> }) {

@@ -465,6 +465,62 @@ describe('TuiApp', () => {
     expect(app.snapshot().status.tokens).toEqual({ input: 12, output: 4 })
   })
 
+  it('projects optional telemetry events into status and clears it for /new', async () => {
+    const runtime = fakeRuntime()
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+    })
+    await app.start()
+    runtime.emit({
+      method: 'session.event',
+      params: {
+        sessionId: 's1',
+        event: {
+          type: 'request/context',
+          seq: 1,
+          time: 1,
+          data: { contextWindow: 100 },
+        },
+      },
+    })
+    runtime.emit({
+      method: 'session.event',
+      params: {
+        sessionId: 's1',
+        event: {
+          type: 'assistant/message',
+          seq: 2,
+          time: 2,
+          data: {
+            message: { content: [{ type: 'text', text: 'done' }] },
+            usage: { inputTokens: 20, outputTokens: 5, cacheReadTokens: 30 },
+          },
+        },
+      },
+    })
+    expect(app.snapshot().status.telemetry).toMatchObject({
+      contextWindow: 100,
+      contextPercent: 50,
+      usage: { input: 20, output: 5, cacheRead: 30 },
+    })
+    app.dispatch({ type: 'command', line: '/new' })
+    expect(app.snapshot().status.telemetry).toEqual({
+      totals: { input: 0, output: 0 },
+      tpsSamples: [],
+      contextSegments: {
+        system: 0,
+        prompt: 0,
+        assistant: 0,
+        thinking: 0,
+        tools: 0,
+      },
+    })
+  })
+
   it('projects subagent lifecycle into status without leaking other sessions', async () => {
     const runtime = fakeRuntime()
     const app = createTuiApp({

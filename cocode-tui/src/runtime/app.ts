@@ -50,6 +50,7 @@ import {
   submitCapturedByok,
   type ChannelSwitchHost,
 } from './channel-switch.ts'
+import { createTelemetryProjector, type TelemetrySnapshot } from './telemetry.ts'
 
 export type TuiAction =
   | { type: 'submit'; text: string }
@@ -98,6 +99,7 @@ export type TuiSnapshot = {
   status: {
     line: string
     tokens?: { input: number; output: number }
+    telemetry: TelemetrySnapshot
     subagents?: TuiSubagentActivity
     queueCount: number
   }
@@ -191,6 +193,7 @@ class TuiAppImpl implements TuiApp {
   private readonly capabilities: TuiCapabilities
   private readonly commands: CommandRegistry
   private readonly assembler: Assembler
+  private readonly telemetry = createTelemetryProjector()
   private readonly history = new InputHistory()
   private readonly listeners = new Set<() => void>()
   private unsubscribeRuntime: (() => void) | undefined
@@ -300,6 +303,7 @@ class TuiAppImpl implements TuiApp {
 
   snapshot(): TuiSnapshot {
     const disabled = this.agent === 'dead' || this.exiting
+    const telemetry = this.telemetry.snapshot()
     return {
       header: {
         product: 'Cocode',
@@ -325,7 +329,14 @@ class TuiAppImpl implements TuiApp {
       },
       status: {
         line: statusLine(this.agent, this.runtimeName, this.locale),
-        tokens: latestUsage(this.assembler.snapshot()),
+        tokens:
+          telemetry.usage === undefined
+            ? latestUsage(this.assembler.snapshot())
+            : {
+                input: telemetry.usage.input,
+                output: telemetry.usage.output,
+              },
+        telemetry,
         subagents: {
           running: this.activeSubagents.size,
           ...(this.lastSubagent === undefined ? {} : { last: this.lastSubagent }),
@@ -484,6 +495,7 @@ class TuiAppImpl implements TuiApp {
       newSession: () => {
         this.sessionId = crypto.randomUUID()
         this.assembler.reset()
+        this.telemetry.reset()
         this.resetSubagentActivity()
         this.queuedPrompts.length = 0
         this.attachments = []
@@ -495,6 +507,7 @@ class TuiAppImpl implements TuiApp {
       },
       clearTranscript: () => {
         this.assembler.reset()
+        this.telemetry.reset()
         this.attachments = []
         this.notice = { tone: 'info', message: 'Transcript cleared' }
         this.emit()
@@ -607,6 +620,7 @@ class TuiAppImpl implements TuiApp {
       this.runtimeName = info.name
       this.sessionId = crypto.randomUUID()
       this.assembler.reset()
+      this.telemetry.reset()
       this.resetSubagentActivity()
       this.queuedPrompts.length = 0
       this.agent = 'idle'
@@ -746,7 +760,10 @@ class TuiAppImpl implements TuiApp {
   private onNotification(notification: TuiNotification): void {
     handleNotification(notification, {
       sessionId: this.sessionId,
-      ingest: (event) => this.assembler.ingest(event),
+      ingest: (event) => {
+        this.telemetry.ingest(event)
+        this.assembler.ingest(event)
+      },
       isDeadOrExiting: () => this.agent === 'dead' || this.exiting,
       setAgent: (agent) => {
         this.agent = agent
@@ -781,6 +798,10 @@ class TuiAppImpl implements TuiApp {
   private resetSubagentActivity(): void {
     this.activeSubagents.clear()
     this.lastSubagent = undefined
+  }
+
+  private resetTelemetry(): void {
+    this.telemetry.reset()
   }
 
   private switchHost(): ChannelSwitchHost {

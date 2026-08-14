@@ -55,6 +55,11 @@ type UiKey =
   | 'queueFull'
   | 'queueSending'
   | 'turnBusy'
+  | 'telemetryTps'
+  | 'telemetryCache'
+  | 'telemetryContext'
+  | 'telemetryReasoning'
+  | 'telemetryActivity'
 
 const TEXT: Record<UiLocale, Record<UiKey, string>> = {
   en: {
@@ -84,7 +89,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     footerMessages: 'shift+↑ messages',
     footerDetails: 'ctrl+o details',
     footerHelp: '? help',
-    footerQuit: 'esc quit',
+    footerQuit: 'esc interrupt / quit',
     footerRedraw: 'ctrl+l redraw',
     agentIdle: 'idle',
     agentRunning: 'running',
@@ -111,6 +116,11 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     queueFull: 'Prompt queue is full (8).',
     queueSending: 'Sending queued prompt…',
     turnBusy: 'Turn in progress. Press Tab to queue this prompt.',
+    telemetryTps: 'TPS {value}',
+    telemetryCache: 'cache {value}%',
+    telemetryContext: 'context {value}%',
+    telemetryReasoning: 'reasoning {value}',
+    telemetryActivity: '{phase}: {line}',
   },
   zh: {
     session: '会话',
@@ -139,7 +149,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     footerMessages: 'Shift+↑ 消息',
     footerDetails: 'Ctrl+O 详情',
     footerHelp: '? 帮助',
-    footerQuit: 'Esc 退出',
+    footerQuit: 'Esc 中断 / 退出',
     footerRedraw: 'Ctrl+L 重绘',
     agentIdle: '空闲',
     agentRunning: '运行中',
@@ -166,6 +176,11 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     queueFull: '输入队列已满（最多 8 条）。',
     queueSending: '正在发送队列中的输入…',
     turnBusy: '当前任务仍在运行，按 Tab 可将输入加入队列。',
+    telemetryTps: 'TPS {value}',
+    telemetryCache: '缓存命中 {value}%',
+    telemetryContext: '上下文 {value}%',
+    telemetryReasoning: '推理 {value}',
+    telemetryActivity: '{phase}：{line}',
   },
 }
 

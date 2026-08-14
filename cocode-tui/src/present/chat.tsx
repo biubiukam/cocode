@@ -69,11 +69,12 @@ export function Chat(props: { app: TuiApp }) {
     composerRows +
     (snap.composer.attachments.length > 0 ? 1 : 0) +
     (snap.notice ? 1 : 0) +
+    (hasTelemetry(snap.status.telemetry) ? 1 : 0) +
     (snap.helpOpen ? snap.helpText.split('\n').length + 4 : 0) +
     (slashOpen ? slashItems.length + 4 : 0) +
-    (fileOpen ? fileItems.length + (fileLoading ? 3 : 4) : 0) +
-    (historySearchOpen ? historyItems.length + 4 : 0) +
-    (resumeOpen ? Math.min(resumeItems.length, 8) + 5 : 0)
+    (fileOpen ? fileItems.length + (fileLoading ? 5 : 4) : 0) +
+    (historySearchOpen ? historyItems.length + 5 : 0) +
+    (resumeOpen ? Math.min(resumeItems.length, 8) + 7 : 0)
   const messageMaxRows = Math.max(0, stdout.rows - reservedRows)
   const selectableMessages = useMemo(
     () =>
@@ -397,6 +398,16 @@ export function Chat(props: { app: TuiApp }) {
       ) : null}
       {snap.helpOpen ? <Help text={snap.helpText} locale={snap.locale} /> : null}
     </Box>
+  )
+}
+
+function hasTelemetry(telemetry: TuiSnapshot['status']['telemetry']): boolean {
+  return (
+    telemetry.tps !== undefined ||
+    telemetry.cacheHitRate !== undefined ||
+    telemetry.contextPercent !== undefined ||
+    telemetry.reasoningEffort !== undefined ||
+    telemetry.activity !== undefined
   )
 }
 

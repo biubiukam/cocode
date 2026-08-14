@@ -37,6 +37,7 @@ export type ChannelSwitchHost = {
   auth?: ChannelAuth
   runtime: TuiRuntime
   assembler: { reset(): void }
+  resetTelemetry?: () => void
   emit(): void
   beginQuit(): void
 }
@@ -211,6 +212,7 @@ async function applyResolved(host: ChannelSwitchHost, target: 'byok' | 'cocode')
     host.model = auth.model
     host.sessionId = crypto.randomUUID()
     host.assembler.reset()
+    host.resetTelemetry?.()
     host.capturingByok = false
     if (host.auth !== undefined) host.auth.mode = auth.mode
     host.agent = 'idle'
