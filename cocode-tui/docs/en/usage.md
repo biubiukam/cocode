@@ -30,6 +30,8 @@ Configure a key on the first-run gate, or set `DEEPSEEK_API_KEY` for this proces
 - `Ctrl+O` toggles verbose mode for full reasoning and tool I/O.
 - `Esc` closes overlays (help, command menu) first; in the normal view, press twice to quit.
 - `Ctrl+L` redraws the screen without clearing the session.
+- Type `@` at any position in the message to search workspace files and directories; use `Tab`, `↑`, or `↓` to select, then Enter to insert the reference.
+- On send, selected files are appended with their contents and selected directories with a bounded listing; references must stay inside the workspace.
 
 Tool output is truncated by display mode; the raw payload stays in the session projection. When the transcript is tight, the composer stays visible.
 
@@ -66,4 +68,4 @@ If another TUI window is still open, `/use`, `/login`, and `/logout` refuse so t
 
 ## Not wired yet
 
-Cancel/steer, approvals, rewind, the skills menu, `@` file completion, `Ctrl+R` history search, and `Ctrl+G` external editor are not bound in TUI. Those need a harness wire, an explicit manifest, or later interaction work. The UI does not draw fake controls.
+Cancel/steer, approvals, rewind, the skills menu, `Ctrl+R` history search, and `Ctrl+G` external editor are not bound in TUI. Those need a harness wire, an explicit manifest, or later interaction work. The UI does not draw fake controls.

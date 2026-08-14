@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import type { TuiNotification, TuiRuntime } from '@cocode/tui-connection'
 import { createTuiApp } from '../../src/runtime/app.ts'
 
@@ -235,6 +238,31 @@ describe('TuiApp', () => {
     expect(app.snapshot().composer).toMatchObject({ text: 'abc', cursor: 2 })
     app.dispatch({ type: 'deleteBackward' })
     expect(app.snapshot().composer).toMatchObject({ text: 'ac', cursor: 1 })
+  })
+
+  it('appends selected file content when submitting a prompt', async () => {
+    const cwd = await mkdtemp(join(tmpdir(), 'cocode-app-context-'))
+    try {
+      await writeFile(join(cwd, 'README.md'), '# Cocode\n')
+      const runtime = fakeRuntime()
+      const app = createTuiApp({
+        runtime,
+        cwd,
+        provider: 'p',
+        model: 'm',
+        sessionId: 's1',
+      })
+      await app.start()
+      app.dispatch({ type: 'setDraft', text: 'review @README.md' })
+      app.dispatch({ type: 'attachFile', start: 7, end: 17, path: 'README.md' })
+      expect(app.snapshot().composer.attachments).toEqual(['README.md'])
+      app.dispatch({ type: 'submit', text: app.snapshot().composer.text })
+      await vi.waitFor(() => expect(runtime.prompts).toHaveLength(1))
+      expect(runtime.prompts[0]?.text).toContain('[Attached file: README.md]')
+      expect(runtime.prompts[0]?.text).toContain('# Cocode')
+    } finally {
+      await rm(cwd, { recursive: true, force: true })
+    }
   })
 
   it('marks the app dead when the runtime transport closes', async () => {

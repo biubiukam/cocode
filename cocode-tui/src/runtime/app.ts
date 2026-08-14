@@ -15,9 +15,12 @@ import {
   createDraft,
   insertDraft,
   moveDraftCursor,
+  replaceDraftRange,
   replaceDraft,
   type DraftState,
 } from './draft.ts'
+import { buildPromptBlocks, loadFileContext } from './file-context.ts'
+import { formatFileMention } from './file-mentions.ts'
 import { resolveWorkspaceInfo } from './workspace.ts'
 import { createAppCommandContext } from './command-context.ts'
 import {
@@ -46,6 +49,7 @@ export type TuiAction =
   | { type: 'insertDraft'; text: string }
   | { type: 'deleteBackward' }
   | { type: 'moveCursor'; delta: number }
+  | { type: 'attachFile'; start: number; end: number; path: string }
   | { type: 'historyPrev' }
   | { type: 'historyNext' }
   | { type: 'toggleVerbose' }
@@ -73,6 +77,7 @@ export type TuiSnapshot = {
     placeholder: string
     disabled: boolean
     mask?: boolean
+    attachments: readonly string[]
   }
   status: { line: string; tokens?: { input: number; output: number } }
   helpOpen: boolean
@@ -158,6 +163,7 @@ class TuiAppImpl implements TuiApp {
   private sessionId: string
   private agent: TuiSnapshot['agent'] = 'starting'
   private draft: DraftState = createDraft()
+  private attachments: Array<{ path: string; token: string }> = []
   private helpOpen = false
   private verbose = false
   private notice: TuiSnapshot['notice']
@@ -271,6 +277,7 @@ class TuiAppImpl implements TuiApp {
           ? '粘贴 API Key，回车确认'
           : composerPlaceholder(this.agent),
         disabled,
+        attachments: this.attachments.map((attachment) => attachment.path),
         ...(this.capturingByok ? { mask: true } : {}),
       },
       status: {
@@ -301,20 +308,33 @@ class TuiAppImpl implements TuiApp {
     switch (action.type) {
       case 'setDraft':
         this.draft = replaceDraft(this.draft, action.text)
+        this.pruneAttachments()
         this.emit()
         return
       case 'insertDraft':
         this.draft = insertDraft(this.draft, action.text)
+        this.pruneAttachments()
         this.emit()
         return
       case 'deleteBackward':
         this.draft = backspaceDraft(this.draft)
+        this.pruneAttachments()
         this.emit()
         return
       case 'moveCursor':
         this.draft = moveDraftCursor(this.draft, action.delta)
         this.emit()
         return
+      case 'attachFile': {
+        const token = formatFileMention(action.path)
+        this.draft = replaceDraftRange(this.draft, action.start, action.end, `${token} `)
+        this.attachments = [
+          ...this.attachments.filter((attachment) => attachment.path !== action.path),
+          { path: action.path, token },
+        ]
+        this.emit()
+        return
+      }
       case 'submit':
         this.submit(action.text)
         return
@@ -379,6 +399,7 @@ class TuiAppImpl implements TuiApp {
       newSession: () => {
         this.sessionId = crypto.randomUUID()
         this.assembler.reset()
+        this.attachments = []
         this.notice = {
           tone: 'info',
           message: `New session ${this.sessionId}`,
@@ -387,6 +408,7 @@ class TuiAppImpl implements TuiApp {
       },
       clearTranscript: () => {
         this.assembler.reset()
+        this.attachments = []
         this.notice = { tone: 'info', message: 'Transcript cleared' }
         this.emit()
       },
@@ -462,18 +484,37 @@ class TuiAppImpl implements TuiApp {
       this.emit()
       return
     }
+    const attachments = this.attachments.slice()
     this.history.push(trimmed)
     this.draft = createDraft()
+    this.attachments = []
     this.notice = undefined
     this.interruptArmed = false
-    void this.runtime
-      .prompt(this.sessionId, [{ type: 'text', text: trimmed }])
-      .catch((error: unknown) => {
-        this.notice = { tone: 'error', message: errorMessage(error) }
-        if (this.agent === 'running') this.agent = 'idle'
-        this.emit()
-      })
+    void this.promptWithAttachments(trimmed, attachments).catch((error: unknown) => {
+      this.notice = { tone: 'error', message: errorMessage(error) }
+      if (this.agent === 'running') this.agent = 'idle'
+      this.emit()
+    })
     this.emit()
+  }
+
+  private promptWithAttachments(
+    text: string,
+    attachments: readonly { path: string; token: string }[],
+  ): Promise<string> {
+    if (attachments.length === 0) {
+      return this.runtime.prompt(this.sessionId, [{ type: 'text', text }])
+    }
+    return loadFileContext({
+      cwd: this.cwd,
+      paths: attachments.map((attachment) => attachment.path),
+    }).then((files) => this.runtime.prompt(this.sessionId, buildPromptBlocks(text, files)))
+  }
+
+  private pruneAttachments(): void {
+    this.attachments = this.attachments.filter((attachment) =>
+      this.draft.text.includes(attachment.token),
+    )
   }
 
   private runCommand(line: string): void {
@@ -490,6 +531,7 @@ class TuiAppImpl implements TuiApp {
       return
     }
     this.draft = createDraft()
+    this.attachments = []
     this.history.push(line)
     command.run(this.commandCtx(), parsed.args)
   }

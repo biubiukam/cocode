@@ -1,5 +1,6 @@
 import { Box, Text } from 'ink'
 import type { TuiSnapshot } from '../../runtime/app.ts'
+import { formatFileMention } from '../../runtime/file-mentions.ts'
 import { theme } from '../theme.ts'
 
 export function Composer(props: { composer: TuiSnapshot['composer'] }) {
@@ -32,7 +33,10 @@ export function Composer(props: { composer: TuiSnapshot['composer'] }) {
                 {index === 0 ? '> ' : '  '}
               </Text>
               <Text color={composer.disabled ? theme.mute : theme.text}>{row.before}</Text>
-              <Text inverse color={composer.disabled ? theme.mute : theme.text}>
+              <Text
+                inverse={!composer.disabled}
+                color={composer.disabled ? theme.mute : theme.text}
+              >
                 {row.cursor}
               </Text>
               <Text color={composer.disabled ? theme.mute : theme.text}>{row.after}</Text>
@@ -40,6 +44,11 @@ export function Composer(props: { composer: TuiSnapshot['composer'] }) {
           ))
         )}
       </Box>
+      {composer.attachments.length > 0 ? (
+        <Text color={theme.info}>
+          attached · {composer.attachments.map(formatFileMention).join(' · ')}
+        </Text>
+      ) : null}
     </Box>
   )
 }

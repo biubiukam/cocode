@@ -31,6 +31,29 @@ export async function listWorkspaceFiles(options: {
   }
 }
 
+export async function listWorkspaceEntries(options: {
+  cwd: string
+  maxFiles?: number
+  maxDepth?: number
+}): Promise<string[]> {
+  const cwd = resolve(options.cwd)
+  const maxFiles = options.maxFiles ?? 2_000
+  try {
+    const result = await execFileAsync(
+      'git',
+      ['-C', cwd, 'ls-files', '-co', '--exclude-standard', '-z'],
+      {
+        encoding: 'buffer',
+        maxBuffer: 4 * 1024 * 1024,
+      },
+    )
+    const files = result.stdout.toString('utf8').split('\0').filter(Boolean)
+    return addParentDirectories(files).slice(0, maxFiles)
+  } catch {
+    return walkWorkspace(cwd, maxFiles, options.maxDepth ?? 8, true)
+  }
+}
+
 export function rankFileMatches(files: readonly string[], query: string, limit = 20): string[] {
   const needle = query.trim().toLowerCase()
   return files
@@ -43,7 +66,12 @@ export function rankFileMatches(files: readonly string[], query: string, limit =
     .map((entry) => entry.file)
 }
 
-async function walkWorkspace(cwd: string, maxFiles: number, maxDepth: number): Promise<string[]> {
+async function walkWorkspace(
+  cwd: string,
+  maxFiles: number,
+  maxDepth: number,
+  includeDirectories = false,
+): Promise<string[]> {
   const result: string[] = []
   const visit = async (directory: string, depth: number): Promise<void> => {
     if (result.length >= maxFiles || depth > maxDepth) return
@@ -56,7 +84,12 @@ async function walkWorkspace(cwd: string, maxFiles: number, maxDepth: number): P
     for (const entry of entries) {
       if (result.length >= maxFiles) return
       if (entry.isDirectory()) {
-        if (!SKIP_DIRECTORIES.has(entry.name)) await visit(join(directory, entry.name), depth + 1)
+        if (!SKIP_DIRECTORIES.has(entry.name)) {
+          if (includeDirectories) {
+            result.push(`${relative(cwd, join(directory, entry.name)).split(sep).join('/')}/`)
+          }
+          await visit(join(directory, entry.name), depth + 1)
+        }
       } else if (entry.isFile()) {
         result.push(relative(cwd, join(directory, entry.name)).split(sep).join('/'))
       }
@@ -64,6 +97,17 @@ async function walkWorkspace(cwd: string, maxFiles: number, maxDepth: number): P
   }
   await visit(cwd, 0)
   return result.sort()
+}
+
+function addParentDirectories(files: readonly string[]): string[] {
+  const entries = new Set(files)
+  for (const file of files) {
+    const parts = file.split('/')
+    for (let index = 1; index < parts.length; index += 1) {
+      entries.add(`${parts.slice(0, index).join('/')}/`)
+    }
+  }
+  return [...entries].sort()
 }
 
 function fileScore(file: string, query: string): number | undefined {

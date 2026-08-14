@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { buildPromptBlocks, loadFileContext } from '../../../src/runtime/file-context.ts'
@@ -32,6 +32,21 @@ describe('file context', () => {
     } finally {
       await rm(cwd, { recursive: true, force: true })
       await rm(outside, { recursive: true, force: true })
+    }
+  })
+
+  it('attaches a bounded directory listing', async () => {
+    const cwd = await mkdtemp(join(tmpdir(), 'cocode-context-dir-'))
+    try {
+      await mkdir(join(cwd, 'src'))
+      await writeFile(join(cwd, 'README.md'), 'readme\n')
+      const contexts = await loadFileContext({ cwd, paths: ['.'], maxDirectoryEntries: 2 })
+      expect(contexts[0]).toMatchObject({ kind: 'directory', path: '.' })
+      const blocks = buildPromptBlocks('inspect', contexts)
+      expect(blocks[0]?.text).toContain('[Attached directory: .]')
+      expect(blocks[0]?.text).toContain('src/')
+    } finally {
+      await rm(cwd, { recursive: true, force: true })
     }
   })
 })

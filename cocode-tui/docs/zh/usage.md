@@ -30,6 +30,8 @@ DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 - `Ctrl+O` 切换详细模式，查看完整思考内容和工具输入输出。
 - `Esc` 在帮助、命令菜单等弹层中先关闭弹层；普通状态下按两次退出或结束当前 TUI。
 - `Ctrl+L` 重绘界面，不清除会话内容。
+- 在消息任意位置输入 `@` 可搜索工作区文件和目录；使用 `Tab`、`↑`、`↓` 选择，回车插入引用。
+- 发送时会在消息末尾附加选中文件内容，目录则附加受限的目录列表；文件必须位于当前工作区内。
 
 工具输出会按显示模式截断，原始内容仍保留在会话投影中。对话区空间不足时，输入区保持可见。
 
@@ -66,4 +68,4 @@ DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 
 ## 当前未接入的交互
 
-取消/steer、审批、rewind、技能菜单、`@` 文件补全、`Ctrl+R` 历史搜索和 `Ctrl+G` 外部编辑器尚未绑定到 TUI 交互。这些能力需要对应的 harness wire、显式 manifest 或后续交互接线；界面不会显示假控件。
+取消/steer、审批、rewind、技能菜单、`Ctrl+R` 历史搜索和 `Ctrl+G` 外部编辑器尚未绑定到 TUI 交互。这些能力需要对应的 harness wire、显式 manifest 或后续交互接线；界面不会显示假控件。

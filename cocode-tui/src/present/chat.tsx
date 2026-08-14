@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { TuiApp, TuiSnapshot } from '../runtime/app.ts'
 import { matchKey } from '../runtime/keymap.ts'
 import { Composer } from './components/Composer.tsx'
+import { FileMenu } from './components/FileMenu.tsx'
 import { Header } from './components/Header.tsx'
 import { Help } from './components/Help.tsx'
 import { MessageList } from './components/MessageList.tsx'
@@ -18,25 +19,39 @@ import {
   type SlashMenuItem,
 } from './components/SlashMenu.tsx'
 import { theme } from './theme.ts'
+import { findFileMentionAtCursor } from '../runtime/file-mentions.ts'
+import { listWorkspaceEntries, rankFileMatches } from '../runtime/workspace-files.ts'
 
 export function Chat(props: { app: TuiApp }) {
   const { app } = props
   const [snap, setSnap] = useState<TuiSnapshot>(() => app.snapshot())
   const [slashDismissed, setSlashDismissed] = useState(false)
   const [slashIndex, setSlashIndex] = useState(0)
+  const [fileDismissed, setFileDismissed] = useState(false)
+  const [fileIndex, setFileIndex] = useState(0)
+  const [fileItems, setFileItems] = useState<readonly string[]>([])
+  const [fileLoading, setFileLoading] = useState(false)
   const { stdout } = useStdout()
   const slashItems = useMemo<readonly SlashMenuItem[]>(
     () => filterSlashItems(snap.commands, snap.composer.text),
     [snap.commands, snap.composer.text],
   )
   const slashOpen = !slashDismissed && slashItems.length > 0
+  const fileMention = useMemo(
+    () => findFileMentionAtCursor(snap.composer.text, snap.composer.cursor),
+    [snap.composer.cursor, snap.composer.text],
+  )
+  const fileVisible = !slashOpen && !fileDismissed && fileMention !== undefined
+  const fileOpen = fileVisible && (fileLoading || fileItems.length > 0)
   const composerRows = Math.max(1, snap.composer.text.split('\n').length)
   const reservedRows =
     11 +
     composerRows +
+    (snap.composer.attachments.length > 0 ? 1 : 0) +
     (snap.notice ? 1 : 0) +
     (snap.helpOpen ? snap.helpText.split('\n').length + 4 : 0) +
-    (slashOpen ? slashItems.length + 4 : 0)
+    (slashOpen ? slashItems.length + 4 : 0) +
+    (fileOpen ? fileItems.length + (fileLoading ? 3 : 4) : 0)
 
   useEffect(
     () =>
@@ -49,7 +64,33 @@ export function Chat(props: { app: TuiApp }) {
   useEffect(() => {
     setSlashDismissed(false)
     setSlashIndex(0)
+    setFileDismissed(false)
+    setFileIndex(0)
   }, [snap.composer.text])
+
+  useEffect(() => {
+    if (!fileVisible || fileMention === undefined) {
+      setFileItems([])
+      setFileLoading(false)
+      return
+    }
+    let active = true
+    setFileLoading(true)
+    void listWorkspaceEntries({ cwd: snap.header.cwd })
+      .then((files) => {
+        if (!active) return
+        setFileItems(rankFileMatches(files, fileMention.query, 8))
+      })
+      .catch(() => {
+        if (active) setFileItems([])
+      })
+      .finally(() => {
+        if (active) setFileLoading(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [fileMention, fileVisible, snap.header.cwd])
 
   useInput((input, key) => {
     if (snap.composer.disabled && !key.ctrl && input !== 'c') {
@@ -76,6 +117,33 @@ export function Chat(props: { app: TuiApp }) {
         const selected = slashItems[moveSlashSelection(slashIndex, 0, slashItems.length)]
         if (selected !== undefined) {
           app.dispatch({ type: 'command', line: `/${selected.name}` })
+        }
+        return
+      }
+    }
+
+    if (fileOpen && fileMention !== undefined) {
+      if (key.escape) {
+        setFileDismissed(true)
+        return
+      }
+      if (key.downArrow || key.tab) {
+        setFileIndex((index) => moveSelection(index, 1, fileItems.length))
+        return
+      }
+      if (key.upArrow) {
+        setFileIndex((index) => moveSelection(index, -1, fileItems.length))
+        return
+      }
+      if (key.return) {
+        const selected = fileItems[moveSelection(fileIndex, 0, fileItems.length)]
+        if (selected !== undefined) {
+          app.dispatch({
+            type: 'attachFile',
+            start: fileMention.start,
+            end: fileMention.end,
+            path: selected,
+          })
         }
         return
       }
@@ -133,9 +201,22 @@ export function Chat(props: { app: TuiApp }) {
         <Text color={theme.mute}>esc quit · ctrl+l redraw</Text>
       </Box>
       {slashOpen ? <SlashMenu items={slashItems} selectedIndex={slashIndex} /> : null}
+      {fileOpen ? (
+        <FileMenu
+          items={fileItems}
+          selectedIndex={fileIndex}
+          query={fileMention?.query ?? ''}
+          loading={fileLoading}
+        />
+      ) : null}
       {snap.helpOpen ? <Help text={snap.helpText} /> : null}
     </Box>
   )
+}
+
+function moveSelection(index: number, delta: number, count: number): number {
+  if (count <= 0) return 0
+  return (((index + delta) % count) + count) % count
 }
 
 function runCommand(app: TuiApp, id: string, draft: string): void {

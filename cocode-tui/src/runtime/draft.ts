@@ -25,6 +25,18 @@ export function insertDraft(state: DraftState, input: string): DraftState {
   }
 }
 
+export function replaceDraftRange(
+  state: DraftState,
+  start: number,
+  end: number,
+  replacement: string,
+): DraftState {
+  const safeStart = clampCursor(start, state.text.length)
+  const safeEnd = Math.max(safeStart, Math.min(Math.trunc(end), state.text.length))
+  const text = state.text.slice(0, safeStart) + replacement + state.text.slice(safeEnd)
+  return createDraft(text, safeStart + replacement.length)
+}
+
 export function insertNewline(state: DraftState): DraftState {
   return insertDraft(state, '\n')
 }
