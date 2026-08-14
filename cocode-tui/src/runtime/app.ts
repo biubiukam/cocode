@@ -70,6 +70,7 @@ export type TuiAction =
   | { type: 'resume.move'; delta: number }
   | { type: 'resume.close' }
   | { type: 'resume.confirm' }
+  | { type: 'queuePrompt' }
 
 export type { TuiCapabilities }
 
@@ -98,6 +99,7 @@ export type TuiSnapshot = {
     line: string
     tokens?: { input: number; output: number }
     subagents?: TuiSubagentActivity
+    queueCount: number
   }
   helpOpen: boolean
   verbose: boolean
@@ -112,6 +114,11 @@ export type TuiSnapshot = {
 export type TuiSubagentActivity = {
   running: number
   last?: { id: string; event: 'started' | 'finished' }
+}
+
+type QueuedPrompt = {
+  text: string
+  attachments: readonly { path: string; token: string }[]
 }
 
 export type TuiAuthInfo = {
@@ -206,6 +213,7 @@ class TuiAppImpl implements TuiApp {
   private readonly auth: TuiAuthInfo | undefined
   private readonly activeSubagents = new Set<string>()
   private lastSubagent: TuiSubagentActivity['last']
+  private readonly queuedPrompts: QueuedPrompt[] = []
   private capturingByok = false
   private closePromise: Promise<void> | undefined
   private resumePicker: ResumePickerState | undefined
@@ -322,6 +330,7 @@ class TuiAppImpl implements TuiApp {
           running: this.activeSubagents.size,
           ...(this.lastSubagent === undefined ? {} : { last: this.lastSubagent }),
         },
+        queueCount: this.queuedPrompts.length,
       },
       helpOpen: this.helpOpen,
       verbose: this.verbose,
@@ -443,6 +452,9 @@ class TuiAppImpl implements TuiApp {
         this.emit()
         return
       }
+      case 'queuePrompt':
+        this.queueCurrentPrompt()
+        return
     }
   }
 
@@ -473,6 +485,7 @@ class TuiAppImpl implements TuiApp {
         this.sessionId = crypto.randomUUID()
         this.assembler.reset()
         this.resetSubagentActivity()
+        this.queuedPrompts.length = 0
         this.attachments = []
         this.notice = {
           tone: 'info',
@@ -595,6 +608,7 @@ class TuiAppImpl implements TuiApp {
       this.sessionId = crypto.randomUUID()
       this.assembler.reset()
       this.resetSubagentActivity()
+      this.queuedPrompts.length = 0
       this.agent = 'idle'
       this.notice = {
         tone: 'info',
@@ -623,8 +637,8 @@ class TuiAppImpl implements TuiApp {
     this.emit()
   }
 
-  private submit(text: string): void {
-    const trimmed = text.trim()
+  private submit(inputText: string): void {
+    const trimmed = inputText.trim()
     if (trimmed === '') return
     if (this.capturingByok) {
       void submitCapturedByok(this.switchHost(), trimmed)
@@ -637,7 +651,7 @@ class TuiAppImpl implements TuiApp {
     if (this.agent !== 'idle') {
       this.notice = {
         tone: 'info',
-        message: 'Turn in progress. Protocol cannot queue or steer yet.',
+        message: text(this.locale, 'turnBusy'),
       }
       this.emit()
       return
@@ -667,6 +681,41 @@ class TuiAppImpl implements TuiApp {
       cwd: this.cwd,
       paths: attachments.map((attachment) => attachment.path),
     }).then((files) => this.runtime.prompt(this.sessionId, buildPromptBlocks(text, files)))
+  }
+
+  private queueCurrentPrompt(): void {
+    const trimmed = this.draft.text.trim()
+    if (trimmed === '' || this.agent !== 'running') return
+    if (this.queuedPrompts.length >= 8) {
+      this.notice = { tone: 'info', message: text(this.locale, 'queueFull') }
+      this.emit()
+      return
+    }
+    this.queuedPrompts.push({ text: trimmed, attachments: this.attachments.slice() })
+    this.history.push(trimmed)
+    this.draft = createDraft()
+    this.attachments = []
+    this.notice = {
+      tone: 'info',
+      message: text(this.locale, 'queueAdded', {
+        count: String(this.queuedPrompts.length),
+      }),
+    }
+    this.emit()
+  }
+
+  private flushQueuedPrompt(): void {
+    if (this.agent !== 'idle') return
+    const next = this.queuedPrompts.shift()
+    if (next === undefined) return
+    this.agent = 'running'
+    this.notice = { tone: 'info', message: text(this.locale, 'queueSending') }
+    this.emit()
+    void this.promptWithAttachments(next.text, next.attachments).catch((error: unknown) => {
+      this.notice = { tone: 'error', message: errorMessage(error) }
+      this.agent = 'idle'
+      this.emit()
+    })
   }
 
   private pruneAttachments(): void {
@@ -701,6 +750,7 @@ class TuiAppImpl implements TuiApp {
       isDeadOrExiting: () => this.agent === 'dead' || this.exiting,
       setAgent: (agent) => {
         this.agent = agent
+        if (agent === 'idle') this.flushQueuedPrompt()
       },
       clearInterrupt: () => {
         this.interruptArmed = false

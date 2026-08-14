@@ -292,6 +292,11 @@ export function Chat(props: { app: TuiApp }) {
       }
     }
 
+    if (key.tab && snap.agent === 'running' && snap.composer.text.trim() !== '') {
+      app.dispatch({ type: 'queuePrompt' })
+      return
+    }
+
     const matched = matchKey({
       raw: input,
       return: key.return,

@@ -36,6 +36,11 @@ export function StatusLine(props: {
             })}
           </Text>
         ) : null}
+        {props.status.queueCount > 0 ? (
+          <Text color={theme.info}>
+            {text(props.locale, 'queueCount', { count: String(props.status.queueCount) })}
+          </Text>
+        ) : null}
       </Box>
       {notice ? <Notice notice={notice} /> : null}
     </Box>

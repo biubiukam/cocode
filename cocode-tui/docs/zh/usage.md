@@ -35,6 +35,7 @@ DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 - `/model <model-id>` 通过 runtime restart 切换当前模型，并创建新 session；切换失败会尝试恢复原模型。
 - `Ctrl+O` 切换详细模式，查看完整思考内容和工具输入输出。
 - 状态栏会显示最近一次 assistant 的输入/输出 token，以及 wire 已报告的当前子代理活动。当前协议没有提供 TPS、缓存命中率、推理等级和上下文分段，因此界面不会显示这些字段。
+- 当前任务运行时按 `Tab` 可将输入加入队列，最多 8 条；收到 `session.status=idle` 后按顺序自动发送。这是本地排队，不会打断当前任务，也不是 steer。
 - `Esc` 在帮助、命令菜单等弹层中先关闭弹层；普通状态下按两次退出或结束当前 TUI。
 - `Ctrl+L` 重绘界面，不清除会话内容。
 - 在消息任意位置输入 `@` 可搜索工作区文件和目录；使用 `Tab`、`↑`、`↓` 选择，回车插入引用。

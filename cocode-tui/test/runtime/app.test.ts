@@ -192,6 +192,38 @@ describe('TuiApp', () => {
     expect(app.snapshot().notice?.message).toMatch(/Turn in progress/)
   })
 
+  it('queues a follow-up while running and sends it after idle', async () => {
+    const runtime = fakeRuntime()
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+    })
+    await app.start()
+    app.dispatch({ type: 'submit', text: 'first' })
+    runtime.emit({
+      method: 'session.status',
+      params: { sessionId: 's1', status: 'running' },
+    })
+    app.dispatch({ type: 'setDraft', text: 'second' })
+    app.dispatch({ type: 'queuePrompt' })
+    expect(app.snapshot().status.queueCount).toBe(1)
+    expect(runtime.prompts).toEqual([{ sessionId: 's1', text: 'first' }])
+    runtime.emit({
+      method: 'session.status',
+      params: { sessionId: 's1', status: 'idle' },
+    })
+    await expect
+      .poll(() => runtime.prompts)
+      .toEqual([
+        { sessionId: 's1', text: 'first' },
+        { sessionId: 's1', text: 'second' },
+      ])
+    expect(app.snapshot().status.queueCount).toBe(0)
+  })
+
   it('ingests session.event into nodes', async () => {
     const runtime = fakeRuntime()
     const app = createTuiApp({

@@ -50,6 +50,11 @@ type UiKey =
   | 'subagentsRunning'
   | 'subagentStarted'
   | 'subagentFinished'
+  | 'queueCount'
+  | 'queueAdded'
+  | 'queueFull'
+  | 'queueSending'
+  | 'turnBusy'
 
 const TEXT: Record<UiLocale, Record<UiKey, string>> = {
   en: {
@@ -101,6 +106,11 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     subagentsRunning: '{count} subagents running',
     subagentStarted: 'subagent {id} started',
     subagentFinished: 'subagent {id} finished',
+    queueCount: 'queued {count}',
+    queueAdded: 'Queued prompt ({count}); it will send when the current turn finishes.',
+    queueFull: 'Prompt queue is full (8).',
+    queueSending: 'Sending queued prompt…',
+    turnBusy: 'Turn in progress. Press Tab to queue this prompt.',
   },
   zh: {
     session: '会话',
@@ -151,6 +161,11 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     subagentsRunning: '{count} 个子代理运行中',
     subagentStarted: '子代理 {id} 已启动',
     subagentFinished: '子代理 {id} 已完成',
+    queueCount: '待处理 {count}',
+    queueAdded: '已加入队列（{count} 条），当前任务结束后自动发送。',
+    queueFull: '输入队列已满（最多 8 条）。',
+    queueSending: '正在发送队列中的输入…',
+    turnBusy: '当前任务仍在运行，按 Tab 可将输入加入队列。',
   },
 }
 
