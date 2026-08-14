@@ -2,9 +2,18 @@ import { describe, expect, it } from 'vitest'
 import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { buildPromptBlocks, loadFileContext } from '../../../src/runtime/file-context.ts'
+import {
+  buildPromptBlocks,
+  isPathInside,
+  loadFileContext,
+} from '../../../src/runtime/file-context.ts'
 
 describe('file context', () => {
+  it('checks Windows traversal with Windows separators', () => {
+    expect(isPathInside('C:\\workspace', 'C:\\workspace\\src\\main.ts', 'win32')).toBe(true)
+    expect(isPathInside('C:\\workspace', 'C:\\workspace\\..\\secret.txt', 'win32')).toBe(false)
+  })
+
   it('loads UTF-8 text and creates one separated text block', async () => {
     const cwd = await mkdtemp(join(tmpdir(), 'cocode-context-'))
     try {
@@ -26,9 +35,15 @@ describe('file context', () => {
     try {
       await writeFile(join(cwd, 'binary.bin'), Buffer.from([0, 1, 2]))
       await writeFile(join(outside, 'secret.txt'), 'secret\n')
-      await symlink(join(outside, 'secret.txt'), join(cwd, 'link.txt'))
+      await symlink(
+        outside,
+        join(cwd, 'outside'),
+        process.platform === 'win32' ? 'junction' : 'dir',
+      )
       await expect(loadFileContext({ cwd, paths: ['binary.bin'] })).rejects.toThrow(/binary/)
-      await expect(loadFileContext({ cwd, paths: ['link.txt'] })).rejects.toThrow(/outside/)
+      await expect(loadFileContext({ cwd, paths: ['outside/secret.txt'] })).rejects.toThrow(
+        /outside/,
+      )
     } finally {
       await rm(cwd, { recursive: true, force: true })
       await rm(outside, { recursive: true, force: true })

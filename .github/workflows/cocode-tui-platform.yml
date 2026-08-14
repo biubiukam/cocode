@@ -1,0 +1,57 @@
+name: Cocode TUI platform checks
+
+on:
+  push:
+    paths:
+      - "cocode-tui/**"
+      - ".github/workflows/cocode-tui-platform.yml"
+  pull_request:
+    paths:
+      - "cocode-tui/**"
+      - ".github/workflows/cocode-tui-platform.yml"
+
+jobs:
+  test:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+
+    defaults:
+      run:
+        working-directory: cocode-tui
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.21.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.19.0
+          cache: pnpm
+          cache-dependency-path: cocode-tui/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Run tests
+        run: pnpm test
+
+      - name: Typecheck TUI source
+        run: pnpm exec tsc --noEmit --project tsconfig.json
+
+      - name: Lint TUI source
+        run: pnpm exec eslint src packages
+
+      - name: Check formatting
+        run: pnpm exec prettier --check src/main.tsx src/present/clear-screen.ts src/present/whale-animation.ts src/present/components/EmptyState.tsx src/present/components/Header.tsx src/present/components/MessageList.tsx src/present/components/WhaleLogo.tsx src/runtime/auth/io.ts src/runtime/auth/open-url.ts src/runtime/errors/locale.ts src/runtime/export-file.ts src/runtime/external-editor.ts src/runtime/file-context.ts src/runtime/sessions-fs.ts src/runtime/sessions-root.ts src/runtime/workspace-files.ts test/present/clear-screen.test.ts test/present/whale-animation.test.ts test/runtime/auth/account.test.ts test/runtime/auth/credentials.test.ts test/runtime/auth/open-url.test.ts test/runtime/auth/paths.test.ts test/runtime/errors.test.ts test/runtime/p1/export-file.test.ts test/runtime/p1/file-context.test.ts test/runtime/p1/history-editor.test.ts test/runtime/p1/sessions-fs.test.ts test/runtime/p1/sessions-root.test.ts

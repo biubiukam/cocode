@@ -1,7 +1,7 @@
 /** Load safe workspace file attachments and format them as prompt text. */
 
 import { readFile, readdir, realpath, stat } from 'node:fs/promises'
-import { isAbsolute, relative, resolve, sep } from 'node:path'
+import { isAbsolute, posix, relative, resolve, sep, win32 } from 'node:path'
 import type { ContentBlock } from '@cocode/tui-connection'
 
 export type FileContext =
@@ -83,10 +83,19 @@ async function listDirectoryEntries(path: string, limit: number): Promise<string
 }
 
 function assertInside(root: string, target: string): void {
-  const rest = relative(root, target)
-  if (rest === '..' || rest.startsWith(`..${'/'}`) || isAbsolute(rest)) {
+  if (!isPathInside(root, target)) {
     throw new Error('file path resolves outside the workspace')
   }
+}
+
+export function isPathInside(
+  root: string,
+  target: string,
+  platform: NodeJS.Platform = process.platform,
+): boolean {
+  const pathApi = platform === 'win32' ? win32 : posix
+  const rest = pathApi.relative(root, target)
+  return rest !== '..' && !rest.startsWith(`..${pathApi.sep}`) && !pathApi.isAbsolute(rest)
 }
 
 function decodeUtf8(bytes: Buffer): string {

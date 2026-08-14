@@ -59,12 +59,12 @@ Type `/` to open the command menu. Keep typing to filter by prefix. `Tab` or arr
 | `/theme dark` / `/theme light` | Switch the display theme                                                    |
 | `/lang zh` / `/lang en`        | Switch between Chinese and English UI                                       |
 | `/model <model-id>`            | Switch models and start a new session                                       |
-| `/resume`                      | List local session history for this workspace                               |
+| `/resume`                      | Open the read-only local session picker for this workspace                  |
 | `/use byok` / `/use cocode`    | Switch between your key and Cocode; switching starts a new session          |
 | `/login` / `/logout`           | Sign in or out of Cocode Cloud; logout keeps your key and stays in chat     |
 | `/exit`                        | Shut down TUI and restore the terminal                                      |
 
-`/resume` currently lists history only. The harness SDK has no `session/open` or `session/resume` wire, so TUI does not pretend it can continue an old session.
+`/resume` reads local session headers and supports text filtering plus `↑` `↓` selection. Enter only explains that the current harness SDK has no `session/open` or `session/resume` wire; it does not change the active session.
 
 ## Errors
 

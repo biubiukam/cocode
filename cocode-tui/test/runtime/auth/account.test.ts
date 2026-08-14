@@ -38,19 +38,22 @@ describe('account', () => {
     expect(JSON.stringify(await readAccount(home))).not.toMatch(/ck_|sk-/)
   })
 
-  it('keeps account.yaml and its directory owner-only', async () => {
-    const home = await tempHome()
-    await writeAccount(home, {
-      origin: 'https://cocode.agency',
-      accessToken: 'access',
-      refreshToken: 'refresh',
-      accessExpiresAt: 1710000000000,
-    })
-    const accountMode = (await stat(join(home, 'account.yaml'))).mode & 0o777
-    const directoryMode = (await stat(home)).mode & 0o777
-    expect(accountMode).toBe(0o600)
-    expect(directoryMode).toBe(0o700)
-  })
+  it.runIf(process.platform !== 'win32')(
+    'keeps account.yaml and its directory owner-only',
+    async () => {
+      const home = await tempHome()
+      await writeAccount(home, {
+        origin: 'https://cocode.agency',
+        accessToken: 'access',
+        refreshToken: 'refresh',
+        accessExpiresAt: 1710000000000,
+      })
+      const accountMode = (await stat(join(home, 'account.yaml'))).mode & 0o777
+      const directoryMode = (await stat(home)).mode & 0o777
+      expect(accountMode).toBe(0o600)
+      expect(directoryMode).toBe(0o700)
+    },
+  )
 
   it('deletes only account.yaml', async () => {
     const home = await tempHome()

@@ -1,13 +1,20 @@
 /**
- * Locale from COCODE_LANG, then LANG / LC_MESSAGES.
+ * Locale from COCODE_LANG, environment locale, then the runtime locale.
  */
 
 import type { Locale } from './catalog.ts'
 
-export function resolveLocale(env: NodeJS.ProcessEnv = process.env): Locale {
+export function resolveLocale(
+  env: NodeJS.ProcessEnv = process.env,
+  systemLocale: string | undefined = Intl.DateTimeFormat().resolvedOptions().locale,
+): Locale {
   const configured = firstTag(env.COCODE_LANG)
   if (configured !== undefined) return configured === 'zh' ? 'zh' : 'en'
-  const fallback = firstTag(env.LC_ALL) ?? firstTag(env.LC_MESSAGES) ?? firstTag(env.LANG)
+  const fallback =
+    firstTag(env.LC_ALL) ??
+    firstTag(env.LC_MESSAGES) ??
+    firstTag(env.LANG) ??
+    firstTag(systemLocale)
   return fallback === 'zh' ? 'zh' : 'en'
 }
 

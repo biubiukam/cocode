@@ -65,10 +65,10 @@ export async function writeYamlFile(path: string, value: unknown, mode = 0o600):
   const handle = await open(temporary, 'wx', mode)
   try {
     await handle.writeFile(text, 'utf8')
-    await handle.chmod(mode)
+    if (process.platform !== 'win32') await handle.chmod(mode)
     await handle.close()
     await rename(temporary, path)
-    await chmod(path, mode)
+    if (process.platform !== 'win32') await chmod(path, mode)
   } catch (error) {
     await handle.close().catch(() => undefined)
     await unlink(temporary).catch(() => undefined)

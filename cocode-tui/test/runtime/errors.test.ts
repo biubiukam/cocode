@@ -22,7 +22,11 @@ describe('resolveLocale', () => {
 
   it('falls back to en for unknown or empty values', () => {
     expect(resolveLocale({ COCODE_LANG: 'fr', LANG: 'zh_CN' })).toBe('en')
-    expect(resolveLocale({})).toBe('en')
+    expect(resolveLocale({}, 'en-US')).toBe('en')
+  })
+
+  it('uses the runtime locale when Windows has no LANG variables', () => {
+    expect(resolveLocale({}, 'zh-CN')).toBe('zh')
   })
 })
 

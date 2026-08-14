@@ -11,7 +11,7 @@ export async function writeSessionExport(
   sessionId: string,
   nodes: readonly ConversationNode[],
 ): Promise<string> {
-  const base = join(cwd, `cocode-export-${sessionId.slice(0, 8)}`)
+  const base = join(cwd, `cocode-export-${safeSessionLabel(sessionId)}`)
   for (let index = 0; index < 100; index += 1) {
     const suffix = index === 0 ? '' : `-${index}`
     const path = `${base}${suffix}.md`
@@ -30,4 +30,14 @@ export async function writeSessionExport(
     }
   }
   throw new TuiError('SESSION_EXPORT_FAILED')
+}
+
+export function safeSessionLabel(sessionId: string): string {
+  const safe = [...sessionId.slice(0, 8)]
+    .map((character) =>
+      character.charCodeAt(0) <= 31 || '<>:"/\\|?*'.includes(character) ? '-' : character,
+    )
+    .join('')
+    .replace(/[. ]+$/g, '')
+  return safe === '' ? 'session' : safe
 }

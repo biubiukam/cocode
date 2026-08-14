@@ -27,6 +27,10 @@ describe('history search', () => {
 describe('external editor', () => {
   it('parses quoted commands and returns edited text', async () => {
     expect(parseEditorCommand('code --wait "draft file"')).toEqual(['code', '--wait', 'draft file'])
+    expect(parseEditorCommand('"C:\\Program Files\\Editor\\editor.exe" --wait', 'win32')).toEqual([
+      'C:\\Program Files\\Editor\\editor.exe',
+      '--wait',
+    ])
     let editedPath = ''
     const parent = await mkdtemp(join(tmpdir(), 'cocode-editor-'))
     try {

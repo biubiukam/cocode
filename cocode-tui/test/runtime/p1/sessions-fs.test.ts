@@ -3,9 +3,14 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { zstdCompressSync } from 'node:zlib'
-import { listSessionSummaries } from '../../../src/runtime/sessions-fs.ts'
+import { listSessionSummaries, samePath } from '../../../src/runtime/sessions-fs.ts'
 
 describe('listSessionSummaries', () => {
+  it('compares Windows paths case-insensitively', () => {
+    expect(samePath('C:\\Work\\Project', 'c:\\work\\project', 'win32')).toBe(true)
+    expect(samePath('/work/Project', '/work/project', 'linux')).toBe(false)
+  })
+
   it('reads raw and zstd headers for the selected cwd', async () => {
     const root = await mkdtemp(join(tmpdir(), 'cocode-session-list-'))
     const cwd = '/work/project'

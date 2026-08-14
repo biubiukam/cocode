@@ -13,7 +13,36 @@ export type EditorRunner = (
   filePath: string,
 ) => Promise<number>
 
-export function parseEditorCommand(value: string): string[] {
+export function parseEditorCommand(
+  value: string,
+  platform: NodeJS.Platform = process.platform,
+): string[] {
+  if (platform === 'win32') return parseWindowsEditorCommand(value)
+  return parsePosixEditorCommand(value)
+}
+
+function parseWindowsEditorCommand(value: string): string[] {
+  const tokens: string[] = []
+  let token = ''
+  let quoted = false
+  for (const character of value.trim()) {
+    if (character === '"') {
+      quoted = !quoted
+    } else if (!quoted && /\s/.test(character)) {
+      if (token !== '') {
+        tokens.push(token)
+        token = ''
+      }
+    } else {
+      token += character
+    }
+  }
+  if (quoted) throw new Error('editor command has an unterminated quote')
+  if (token !== '') tokens.push(token)
+  return tokens
+}
+
+function parsePosixEditorCommand(value: string): string[] {
   const tokens: string[] = []
   let token = ''
   let quote: "'" | '"' | undefined
@@ -73,7 +102,7 @@ export async function editDraft(options: {
       throw new Error('Edited draft is not valid UTF-8 text.')
     }
   } finally {
-    await rm(directory, { recursive: true, force: true })
+    await rm(directory, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 })
   }
 }
 

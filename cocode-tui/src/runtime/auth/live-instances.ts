@@ -23,7 +23,7 @@ export type LiveInstanceContext = {
 
 export const defaultLiveContext: LiveInstanceContext = {
   pid: process.pid,
-  isAlive: pidIsAlive,
+  isAlive: isProcessAlive,
 }
 
 export async function registerLiveInstance(
@@ -88,11 +88,11 @@ async function sweepStale(dir: string, ctx: LiveInstanceContext): Promise<number
   return live
 }
 
-function pidIsAlive(pid: number): boolean {
+export function isProcessAlive(pid: number, kill: typeof process.kill = process.kill): boolean {
   try {
-    process.kill(pid, 0)
+    kill(pid, 0)
     return true
-  } catch {
-    return false
+  } catch (error) {
+    return (error as NodeJS.ErrnoException | undefined)?.code === 'EPERM'
   }
 }

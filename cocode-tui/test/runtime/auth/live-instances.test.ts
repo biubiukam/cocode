@@ -6,6 +6,7 @@ import {
   otherLiveCount,
   registerLiveInstance,
   releaseLiveInstance,
+  isProcessAlive,
   type LiveInstanceContext,
 } from '../../../src/runtime/auth/live-instances.ts'
 
@@ -30,6 +31,15 @@ function ctx(pid: number, alive: readonly number[]): LiveInstanceContext {
 }
 
 describe('live TUI instances', () => {
+  it('treats EPERM as a live process', () => {
+    const error = Object.assign(new Error('permission denied'), { code: 'EPERM' })
+    expect(
+      isProcessAlive(42, () => {
+        throw error
+      }),
+    ).toBe(true)
+  })
+
   it('does not count the current process as another instance', async () => {
     const home = await tempHome()
     const self = ctx(42, [42])

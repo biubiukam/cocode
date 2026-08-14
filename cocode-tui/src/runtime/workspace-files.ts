@@ -24,8 +24,8 @@ export async function listWorkspaceFiles(options: {
         maxBuffer: 4 * 1024 * 1024,
       },
     )
-    const files = result.stdout.toString('utf8').split('\0').filter(Boolean)
-    return files.slice(0, maxFiles).map((file) => file.split(sep).join('/'))
+    const files = result.stdout.toString('utf8').split('\0').filter(Boolean).map(toDisplayPath)
+    return files.slice(0, maxFiles)
   } catch {
     return walkWorkspace(cwd, maxFiles, options.maxDepth ?? 8)
   }
@@ -47,7 +47,7 @@ export async function listWorkspaceEntries(options: {
         maxBuffer: 4 * 1024 * 1024,
       },
     )
-    const files = result.stdout.toString('utf8').split('\0').filter(Boolean)
+    const files = result.stdout.toString('utf8').split('\0').filter(Boolean).map(toDisplayPath)
     return addParentDirectories(files).slice(0, maxFiles)
   } catch {
     return walkWorkspace(cwd, maxFiles, options.maxDepth ?? 8, true)
@@ -86,12 +86,12 @@ async function walkWorkspace(
       if (entry.isDirectory()) {
         if (!SKIP_DIRECTORIES.has(entry.name)) {
           if (includeDirectories) {
-            result.push(`${relative(cwd, join(directory, entry.name)).split(sep).join('/')}/`)
+            result.push(`${toDisplayPath(relative(cwd, join(directory, entry.name)))}/`)
           }
           await visit(join(directory, entry.name), depth + 1)
         }
       } else if (entry.isFile()) {
-        result.push(relative(cwd, join(directory, entry.name)).split(sep).join('/'))
+        result.push(toDisplayPath(relative(cwd, join(directory, entry.name))))
       }
     }
   }
@@ -126,4 +126,8 @@ function fileScore(file: string, query: string): number | undefined {
     cursor += 1
   }
   return 100 - lower.length / 100
+}
+
+function toDisplayPath(path: string): string {
+  return path.split(sep).join('/')
 }

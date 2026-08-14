@@ -3,7 +3,7 @@
 import { createReadStream } from 'node:fs'
 import { readdir, stat } from 'node:fs/promises'
 import { createZstdDecompress } from 'node:zlib'
-import { join, resolve } from 'node:path'
+import { join, posix, resolve, win32 } from 'node:path'
 
 export type SessionSummary = {
   id: string
@@ -74,7 +74,7 @@ export async function listSessionSummaries(options: {
       try {
         const line = await readFirstLine(existing[0], existing[0] === compressed)
         const header = line === undefined ? undefined : parseHeader(line)
-        if (header === undefined || header.cwd === undefined || resolve(header.cwd) !== targetCwd) {
+        if (header === undefined || header.cwd === undefined || !samePath(header.cwd, targetCwd)) {
           skipped += 1
           continue
         }
@@ -159,4 +159,17 @@ function parseHeader(line: string): SessionHeader | undefined {
 
 function isNotFound(error: unknown): boolean {
   return (error as NodeJS.ErrnoException | undefined)?.code === 'ENOENT'
+}
+
+export function samePath(
+  left: string,
+  right: string,
+  platform: NodeJS.Platform = process.platform,
+): boolean {
+  const pathApi = platform === 'win32' ? win32 : posix
+  const leftPath = pathApi.resolve(left)
+  const rightPath = pathApi.resolve(right)
+  return platform === 'win32'
+    ? leftPath.toLowerCase() === rightPath.toLowerCase()
+    : leftPath === rightPath
 }

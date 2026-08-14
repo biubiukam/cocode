@@ -36,7 +36,7 @@ describe('credentials', () => {
     })
   })
 
-  it('writes the document mode 0600', async () => {
+  it.runIf(process.platform !== 'win32')('writes the document mode 0600', async () => {
     const home = await tempHome()
     await patchCredential(home, 'DEEPSEEK_API_KEY', 'sk-secret')
     const { stat } = await import('node:fs/promises')
@@ -68,10 +68,13 @@ describe('credentials', () => {
     await expect(patchCredential(home, 'not a ref', 'sk-x')).rejects.toThrow(/AUTH_CREDENTIAL_REF/)
   })
 
-  it('rejects a world-readable file instead of reading it', async () => {
-    const home = await tempHome()
-    const path = join(home, '.credentials.yaml')
-    await writeFile(path, 'DEEPSEEK_API_KEY: sk-old\n', { mode: 0o644 })
-    await expect(patchCredential(home, 'OPENAI_API_KEY', 'sk-new')).rejects.toThrow(/IO_MODE/)
-  })
+  it.runIf(process.platform !== 'win32')(
+    'rejects a world-readable file instead of reading it',
+    async () => {
+      const home = await tempHome()
+      const path = join(home, '.credentials.yaml')
+      await writeFile(path, 'DEEPSEEK_API_KEY: sk-old\n', { mode: 0o644 })
+      await expect(patchCredential(home, 'OPENAI_API_KEY', 'sk-new')).rejects.toThrow(/IO_MODE/)
+    },
+  )
 })

@@ -69,7 +69,6 @@ async function main(): Promise<void> {
   const { createTuiRuntime } = await import('@cocode/tui-connection')
   const sessionRoot = resolveSessionRoot({
     env: process.env,
-    productHome: resolved.home,
     cwd: init.cwd,
   })
   const sessionList = (await directoryExists(sessionRoot.path)) ? 'jsonl' : 'none'

@@ -1,12 +1,13 @@
 /**
  * Harness JSON-RPC transport for Cocode TUI.
  * Sole package allowed to import @deepseek-ai/dsh-sdk-client.
- * link: keeps sibling package peers resolvable.
+ * The published SDK keeps clean Windows/Linux checkouts installable without a
+ * sibling cocode-harness clone.
  */
 
-export { createTuiRuntime } from "./client.ts";
-export { parseInitFromEnv, parseLaunchFromEnv } from "./env.ts";
-export type { EnvError } from "./env.ts";
+export { createTuiRuntime } from './client.ts'
+export { parseInitFromEnv, parseLaunchFromEnv } from './env.ts'
+export type { EnvError } from './env.ts'
 export type {
   ContentBlock,
   SessionEvent,
@@ -15,7 +16,7 @@ export type {
   TuiLaunch,
   TuiNotification,
   TuiRuntime,
-} from "./types.ts";
+} from './types.ts'
 
 /** @deprecated Use TuiLaunch. Kept for the scaffold call site. */
-export type { TuiLaunch as HarnessJsonRpcLaunch } from "./types.ts";
+export type { TuiLaunch as HarnessJsonRpcLaunch } from './types.ts'
