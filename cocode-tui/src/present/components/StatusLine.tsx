@@ -2,11 +2,13 @@ import { Box, Text } from 'ink'
 import type { TuiSnapshot } from '../../runtime/app.ts'
 import { agentMark } from './agent-status.ts'
 import { theme } from '../theme.ts'
+import { text, type UiLocale } from '../../runtime/ui-locale.ts'
 
 export function StatusLine(props: {
   status: TuiSnapshot['status']
   agent: TuiSnapshot['agent']
   notice?: TuiSnapshot['notice']
+  locale: UiLocale
 }) {
   const notice = props.notice
   return (
@@ -17,7 +19,8 @@ export function StatusLine(props: {
         </Text>
         {props.status.tokens !== undefined ? (
           <Text color={theme.mute}>
-            tokens in {props.status.tokens.input} · out {props.status.tokens.output}
+            {text(props.locale, 'tokensIn')} {props.status.tokens.input} ·{' '}
+            {text(props.locale, 'tokensOut')} {props.status.tokens.output}
           </Text>
         ) : null}
       </Box>

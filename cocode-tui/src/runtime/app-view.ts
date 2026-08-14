@@ -2,22 +2,43 @@
 
 import type { ConversationNode } from './nodes/types.ts'
 import type { TuiSnapshot } from './app.ts'
+import { text, type UiLocale } from './ui-locale.ts'
 import { redactSecrets } from './diagnostics.ts'
 import { displayError, formatError } from './errors/index.ts'
 
-export function composerPlaceholder(agent: TuiSnapshot['agent']): string {
+export function composerPlaceholder(agent: TuiSnapshot['agent'], locale: UiLocale = 'en'): string {
+  if (locale === 'zh') {
+    if (agent === 'starting') return '正在连接…'
+    if (agent === 'running') return '正在工作 — 连按 Esc 退出'
+    if (agent === 'dead') return '运行时已停止 — /exit'
+    return '输入消息  / 查看命令'
+  }
   if (agent === 'starting') return 'Connecting…'
   if (agent === 'running') return 'Working — Esc then again to quit'
   if (agent === 'dead') return 'Runtime stopped — /exit'
   return 'Type a message  / for commands'
 }
 
-export function statusLine(agent: TuiSnapshot['agent'], runtimeName: string): string {
+export function statusLine(
+  agent: TuiSnapshot['agent'],
+  runtimeName: string,
+  locale: UiLocale = 'en',
+): string {
   const name = runtimeName === '' ? 'runtime' : runtimeName
+  const label =
+    agent === 'idle'
+      ? text(locale, 'agentIdle')
+      : agent === 'running'
+      ? text(locale, 'agentRunning')
+      : agent === 'starting'
+      ? text(locale, 'agentStarting')
+      : text(locale, 'agentDead')
   if (agent === 'running') {
-    return `${name} · running · protocol cannot cancel`
+    return locale === 'zh'
+      ? `${name} · ${label} · 协议暂不支持取消`
+      : `${name} · ${label} · protocol cannot cancel`
   }
-  return `${name} · ${agent}`
+  return `${name} · ${label}`
 }
 
 export function latestUsage(

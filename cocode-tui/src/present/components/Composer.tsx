@@ -2,8 +2,9 @@ import { Box, Text } from 'ink'
 import type { TuiSnapshot } from '../../runtime/app.ts'
 import { formatFileMention } from '../../runtime/file-mentions.ts'
 import { theme } from '../theme.ts'
+import { text, type UiLocale } from '../../runtime/ui-locale.ts'
 
-export function Composer(props: { composer: TuiSnapshot['composer'] }) {
+export function Composer(props: { composer: TuiSnapshot['composer']; locale: UiLocale }) {
   const { composer } = props
   const empty = composer.text === ''
   const rows = empty ? [] : renderRows(composer.text, composer.cursor)
@@ -16,9 +17,11 @@ export function Composer(props: { composer: TuiSnapshot['composer'] }) {
     >
       <Box width="100%" justifyContent="space-between">
         <Text color={composer.disabled ? theme.mute : theme.brand} bold>
-          {composer.mask ? 'secret' : 'prompt'}
+          {composer.mask ? text(props.locale, 'secret') : text(props.locale, 'prompt')}
         </Text>
-        <Text color={theme.mute}>{composer.disabled ? 'locked' : 'enter to send'}</Text>
+        <Text color={theme.mute}>
+          {composer.disabled ? text(props.locale, 'locked') : text(props.locale, 'send')}
+        </Text>
       </Box>
       <Box flexDirection="column" marginTop={1}>
         {empty ? (
@@ -46,7 +49,8 @@ export function Composer(props: { composer: TuiSnapshot['composer'] }) {
       </Box>
       {composer.attachments.length > 0 ? (
         <Text color={theme.info}>
-          attached · {composer.attachments.map(formatFileMention).join(' · ')}
+          {text(props.locale, 'attached')} ·{' '}
+          {composer.attachments.map(formatFileMention).join(' · ')}
         </Text>
       ) : null}
     </Box>

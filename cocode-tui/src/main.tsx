@@ -24,6 +24,7 @@ import {
 import { AuthGate } from './present/auth-gate.tsx'
 import { Chat } from './present/chat.tsx'
 import { clearViewport, enterScreen, parseScreenMode } from './present/clear-screen.ts'
+import { resolveUiLocale } from './runtime/ui-locale.ts'
 
 loadDotenv(resolve(process.cwd(), '.env'))
 
@@ -105,6 +106,7 @@ async function main(): Promise<void> {
       argsConfigured: nonempty(process.env.COCODE_HARNESS_ARGS),
       sessionRoot: sessionRoot.path,
     },
+    locale: resolveUiLocale(process.env),
     setTheme,
   })
 

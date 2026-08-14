@@ -25,6 +25,7 @@ import { searchHistory } from '../runtime/history-search.ts'
 import { listWorkspaceEntries, rankFileMatches } from '../runtime/workspace-files.ts'
 import { moveMessageSelection, selectableMessageKeys } from './message-selection.ts'
 import { visibleTail } from './visible-tail.ts'
+import { text } from '../runtime/ui-locale.ts'
 
 export function Chat(props: { app: TuiApp }) {
   const { app } = props
@@ -304,31 +305,51 @@ export function Chat(props: { app: TuiApp }) {
         selectedNodeId={messageSelectionActive ? selectedMessageId : undefined}
         expandedNodeIds={expandedMessageIds}
       />
-      <StatusLine status={snap.status} agent={snap.agent} notice={snap.notice} />
-      <Composer composer={snap.composer} />
+      <StatusLine
+        status={snap.status}
+        agent={snap.agent}
+        notice={snap.notice}
+        locale={snap.locale}
+      />
+      <Composer composer={snap.composer} locale={snap.locale} />
       <Box width="100%" marginTop={1} justifyContent="space-between">
         {messageSelectionActive ? (
-          <Text color={theme.brand}>message mode · ↑↓ move · enter expand · esc close</Text>
+          <Text color={theme.brand}>
+            {text(snap.locale, 'messageMode')} · {text(snap.locale, 'messageModeHint')}
+          </Text>
         ) : (
           <>
-            <Text color={theme.mute}>↑↓ history · shift+↑ messages · ctrl+o details · ? help</Text>
-            <Text color={theme.mute}>esc quit · ctrl+l redraw</Text>
+            <Text color={theme.mute}>
+              {text(snap.locale, 'footerHistory')} · {text(snap.locale, 'footerMessages')} ·{' '}
+              {text(snap.locale, 'footerDetails')} · {text(snap.locale, 'footerHelp')}
+            </Text>
+            <Text color={theme.mute}>
+              {text(snap.locale, 'footerQuit')} · {text(snap.locale, 'footerRedraw')}
+            </Text>
           </>
         )}
       </Box>
-      {slashOpen ? <SlashMenu items={slashItems} selectedIndex={slashIndex} /> : null}
+      {slashOpen ? (
+        <SlashMenu items={slashItems} selectedIndex={slashIndex} locale={snap.locale} />
+      ) : null}
       {fileOpen ? (
         <FileMenu
           items={fileItems}
           selectedIndex={fileIndex}
           query={fileMention?.query ?? ''}
           loading={fileLoading}
+          locale={snap.locale}
         />
       ) : null}
       {historySearchOpen ? (
-        <HistorySearch query={historyQuery} matches={historyItems} selectedIndex={historyIndex} />
+        <HistorySearch
+          query={historyQuery}
+          matches={historyItems}
+          selectedIndex={historyIndex}
+          locale={snap.locale}
+        />
       ) : null}
-      {snap.helpOpen ? <Help text={snap.helpText} /> : null}
+      {snap.helpOpen ? <Help text={snap.helpText} locale={snap.locale} /> : null}
     </Box>
   )
 }

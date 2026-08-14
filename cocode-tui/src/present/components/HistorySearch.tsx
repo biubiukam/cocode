@@ -1,10 +1,12 @@
 import { Box, Text } from 'ink'
 import { theme } from '../theme.ts'
+import { text, type UiLocale } from '../../runtime/ui-locale.ts'
 
 export function HistorySearch(props: {
   query: string
   matches: readonly string[]
   selectedIndex: number
+  locale: UiLocale
 }) {
   const selected =
     props.matches.length === 0
@@ -19,11 +21,12 @@ export function HistorySearch(props: {
       paddingX={1}
     >
       <Text color={theme.brand} bold>
-        history <Text color={theme.mute}>· ctrl+r · ↑↓ select · enter use · esc close</Text>
+        {text(props.locale, 'history')}{' '}
+        <Text color={theme.mute}>· {text(props.locale, 'historyHint')}</Text>
       </Text>
-      <Text color={theme.text}>⌕ {props.query || 'type to search…'}</Text>
+      <Text color={theme.text}>⌕ {props.query || text(props.locale, 'historyPlaceholder')}</Text>
       {props.matches.length === 0 ? (
-        <Text color={theme.mute}>No matching messages</Text>
+        <Text color={theme.mute}>{text(props.locale, 'historyEmpty')}</Text>
       ) : (
         props.matches.map((entry, index) => {
           const active = index === selected

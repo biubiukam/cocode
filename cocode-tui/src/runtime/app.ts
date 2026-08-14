@@ -35,6 +35,7 @@ import { closeRuntime } from './lifecycle.ts'
 import { handleNotification } from './notification.ts'
 import { errorNotice } from './errors/index.ts'
 import { redactSecrets } from './diagnostics.ts'
+import { localeName, parseUiLocale, text, type UiLocale } from './ui-locale.ts'
 import {
   logoutChannel,
   requestChannelSwitch,
@@ -72,6 +73,7 @@ export type TuiSnapshot = {
   agent: 'idle' | 'running' | 'starting' | 'dead'
   nodes: readonly ConversationNode[]
   history: readonly string[]
+  locale: UiLocale
   composer: {
     text: string
     cursor: number
@@ -116,6 +118,7 @@ export type TuiCommandCtx = {
   exportTranscript?: () => Promise<void>
   initWorkspace?: () => Promise<void>
   setTheme?: (name: 'dark' | 'light') => void
+  setLocale?: (value: string) => void
   resumeSessions?: () => Promise<void>
 }
 
@@ -143,6 +146,7 @@ export type TuiAppOptions = {
     sessionRoot?: string
   }
   setTheme?: (name: 'dark' | 'light') => void
+  locale?: UiLocale
 }
 
 export function createTuiApp(options: TuiAppOptions): TuiApp {
@@ -175,6 +179,7 @@ class TuiAppImpl implements TuiApp {
   private workspaceBranch: string | undefined
   private readonly diagnostics: NonNullable<TuiAppOptions['diagnostics']>
   private readonly themeSetter: TuiAppOptions['setTheme']
+  private locale: UiLocale
   private readonly auth: TuiAuthInfo | undefined
   private capturingByok = false
   private closePromise: Promise<void> | undefined
@@ -195,6 +200,7 @@ class TuiAppImpl implements TuiApp {
       argsConfigured: true,
     }
     this.themeSetter = options.setTheme
+    this.locale = options.locale ?? 'en'
   }
 
   async start(): Promise<void> {
@@ -272,25 +278,26 @@ class TuiAppImpl implements TuiApp {
       agent: this.agent,
       nodes: this.assembler.snapshot(),
       history: this.history.entriesSnapshot(),
+      locale: this.locale,
       composer: {
         text: this.capturingByok ? '*'.repeat(this.draft.text.length) : this.draft.text,
         cursor: this.draft.cursor,
         placeholder: this.capturingByok
           ? '粘贴 API Key，回车确认'
-          : composerPlaceholder(this.agent),
+          : composerPlaceholder(this.agent, this.locale),
         disabled,
         attachments: this.attachments.map((attachment) => attachment.path),
         ...(this.capturingByok ? { mask: true } : {}),
       },
       status: {
-        line: statusLine(this.agent, this.runtimeName),
+        line: statusLine(this.agent, this.runtimeName, this.locale),
         tokens: latestUsage(this.assembler.snapshot()),
       },
       helpOpen: this.helpOpen,
       verbose: this.verbose,
       capabilities: this.capabilities,
       notice: this.notice,
-      helpText: helpText(this.capabilities, this.commands),
+      helpText: helpText(this.capabilities, this.commands, this.locale),
       commands: this.commands.list(this.capabilities).map(({ name, summary }) => ({
         name,
         summary,
@@ -461,6 +468,20 @@ class TuiAppImpl implements TuiApp {
           tone: 'info',
           message:
             this.themeSetter === undefined ? 'Theme switching is unavailable.' : `Theme: ${name}`,
+        }
+        this.emit()
+      },
+      setLocale: (value) => {
+        const locale = parseUiLocale(value)
+        if (locale === undefined) {
+          this.notice = { tone: 'info', message: text(this.locale, 'langUsage') }
+          this.emit()
+          return
+        }
+        this.locale = locale
+        this.notice = {
+          tone: 'info',
+          message: text(this.locale, 'langChanged', { lang: localeName(locale) }),
         }
         this.emit()
       },

@@ -64,6 +64,21 @@ function fakeRuntime(): TuiRuntime & {
 }
 
 describe('TuiApp', () => {
+  it('switches interface language with /lang', async () => {
+    const app = createTuiApp({
+      runtime: fakeRuntime(),
+      cwd: '/tmp',
+      provider: 'deepseek-official',
+      model: 'deepseek-v4-flash',
+      sessionId: 's1',
+      locale: 'en',
+    })
+    await app.start()
+    app.dispatch({ type: 'command', line: '/lang zh' })
+    expect(app.snapshot().locale).toBe('zh')
+    expect(app.snapshot().composer.placeholder).toContain('输入消息')
+  })
+
   it('prompts only when idle', async () => {
     const runtime = fakeRuntime()
     const app = createTuiApp({

@@ -21,6 +21,7 @@ describe('commands', () => {
       'status',
       'doctor',
       'theme',
+      'lang',
       'export',
       'init',
       'new',
@@ -72,6 +73,13 @@ describe('commands', () => {
     command?.run(commandCtx({ useAuth: (target) => used.push(target) }), '')
     expect(used).toEqual(['login'])
   })
+
+  it('/lang delegates the requested locale', () => {
+    const locales: string[] = []
+    const command = createBuiltinCommands().find('lang', P0_CAPABILITIES)
+    command?.run(commandCtx({ setLocale: (value) => locales.push(value) }), 'zh')
+    expect(locales).toEqual(['zh'])
+  })
 })
 
 function commandCtx(
@@ -79,6 +87,7 @@ function commandCtx(
     dispatch: (action: TuiAction) => void
     notice: (tone: 'info' | 'error', message: string) => void
     useAuth: (target: 'byok' | 'cocode' | 'login') => void
+    setLocale: (value: string) => void
   }> = {},
 ) {
   return {
@@ -89,5 +98,6 @@ function commandCtx(
     notice: overrides.notice ?? (() => {}),
     logout: async () => {},
     useAuth: overrides.useAuth,
+    setLocale: overrides.setLocale,
   }
 }

@@ -1,5 +1,6 @@
 import { Box, Text } from 'ink'
 import { theme } from '../theme.ts'
+import { text, type UiLocale } from '../../runtime/ui-locale.ts'
 
 export type SlashMenuItem = {
   name: string
@@ -32,7 +33,11 @@ export function selectedSlashItem<T>(items: readonly T[], selectedIndex: number)
   return items[moveSlashSelection(selectedIndex, 0, items.length)]
 }
 
-export function SlashMenu(props: { items: readonly SlashMenuItem[]; selectedIndex: number }) {
+export function SlashMenu(props: {
+  items: readonly SlashMenuItem[]
+  selectedIndex: number
+  locale: UiLocale
+}) {
   if (props.items.length === 0) return null
   const selected = moveSlashSelection(props.selectedIndex, 0, props.items.length)
   return (
@@ -44,7 +49,8 @@ export function SlashMenu(props: { items: readonly SlashMenuItem[]; selectedInde
       paddingX={1}
     >
       <Text color={theme.dim} bold>
-        commands <Text color={theme.mute}>· tab / ↑↓ select</Text>
+        {text(props.locale, 'commands')}{' '}
+        <Text color={theme.mute}>· {text(props.locale, 'commandsHint')}</Text>
       </Text>
       {props.items.map((item, index) => {
         const active = index === selected
