@@ -1,2 +1,12 @@
 packages:
   - packages/*
+  - vendor/cosmokit
+  - vendor/cordis
+  - vendor/loader
+
+# Postinstall is required for these to be usable at all: electron downloads its
+# binary, esbuild links its platform build.
+onlyBuiltDependencies:
+  - electron
+  - electron-winstaller
+  - esbuild

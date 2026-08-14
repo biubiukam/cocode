@@ -44,7 +44,8 @@ cocode-gui/
 ```sh
 cd cocode-gui
 pnpm install
-pnpm run dev
+pnpm run dev          # Electron desktop client (default)
+pnpm run dev:web      # browser-only, e.g. design-system.html
 pnpm run typecheck
 ```
 
@@ -99,7 +100,7 @@ pnpm dsh web          # GUI 联调
 
 | 改动 | 检查 |
 |------|------|
-| GUI 组件 / 令牌 | `cd cocode-gui && pnpm run dev` + `.dev/guide/design-system.html` 对照 |
+| GUI 组件 / 令牌 | `cd cocode-gui && pnpm run dev:web` + `.dev/guide/design-system.html` 对照 |
 | TUI 交互 | `cd cocode-tui && pnpm run dev` + JSON-RPC 联调 |
 | harness API | 先在 harness 落地，再更新对应 `packages/connection` |
 

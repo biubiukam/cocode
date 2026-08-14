@@ -2,22 +2,80 @@
   "name": "@cocode/gui-root",
   "private": true,
   "type": "module",
+  "main": "dist-electron/main.js",
   "engines": {
     "node": "^22.19 || >=24"
   },
   "scripts": {
-    "dev": "node --import tsx/esm src/main.ts",
-    "typecheck": "tsc --noEmit && pnpm -r typecheck",
-    "lint": "pnpm -r lint",
-    "build": "pnpm -r build"
+    "dev": "node scripts/dev-electron.mjs",
+    "dev:web": "vite",
+    "build": "pnpm run build:web && pnpm run build:electron",
+    "build:web": "vite build",
+    "build:electron": "node scripts/build-electron.mjs",
+    "package": "pnpm run build && electron-builder",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit && pnpm -r typecheck",
+    "lint": "pnpm run check:layers && pnpm run check:design && pnpm run check:design-system && pnpm -r lint",
+    "check:layers": "node scripts/check-layers.mjs",
+    "check:design": "node scripts/check-design-tokens.mjs",
+    "check:design-system": "node scripts/port-design-system.mjs --check",
+    "port:design-system": "node scripts/port-design-system.mjs"
   },
   "dependencies": {
+    "@aiden0z/pptx-renderer": "^1.2.4",
     "@cocode/gui-connection": "workspace:*",
-    "@cocode/ui": "workspace:*"
+    "@cocode/ui": "workspace:*",
+    "@deepseek-ai/cordis": "workspace:*",
+    "@deepseek-ai/cordis-plugin-loader": "workspace:*",
+    "@deepseek-ai/cosmokit": "workspace:*",
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-dropdown-menu": "^2.1.16",
+    "@radix-ui/react-slot": "^1.2.3",
+    "@radix-ui/react-tooltip": "^1.2.8",
+    "@tanstack/react-virtual": "^3.13.12",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "docx-preview": "^0.4.0",
+    "immer": "^10.1.3",
+    "lucide-react": "^0.544.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "shiki": "^3.13.0",
+    "tailwind-merge": "^3.3.1",
+    "xlsx": "^0.18.5",
+    "zod": "^4.1.11",
+    "zustand": "^5.0.8"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.1.13",
     "@types/node": "^22.20.1",
+    "@types/react": "^19.1.13",
+    "@types/react-dom": "^19.1.9",
+    "@vitejs/plugin-react": "^5.0.3",
+    "electron": "^38.1.2",
+    "electron-builder": "^26.0.12",
+    "esbuild": "^0.25.10",
+    "tailwindcss": "^4.1.13",
     "tsx": "^4.20.5",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "vite": "^7.1.7"
+  },
+  "build": {
+    "appId": "dev.cocode.gui",
+    "productName": "Cocode",
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "mac": {
+      "target": "dmg"
+    }
   }
 }

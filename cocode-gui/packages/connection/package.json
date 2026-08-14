@@ -10,5 +10,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "node -e \"process.exit(0)\"",
     "build": "node -e \"process.exit(0)\""
+  },
+  "peerDependencies": {
+    "zod": "^4.1.11"
   }
 }

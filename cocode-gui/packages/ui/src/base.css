@@ -1,0 +1,79 @@
+/**
+ * Global baseline shared by both carriers: the typography floor from the design
+ * system §2, the non-removable focus ring, and the shell-level scroll discipline.
+ */
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  /* The shell owns every scroll region; the document itself never scrolls. */
+  overflow: hidden;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* Composer focus ring lives on `.composer:focus-within` (design system §5.2).
+   These overrides must stay unlayered: global `:focus-visible` above outranks
+   the component-layer `.composer textarea { outline: 0 }` rule otherwise. */
+.composer textarea:focus,
+.composer textarea:focus-visible {
+  outline: none;
+}
+
+.composer .composer-control:focus-visible,
+.composer .send-button:focus-visible {
+  outline: none;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--foreground);
+}
+
+/* Scrollbars read as structure, not chrome, in every parallel scroll region. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-clip: padding-box;
+  background-color: var(--border-strong);
+  border: 3px solid transparent;
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

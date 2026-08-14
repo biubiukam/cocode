@@ -1,0 +1,13 @@
+/**
+ * The renderer's single style entry. Order matters: Tailwind first, then the
+ * token definitions that override its defaults, then the theme mapping that lifts
+ * those tokens into utilities.
+ */
+
+@import 'tailwindcss';
+@import '@cocode/ui/tokens.css';
+@import '@cocode/ui/theme.css';
+@import '@cocode/ui/base.css';
+@import '@cocode/ui/design-system.css';
+@import './views/prose.css';
+@import '@xterm/xterm/css/xterm.css';

@@ -1,0 +1,48 @@
+/**
+ * Lifts the design tokens into Tailwind utilities. `@theme inline` inlines the
+ * referenced value into each utility instead of emitting a second variable, so
+ * `tokens.css` stays the only place a token is defined (RFC §4.4 / §7.1).
+ *
+ * The two shadcn traps are closed here by omission: there is no `--color-accent`
+ * hover alias (shadcn's `--accent` is a hover fill, ours is the brand blue) and
+ * no border-valued `--color-input` (shadcn's `--input` is a border color, ours is
+ * the field fill). Hover fills use `bg-secondary`; field borders use `border-strong`.
+ */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-subtle-foreground: var(--subtle-foreground);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--input);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-soft: var(--accent-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-ring: var(--ring);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius);
+  --radius-lg: var(--radius-lg);
+
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+}

@@ -34,6 +34,24 @@
   --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.04);
   --shadow-md: 0 12px 32px rgb(0 0 0 / 0.08);
   --sidebar-width: 256px;
+  --font-sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Workspace shell (RFC §7.4). Defaults only — the live sizes are layout state. */
+  --shell-header-height: 50px;
+  --dock-tabbar-height: 36px;
+  --dock-right-width: 360px;
+  --dock-bottom-height: 280px;
+  --split-handle-hit: 8px;
+  /* Shell overlay scrim (§8, right-dock overlay) and the modal dialog scrim (§1.1). */
+  --overlay-scrim: rgb(9 9 11 / 0.16);
+  --dialog-scrim: rgb(0 0 0 / 0.48);
+}
+
+@media (max-width: 980px) {
+  :root {
+    --sidebar-width: 220px;
+  }
 }
 
 [data-theme='dark'] {

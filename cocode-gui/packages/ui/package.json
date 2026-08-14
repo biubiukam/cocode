@@ -5,11 +5,17 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./tokens.css": "./src/tokens.css"
+    "./tokens.css": "./src/tokens.css",
+    "./theme.css": "./src/theme.css",
+    "./base.css": "./src/base.css",
+    "./design-system.css": "./src/design-system.css"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "lint": "node -e \"process.exit(0)\"",
     "build": "node -e \"process.exit(0)\""
+  },
+  "peerDependencies": {
+    "react": "^19.1.1"
   }
 }
