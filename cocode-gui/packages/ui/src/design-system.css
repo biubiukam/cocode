@@ -390,12 +390,11 @@
   .artifact-copy strong { display: block; overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
   .artifact-copy small { display: block; margin-top: 2px; color: var(--muted-foreground); font-size: 10px; }
   .artifact-card .button { min-height: 28px; padding: 0 9px; font-size: 10px; }
-  .evidence-list { display: grid; gap: 6px; }
-  .evidence-item { display: flex; min-width: 0; align-items: center; gap: 9px; min-height: 38px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-sunken); color: var(--muted-foreground); font-size: 10px; }
-  .evidence-item .file-icon { width: 34px; height: 34px; border-radius: 9px; font-size: 12px; }
-  .evidence-item:last-child .file-icon { border-color: color-mix(in srgb, var(--success) 30%, var(--border)); background: var(--success-soft); color: var(--success); font-size: 16px; }
-  .evidence-item strong { min-width: 0; overflow: hidden; color: var(--foreground); text-overflow: ellipsis; white-space: nowrap; }
-  .evidence-item code { margin-left: auto; color: var(--accent-ink); font-size: 10px; white-space: nowrap; }
+  .evidence-list { display: grid; gap: 8px; }
+  .evidence-item { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 9px; align-items: center; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-sunken); color: var(--muted-foreground); font-size: 10px; }
+  .evidence-item:last-child .artifact-icon { border-color: color-mix(in srgb, var(--success) 30%, var(--border)); background: var(--success-soft); color: var(--success); font-size: 14px; }
+  .evidence-item strong { min-width: 0; overflow: hidden; color: var(--foreground); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+  .evidence-item code { color: var(--accent-ink); font-size: 10px; white-space: nowrap; }
   .recovery-card { display: grid; gap: 10px; padding: 12px; border: 1px solid color-mix(in srgb, var(--warning) 28%, var(--border)); border-radius: var(--radius); background: var(--warning-soft); }
   .recovery-head { display: flex; align-items: center; gap: 8px; }
   .recovery-head strong { font-size: 12px; }
