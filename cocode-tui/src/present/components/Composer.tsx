@@ -27,7 +27,9 @@ export function Composer(props: { composer: TuiSnapshot['composer']; locale: UiL
         {empty ? (
           <Box>
             <Text color={composer.disabled ? theme.mute : theme.brand}>{'> '}</Text>
-            <Text color={theme.mute}>{composer.placeholder}</Text>
+            <Text color={theme.mute} wrap="truncate-end">
+              {composer.placeholder}
+            </Text>
           </Box>
         ) : (
           rows.map((row, index) => (

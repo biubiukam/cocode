@@ -2,11 +2,12 @@
  * First-run fork: paste a key or log in. Types only, no agency client.
  */
 
-import { Box, Text, useInput } from 'ink'
+import { Box, Text, useInput, useStdout } from 'ink'
 import { useState } from 'react'
 import type { AuthAction, AuthSnapshot } from '../runtime/auth/types.ts'
 import { cycleGateOption, GATE_OPTIONS } from './auth-options.ts'
 import { theme } from './theme.ts'
+import { WhaleLogo } from './components/WhaleLogo.tsx'
 
 export function AuthGate(props: {
   snapshot: AuthSnapshot
@@ -16,7 +17,9 @@ export function AuthGate(props: {
   const { snapshot, dispatch, onQuit } = props
   const [draft, setDraft] = useState('')
   const [focused, setFocused] = useState(0)
+  const { stdout } = useStdout()
   const picking = snapshot.phase === 'gate' || snapshot.phase === 'failed'
+  const logoSize = stdout.columns < 56 ? 'small' : stdout.columns < 72 ? 'medium' : 'large'
 
   useInput((input, key) => {
     if (key.escape || (key.ctrl && input === 'c')) {
@@ -80,9 +83,13 @@ export function AuthGate(props: {
 
   return (
     <Box flexDirection="column" padding={1}>
-      <Text color={theme.brand} bold>
-        Cocode
-      </Text>
+      <WhaleLogo size={logoSize} />
+      <Box marginTop={1} gap={1}>
+        <Text color={theme.brand} bold>
+          cocode
+        </Text>
+        <Text color={theme.mute}>terminal agent</Text>
+      </Box>
       <Box marginTop={1}>
         <Text color={theme.text}>用自己的 Key，或登录 Cocode 账号。</Text>
       </Box>

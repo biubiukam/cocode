@@ -337,13 +337,20 @@ export function Chat(props: { app: TuiApp }) {
 
   return (
     <Box flexDirection="column" height={stdout.rows}>
-      <Header header={snap.header} agent={snap.agent} />
+      <Header
+        header={snap.header}
+        agent={snap.agent}
+        locale={snap.locale}
+        columns={stdout.columns}
+      />
       <MessageList
         nodes={snap.nodes}
         verbose={snap.verbose}
         maxRows={messageMaxRows}
         selectedNodeId={messageSelectionActive ? selectedMessageId : undefined}
         expandedNodeIds={expandedMessageIds}
+        locale={snap.locale}
+        maxColumns={stdout.columns}
       />
       <StatusLine
         status={snap.status}

@@ -35,6 +35,8 @@ type UiKey =
   | 'agentRunning'
   | 'agentStarting'
   | 'agentDead'
+  | 'emptyTitle'
+  | 'emptyHint'
   | 'langChanged'
   | 'langUsage'
   | 'modelUsage'
@@ -101,6 +103,8 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     agentRunning: 'running',
     agentStarting: 'starting',
     agentDead: 'dead',
+    emptyTitle: 'cocode is ready',
+    emptyHint: 'Ask a question or describe a task to start.',
     langChanged: 'Language: {lang}',
     langUsage: 'Use /lang zh or /lang en.',
     modelUsage: 'Use /model <model-id>.',
@@ -166,6 +170,8 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     agentRunning: '运行中',
     agentStarting: '连接中',
     agentDead: '已停止',
+    emptyTitle: 'cocode 已准备好',
+    emptyHint: '输入问题或描述任务，开始工作。',
     langChanged: '界面语言：{lang}',
     langUsage: '使用 /lang zh 或 /lang en。',
     modelUsage: '使用 /model <model-id>。',

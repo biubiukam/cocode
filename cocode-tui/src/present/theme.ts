@@ -6,6 +6,7 @@ export type ThemeName = 'dark' | 'light'
 
 export type ThemeTokens = {
   brand: string
+  accent: string
   text: string
   dim: string
   mute: string
@@ -22,6 +23,7 @@ export type ThemeTokens = {
 export const themes: Record<ThemeName, ThemeTokens> = {
   dark: {
     brand: '#7EB8D4',
+    accent: '#F6C453',
     text: '#D6D3D1',
     dim: '#A8A29E',
     mute: '#78716C',
@@ -36,6 +38,7 @@ export const themes: Record<ThemeName, ThemeTokens> = {
   },
   light: {
     brand: '#25627A',
+    accent: '#A16207',
     text: '#292524',
     dim: '#57534E',
     mute: '#78716C',

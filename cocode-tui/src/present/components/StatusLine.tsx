@@ -60,10 +60,10 @@ export function StatusLine(props: {
   return (
     <Box flexDirection="column" marginBottom={1}>
       <Box width="100%" justifyContent="space-between">
-        <Text color={theme.dim}>
+        <Text color={theme.dim} wrap="truncate-end">
           {agentMark(props.agent)} {props.status.line}
         </Text>
-        <Box>
+        <Box flexShrink={0}>
           {props.status.tokens !== undefined ? (
             <Text color={theme.mute}>
               {text(props.locale, 'tokensIn')} {props.status.tokens.input} ·{' '}
@@ -94,7 +94,9 @@ export function StatusLine(props: {
         </Box>
       </Box>
       {telemetryBits.length > 0 ? (
-        <Text color={theme.mute}>{telemetryBits.join(' · ')}</Text>
+        <Text color={theme.mute} wrap="truncate-end">
+          {telemetryBits.join(' · ')}
+        </Text>
       ) : null}
       {notice ? <Notice notice={notice} /> : null}
     </Box>
