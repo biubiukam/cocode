@@ -10,5 +10,11 @@
     "typecheck": "tsc --noEmit",
     "lint": "node -e \"process.exit(0)\"",
     "build": "node -e \"process.exit(0)\""
+  },
+  "dependencies": {
+    "@deepseek-ai/dsh-sdk-client": "link:../../../../cocode-harness/packages/sdk/client"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1"
   }
 }

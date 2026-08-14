@@ -1,0 +1,238 @@
+import { describe, expect, it } from "vitest";
+import type { SessionEvent } from "@cocode/tui-connection";
+import { createAssembler } from "../../src/runtime/assembler.ts";
+import { createBuiltinRegistry } from "../../src/runtime/nodes/builtins.ts";
+
+function ev(type: string, seq: number, data: unknown): SessionEvent {
+  return { type, seq, time: seq * 1000, data };
+}
+
+function assembler() {
+  return createAssembler(createBuiltinRegistry());
+}
+
+describe("Assembler", () => {
+  it("projects user/message into a user node", () => {
+    const a = assembler();
+    a.ingest(
+      ev("user/message", 1, {
+        id: "m1",
+        role: "user",
+        content: [{ type: "text", text: "hello" }],
+        source: { kind: "user" },
+      }),
+    );
+    const nodes = a.snapshot();
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0]).toMatchObject({
+      kind: "user",
+      id: "m1",
+      text: "hello",
+    });
+  });
+
+  it("merges assistant chunks then seals on message", () => {
+    const a = assembler();
+    a.ingest(
+      ev("assistant/chunk", 1, {
+        turn: 1,
+        step: 0,
+        chunk: { type: "text-delta", index: 0, text: "Hel" },
+      }),
+    );
+    a.ingest(
+      ev("assistant/chunk", 2, {
+        turn: 1,
+        step: 0,
+        chunk: { type: "reasoning-delta", index: 1, text: "think" },
+      }),
+    );
+    a.ingest(
+      ev("assistant/chunk", 3, {
+        turn: 1,
+        step: 0,
+        chunk: { type: "text-delta", index: 0, text: "lo" },
+      }),
+    );
+    expect(a.snapshot()[0]).toMatchObject({
+      kind: "assistant",
+      id: "1:0",
+      text: "Hello",
+      reasoning: "think",
+      streaming: true,
+    });
+    a.ingest(
+      ev("assistant/message", 4, {
+        turn: 1,
+        step: 0,
+        message: {
+          id: "a1",
+          role: "assistant",
+          content: [
+            { type: "reasoning", text: "think" },
+            { type: "text", text: "Hello" },
+          ],
+          source: { kind: "model", provider: "p", model: "m" },
+        },
+        usage: { inputTokens: 10, outputTokens: 2 },
+      }),
+    );
+    expect(a.snapshot()[0]).toMatchObject({
+      kind: "assistant",
+      text: "Hello",
+      reasoning: "think",
+      streaming: false,
+      usage: { input: 10, output: 2 },
+    });
+  });
+
+  it("pairs tool/call and tool/result by callId", () => {
+    const a = assembler();
+    a.ingest(
+      ev("tool/call", 1, {
+        turn: 1,
+        step: 0,
+        callId: "c1",
+        name: "bash",
+        arguments: '{"command":"ls"}',
+      }),
+    );
+    expect(a.snapshot()[0]).toMatchObject({
+      kind: "tool",
+      id: "c1",
+      name: "bash",
+      status: "running",
+    });
+    a.ingest(
+      ev("tool/result", 2, {
+        turn: 1,
+        step: 0,
+        message: {
+          id: "r1",
+          role: "user",
+          content: [
+            {
+              type: "tool-result",
+              toolCallId: "c1",
+              content: [{ type: "text", text: "ok" }],
+            },
+          ],
+          source: { kind: "tool", callId: "c1" },
+        },
+      }),
+    );
+    expect(a.snapshot()[0]).toMatchObject({
+      kind: "tool",
+      id: "c1",
+      status: "success",
+      result: "ok",
+    });
+  });
+
+  it("marks tool error from error field", () => {
+    const a = assembler();
+    a.ingest(
+      ev("tool/call", 1, {
+        turn: 1,
+        step: 0,
+        callId: "c2",
+        name: "bash",
+        arguments: "{}",
+      }),
+    );
+    a.ingest(
+      ev("tool/result", 2, {
+        turn: 1,
+        step: 0,
+        message: {
+          id: "r2",
+          role: "user",
+          content: [
+            {
+              type: "tool-result",
+              toolCallId: "c2",
+              isError: true,
+              content: [{ type: "text", text: "boom" }],
+            },
+          ],
+          source: { kind: "tool", callId: "c2" },
+        },
+        error: { name: "BashError", code: "EXIT" },
+      }),
+    );
+    expect(a.snapshot()[0]).toMatchObject({
+      kind: "tool",
+      status: "error",
+      error: { name: "BashError", code: "EXIT" },
+    });
+  });
+
+  it("ignores replayed or out-of-order seq", () => {
+    const a = assembler();
+    a.ingest(
+      ev("user/message", 2, {
+        id: "m2",
+        role: "user",
+        content: [{ type: "text", text: "second" }],
+        source: { kind: "user" },
+      }),
+    );
+    a.ingest(
+      ev("user/message", 1, {
+        id: "m1",
+        role: "user",
+        content: [{ type: "text", text: "first" }],
+        source: { kind: "user" },
+      }),
+    );
+    expect(a.snapshot()).toHaveLength(1);
+    expect(a.snapshot()[0]).toMatchObject({ id: "m2" });
+  });
+
+  it("routes unknown types to fallback notice", () => {
+    const a = assembler();
+    a.ingest(ev("turn/start", 1, { turn: 1 }));
+    expect(a.snapshot()[0]).toMatchObject({
+      kind: "notice",
+      tone: "info",
+      verboseOnly: true,
+      message: "turn/start",
+    });
+  });
+
+  it("replaceWindow rebuilds from a full list", () => {
+    const a = assembler();
+    a.ingest(
+      ev("user/message", 1, {
+        id: "old",
+        role: "user",
+        content: [{ type: "text", text: "old" }],
+        source: { kind: "user" },
+      }),
+    );
+    a.replaceWindow([
+      ev("user/message", 10, {
+        id: "new",
+        role: "user",
+        content: [{ type: "text", text: "new" }],
+        source: { kind: "user" },
+      }),
+    ]);
+    expect(a.snapshot()).toHaveLength(1);
+    expect(a.snapshot()[0]).toMatchObject({ id: "new", text: "new" });
+  });
+
+  it("reset clears projected nodes", () => {
+    const a = assembler();
+    a.ingest(
+      ev("user/message", 1, {
+        id: "m1",
+        role: "user",
+        content: [{ type: "text", text: "x" }],
+        source: { kind: "user" },
+      }),
+    );
+    a.reset();
+    expect(a.snapshot()).toEqual([]);
+  });
+});

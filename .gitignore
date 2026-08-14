@@ -13,6 +13,7 @@ Desktop.ini
 /.cocode/
 /cocode-gui/.cocode/
 /cocode-tui/.cocode/
+/cocode-tui/.sessions/
 
 # Harness nested copy — prefer sibling clone at ~/www/cocode-harness
 /cocode-harness/
