@@ -9,6 +9,19 @@ describe('history search', () => {
   it('returns recent unique matches', () => {
     expect(searchHistory(['one', 'two', 'one', 'three'], 'o')).toEqual(['one', 'two'])
   })
+
+  it('matches case-insensitively after trimming the query', () => {
+    expect(searchHistory(['Fix Login', 'add tests'], '  LOGIN ')).toEqual(['Fix Login'])
+  })
+
+  it('returns an empty list for empty history or no matches', () => {
+    expect(searchHistory([], '')).toEqual([])
+    expect(searchHistory(['one', 'two'], 'missing')).toEqual([])
+  })
+
+  it('keeps the newest occurrence and respects the result limit', () => {
+    expect(searchHistory(['old', 'middle', 'new'], '', 2)).toEqual(['new', 'middle'])
+  })
 })
 
 describe('external editor', () => {

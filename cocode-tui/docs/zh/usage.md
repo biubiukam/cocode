@@ -27,6 +27,7 @@ DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 - `Enter` 发送；`Shift+Enter` 换行。
 - `←` `→` 移动光标，`Backspace` 删除光标前的字符。
 - `↑` `↓` 查看本地输入历史。
+- `Ctrl+R` 打开历史搜索；输入文字过滤最近消息，使用 `↑` `↓` 选择，回车回填到输入区，`Esc` 关闭。
 - `Ctrl+O` 切换详细模式，查看完整思考内容和工具输入输出。
 - `Esc` 在帮助、命令菜单等弹层中先关闭弹层；普通状态下按两次退出或结束当前 TUI。
 - `Ctrl+L` 重绘界面，不清除会话内容。
@@ -70,4 +71,4 @@ DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 
 ## 当前未接入的交互
 
-取消/steer、审批、rewind、技能菜单、`Ctrl+R` 历史搜索和 `Ctrl+G` 外部编辑器尚未绑定到 TUI 交互。这些能力需要对应的 harness wire、显式 manifest 或后续交互接线；界面不会显示假控件。
+取消/steer、审批、rewind、技能菜单和 `Ctrl+G` 外部编辑器尚未绑定到 TUI 交互。这些能力需要对应的 harness wire、显式 manifest 或后续交互接线；界面不会显示假控件。

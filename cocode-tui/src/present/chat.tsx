@@ -10,6 +10,7 @@ import { Composer } from './components/Composer.tsx'
 import { FileMenu } from './components/FileMenu.tsx'
 import { Header } from './components/Header.tsx'
 import { Help } from './components/Help.tsx'
+import { HistorySearch } from './components/HistorySearch.tsx'
 import { MessageList } from './components/MessageList.tsx'
 import { StatusLine } from './components/StatusLine.tsx'
 import {
@@ -20,6 +21,7 @@ import {
 } from './components/SlashMenu.tsx'
 import { theme } from './theme.ts'
 import { findFileMentionAtCursor } from '../runtime/file-mentions.ts'
+import { searchHistory } from '../runtime/history-search.ts'
 import { listWorkspaceEntries, rankFileMatches } from '../runtime/workspace-files.ts'
 
 export function Chat(props: { app: TuiApp }) {
@@ -31,18 +33,26 @@ export function Chat(props: { app: TuiApp }) {
   const [fileIndex, setFileIndex] = useState(0)
   const [fileItems, setFileItems] = useState<readonly string[]>([])
   const [fileLoading, setFileLoading] = useState(false)
+  const [historySearchOpen, setHistorySearchOpen] = useState(false)
+  const [historyQuery, setHistoryQuery] = useState('')
+  const [historyIndex, setHistoryIndex] = useState(0)
   const { stdout } = useStdout()
   const slashItems = useMemo<readonly SlashMenuItem[]>(
     () => filterSlashItems(snap.commands, snap.composer.text),
     [snap.commands, snap.composer.text],
   )
-  const slashOpen = !slashDismissed && slashItems.length > 0
+  const slashOpen = !historySearchOpen && !slashDismissed && slashItems.length > 0
   const fileMention = useMemo(
     () => findFileMentionAtCursor(snap.composer.text, snap.composer.cursor),
     [snap.composer.cursor, snap.composer.text],
   )
-  const fileVisible = !slashOpen && !fileDismissed && fileMention !== undefined
+  const fileVisible =
+    !historySearchOpen && !slashOpen && !fileDismissed && fileMention !== undefined
   const fileOpen = fileVisible && (fileLoading || fileItems.length > 0)
+  const historyItems = useMemo(
+    () => searchHistory(snap.history, historyQuery, 8),
+    [historyQuery, snap.history],
+  )
   const composerRows = Math.max(1, snap.composer.text.split('\n').length)
   const reservedRows =
     11 +
@@ -51,7 +61,8 @@ export function Chat(props: { app: TuiApp }) {
     (snap.notice ? 1 : 0) +
     (snap.helpOpen ? snap.helpText.split('\n').length + 4 : 0) +
     (slashOpen ? slashItems.length + 4 : 0) +
-    (fileOpen ? fileItems.length + (fileLoading ? 3 : 4) : 0)
+    (fileOpen ? fileItems.length + (fileLoading ? 3 : 4) : 0) +
+    (historySearchOpen ? historyItems.length + 4 : 0)
 
   useEffect(
     () =>
@@ -97,6 +108,48 @@ export function Chat(props: { app: TuiApp }) {
       if (key.escape || (key.ctrl && input === 'c')) {
         app.dispatch({ type: 'quit' })
       }
+      return
+    }
+
+    if (historySearchOpen) {
+      if (key.escape) {
+        setHistorySearchOpen(false)
+        setHistoryQuery('')
+        setHistoryIndex(0)
+        return
+      }
+      if (key.upArrow) {
+        setHistoryIndex((index) => moveSelection(index, -1, historyItems.length))
+        return
+      }
+      if (key.downArrow) {
+        setHistoryIndex((index) => moveSelection(index, 1, historyItems.length))
+        return
+      }
+      if (key.return) {
+        const selected = historyItems[moveSelection(historyIndex, 0, historyItems.length)]
+        if (selected !== undefined) app.dispatch({ type: 'setDraft', text: selected })
+        setHistorySearchOpen(false)
+        setHistoryQuery('')
+        setHistoryIndex(0)
+        return
+      }
+      if (key.backspace || key.delete) {
+        setHistoryQuery((query) => query.slice(0, -1))
+        setHistoryIndex(0)
+        return
+      }
+      if (input !== '' && !key.ctrl) {
+        setHistoryQuery((query) => query + input)
+        setHistoryIndex(0)
+      }
+      return
+    }
+
+    if (key.ctrl && input === 'r') {
+      setHistorySearchOpen(true)
+      setHistoryQuery('')
+      setHistoryIndex(0)
       return
     }
 
@@ -208,6 +261,9 @@ export function Chat(props: { app: TuiApp }) {
           query={fileMention?.query ?? ''}
           loading={fileLoading}
         />
+      ) : null}
+      {historySearchOpen ? (
+        <HistorySearch query={historyQuery} matches={historyItems} selectedIndex={historyIndex} />
       ) : null}
       {snap.helpOpen ? <Help text={snap.helpText} /> : null}
     </Box>

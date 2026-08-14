@@ -1,4 +1,4 @@
-/** Pure fuzzy filtering for the local composer history. */
+/** Pure substring filtering for the local composer history. */
 
 export function searchHistory(entries: readonly string[], query: string, limit = 20): string[] {
   const needle = query.trim().toLocaleLowerCase()

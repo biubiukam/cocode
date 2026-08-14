@@ -71,6 +71,7 @@ export type TuiSnapshot = {
   }
   agent: 'idle' | 'running' | 'starting' | 'dead'
   nodes: readonly ConversationNode[]
+  history: readonly string[]
   composer: {
     text: string
     cursor: number
@@ -270,6 +271,7 @@ class TuiAppImpl implements TuiApp {
       },
       agent: this.agent,
       nodes: this.assembler.snapshot(),
+      history: this.history.entriesSnapshot(),
       composer: {
         text: this.capturingByok ? '*'.repeat(this.draft.text.length) : this.draft.text,
         cursor: this.draft.cursor,
