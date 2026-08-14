@@ -16,6 +16,8 @@ Configure a key on the first-run gate, or set `DEEPSEEK_API_KEY` for this proces
 
 ## Screen regions
 
+Set `COCODE_TUI_SCREEN=inline` (the default) to keep the main screen and scrollback, or `alternate` for a fullscreen alternate buffer that is restored on exit. Legacy Windows consoles without alternate-buffer support fall back to `inline`.
+
 - The header shows the workspace, git branch, session, provider, model, and live Agent state.
 - The transcript projects `you`, `cocode`, reasoning, and tool results as separate node groups.
 - The status bar shows runtime state, notices, and input/output token usage when supplied by the runtime.

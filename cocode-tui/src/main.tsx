@@ -23,7 +23,7 @@ import {
 } from './runtime/auth/index.ts'
 import { AuthGate } from './present/auth-gate.tsx'
 import { Chat } from './present/chat.tsx'
-import { clearScreen } from './present/clear-screen.ts'
+import { clearViewport, enterScreen, parseScreenMode } from './present/clear-screen.ts'
 
 loadDotenv(resolve(process.cwd(), '.env'))
 
@@ -42,10 +42,14 @@ async function main(): Promise<void> {
     return
   }
 
+  const leaveScreen = enterScreen(parseScreenMode(process.env.COCODE_TUI_SCREEN))
+  process.once('exit', () => leaveScreen())
+
   const auth = await createAuthStore()
   if (auth.snapshot().phase !== 'ready') {
     const gated = await runAuthGate(auth)
     if (!gated) {
+      leaveScreen()
       process.exitCode = 0
       return
     }
@@ -104,7 +108,7 @@ async function main(): Promise<void> {
     setTheme,
   })
 
-  clearScreen()
+  clearViewport()
   const screen = render(<Chat app={app} />)
   let exitStarted = false
   const finish = async (): Promise<void> => {
@@ -112,6 +116,7 @@ async function main(): Promise<void> {
     exitStarted = true
     stop()
     await screen.unmount()
+    leaveScreen()
     try {
       await releaseLiveInstance(resolved.home)
       await app.close()
@@ -153,7 +158,7 @@ function runAuthGate(store: AuthStore): Promise<boolean> {
       />
     )
 
-    clearScreen()
+    clearViewport()
     const screen = render(view())
     const unsubscribe = store.subscribe(() => {
       const snapshot = store.snapshot()

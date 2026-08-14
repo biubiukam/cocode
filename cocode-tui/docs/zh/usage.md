@@ -16,6 +16,8 @@ DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 
 ## 界面分区
 
+终端呈现方式由 `COCODE_TUI_SCREEN` 控制：`inline`（默认）保留主屏和滚动历史，`alternate` 使用全屏备用缓冲区，退出时恢复原终端。Windows 旧版控制台不支持备用缓冲区时会自动回退到 `inline`。
+
 - 顶部显示工作区、git 分支、session、provider、model 和实时 Agent 状态。
 - 中间是会话投影：`you`、`cocode`、思考内容和工具结果按节点分组显示。
 - 底部状态栏显示运行状态、notice 以及已有的输入/输出 token 用量。
