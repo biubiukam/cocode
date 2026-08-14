@@ -23,6 +23,19 @@ export function StatusLine(props: {
             {text(props.locale, 'tokensOut')} {props.status.tokens.output}
           </Text>
         ) : null}
+        {props.status.subagents !== undefined && props.status.subagents.running > 0 ? (
+          <Text color={theme.info}>
+            {text(props.locale, 'subagentsRunning', {
+              count: String(props.status.subagents.running),
+            })}
+          </Text>
+        ) : props.status.subagents?.last?.event === 'finished' ? (
+          <Text color={theme.mute}>
+            {text(props.locale, 'subagentFinished', {
+              id: props.status.subagents.last.id,
+            })}
+          </Text>
+        ) : null}
       </Box>
       {notice ? <Notice notice={notice} /> : null}
     </Box>

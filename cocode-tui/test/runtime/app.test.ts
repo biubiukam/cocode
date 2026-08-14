@@ -433,6 +433,46 @@ describe('TuiApp', () => {
     expect(app.snapshot().status.tokens).toEqual({ input: 12, output: 4 })
   })
 
+  it('projects subagent lifecycle into status without leaking other sessions', async () => {
+    const runtime = fakeRuntime()
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+      locale: 'zh',
+    })
+    await app.start()
+    runtime.emit({
+      method: 'subagent.started',
+      params: { parentSessionId: 'other', childSessionId: 'ignored' },
+    })
+    expect(app.snapshot().status.subagents?.running).toBe(0)
+    runtime.emit({
+      method: 'subagent.started',
+      params: { parentSessionId: 's1', childSessionId: 'child-1' },
+    })
+    expect(app.snapshot().status.subagents).toEqual({
+      running: 1,
+      last: { id: 'child-1', event: 'started' },
+    })
+    runtime.emit({
+      method: 'subagent.finished',
+      params: {
+        parentSessionId: 's1',
+        childSessionId: 'child-1',
+        provider: 'p',
+        agentId: 'a1',
+        status: 'ok',
+      },
+    })
+    expect(app.snapshot().status.subagents).toEqual({
+      running: 0,
+      last: { id: 'child-1', event: 'finished' },
+    })
+  })
+
   it('doctor redacts credentials and reports launch state', async () => {
     const runtime = fakeRuntime()
     runtime.failStart = new Error('API_KEY=sk-secret')

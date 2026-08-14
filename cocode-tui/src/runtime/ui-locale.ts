@@ -47,6 +47,9 @@ type UiKey =
   | 'resumeQuery'
   | 'resumeEmpty'
   | 'resumeUnavailable'
+  | 'subagentsRunning'
+  | 'subagentStarted'
+  | 'subagentFinished'
 
 const TEXT: Record<UiLocale, Record<UiKey, string>> = {
   en: {
@@ -95,6 +98,9 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     resumeEmpty: 'No sessions found for this workspace.',
     resumeUnavailable:
       'Cannot resume {session}: the current harness connection has no session/open or session/resume method.',
+    subagentsRunning: '{count} subagents running',
+    subagentStarted: 'subagent {id} started',
+    subagentFinished: 'subagent {id} finished',
   },
   zh: {
     session: '会话',
@@ -142,6 +148,9 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     resumeEmpty: '当前工作区没有可用的历史会话。',
     resumeUnavailable:
       '无法恢复会话 {session}：当前 harness 连接没有 session/open 或 session/resume 方法。',
+    subagentsRunning: '{count} 个子代理运行中',
+    subagentStarted: '子代理 {id} 已启动',
+    subagentFinished: '子代理 {id} 已完成',
   },
 }
 

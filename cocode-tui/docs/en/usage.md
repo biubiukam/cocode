@@ -34,6 +34,7 @@ Set `COCODE_TUI_SCREEN=inline` (the default) to keep the main screen and scrollb
 - `/lang zh` or `/lang en` switches the interface immediately; startup language follows `COCODE_LANG`, `LANG`, and related locale variables.
 - `/model <model-id>` restarts the runtime with a new model and starts a new session; a failed switch attempts to restore the previous model.
 - `Ctrl+O` toggles verbose mode for full reasoning and tool I/O.
+- The status line shows the latest assistant input/output usage and current subagent activity when the wire reports it. TPS, cache hits, reasoning effort, and context segments are not displayed because the current protocol does not provide them.
 - `Esc` closes overlays (help, command menu) first; in the normal view, press twice to quit.
 - `Ctrl+L` redraws the screen without clearing the session.
 - Type `@` at any position in the message to search workspace files and directories; use `Tab`, `↑`, or `↓` to select, then Enter to insert the reference.

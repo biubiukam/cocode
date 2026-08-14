@@ -94,7 +94,11 @@ export type TuiSnapshot = {
     mask?: boolean
     attachments: readonly string[]
   }
-  status: { line: string; tokens?: { input: number; output: number } }
+  status: {
+    line: string
+    tokens?: { input: number; output: number }
+    subagents?: TuiSubagentActivity
+  }
   helpOpen: boolean
   verbose: boolean
   capabilities: TuiCapabilities
@@ -103,6 +107,11 @@ export type TuiSnapshot = {
   commands: readonly { name: string; summary: string }[]
   resumePicker?: ResumePickerState
   exiting: boolean
+}
+
+export type TuiSubagentActivity = {
+  running: number
+  last?: { id: string; event: 'started' | 'finished' }
 }
 
 export type TuiAuthInfo = {
@@ -195,6 +204,8 @@ class TuiAppImpl implements TuiApp {
   private readonly themeSetter: TuiAppOptions['setTheme']
   private locale: UiLocale
   private readonly auth: TuiAuthInfo | undefined
+  private readonly activeSubagents = new Set<string>()
+  private lastSubagent: TuiSubagentActivity['last']
   private capturingByok = false
   private closePromise: Promise<void> | undefined
   private resumePicker: ResumePickerState | undefined
@@ -307,6 +318,10 @@ class TuiAppImpl implements TuiApp {
       status: {
         line: statusLine(this.agent, this.runtimeName, this.locale),
         tokens: latestUsage(this.assembler.snapshot()),
+        subagents: {
+          running: this.activeSubagents.size,
+          ...(this.lastSubagent === undefined ? {} : { last: this.lastSubagent }),
+        },
       },
       helpOpen: this.helpOpen,
       verbose: this.verbose,
@@ -457,6 +472,7 @@ class TuiAppImpl implements TuiApp {
       newSession: () => {
         this.sessionId = crypto.randomUUID()
         this.assembler.reset()
+        this.resetSubagentActivity()
         this.attachments = []
         this.notice = {
           tone: 'info',
@@ -578,6 +594,7 @@ class TuiAppImpl implements TuiApp {
       this.runtimeName = info.name
       this.sessionId = crypto.randomUUID()
       this.assembler.reset()
+      this.resetSubagentActivity()
       this.agent = 'idle'
       this.notice = {
         tone: 'info',
@@ -688,11 +705,32 @@ class TuiAppImpl implements TuiApp {
       clearInterrupt: () => {
         this.interruptArmed = false
       },
+      subagentStarted: (childSessionId) => {
+        this.recordSubagent(childSessionId, 'started')
+        return text(this.locale, 'subagentStarted', { id: safeSubagentId(childSessionId) })
+      },
+      subagentFinished: (childSessionId) => {
+        this.recordSubagent(childSessionId, 'finished')
+        return text(this.locale, 'subagentFinished', { id: safeSubagentId(childSessionId) })
+      },
       notice: (message) => {
         this.notice = { tone: 'info', message }
       },
       emit: () => this.emit(),
     })
+  }
+
+  private recordSubagent(childSessionId: string, event: 'started' | 'finished'): void {
+    const id = safeSubagentId(childSessionId)
+    if (id === '') return
+    if (event === 'started') this.activeSubagents.add(id)
+    else this.activeSubagents.delete(id)
+    this.lastSubagent = { id, event }
+  }
+
+  private resetSubagentActivity(): void {
+    this.activeSubagents.clear()
+    this.lastSubagent = undefined
   }
 
   private switchHost(): ChannelSwitchHost {
@@ -709,4 +747,14 @@ class TuiAppImpl implements TuiApp {
   private emit(): void {
     for (const listener of this.listeners) listener()
   }
+}
+
+function safeSubagentId(value: string): string {
+  return [...value]
+    .filter((char) => {
+      const code = char.charCodeAt(0)
+      return code >= 0x20 && code !== 0x7f
+    })
+    .join('')
+    .slice(0, 32)
 }

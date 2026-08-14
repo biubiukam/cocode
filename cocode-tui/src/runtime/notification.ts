@@ -10,6 +10,8 @@ export function handleNotification(
     isDeadOrExiting: () => boolean
     setAgent: (agent: 'idle' | 'running') => void
     clearInterrupt: () => void
+    subagentStarted: (childSessionId: string) => string
+    subagentFinished: (childSessionId: string) => string
     notice: (message: string) => void
     emit: () => void
   },
@@ -30,11 +32,11 @@ export function handleNotification(
   }
   if (notification.method === 'subagent.started') {
     if (notification.params.parentSessionId !== host.sessionId) return
-    host.notice(`Subagent ${notification.params.childSessionId}`)
+    host.notice(host.subagentStarted(notification.params.childSessionId))
     host.emit()
     return
   }
   if (notification.params.parentSessionId !== host.sessionId) return
-  host.notice(`Subagent finished ${notification.params.childSessionId}`)
+  host.notice(host.subagentFinished(notification.params.childSessionId))
   host.emit()
 }
