@@ -3,7 +3,7 @@
  */
 
 import type { TuiCapabilities } from "./capabilities.ts";
-import type { TuiAction, TuiCommandCtx } from "./app.ts";
+import type { TuiCommandCtx } from "./app.ts";
 
 export type Command = {
   name: string;
@@ -30,6 +30,17 @@ export class CommandRegistry {
   }
 }
 
+export function filterCommands(
+  commands: readonly Command[],
+  draft: string,
+): readonly Command[] {
+  if (!/^\/\S*$/.test(draft)) return [];
+  const prefix = draft.slice(1).toLowerCase();
+  return commands.filter((command) =>
+    command.name.toLowerCase().startsWith(prefix),
+  );
+}
+
 export function createBuiltinCommands(): CommandRegistry {
   const registry = new CommandRegistry();
   const local = (name: string, summary: string, run: Command["run"]): void => {
@@ -54,11 +65,40 @@ export function createBuiltinCommands(): CommandRegistry {
   local("status", "Show session, model, and agent state", (ctx) => {
     ctx.showStatus();
   });
-  local("theme", "P0 ships one dark theme", (ctx) => {
-    ctx.notice("info", "P0 theme is dark only. /theme light arrives in P1.");
+  local("doctor", "Show safe launch and initialize diagnostics", (ctx) => {
+    ctx.showDoctor?.();
+  });
+  local("theme", "Switch the terminal theme", (ctx, args) => {
+    const name = args.trim().toLowerCase();
+    if (name !== "dark" && name !== "light") {
+      ctx.notice("info", "Use /theme dark or /theme light.");
+      return;
+    }
+    ctx.setTheme?.(name);
+  });
+  local("export", "Export the projected session as Markdown", (ctx) => {
+    void ctx.exportTranscript?.();
+  });
+  local("init", "Create AGENTS.md when the workspace has none", (ctx) => {
+    void ctx.initWorkspace?.();
+  });
+  registry.register({
+    name: "resume",
+    summary: "List local session history for this workspace",
+    kind: "local",
+    available: (caps) => caps.sessionList === "jsonl",
+    run: (ctx) => {
+      void ctx.resumeSessions?.();
+    },
   });
   local("new", "Start a new session id (not a fork)", (ctx) => {
     ctx.newSession();
+  });
+  local("login", "Sign in with Cocode (restart after logout)", (ctx) => {
+    ctx.notice("info", "换账号请先 /logout，然后重新启动。");
+  });
+  local("logout", "Sign out of Cocode Cloud and quit", (ctx) => {
+    void ctx.logout();
   });
 
   return registry;

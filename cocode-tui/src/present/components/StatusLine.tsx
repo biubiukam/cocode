@@ -1,20 +1,23 @@
-import { Box, Text } from "ink";
-import type { TuiSnapshot } from "../../runtime/app.ts";
-import { theme } from "../theme.ts";
+import { Box, Text } from 'ink'
+import type { TuiSnapshot } from '../../runtime/app.ts'
+import { theme } from '../theme.ts'
 
 export function StatusLine(props: {
-  status: TuiSnapshot["status"];
-  notice?: TuiSnapshot["notice"];
+  status: TuiSnapshot['status']
+  notice?: TuiSnapshot['notice']
 }) {
-  const notice = props.notice;
+  const notice = props.notice
   return (
     <Box flexDirection="column">
-      <Text color={theme.mute}>{props.status.line}</Text>
+      <Text color={theme.mute}>
+        {props.status.line}
+        {props.status.tokens === undefined
+          ? ''
+          : ` · in ${props.status.tokens.input} / out ${props.status.tokens.output}`}
+      </Text>
       {notice ? (
-        <Text color={notice.tone === "error" ? theme.error : theme.info}>
-          {notice.message}
-        </Text>
+        <Text color={notice.tone === 'error' ? theme.error : theme.info}>{notice.message}</Text>
       ) : null}
     </Box>
-  );
+  )
 }

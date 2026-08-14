@@ -17,7 +17,19 @@ describe("commands", () => {
     const names = createBuiltinCommands()
       .list(P0_CAPABILITIES)
       .map((command) => command.name);
-    expect(names).toEqual(["help", "exit", "clear", "status", "theme", "new"]);
+    expect(names).toEqual([
+      "help",
+      "exit",
+      "clear",
+      "status",
+      "doctor",
+      "theme",
+      "export",
+      "init",
+      "new",
+      "login",
+      "logout",
+    ]);
   });
 
   it("unknown names are absent", () => {
@@ -36,9 +48,28 @@ describe("commands", () => {
         clearTranscript: () => {},
         showStatus: () => {},
         notice: () => {},
+        logout: async () => {},
       },
       "",
     );
     expect(actions).toEqual([{ type: "quit" }]);
+  });
+
+  it("/login asks the user to restart", () => {
+    const notices: string[] = [];
+    const command = createBuiltinCommands().find("login", P0_CAPABILITIES);
+    command?.run(
+      {
+        dispatch: () => {},
+        newSession: () => {},
+        clearTranscript: () => {},
+        showStatus: () => {},
+        notice: (_tone, message) => notices.push(message),
+        logout: async () => {},
+      },
+      "",
+    );
+    expect(notices.join("\n")).toMatch(/logout/);
+    expect(notices.join("\n")).not.toMatch(/sk-|ck_/);
   });
 });

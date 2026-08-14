@@ -2,407 +2,498 @@
  * TuiApp owns session lifecycle, projection, and local queues.
  */
 
-import type { TuiNotification, TuiRuntime } from "@cocode/tui-connection";
-import { createAssembler, type Assembler } from "./assembler.ts";
-import { P0_CAPABILITIES, type TuiCapabilities } from "./capabilities.ts";
+import type { TuiNotification, TuiRuntime } from '@cocode/tui-connection'
+import { createAssembler, type Assembler } from './assembler.ts'
+import { P0_CAPABILITIES, type TuiCapabilities } from './capabilities.ts'
+import { CommandRegistry, createBuiltinCommands, helpText, parseSlash } from './commands.ts'
+import { InputHistory } from './history.ts'
+import type { ConversationNode } from './nodes/types.ts'
 import {
-  CommandRegistry,
-  createBuiltinCommands,
-  helpText,
-  parseSlash,
-} from "./commands.ts";
-import { InputHistory } from "./history.ts";
-import type { ConversationNode } from "./nodes/types.ts";
+  backspaceDraft,
+  createDraft,
+  insertDraft,
+  moveDraftCursor,
+  replaceDraft,
+  type DraftState,
+} from './draft.ts'
+import { resolveWorkspaceInfo } from './workspace.ts'
+import { createAppCommandContext } from './command-context.ts'
+import {
+  composerPlaceholder,
+  errorMessage,
+  latestUsage,
+  startErrorMessage,
+  statusLine,
+} from './app-view.ts'
+import { handleInterrupt } from './interrupt.ts'
+import { closeRuntime } from './lifecycle.ts'
+import { handleNotification } from './notification.ts'
 
 export type TuiAction =
-  | { type: "submit"; text: string }
-  | { type: "command"; line: string }
-  | { type: "setDraft"; text: string }
-  | { type: "historyPrev" }
-  | { type: "historyNext" }
-  | { type: "toggleVerbose" }
-  | { type: "toggleHelp" }
-  | { type: "interruptOrQuit" }
-  | { type: "quit" };
+  | { type: 'submit'; text: string }
+  | { type: 'command'; line: string }
+  | { type: 'setDraft'; text: string }
+  | { type: 'insertDraft'; text: string }
+  | { type: 'deleteBackward' }
+  | { type: 'moveCursor'; delta: number }
+  | { type: 'historyPrev' }
+  | { type: 'historyNext' }
+  | { type: 'toggleVerbose' }
+  | { type: 'toggleHelp' }
+  | { type: 'interruptOrQuit' }
+  | { type: 'quit' }
+  | { type: 'redraw' }
 
-export type { TuiCapabilities };
+export type { TuiCapabilities }
 
 export type TuiSnapshot = {
   header: {
-    product: "Cocode";
-    sessionId: string;
-    model: string;
-    provider: string;
-    cwd: string;
-  };
-  agent: "idle" | "running" | "starting" | "dead";
-  nodes: readonly ConversationNode[];
-  composer: { text: string; placeholder: string; disabled: boolean };
-  status: { line: string };
-  helpOpen: boolean;
-  verbose: boolean;
-  capabilities: TuiCapabilities;
-  notice?: { tone: "info" | "error"; message: string };
-  helpText: string;
-  exiting: boolean;
-};
+    product: 'Cocode'
+    sessionId: string
+    model: string
+    provider: string
+    cwd: string
+    branch?: string
+  }
+  agent: 'idle' | 'running' | 'starting' | 'dead'
+  nodes: readonly ConversationNode[]
+  composer: {
+    text: string
+    cursor: number
+    placeholder: string
+    disabled: boolean
+  }
+  status: { line: string; tokens?: { input: number; output: number } }
+  helpOpen: boolean
+  verbose: boolean
+  capabilities: TuiCapabilities
+  notice?: { tone: 'info' | 'error'; message: string }
+  helpText: string
+  commands: readonly { name: string; summary: string }[]
+  exiting: boolean
+}
+
+export type TuiAuthInfo = {
+  mode: 'byok' | 'cocode'
+  envLocked: boolean
+  accountLabel?: string
+  logout: () => Promise<void>
+}
 
 export type TuiCommandCtx = {
-  dispatch: (action: TuiAction) => void;
-  newSession: () => void;
-  clearTranscript: () => void;
-  showStatus: () => void;
-  notice: (tone: "info" | "error", message: string) => void;
-};
+  dispatch: (action: TuiAction) => void
+  newSession: () => void
+  clearTranscript: () => void
+  showStatus: () => void
+  notice: (tone: 'info' | 'error', message: string) => void
+  logout: () => Promise<void>
+  showDoctor?: () => void
+  exportTranscript?: () => Promise<void>
+  initWorkspace?: () => Promise<void>
+  setTheme?: (name: 'dark' | 'light') => void
+  resumeSessions?: () => Promise<void>
+}
 
 export type TuiApp = {
-  start(): Promise<void>;
-  close(): Promise<void>;
-  snapshot(): TuiSnapshot;
-  subscribe(listener: () => void): () => void;
-  dispatch(action: TuiAction): void;
-};
+  start(): Promise<void>
+  close(): Promise<void>
+  snapshot(): TuiSnapshot
+  subscribe(listener: () => void): () => void
+  dispatch(action: TuiAction): void
+}
 
 export type TuiAppOptions = {
-  runtime: TuiRuntime;
-  cwd: string;
-  provider: string;
-  model: string;
-  sessionId?: string;
-  capabilities?: TuiCapabilities;
-  commands?: CommandRegistry;
-};
+  runtime: TuiRuntime
+  cwd: string
+  provider: string
+  model: string
+  sessionId?: string
+  capabilities?: TuiCapabilities
+  commands?: CommandRegistry
+  auth?: TuiAuthInfo
+  diagnostics?: {
+    tty: boolean
+    launchConfigured: boolean
+    argsConfigured: boolean
+    sessionRoot?: string
+  }
+  setTheme?: (name: 'dark' | 'light') => void
+}
 
 export function createTuiApp(options: TuiAppOptions): TuiApp {
-  return new TuiAppImpl(options);
+  return new TuiAppImpl(options)
 }
 
 class TuiAppImpl implements TuiApp {
-  private readonly runtime: TuiRuntime;
-  private readonly cwd: string;
-  private readonly provider: string;
-  private readonly model: string;
-  private readonly capabilities: TuiCapabilities;
-  private readonly commands: CommandRegistry;
-  private readonly assembler: Assembler;
-  private readonly history = new InputHistory();
-  private readonly listeners = new Set<() => void>();
-  private unsubscribeRuntime: (() => void) | undefined;
-  private sessionId: string;
-  private agent: TuiSnapshot["agent"] = "starting";
-  private draft = "";
-  private helpOpen = false;
-  private verbose = false;
-  private notice: TuiSnapshot["notice"];
-  private interruptArmed = false;
-  private exiting = false;
-  private runtimeName = "";
+  private readonly runtime: TuiRuntime
+  private readonly cwd: string
+  private readonly provider: string
+  private readonly model: string
+  private readonly capabilities: TuiCapabilities
+  private readonly commands: CommandRegistry
+  private readonly assembler: Assembler
+  private readonly history = new InputHistory()
+  private readonly listeners = new Set<() => void>()
+  private unsubscribeRuntime: (() => void) | undefined
+  private unsubscribeRuntimeClose: (() => void) | undefined
+  private sessionId: string
+  private agent: TuiSnapshot['agent'] = 'starting'
+  private draft: DraftState = createDraft()
+  private helpOpen = false
+  private verbose = false
+  private notice: TuiSnapshot['notice']
+  private interruptArmed = false
+  private exiting = false
+  private runtimeName = ''
+  private initError: string | undefined
+  private workspaceBranch: string | undefined
+  private readonly diagnostics: NonNullable<TuiAppOptions['diagnostics']>
+  private readonly themeSetter: TuiAppOptions['setTheme']
+  private readonly auth: TuiAuthInfo | undefined
+  private closePromise: Promise<void> | undefined
 
   constructor(options: TuiAppOptions) {
-    this.runtime = options.runtime;
-    this.cwd = options.cwd;
-    this.provider = options.provider;
-    this.model = options.model;
-    this.sessionId = options.sessionId ?? crypto.randomUUID();
-    this.capabilities = options.capabilities ?? P0_CAPABILITIES;
-    this.commands = options.commands ?? createBuiltinCommands();
-    this.assembler = createAssembler();
+    this.runtime = options.runtime
+    this.cwd = options.cwd
+    this.provider = options.provider
+    this.model = options.model
+    this.sessionId = options.sessionId ?? crypto.randomUUID()
+    this.capabilities = options.capabilities ?? P0_CAPABILITIES
+    this.commands = options.commands ?? createBuiltinCommands()
+    this.assembler = createAssembler()
+    this.auth = options.auth
+    this.diagnostics = options.diagnostics ?? {
+      tty: true,
+      launchConfigured: true,
+      argsConfigured: true,
+    }
+    this.themeSetter = options.setTheme
   }
 
   async start(): Promise<void> {
-    this.agent = "starting";
-    this.emit();
-    this.unsubscribeRuntime = this.runtime.subscribe((n) =>
-      this.onNotification(n),
-    );
+    this.agent = 'starting'
+    this.emit()
+    this.unsubscribeRuntime = this.runtime.subscribe((n) => this.onNotification(n))
+    this.unsubscribeRuntimeClose = this.runtime.onClose?.((error) => {
+      if (this.exiting) return
+      this.agent = 'dead'
+      this.notice = {
+        tone: 'error',
+        message: `Runtime stopped${error === undefined ? '' : `: ${error}`}`,
+      }
+      this.emit()
+    })
     try {
       const info = await this.runtime.start({
         cwd: this.cwd,
         provider: this.provider,
         model: this.model,
-      });
-      this.runtimeName = info.name;
-      this.agent = "idle";
-      this.notice = {
-        tone: "info",
-        message: `Connected ${info.name} ${info.version}`,
-      };
+      })
+      if (this.exiting) return
+      this.runtimeName = info.name
+      this.agent = 'idle'
+      this.initError = undefined
+      this.notice = undefined
+      this.workspaceBranch = (await resolveWorkspaceInfo(this.cwd)).branch
+      if (this.exiting) return
     } catch (error) {
-      this.agent = "dead";
+      if (this.exiting) return
+      this.agent = 'dead'
+      this.initError = errorMessage(error)
       this.notice = {
-        tone: "error",
+        tone: 'error',
         message: startErrorMessage(error),
-      };
+      }
     }
-    this.emit();
+    this.emit()
   }
 
   async close(): Promise<void> {
-    this.unsubscribeRuntime?.();
-    this.unsubscribeRuntime = undefined;
-    await this.runtime.close();
+    this.closePromise ??= this.closeRuntime()
+    return this.closePromise
+  }
+
+  private async closeRuntime(): Promise<void> {
+    await closeRuntime({
+      unsubscribe: () => {
+        this.unsubscribeRuntime?.()
+        this.unsubscribeRuntime = undefined
+      },
+      unsubscribeClose: () => {
+        this.unsubscribeRuntimeClose?.()
+        this.unsubscribeRuntimeClose = undefined
+      },
+      runtimeClose: () => this.runtime.close(),
+      markDead: () => {
+        this.agent = 'dead'
+        this.emit()
+      },
+    })
   }
 
   snapshot(): TuiSnapshot {
-    const disabled = this.agent === "dead" || this.exiting;
+    const disabled = this.agent === 'dead' || this.exiting
     return {
       header: {
-        product: "Cocode",
+        product: 'Cocode',
         sessionId: this.sessionId,
         model: this.model,
         provider: this.provider,
         cwd: this.cwd,
+        branch: this.workspaceBranch,
       },
       agent: this.agent,
       nodes: this.assembler.snapshot(),
       composer: {
-        text: this.draft,
+        text: this.draft.text,
+        cursor: this.draft.cursor,
         placeholder: composerPlaceholder(this.agent),
         disabled,
       },
-      status: { line: statusLine(this.agent, this.runtimeName) },
+      status: {
+        line: statusLine(this.agent, this.runtimeName),
+        tokens: latestUsage(this.assembler.snapshot()),
+      },
       helpOpen: this.helpOpen,
       verbose: this.verbose,
       capabilities: this.capabilities,
       notice: this.notice,
       helpText: helpText(this.capabilities, this.commands),
+      commands: this.commands.list(this.capabilities).map(({ name, summary }) => ({
+        name,
+        summary,
+      })),
       exiting: this.exiting,
-    };
+    }
   }
 
   subscribe(listener: () => void): () => void {
-    this.listeners.add(listener);
+    this.listeners.add(listener)
     return () => {
-      this.listeners.delete(listener);
-    };
+      this.listeners.delete(listener)
+    }
   }
 
   dispatch(action: TuiAction): void {
     switch (action.type) {
-      case "setDraft":
-        this.draft = action.text;
-        this.emit();
-        return;
-      case "submit":
-        this.submit(action.text);
-        return;
-      case "command":
-        this.runCommand(action.line);
-        return;
-      case "historyPrev": {
-        const next = this.history.prev(this.draft);
-        if (next !== undefined) this.draft = next;
-        this.emit();
-        return;
+      case 'setDraft':
+        this.draft = replaceDraft(this.draft, action.text)
+        this.emit()
+        return
+      case 'insertDraft':
+        this.draft = insertDraft(this.draft, action.text)
+        this.emit()
+        return
+      case 'deleteBackward':
+        this.draft = backspaceDraft(this.draft)
+        this.emit()
+        return
+      case 'moveCursor':
+        this.draft = moveDraftCursor(this.draft, action.delta)
+        this.emit()
+        return
+      case 'submit':
+        this.submit(action.text)
+        return
+      case 'command':
+        this.runCommand(action.line)
+        return
+      case 'historyPrev': {
+        const next = this.history.prev(this.draft.text)
+        if (next !== undefined) this.draft = replaceDraft(this.draft, next)
+        this.emit()
+        return
       }
-      case "historyNext": {
-        const next = this.history.next(this.draft);
-        if (next !== undefined) this.draft = next;
-        this.emit();
-        return;
+      case 'historyNext': {
+        const next = this.history.next(this.draft.text)
+        if (next !== undefined) this.draft = replaceDraft(this.draft, next)
+        this.emit()
+        return
       }
-      case "toggleVerbose":
-        this.verbose = !this.verbose;
-        this.emit();
-        return;
-      case "toggleHelp":
-        this.helpOpen = !this.helpOpen;
-        this.emit();
-        return;
-      case "interruptOrQuit":
-        this.interruptOrQuit();
-        return;
-      case "quit":
-        this.beginQuit();
-        return;
+      case 'toggleVerbose':
+        this.verbose = !this.verbose
+        this.emit()
+        return
+      case 'toggleHelp':
+        this.helpOpen = !this.helpOpen
+        this.emit()
+        return
+      case 'interruptOrQuit':
+        this.interruptOrQuit()
+        return
+      case 'quit':
+        this.beginQuit()
+        return
+      case 'redraw':
+        this.emit()
+        return
     }
   }
 
   private interruptOrQuit(): void {
-    if (this.helpOpen) {
-      this.helpOpen = false;
-      this.emit();
-      return;
-    }
-    if (this.agent === "running" && !this.capabilities.cancel) {
-      if (!this.interruptArmed) {
-        this.interruptArmed = true;
-        this.notice = {
-          tone: "info",
-          message:
-            "Protocol cannot cancel. Press again to quit and kill the runtime.",
-        };
-        this.emit();
-        return;
-      }
-      this.beginQuit();
-      return;
-    }
-    if (!this.interruptArmed) {
-      this.interruptArmed = true;
-      this.notice = { tone: "info", message: "Press again to quit." };
-      this.emit();
-      return;
-    }
-    this.beginQuit();
+    handleInterrupt({
+      helpOpen: this.helpOpen,
+      agentRunning: this.agent === 'running',
+      canCancel: this.capabilities.cancel,
+      armed: this.interruptArmed,
+      close: () => this.beginQuit(),
+      setHelpOpen: (open) => {
+        this.helpOpen = open
+      },
+      setArmed: (armed) => {
+        this.interruptArmed = armed
+      },
+      notice: (message) => {
+        this.notice = { tone: 'info', message }
+      },
+      emit: () => this.emit(),
+    })
   }
 
   private commandCtx(): TuiCommandCtx {
-    return {
+    return createAppCommandContext({
       dispatch: (action) => this.dispatch(action),
       newSession: () => {
-        this.sessionId = crypto.randomUUID();
-        this.assembler.reset();
+        this.sessionId = crypto.randomUUID()
+        this.assembler.reset()
         this.notice = {
-          tone: "info",
+          tone: 'info',
           message: `New session ${this.sessionId}`,
-        };
-        this.emit();
+        }
+        this.emit()
       },
       clearTranscript: () => {
-        this.assembler.reset();
-        this.notice = { tone: "info", message: "Transcript cleared" };
-        this.emit();
+        this.assembler.reset()
+        this.notice = { tone: 'info', message: 'Transcript cleared' }
+        this.emit()
       },
       showStatus: () => {
+        const authBits =
+          this.auth === undefined
+            ? []
+            : [
+                `auth: ${this.auth.mode}`,
+                this.auth.envLocked ? 'env-locked' : undefined,
+                this.auth.accountLabel === undefined
+                  ? undefined
+                  : `account: ${this.auth.accountLabel}`,
+              ].filter((bit): bit is string => bit !== undefined)
         this.notice = {
-          tone: "info",
+          tone: 'info',
           message: [
             `session ${this.sessionId}`,
             `${this.provider}/${this.model}`,
             this.agent,
-            this.runtimeName === "" ? "runtime offline" : this.runtimeName,
-          ].join(" · "),
-        };
-        this.emit();
+            this.runtimeName === '' ? 'runtime offline' : this.runtimeName,
+            ...authBits,
+          ].join(' · '),
+        }
+        this.emit()
       },
       notice: (tone, message) => {
-        this.notice = { tone, message };
-        this.emit();
+        this.notice = { tone, message }
+        this.emit()
       },
-    };
+      logout: () => this.auth?.logout() ?? Promise.resolve(),
+      beginQuit: () => this.beginQuit(),
+      initError: this.initError,
+      capabilities: this.capabilities,
+      cwd: this.cwd,
+      provider: this.provider,
+      model: this.model,
+      runtimeName: this.runtimeName,
+      diagnostics: this.diagnostics,
+      auth: this.auth,
+      sessionId: () => this.sessionId,
+      nodes: this.assembler.snapshot(),
+      setTheme: (name) => {
+        this.themeSetter?.(name)
+        this.notice = {
+          tone: 'info',
+          message:
+            this.themeSetter === undefined ? 'Theme switching is unavailable.' : `Theme: ${name}`,
+        }
+        this.emit()
+      },
+    })
   }
 
   private submit(text: string): void {
-    const trimmed = text.trim();
-    if (trimmed === "") return;
-    if (trimmed.startsWith("/")) {
-      this.runCommand(trimmed);
-      return;
+    const trimmed = text.trim()
+    if (trimmed === '') return
+    if (trimmed.startsWith('/')) {
+      this.runCommand(trimmed)
+      return
     }
-    if (this.agent !== "idle") {
+    if (this.agent !== 'idle') {
       this.notice = {
-        tone: "info",
-        message: "Turn in progress. Protocol cannot queue or steer yet.",
-      };
-      this.emit();
-      return;
+        tone: 'info',
+        message: 'Turn in progress. Protocol cannot queue or steer yet.',
+      }
+      this.emit()
+      return
     }
-    this.history.push(trimmed);
-    this.draft = "";
-    this.notice = undefined;
-    this.interruptArmed = false;
+    this.history.push(trimmed)
+    this.draft = createDraft()
+    this.notice = undefined
+    this.interruptArmed = false
     void this.runtime
-      .prompt(this.sessionId, [{ type: "text", text: trimmed }])
+      .prompt(this.sessionId, [{ type: 'text', text: trimmed }])
       .catch((error: unknown) => {
-        this.notice = { tone: "error", message: errorMessage(error) };
-        if (this.agent === "running") this.agent = "idle";
-        this.emit();
-      });
-    this.emit();
+        this.notice = { tone: 'error', message: errorMessage(error) }
+        if (this.agent === 'running') this.agent = 'idle'
+        this.emit()
+      })
+    this.emit()
   }
 
   private runCommand(line: string): void {
-    const parsed = parseSlash(line);
+    const parsed = parseSlash(line)
     if (parsed === null) {
-      this.notice = { tone: "error", message: "Not a command" };
-      this.emit();
-      return;
+      this.notice = { tone: 'error', message: 'Not a command' }
+      this.emit()
+      return
     }
-    const command = this.commands.find(parsed.name, this.capabilities);
+    const command = this.commands.find(parsed.name, this.capabilities)
     if (command === undefined) {
       this.notice = {
-        tone: "error",
+        tone: 'error',
         message: `Unknown command /${parsed.name}`,
-      };
-      this.emit();
-      return;
+      }
+      this.emit()
+      return
     }
-    this.draft = "";
-    this.history.push(line);
-    command.run(this.commandCtx(), parsed.args);
+    this.draft = createDraft()
+    this.history.push(line)
+    command.run(this.commandCtx(), parsed.args)
   }
 
   private onNotification(notification: TuiNotification): void {
-    if (notification.method === "session.event") {
-      if (notification.params.sessionId !== this.sessionId) return;
-      this.assembler.ingest(notification.params.event);
-      this.emit();
-      return;
-    }
-    if (notification.method === "session.status") {
-      if (notification.params.sessionId !== this.sessionId) return;
-      if (this.agent === "dead" || this.exiting) return;
-      this.agent = notification.params.status;
-      this.interruptArmed = false;
-      this.emit();
-      return;
-    }
-    if (notification.method === "subagent.started") {
-      if (notification.params.parentSessionId !== this.sessionId) return;
-      this.notice = {
-        tone: "info",
-        message: `Subagent ${notification.params.childSessionId}`,
-      };
-      this.emit();
-      return;
-    }
-    if (notification.params.parentSessionId !== this.sessionId) return;
-    this.notice = {
-      tone: "info",
-      message: `Subagent finished ${notification.params.childSessionId}`,
-    };
-    this.emit();
+    handleNotification(notification, {
+      sessionId: this.sessionId,
+      ingest: (event) => this.assembler.ingest(event),
+      isDeadOrExiting: () => this.agent === 'dead' || this.exiting,
+      setAgent: (agent) => {
+        this.agent = agent
+      },
+      clearInterrupt: () => {
+        this.interruptArmed = false
+      },
+      notice: (message) => {
+        this.notice = { tone: 'info', message }
+      },
+      emit: () => this.emit(),
+    })
   }
 
   private beginQuit(): void {
-    if (this.exiting) return;
-    this.exiting = true;
-    this.emit();
-    void this.close().finally(() => {
-      this.agent = "dead";
-      this.emit();
-    });
+    if (this.exiting) return
+    this.exiting = true
+    this.emit()
+    void this.close().catch(() => undefined)
   }
 
   private emit(): void {
-    for (const listener of this.listeners) listener();
+    for (const listener of this.listeners) listener()
   }
-}
-
-function composerPlaceholder(agent: TuiSnapshot["agent"]): string {
-  if (agent === "starting") return "Connecting…";
-  if (agent === "running") return "Working — Esc then again to quit";
-  if (agent === "dead") return "Runtime stopped — /exit";
-  return "Type a message  / for commands";
-}
-
-function statusLine(agent: TuiSnapshot["agent"], runtimeName: string): string {
-  const name = runtimeName === "" ? "runtime" : runtimeName;
-  if (agent === "running") {
-    return `${name} · running · protocol cannot cancel`;
-  }
-  return `${name} · ${agent}`;
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-function startErrorMessage(error: unknown): string {
-  return [
-    "Initialize failed. Build sibling cocode-harness (pnpm run build),",
-    "set COCODE_HARNESS_ARGS, then /exit.",
-    errorMessage(error),
-  ].join(" ");
 }

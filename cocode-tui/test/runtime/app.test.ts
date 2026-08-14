@@ -5,17 +5,24 @@ import { createTuiApp } from "../../src/runtime/app.ts";
 function fakeRuntime(): TuiRuntime & {
   prompts: { sessionId: string; text: string }[];
   emit: (n: TuiNotification) => void;
+  emitClose: (error?: string) => void;
+  closeCount: number;
   failStart?: Error;
 } {
   const handlers = new Set<(n: TuiNotification) => void>();
+  const closeHandlers = new Set<(error?: string) => void>();
   const runtime: TuiRuntime & {
     prompts: { sessionId: string; text: string }[];
     emit: (n: TuiNotification) => void;
     failStart?: Error;
   } = {
     prompts: [],
+    closeCount: 0,
     emit(n) {
       for (const handler of handlers) handler(n);
+    },
+    emitClose(error) {
+      for (const handler of closeHandlers) handler(error);
     },
     async start() {
       if (runtime.failStart) throw runtime.failStart;
@@ -32,7 +39,13 @@ function fakeRuntime(): TuiRuntime & {
         handlers.delete(handler);
       };
     },
-    async close() {},
+    onClose(handler) {
+      closeHandlers.add(handler);
+      return () => closeHandlers.delete(handler);
+    },
+    async close() {
+      runtime.closeCount += 1;
+    },
   };
   return runtime;
 }
@@ -195,5 +208,131 @@ describe("TuiApp", () => {
     const snap = app.snapshot();
     expect(snap.header.sessionId).not.toBe("s1");
     expect(snap.nodes).toEqual([]);
+  });
+
+  it("edits the draft around a cursor", async () => {
+    const runtime = fakeRuntime();
+    const app = createTuiApp({
+      runtime,
+      cwd: "/tmp",
+      provider: "p",
+      model: "m",
+    });
+    await app.start();
+    app.dispatch({ type: "setDraft", text: "ac" });
+    app.dispatch({ type: "moveCursor", delta: -1 });
+    app.dispatch({ type: "insertDraft", text: "b" });
+    expect(app.snapshot().composer).toMatchObject({ text: "abc", cursor: 2 });
+    app.dispatch({ type: "deleteBackward" });
+    expect(app.snapshot().composer).toMatchObject({ text: "ac", cursor: 1 });
+  });
+
+  it("marks the app dead when the runtime transport closes", async () => {
+    const runtime = fakeRuntime();
+    const app = createTuiApp({
+      runtime,
+      cwd: "/tmp",
+      provider: "p",
+      model: "m",
+    });
+    await app.start();
+    runtime.emitClose("stderr tail");
+    expect(app.snapshot().agent).toBe("dead");
+    expect(app.snapshot().composer.disabled).toBe(true);
+    expect(app.snapshot().notice?.message).toMatch(/stderr tail/);
+  });
+
+  it("closes the runtime once for repeated quit actions", async () => {
+    const runtime = fakeRuntime();
+    const app = createTuiApp({
+      runtime,
+      cwd: "/tmp",
+      provider: "p",
+      model: "m",
+    });
+    await app.start();
+    app.dispatch({ type: "quit" });
+    app.dispatch({ type: "quit" });
+    await app.close();
+    expect(runtime.closeCount).toBe(1);
+    expect(app.snapshot().exiting).toBe(true);
+  });
+
+  it("shows the latest assistant usage without inventing zeroes", async () => {
+    const runtime = fakeRuntime();
+    const app = createTuiApp({
+      runtime,
+      cwd: "/tmp",
+      provider: "p",
+      model: "m",
+      sessionId: "s1",
+    });
+    await app.start();
+    runtime.emit({
+      method: "session.event",
+      params: {
+        sessionId: "s1",
+        event: {
+          type: "assistant/message",
+          seq: 1,
+          time: 1,
+          data: {
+            turn: 1,
+            step: 1,
+            message: { content: [{ type: "text", text: "done" }] },
+            usage: { inputTokens: 12, outputTokens: 4 },
+          },
+        },
+      },
+    });
+    expect(app.snapshot().status.tokens).toEqual({ input: 12, output: 4 });
+  });
+
+  it("doctor redacts credentials and reports launch state", async () => {
+    const runtime = fakeRuntime();
+    runtime.failStart = new Error("API_KEY=sk-secret");
+    const app = createTuiApp({
+      runtime,
+      cwd: "/tmp",
+      provider: "p",
+      model: "m",
+      diagnostics: {
+        tty: true,
+        launchConfigured: false,
+        argsConfigured: true,
+        sessionRoot: "/tmp/sessions",
+      },
+    });
+    await app.start();
+    app.dispatch({ type: "command", line: "/doctor" });
+    const message = app.snapshot().notice?.message ?? "";
+    expect(message).toMatch(/tty yes/);
+    expect(message).toMatch(/launch unset/);
+    expect(message).toMatch(/initialize error/);
+    expect(message).not.toMatch(/sk-|API_KEY=|ck_live_/);
+  });
+
+  it("/status mentions auth mode and never prints a key", async () => {
+    const runtime = fakeRuntime();
+    const app = createTuiApp({
+      runtime,
+      cwd: "/tmp",
+      provider: "deepseek-official",
+      model: "deepseek-v4-flash",
+      sessionId: "s1",
+      auth: {
+        mode: "byok",
+        envLocked: true,
+        accountLabel: "Ada",
+        logout: async () => {},
+      },
+    });
+    await app.start();
+    app.dispatch({ type: "command", line: "/status" });
+    const message = app.snapshot().notice?.message ?? "";
+    expect(message).toMatch(/auth: byok/);
+    expect(message).toMatch(/env-locked/);
+    expect(message).toMatch(/account: Ada/);
+    expect(message).not.toMatch(/sk-|ck_live_|API_KEY=/);
   });
 });

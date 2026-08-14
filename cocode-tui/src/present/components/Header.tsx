@@ -1,10 +1,14 @@
-import { Box, Text } from "ink";
-import type { TuiSnapshot } from "../../runtime/app.ts";
-import { theme } from "../theme.ts";
+import { Box, Text } from 'ink'
+import type { TuiSnapshot } from '../../runtime/app.ts'
+import { workspaceName } from '../../runtime/workspace.ts'
+import { theme } from '../theme.ts'
 
-export function Header(props: { header: TuiSnapshot["header"] }) {
-  const { header } = props;
-  const session = header.sessionId.slice(0, 8);
+type HeaderData = TuiSnapshot['header'] & { branch?: string }
+
+export function Header(props: { header: HeaderData }) {
+  const { header } = props
+  const session = header.sessionId.slice(0, 8)
+  const workspace = workspaceName(header.cwd)
   return (
     <Box gap={1}>
       <Text color={theme.brand} bold>
@@ -14,6 +18,8 @@ export function Header(props: { header: TuiSnapshot["header"] }) {
       <Text color={theme.dim}>
         {header.provider}/{header.model}
       </Text>
+      <Text color={theme.mute}>{workspace}</Text>
+      {header.branch ? <Text color={theme.dim}>{header.branch}</Text> : null}
     </Box>
-  );
+  )
 }
