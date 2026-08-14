@@ -283,6 +283,49 @@ describe('TuiApp', () => {
     expect(app.snapshot().nodes[0]).toMatchObject({ kind: 'user', text: 'hi' })
   })
 
+  it('coalesces synchronous runtime notifications into one render wakeup', async () => {
+    const runtime = fakeRuntime()
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+    })
+    await app.start()
+    let wakeups = 0
+    app.subscribe(() => {
+      wakeups += 1
+    })
+    runtime.emit({
+      method: 'session.event',
+      params: {
+        sessionId: 's1',
+        event: {
+          type: 'assistant/chunk',
+          seq: 1,
+          time: 1,
+          data: { turn: 1, step: 0, chunk: { type: 'text-delta', text: 'a' } },
+        },
+      },
+    })
+    runtime.emit({
+      method: 'session.event',
+      params: {
+        sessionId: 's1',
+        event: {
+          type: 'assistant/chunk',
+          seq: 2,
+          time: 2,
+          data: { turn: 1, step: 0, chunk: { type: 'text-delta', text: 'b' } },
+        },
+      },
+    })
+    expect(wakeups).toBe(0)
+    await vi.waitFor(() => expect(wakeups).toBe(1))
+    expect(app.snapshot().nodes[0]).toMatchObject({ text: 'ab' })
+  })
+
   it('ignores events for other sessions', async () => {
     const runtime = fakeRuntime()
     const app = createTuiApp({

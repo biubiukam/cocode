@@ -226,6 +226,7 @@ class TuiAppImpl implements TuiApp {
   private lastSubagent: TuiSubagentActivity['last']
   private readonly queuedPrompts: QueuedPrompt[] = []
   private capturingByok = false
+  private emitScheduled = false
   private closePromise: Promise<void> | undefined
   private resumePicker: ResumePickerState | undefined
 
@@ -853,7 +854,7 @@ class TuiAppImpl implements TuiApp {
       notice: (message) => {
         this.notice = { tone: 'info', message }
       },
-      emit: () => this.emit(),
+      emit: () => this.scheduleEmit(),
     })
   }
 
@@ -891,6 +892,15 @@ class TuiAppImpl implements TuiApp {
 
   private emit(): void {
     for (const listener of this.listeners) listener()
+  }
+
+  private scheduleEmit(): void {
+    if (this.emitScheduled) return
+    this.emitScheduled = true
+    queueMicrotask(() => {
+      this.emitScheduled = false
+      this.emit()
+    })
   }
 }
 
