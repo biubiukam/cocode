@@ -1,9 +1,11 @@
 import { Box, Text } from 'ink'
 import type { TuiSnapshot } from '../../runtime/app.ts'
+import { agentMark } from './agent-status.ts'
 import { theme } from '../theme.ts'
 
 export function StatusLine(props: {
   status: TuiSnapshot['status']
+  agent: TuiSnapshot['agent']
   notice?: TuiSnapshot['notice']
 }) {
   const notice = props.notice
@@ -11,7 +13,7 @@ export function StatusLine(props: {
     <Box flexDirection="column" marginBottom={1}>
       <Box width="100%" justifyContent="space-between">
         <Text color={theme.dim}>
-          {statusMark(props.status.line)} {props.status.line}
+          {agentMark(props.agent)} {props.status.line}
         </Text>
         {props.status.tokens !== undefined ? (
           <Text color={theme.mute}>
@@ -22,13 +24,6 @@ export function StatusLine(props: {
       {notice ? <Notice notice={notice} /> : null}
     </Box>
   )
-}
-
-function statusMark(line: string): string {
-  if (line.includes('running')) return '◐'
-  if (line.includes('dead')) return '×'
-  if (line.includes('starting')) return '○'
-  return '●'
 }
 
 function Notice(props: { notice: NonNullable<TuiSnapshot['notice']> }) {

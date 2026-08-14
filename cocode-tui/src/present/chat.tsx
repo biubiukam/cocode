@@ -30,6 +30,13 @@ export function Chat(props: { app: TuiApp }) {
     [snap.commands, snap.composer.text],
   )
   const slashOpen = !slashDismissed && slashItems.length > 0
+  const composerRows = Math.max(1, snap.composer.text.split('\n').length)
+  const reservedRows =
+    11 +
+    composerRows +
+    (snap.notice ? 1 : 0) +
+    (snap.helpOpen ? snap.helpText.split('\n').length + 4 : 0) +
+    (slashOpen ? slashItems.length + 4 : 0)
 
   useEffect(
     () =>
@@ -117,9 +124,9 @@ export function Chat(props: { app: TuiApp }) {
       <MessageList
         nodes={snap.nodes}
         verbose={snap.verbose}
-        maxRows={Math.max(0, stdout.rows - (snap.helpOpen ? 11 : 9))}
+        maxRows={Math.max(0, stdout.rows - reservedRows)}
       />
-      <StatusLine status={snap.status} notice={snap.notice} />
+      <StatusLine status={snap.status} agent={snap.agent} notice={snap.notice} />
       <Composer composer={snap.composer} />
       <Box width="100%" marginTop={1} justifyContent="space-between">
         <Text color={theme.mute}>↑↓ history · ctrl+o details · ? help</Text>
