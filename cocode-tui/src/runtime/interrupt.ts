@@ -13,6 +13,11 @@ export function handleInterrupt(options: {
   cancel?: () => Promise<boolean>
   cancelAccepted?: (wasRunning: boolean) => void
   cancelFailed?: (error: unknown) => void
+  emptyComposer: boolean
+  canRewind: boolean
+  rewind?: () => void
+  rewindNotice?: string
+  rewindUnavailable?: string
 }): void {
   if (options.helpOpen) {
     options.setHelpOpen(false)
@@ -47,6 +52,22 @@ export function handleInterrupt(options: {
       return
     }
     options.close()
+    return
+  }
+  if (options.emptyComposer && options.canRewind) {
+    if (!options.armed) {
+      options.setArmed(true)
+      options.notice(options.rewindNotice ?? 'Press Esc again to rewind.')
+      options.emit()
+      return
+    }
+    options.setArmed(false)
+    if (options.rewind === undefined) {
+      options.notice(options.rewindUnavailable ?? 'Rewind is unavailable.')
+      options.emit()
+      return
+    }
+    options.rewind()
     return
   }
   if (!options.armed) {

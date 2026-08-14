@@ -15,6 +15,16 @@ type HarnessClient = InstanceType<SdkClient['HarnessClient']>
 type CancelableHarnessClient = HarnessClient & {
   cancel(sessionId: string, keepInbox?: boolean): Promise<boolean>
   open(sessionId: string, replaceSessionId?: string): Promise<boolean>
+  fork(
+    sourceSessionId: string,
+    boundary?: number,
+    replaceSessionId?: string,
+  ): Promise<{ sessionId: string; seedLength: number; seed: SessionEvent[] }>
+  rewind(
+    sourceSessionId: string,
+    messageSeq: number,
+    replaceSessionId?: string,
+  ): Promise<{ sessionId: string; seedLength: number; seed: SessionEvent[] }>
 }
 
 export function createTuiRuntime(launch: TuiLaunch): TuiRuntime {
@@ -98,6 +108,24 @@ class SdkTuiRuntime implements TuiRuntime {
   async open(sessionId: string, replaceSessionId?: string): Promise<boolean> {
     const client = this.requireClient()
     return (client as CancelableHarnessClient).open(sessionId, replaceSessionId)
+  }
+
+  async fork(
+    sourceSessionId: string,
+    boundary?: number,
+    replaceSessionId?: string,
+  ): Promise<{ sessionId: string; seedLength: number; seed: SessionEvent[] }> {
+    const client = this.requireClient()
+    return (client as CancelableHarnessClient).fork(sourceSessionId, boundary, replaceSessionId)
+  }
+
+  async rewind(
+    sourceSessionId: string,
+    messageSeq: number,
+    replaceSessionId?: string,
+  ): Promise<{ sessionId: string; seedLength: number; seed: SessionEvent[] }> {
+    const client = this.requireClient()
+    return (client as CancelableHarnessClient).rewind(sourceSessionId, messageSeq, replaceSessionId)
   }
 
   subscribe(handler: (n: TuiNotification) => void): () => void {

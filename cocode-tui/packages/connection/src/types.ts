@@ -60,6 +60,16 @@ export type TuiRuntime = {
   prompt(sessionId: string, blocks: ContentBlock[]): Promise<string>
   cancel(sessionId: string, keepInbox?: boolean): Promise<boolean>
   open(sessionId: string, replaceSessionId?: string): Promise<boolean>
+  fork(
+    sourceSessionId: string,
+    boundary?: number,
+    replaceSessionId?: string,
+  ): Promise<{ sessionId: string; seedLength: number; seed: SessionEvent[] }>
+  rewind(
+    sourceSessionId: string,
+    messageSeq: number,
+    replaceSessionId?: string,
+  ): Promise<{ sessionId: string; seedLength: number; seed: SessionEvent[] }>
   subscribe(handler: (n: TuiNotification) => void): () => void
   onClose?: (handler: (error?: string) => void) => () => void
   close(): Promise<void>

@@ -14,6 +14,7 @@ function fakeRuntime(): TuiRuntime & {
   restarts: { provider: string; model: string }[]
   cancels: { sessionId: string; keepInbox: boolean }[]
   opens: { sessionId: string; replaceSessionId?: string }[]
+  rewinds: { sourceSessionId: string; messageSeq: number; replaceSessionId?: string }[]
   failStart?: Error
   cancelError?: Error
   failRestartModels: Set<string>
@@ -30,6 +31,7 @@ function fakeRuntime(): TuiRuntime & {
     restarts: [],
     cancels: [],
     opens: [],
+    rewinds: [],
     failRestartModels: new Set(),
     emit(n) {
       for (const handler of handlers) handler(n)
@@ -68,6 +70,28 @@ function fakeRuntime(): TuiRuntime & {
         ...(replaceSessionId === undefined ? {} : { replaceSessionId }),
       })
       return true
+    },
+    async fork() {
+      return { sessionId: 'forked-session', seedLength: 0, seed: [] }
+    },
+    async rewind(sourceSessionId, messageSeq, replaceSessionId) {
+      runtime.rewinds.push({
+        sourceSessionId,
+        messageSeq,
+        ...(replaceSessionId === undefined ? {} : { replaceSessionId }),
+      })
+      return {
+        sessionId: 'rewound-session',
+        seedLength: 1,
+        seed: [
+          {
+            type: 'user/message',
+            seq: 2,
+            time: 2,
+            data: { id: 'u1', content: [{ type: 'text', text: 'retry this' }] },
+          },
+        ],
+      }
     },
     subscribe(handler) {
       handlers.add(handler)
@@ -412,6 +436,75 @@ describe('TuiApp', () => {
     expect(app.snapshot().notice?.message).toMatch(/Press again/)
     app.dispatch({ type: 'interruptOrQuit' })
     expect(app.snapshot().exiting).toBe(true)
+  })
+
+  it('clears the interrupt arm when the composer changes', async () => {
+    const app = createTuiApp({
+      runtime: fakeRuntime(),
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+      capabilities: { ...P0_CAPABILITIES, rewind: true },
+    })
+    await app.start()
+    app.dispatch({ type: 'interruptOrQuit' })
+    app.dispatch({ type: 'insertDraft', text: 'draft' })
+    app.dispatch({ type: 'interruptOrQuit' })
+    expect(app.snapshot().exiting).toBe(false)
+    app.dispatch({ type: 'interruptOrQuit' })
+    expect(app.snapshot().exiting).toBe(true)
+  })
+
+  it('opens rewind on double Esc when the composer is empty', async () => {
+    const runtime = fakeRuntime()
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+      capabilities: { ...P0_CAPABILITIES, rewind: true },
+    })
+    await app.start()
+    runtime.emit({
+      method: 'session.event',
+      params: {
+        sessionId: 's1',
+        event: {
+          type: 'user/message',
+          seq: 2,
+          time: 2,
+          data: { id: 'u1', content: [{ type: 'text', text: 'retry this' }] },
+        },
+      },
+    })
+    runtime.emit({
+      method: 'session.event',
+      params: {
+        sessionId: 's1',
+        event: {
+          type: 'user/message',
+          seq: 5,
+          time: 5,
+          data: { id: 'u2', content: [{ type: 'text', text: 'retry latest' }] },
+        },
+      },
+    })
+    app.dispatch({ type: 'interruptOrQuit' })
+    expect(app.snapshot().exiting).toBe(false)
+    expect(app.snapshot().notice?.message).toContain('Press Esc again')
+    app.dispatch({ type: 'interruptOrQuit' })
+    expect(app.snapshot().rewindPicker?.open).toBe(true)
+    app.dispatch({ type: 'rewind.confirm' })
+    expect(app.snapshot().rewindPicker?.confirming).toBe(true)
+    app.dispatch({ type: 'rewind.confirm' })
+    await expect.poll(() => app.snapshot().header.sessionId).toBe('rewound-session')
+    expect(runtime.rewinds).toEqual([
+      { sourceSessionId: 's1', messageSeq: 5, replaceSessionId: 's1' },
+    ])
+    expect(app.snapshot().nodes).toMatchObject([{ kind: 'user', text: 'retry this' }])
+    expect(app.snapshot().composer.text).toBe('retry latest')
   })
 
   it('reports a failed cancellation request without claiming completion', async () => {

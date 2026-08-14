@@ -47,6 +47,14 @@ import {
   type ResumePickerState,
 } from './resume-picker.ts'
 import {
+  closeRewindPicker,
+  confirmRewindSelection,
+  createRewindPicker,
+  moveRewindSelection,
+  selectedRewindItem,
+  type RewindPickerState,
+} from './rewind-picker.ts'
+import {
   logoutChannel,
   requestChannelSwitch,
   submitCapturedByok,
@@ -74,6 +82,10 @@ export type TuiAction =
   | { type: 'resume.move'; delta: number }
   | { type: 'resume.close' }
   | { type: 'resume.confirm' }
+  | { type: 'rewind.open' }
+  | { type: 'rewind.move'; delta: number }
+  | { type: 'rewind.close' }
+  | { type: 'rewind.confirm' }
   | { type: 'queuePrompt' }
 
 export type { TuiCapabilities }
@@ -118,6 +130,7 @@ export type TuiSnapshot = {
   helpText: string
   commands: readonly { name: string; summary: string }[]
   resumePicker?: ResumePickerState
+  rewindPicker?: RewindPickerState
   exiting: boolean
 }
 
@@ -230,6 +243,7 @@ class TuiAppImpl implements TuiApp {
   private emitScheduled = false
   private closePromise: Promise<void> | undefined
   private resumePicker: ResumePickerState | undefined
+  private rewindPicker: RewindPickerState | undefined
 
   constructor(options: TuiAppOptions) {
     this.runtime = options.runtime
@@ -374,6 +388,7 @@ class TuiAppImpl implements TuiApp {
         summary,
       })),
       resumePicker: this.resumePicker,
+      rewindPicker: this.rewindPicker,
       exiting: this.exiting,
     }
   }
@@ -389,16 +404,19 @@ class TuiAppImpl implements TuiApp {
     switch (action.type) {
       case 'setDraft':
         this.draft = replaceDraft(this.draft, action.text)
+        this.interruptArmed = false
         this.pruneAttachments()
         this.emit()
         return
       case 'insertDraft':
         this.draft = insertDraft(this.draft, action.text)
+        this.interruptArmed = false
         this.pruneAttachments()
         this.emit()
         return
       case 'deleteBackward':
         this.draft = backspaceDraft(this.draft)
+        this.interruptArmed = false
         this.pruneAttachments()
         this.emit()
         return
@@ -427,13 +445,19 @@ class TuiAppImpl implements TuiApp {
         return
       case 'historyPrev': {
         const next = this.history.prev(this.draft.text)
-        if (next !== undefined) this.draft = replaceDraft(this.draft, next)
+        if (next !== undefined) {
+          this.draft = replaceDraft(this.draft, next)
+          this.interruptArmed = false
+        }
         this.emit()
         return
       }
       case 'historyNext': {
         const next = this.history.next(this.draft.text)
-        if (next !== undefined) this.draft = replaceDraft(this.draft, next)
+        if (next !== undefined) {
+          this.draft = replaceDraft(this.draft, next)
+          this.interruptArmed = false
+        }
         this.emit()
         return
       }
@@ -482,6 +506,35 @@ class TuiAppImpl implements TuiApp {
         this.emit()
         return
       }
+      case 'rewind.open':
+        this.openRewindPicker()
+        return
+      case 'rewind.move':
+        if (this.rewindPicker !== undefined) {
+          this.rewindPicker = moveRewindSelection(this.rewindPicker, action.delta)
+          this.emit()
+        }
+        return
+      case 'rewind.close':
+        if (this.rewindPicker !== undefined) {
+          this.rewindPicker = closeRewindPicker(this.rewindPicker)
+          this.emit()
+        }
+        return
+      case 'rewind.confirm':
+        if (this.rewindPicker === undefined) return
+        if (!this.rewindPicker.confirming) {
+          this.rewindPicker = confirmRewindSelection(this.rewindPicker)
+          this.emit()
+          return
+        }
+        {
+          const selected = selectedRewindItem(this.rewindPicker)
+          this.rewindPicker = closeRewindPicker(this.rewindPicker)
+          if (selected !== undefined) void this.rewindSession(selected)
+          this.emit()
+        }
+        return
       case 'queuePrompt':
         this.queueCurrentPrompt()
         return
@@ -520,6 +573,13 @@ class TuiAppImpl implements TuiApp {
           message: `${text(this.locale, 'cancelFailed')}: ${errorMessage(error)}`,
         }
       },
+      emptyComposer: this.draft.text.trim() === '',
+      canRewind:
+        this.capabilities.rewind &&
+        this.assembler.snapshot().filter((node) => node.kind === 'user').length > 1,
+      rewind: () => this.dispatch({ type: 'rewind.open' }),
+      rewindNotice: text(this.locale, 'rewindArm'),
+      rewindUnavailable: text(this.locale, 'rewindUnavailable'),
       emit: () => this.emit(),
     })
   }
@@ -725,6 +785,49 @@ class TuiAppImpl implements TuiApp {
         tone: 'info',
         message: text(this.locale, 'resumeLoaded', { session: sessionId.slice(0, 8) }),
       }
+    } catch (error) {
+      this.agent = 'idle'
+      this.notice = { tone: 'error', message: errorMessage(error) }
+    }
+    this.emit()
+  }
+
+  private openRewindPicker(): void {
+    const users = this.assembler
+      .snapshot()
+      .filter((node): node is Extract<ConversationNode, { kind: 'user' }> => node.kind === 'user')
+    const items = users
+      .slice(1)
+      .reverse()
+      .map((node) => ({ id: node.id, seq: node.seq, text: node.text }))
+    if (items.length === 0) {
+      this.notice = { tone: 'info', message: text(this.locale, 'rewindEmpty') }
+      this.emit()
+      return
+    }
+    this.rewindPicker = createRewindPicker(items)
+    this.helpOpen = false
+    this.notice = undefined
+    this.emit()
+  }
+
+  private async rewindSession(item: { seq: number; text: string }): Promise<void> {
+    const previousSessionId = this.sessionId
+    this.agent = 'starting'
+    this.notice = { tone: 'info', message: text(this.locale, 'rewindLoading') }
+    this.emit()
+    try {
+      const result = await this.runtime.rewind(previousSessionId, item.seq, previousSessionId)
+      this.sessionId = result.sessionId
+      this.assembler.replaceWindow(result.seed)
+      this.telemetry.reset()
+      this.sessionState.reset()
+      this.resetSubagentActivity()
+      this.queuedPrompts.length = 0
+      this.attachments = []
+      this.draft = replaceDraft(this.draft, item.text)
+      this.agent = 'idle'
+      this.notice = { tone: 'info', message: text(this.locale, 'rewindLoaded') }
     } catch (error) {
       this.agent = 'idle'
       this.notice = { tone: 'error', message: errorMessage(error) }

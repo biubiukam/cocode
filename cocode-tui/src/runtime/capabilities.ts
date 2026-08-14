@@ -15,7 +15,7 @@ export const P0_CAPABILITIES: TuiCapabilities = {
   cancel: true,
   approval: false,
   promptMode: false,
-  rewind: false,
+  rewind: true,
   sessionList: 'none',
   skills: false,
 }

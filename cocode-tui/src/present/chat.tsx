@@ -13,6 +13,7 @@ import { Help } from './components/Help.tsx'
 import { HistorySearch } from './components/HistorySearch.tsx'
 import { MessageList } from './components/MessageList.tsx'
 import { ResumePicker } from './components/ResumePicker.tsx'
+import { RewindPicker } from './components/RewindPicker.tsx'
 import { StatusLine } from './components/StatusLine.tsx'
 import {
   filterSlashItems,
@@ -56,13 +57,21 @@ export function Chat(props: { app: TuiApp }) {
   )
   const resumeOpen = snap.resumePicker?.open === true
   const resumeItems = snap.resumePicker === undefined ? [] : visibleResumeItems(snap.resumePicker)
+  const rewindState = snap.rewindPicker
+  const rewindOpen = rewindState?.open === true
   const slashOpen =
-    !resumeOpen && !historySearchOpen && !snap.helpOpen && !slashDismissed && slashItems.length > 0
+    !rewindOpen &&
+    !resumeOpen &&
+    !historySearchOpen &&
+    !snap.helpOpen &&
+    !slashDismissed &&
+    slashItems.length > 0
   const fileMention = useMemo(
     () => findFileMentionAtCursor(snap.composer.text, snap.composer.cursor),
     [snap.composer.cursor, snap.composer.text],
   )
   const fileVisible =
+    !rewindOpen &&
     !resumeOpen &&
     !historySearchOpen &&
     !snap.helpOpen &&
@@ -88,6 +97,9 @@ export function Chat(props: { app: TuiApp }) {
     historyMatches: historySearchOpen ? historyItems.length : undefined,
     resumeItems: resumeOpen ? resumeItems.length : undefined,
     resumeSelected: resumeOpen ? snap.resumePicker?.selected : undefined,
+    rewindItems: rewindOpen ? rewindState.items.length : undefined,
+    rewindSelected: rewindOpen ? rewindState.selected : undefined,
+    rewindConfirming: rewindOpen ? rewindState.confirming : undefined,
   })
   const messageMaxRows = layout.messageRows
   const selectableMessages = useMemo(
@@ -181,6 +193,21 @@ export function Chat(props: { app: TuiApp }) {
 
   useInput((input, key) => {
     if (editorBusy) return
+    if (rewindOpen) {
+      if (key.escape) {
+        app.dispatch({ type: 'rewind.close' })
+        return
+      }
+      if (!rewindState?.confirming && (key.upArrow || key.downArrow)) {
+        app.dispatch({ type: 'rewind.move', delta: key.upArrow ? -1 : 1 })
+        return
+      }
+      if (key.return) {
+        app.dispatch({ type: 'rewind.confirm' })
+        return
+      }
+      return
+    }
     if (layout.tooSmall) {
       if (key.escape || (key.ctrl && (input === 'c' || input === 'd'))) {
         app.dispatch({ type: 'quit' })
@@ -405,6 +432,13 @@ export function Chat(props: { app: TuiApp }) {
             })}
           </Text>
         ) : null}
+        {rewindOpen && rewindState !== undefined ? (
+          <RewindPicker
+            state={rewindState}
+            locale={snap.locale}
+            maxRows={Math.max(1, stdout.rows - 2)}
+          />
+        ) : null}
       </Box>
     )
   }
@@ -445,6 +479,9 @@ export function Chat(props: { app: TuiApp }) {
           locale={snap.locale}
           maxRows={layout.overlayRows}
         />
+      ) : null}
+      {rewindOpen ? (
+        <RewindPicker state={rewindState} locale={snap.locale} maxRows={layout.overlayRows} />
       ) : null}
       {snap.helpOpen ? (
         <Help text={snap.helpText} locale={snap.locale} maxRows={layout.overlayRows} />

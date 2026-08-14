@@ -51,6 +51,14 @@ type UiKey =
   | 'resumeLoading'
   | 'resumeLoaded'
   | 'resumeUnavailable'
+  | 'rewindTitle'
+  | 'rewindHint'
+  | 'rewindArm'
+  | 'rewindEmpty'
+  | 'rewindLoading'
+  | 'rewindLoaded'
+  | 'rewindConfirm'
+  | 'rewindUnavailable'
   | 'subagentsRunning'
   | 'subagentStarted'
   | 'subagentFinished'
@@ -127,6 +135,14 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     resumeLoading: 'Loading session history…',
     resumeLoaded: 'Resumed session {session}.',
     resumeUnavailable: 'Cannot resume session {session}: the session file is unavailable.',
+    rewindTitle: 'Rewind conversation',
+    rewindHint: '↑↓ select · enter review · esc close',
+    rewindArm: 'Press Esc again to choose a rewind point.',
+    rewindEmpty: 'No user messages available to rewind.',
+    rewindLoading: 'Creating a rewind session…',
+    rewindLoaded: 'Rewind ready. Edit the draft and press enter to resend.',
+    rewindConfirm: 'Rewind to this message? Press enter again to confirm · esc cancel',
+    rewindUnavailable: 'Rewind is unavailable.',
     subagentsRunning: '{count} subagents running',
     subagentStarted: 'subagent {id} started',
     subagentFinished: 'subagent {id} finished',
@@ -202,6 +218,14 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     resumeLoading: '正在加载会话历史…',
     resumeLoaded: '已恢复会话 {session}。',
     resumeUnavailable: '无法恢复会话 {session}：会话文件不可用。',
+    rewindTitle: '回滚会话',
+    rewindHint: '↑↓ 选择 · 回车预览 · Esc 关闭',
+    rewindArm: '再次按 Esc 选择回滚位置。',
+    rewindEmpty: '没有可回滚的用户消息。',
+    rewindLoading: '正在创建回滚会话…',
+    rewindLoaded: '已准备回滚草稿，修改后按回车重新发送。',
+    rewindConfirm: '确定回滚到这条消息？再次回车确认 · Esc 取消',
+    rewindUnavailable: '当前无法回滚。',
     subagentsRunning: '{count} 个子代理运行中',
     subagentStarted: '子代理 {id} 已启动',
     subagentFinished: '子代理 {id} 已完成',

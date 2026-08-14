@@ -50,6 +50,8 @@ describe('chat layout rows', () => {
     ['empty resume', { resumeItems: 0 }, 18],
     ['resume results', { resumeItems: 4 }, 21],
     ['windowed resume', { resumeItems: 12 }, 26],
+    ['rewind results', { rewindItems: 4 }, 22],
+    ['windowed rewind', { rewindItems: 12, rewindSelected: 6 }, 26],
   ] as const)('covers the %s overlay height', (_name, overlay, reservedRows) => {
     const layout = calculateChatLayout({
       viewportRows: 80,
@@ -151,5 +153,15 @@ describe('chat layout rows', () => {
         resumeSelected: 6,
       }).overlayRows,
     ).toBe(15)
+  })
+
+  it('reserves the rewind confirmation line', () => {
+    const layout = calculateChatLayout({
+      viewportRows: 80,
+      composerLines: 1,
+      rewindItems: 2,
+      rewindConfirming: true,
+    })
+    expect(layout.overlayRows).toBe(9)
   })
 })
