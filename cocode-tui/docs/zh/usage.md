@@ -14,6 +14,14 @@ DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 
 密钥可以通过首屏登录配置，也可以临时设置 `DEEPSEEK_API_KEY`。开发环境可用 `COCODE_HOME` 指向单独目录；会话目录默认使用该目录下的 `sessions`，也可以用 `DSH_SESSION_ROOT` 覆盖。
 
+## 界面分区
+
+- 顶部显示工作区、git 分支、session、provider、model 和实时 Agent 状态。
+- 中间是会话投影：`you`、`cocode`、思考内容和工具结果按节点分组显示。
+- 底部状态栏显示运行状态、notice 以及已有的输入/输出 token 用量。
+- 输入区使用带边框的 `prompt` 面板；runtime 不可用时会显示 `locked`，不会继续伪装成可编辑状态。
+- `/` 命令菜单和 `?` 帮助面板会占用自己的布局空间，消息区会自动缩小以保持输入区可见。
+
 ## 对话编辑
 
 - `Enter` 发送；`Shift+Enter` 换行。

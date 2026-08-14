@@ -14,6 +14,14 @@ DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 
 Configure a key on the first-run gate, or set `DEEPSEEK_API_KEY` for this process. For development, point `COCODE_HOME` at a separate directory. Sessions default to `sessions` under that home; `DSH_SESSION_ROOT` can override it.
 
+## Screen regions
+
+- The header shows the workspace, git branch, session, provider, model, and live Agent state.
+- The transcript projects `you`, `cocode`, reasoning, and tool results as separate node groups.
+- The status bar shows runtime state, notices, and input/output token usage when supplied by the runtime.
+- The composer is a bordered `prompt` panel; a dead runtime is shown as `locked` instead of looking editable.
+- The `/` command menu and `?` help panel reserve their own rows, so the composer stays visible when the transcript is crowded.
+
 ## Editing
 
 - `Enter` sends; `Shift+Enter` inserts a newline.
