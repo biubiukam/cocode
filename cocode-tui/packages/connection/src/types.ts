@@ -9,6 +9,23 @@ export type ContentBlock = {
   [key: string]: unknown
 }
 
+export type TuiImageMediaType = 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif'
+
+export type TuiImageAttachmentRef = {
+  attachmentId: string
+  mediaType: TuiImageMediaType
+  bytes: number
+  width: number
+  height: number
+  name?: string
+}
+
+export type TuiImageInput = {
+  data: Uint8Array
+  mediaType: TuiImageMediaType
+  name?: string
+}
+
 export type SessionEvent = {
   type: string
   seq: number
@@ -21,6 +38,8 @@ export type SkillEntry = {
   name: string
   description: string
   whenToUse?: string
+  /** Discovery source used to namespace command-palette entries when known. */
+  source?: string
 }
 
 export type TuiQuestionOption = {
@@ -148,6 +167,7 @@ export type TuiRuntimeCapabilityName =
   | 'promptMode'
   | 'queueMode'
   | 'modelList'
+  | 'imageAttachments'
 
 export type TuiRuntimeCapabilities = Record<TuiRuntimeCapabilityName, boolean>
 
@@ -158,6 +178,7 @@ export type TuiRuntimeAdvertisement = {
   planMode: boolean
   sessionList: boolean
   modelList: boolean
+  imageAttachments: boolean
   checkpoint: false
 }
 
@@ -226,6 +247,7 @@ export type TuiRuntime = {
   listSkills?(sessionId: string): Promise<SkillEntry[]>
   listSessions?(cwd?: string): Promise<TuiSessionSummary[]>
   listModels?(): Promise<TuiModelCatalog>
+  saveImages?(images: readonly TuiImageInput[]): Promise<TuiImageAttachmentRef[]>
   permissionMode?(
     sessionId: string,
     mode?: string,

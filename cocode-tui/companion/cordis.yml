@@ -10,6 +10,9 @@
 - id: credentials
   name: '@deepseek-ai/dsh-credentials-local'
 
+- id: attachments
+  name: '@deepseek-ai/dsh-attachment-local'
+
 - id: llm-deepseek
   name: '@deepseek-ai/dsh-llm-deepseek'
   config:
@@ -42,6 +45,21 @@
     toolBash:
       enableRunInBackground: false
     toolJobs: false
+
+- id: cocode-vision
+  name: '../packages/vision/src/index.ts'
+  config:
+    autoRead: true
+    fallbackToNative: true
+    provider: !!js "process.env.COCODE_VISION_PROVIDER ?? 'cocode'"
+    user:
+      endpoint: !!js 'process.env.COCODE_VISION_USER_ENDPOINT'
+      model: !!js 'process.env.COCODE_VISION_USER_MODEL'
+      credentialRef: !!js 'process.env.COCODE_VISION_USER_CREDENTIAL_REF'
+    cocode:
+      endpoint: !!js 'process.env.COCODE_VISION_ENDPOINT'
+      model: !!js 'process.env.COCODE_VISION_MODEL'
+      credentialRef: !!js 'process.env.COCODE_VISION_CREDENTIAL_REF'
 
 - id: sessions
   name: '@deepseek-ai/dsh-session-persistence-jsonl'

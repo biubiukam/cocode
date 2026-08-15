@@ -1,9 +1,18 @@
 /** Local prompt queue used while the runtime is processing a turn. */
 
+import type { TuiImageInput } from '@cocode/tui-connection'
+
+export type DraftImage = TuiImageInput & {
+  id: string
+  name: string
+  token: string
+}
+
 export type QueuedPrompt = {
   id: string
   text: string
   attachments: readonly { path: string; token: string }[]
+  images: readonly DraftImage[]
 }
 
 export type PromptQueue = {

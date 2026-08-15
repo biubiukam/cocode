@@ -40,6 +40,18 @@ await build({
   tsconfig: resolve(root, 'tsconfig.json'),
 })
 
+await build({
+  absWorkingDir: root,
+  entryPoints: ['packages/vision/src/index.ts'],
+  outfile: resolve(dist, 'vision.mjs'),
+  bundle: true,
+  format: 'esm',
+  platform: 'node',
+  target: 'node22.19',
+  sourcemap: true,
+  tsconfig: resolve(root, 'tsconfig.json'),
+})
+
 await copyFile(resolve(root, 'scripts/companion-runner.mjs'), resolve(dist, 'companion-runner.mjs'))
 await copyFile(resolve(root, 'scripts/companion-layout.mjs'), resolve(dist, 'companion-layout.mjs'))
 
@@ -47,7 +59,7 @@ const sourceConfig = await readFile(resolve(root, 'companion/cordis.yml'), 'utf8
 const packagedConfig = sourceConfig.replace(
   "name: '../packages/companion/src/index.ts'",
   "name: './companion.mjs'",
-)
+).replace("name: '../packages/vision/src/index.ts'", "name: './vision.mjs'")
 await writeFile(resolve(dist, 'companion.cordis.yml'), packagedConfig)
 
 console.log(`Built Cocode TUI into ${dist}`)

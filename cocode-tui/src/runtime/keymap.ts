@@ -9,6 +9,8 @@ export type CommandId =
   | 'session.interruptOrQuit'
   | 'app.quit'
   | 'app.redraw'
+  | 'model.open'
+  | 'image.paste'
   | 'transcript.toggleVerbose'
   | 'editor.open'
   | 'help.toggle'
@@ -56,7 +58,9 @@ export const DEFAULT_BINDINGS: Readonly<Record<CommandId, readonly KeyBinding[]>
   'input.newline': [binding('enter', { shift: true }), binding('j', { ctrl: true })],
   'session.interruptOrQuit': [binding('escape'), binding('c', { ctrl: true })],
   'app.quit': [binding('d', { ctrl: true, emptyOnly: true })],
-  'app.redraw': [binding('l', { ctrl: true })],
+  'app.redraw': [],
+  'model.open': [binding('l', { ctrl: true })],
+  'image.paste': [binding('v', { ctrl: true })],
   'transcript.toggleVerbose': [binding('o', { ctrl: true })],
   'editor.open': [binding('g', { ctrl: true })],
   'help.toggle': [binding('?', { emptyOnly: true })],
@@ -89,6 +93,8 @@ export function matchKey(
     'input.submit',
     'session.interruptOrQuit',
     'app.quit',
+    'model.open',
+    'image.paste',
     'app.redraw',
     'transcript.toggleVerbose',
     'editor.open',

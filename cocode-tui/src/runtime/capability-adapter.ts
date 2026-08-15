@@ -25,6 +25,7 @@ export function applyRuntimeCapabilities(
     promptMode: runtime.capabilities.promptMode,
     queueMode: runtime.capabilities.queueMode,
     modelList: runtime.capabilities.modelList,
+    imageAttachments: runtime.capabilities.imageAttachments,
     sessionList: runtime.capabilities.sessionList
       ? 'rpc'
       : configured.sessionList === 'jsonl'

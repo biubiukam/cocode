@@ -6,6 +6,8 @@ import type {
   AgentHandle,
   CompanionCapabilities,
   ContentBlock,
+  ImageAttachmentRef,
+  ImageMediaType,
   InitializeParams,
   PromptParams,
   RuntimeContext,
@@ -74,6 +76,24 @@ type LlmService = {
   listModels(provider: string): Promise<
     readonly { id: string; name?: string; description?: string }[]
   >
+}
+type AttachmentService = {
+  imageLimits: {
+    maxImageBytes: number
+    maxImagesPerMessage: number
+    maxMessageImageBytes: number
+    mediaTypes: readonly ImageMediaType[]
+  }
+  validateImage(input: {
+    data: Uint8Array
+    mediaType: ImageMediaType
+    name?: string
+  }): Promise<void>
+  saveImage(input: {
+    data: Uint8Array
+    mediaType: ImageMediaType
+    name?: string
+  }): Promise<ImageAttachmentRef>
 }
 type PersistenceService = {
   list(): Promise<
@@ -214,6 +234,7 @@ export class TuiCompanionGateway {
       promptModes: ['normal', 'queue', 'steer'],
       skills: this.ctx.get('skills') !== undefined,
       modelList: typeof llm?.listProviders === 'function' && typeof llm.listModels === 'function',
+      imageAttachments: this.ctx.get('attachments') !== undefined,
       approval: this.ctx.get('approval') !== undefined,
       permissionMode: this.ctx.get('permissionPresets') !== undefined,
       planMode: this.ctx.get('planMode') !== undefined,
@@ -257,7 +278,13 @@ export class TuiCompanionGateway {
     this.assertInitialized()
     const record = await this.getOrCreateSession(params.sessionId)
     this.assertLive(params.sessionId, record)
-    const message = createUserMessage(params.contentBlocks)
+    const vision = this.ctx.get('cocodeVision') as
+      | { prepareBlocks(blocks: readonly ContentBlock[]): Promise<ContentBlock[]> }
+      | undefined
+    const contentBlocks = vision === undefined
+      ? params.contentBlocks
+      : await vision.prepareBlocks(params.contentBlocks)
+    const message = createUserMessage(contentBlocks)
     switch (params.mode ?? 'normal') {
       case 'normal':
       case 'queue':
@@ -270,6 +297,29 @@ export class TuiCompanionGateway {
         throw new Error(`session/prompt has unsupported mode: ${String(params.mode)}`)
     }
     return { messageId: message.id }
+  }
+
+  async saveImages(params: Record<string, unknown>): Promise<{ attachments: ImageAttachmentRef[] }> {
+    this.assertInitialized()
+    const store = this.ctx.get('attachments') as AttachmentService | undefined
+    if (store === undefined) {
+      throw new Error('image attachment capability is unavailable: attachment storage is not configured')
+    }
+    if (!Array.isArray(params.images) || params.images.length === 0) {
+      throw new TypeError('attachment/saveImages requires at least one image')
+    }
+    if (params.images.length > store.imageLimits.maxImagesPerMessage) {
+      throw new Error(`image count exceeds ${store.imageLimits.maxImagesPerMessage}`)
+    }
+    const images = params.images.map((image, index) =>
+      parseImageInput(image, index, store.imageLimits.maxImageBytes, store.imageLimits.mediaTypes),
+    )
+    const totalBytes = images.reduce((total, image) => total + image.data.byteLength, 0)
+    if (totalBytes > store.imageLimits.maxMessageImageBytes) {
+      throw new Error(`image bytes exceed ${store.imageLimits.maxMessageImageBytes}`)
+    }
+    await Promise.all(images.map((image) => store.validateImage(image)))
+    return { attachments: await Promise.all(images.map((image) => store.saveImage(image))) }
   }
 
   async listSessions(
@@ -606,6 +656,8 @@ export class TuiCompanionGateway {
       case 'cocode/model/list':
       case 'model/list':
         return this.listModels()
+      case 'cocode/attachment/saveImages':
+        return this.saveImages(params)
       case 'cocode/permission/mode':
       case 'permission/mode':
         return this.permissionMode(params as { sessionId: string; mode?: string })
@@ -825,6 +877,46 @@ function createUserMessage(content: ContentBlock[]): UserMessage {
   }
   return deepFreeze(message)
 }
+
+function parseImageInput(
+  value: unknown,
+  index: number,
+  maxBytes: number,
+  mediaTypes: readonly ImageMediaType[],
+): { data: Uint8Array; mediaType: ImageMediaType; name?: string } {
+  if (!isRecord(value) || typeof value.data !== 'string' || !isImageMediaType(value.mediaType)) {
+    throw new TypeError(`attachment/saveImages image ${index + 1} is invalid`)
+  }
+  if (!mediaTypes.includes(value.mediaType)) {
+    throw new Error(`attachment/saveImages does not accept ${value.mediaType}`)
+  }
+  const data = decodeBase64(value.data, maxBytes)
+  const name = typeof value.name === 'string' && value.name.trim() !== ''
+    ? value.name.trim()
+    : undefined
+  return {
+    data,
+    mediaType: value.mediaType,
+    ...(name === undefined ? {} : { name }),
+  }
+}
+
+function decodeBase64(value: string, maxBytes: number): Uint8Array {
+  if (value === '' || value.length > Math.ceil(maxBytes / 3) * 4 + 4 || !BASE64_PATTERN.test(value)) {
+    throw new Error('attachment/saveImages contains invalid base64 data')
+  }
+  const data = Buffer.from(value, 'base64')
+  if (data.byteLength > maxBytes || data.toString('base64') !== value) {
+    throw new Error('attachment/saveImages contains invalid base64 data')
+  }
+  return data
+}
+
+function isImageMediaType(value: unknown): value is ImageMediaType {
+  return value === 'image/png' || value === 'image/jpeg' || value === 'image/webp' || value === 'image/gif'
+}
+
+const BASE64_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/
 
 function deepFreeze<T>(value: T): T {
   if (value !== null && typeof value === 'object') {

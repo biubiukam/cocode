@@ -18,6 +18,7 @@ const releaseFiles = [
   'dist/companion.mjs',
   'dist/companion-runner.mjs',
   'dist/companion.cordis.yml',
+  'dist/vision.mjs',
 ]
 
 if (packageJson.private === true) failures.push('package.json must not be private')

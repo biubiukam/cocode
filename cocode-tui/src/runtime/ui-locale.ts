@@ -11,6 +11,14 @@ type UiKey =
   | 'locked'
   | 'send'
   | 'attached'
+  | 'imageReading'
+  | 'imageAttached'
+  | 'imageClipboardUnavailable'
+  | 'imageClipboardEmpty'
+  | 'imageTooLarge'
+  | 'imageUnsupported'
+  | 'imageRuntimeUnavailable'
+  | 'imageCountLimit'
   | 'history'
   | 'historyHint'
   | 'historyPlaceholder'
@@ -233,6 +241,14 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     locked: 'locked',
     send: 'enter to send',
     attached: 'attached',
+    imageReading: 'Reading image from the clipboard…',
+    imageAttached: 'Attached {name}.',
+    imageClipboardUnavailable: 'Image clipboard access is unavailable on this system.',
+    imageClipboardEmpty: 'The clipboard does not contain an image.',
+    imageTooLarge: 'Clipboard image exceeds the 5 MiB limit.',
+    imageUnsupported: 'Clipboard image format is not supported.',
+    imageRuntimeUnavailable: 'This runtime cannot store image attachments.',
+    imageCountLimit: 'A prompt can contain at most 20 images.',
     history: 'history',
     historyHint: 'ctrl+r · ↑↓ select · enter use · esc close',
     historyPlaceholder: 'type to search…',
@@ -454,6 +470,14 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     locked: '已锁定',
     send: '回车发送',
     attached: '已附加',
+    imageReading: '正在读取剪贴板图片…',
+    imageAttached: '已附加图片 {name}。',
+    imageClipboardUnavailable: '当前系统无法读取图片剪贴板。',
+    imageClipboardEmpty: '剪贴板中没有图片。',
+    imageTooLarge: '剪贴板图片超过 5 MiB 限制。',
+    imageUnsupported: '不支持剪贴板中的图片格式。',
+    imageRuntimeUnavailable: '当前运行时无法存储图片附件。',
+    imageCountLimit: '一条输入最多包含 20 张图片。',
     history: '历史搜索',
     historyHint: 'Ctrl+R · ↑↓ 选择 · 回车使用 · Esc 关闭',
     historyPlaceholder: '输入关键词搜索…',

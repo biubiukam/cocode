@@ -21,6 +21,8 @@ import type {
   TuiModelCatalog,
   TuiModelCatalogFailure,
   TuiModelProviderGroup,
+  TuiImageAttachmentRef,
+  TuiImageInput,
 } from './types.ts'
 import { fallbackCapabilitySnapshot, probeRuntimeCapabilities } from './capability.ts'
 
@@ -244,6 +246,22 @@ class SdkTuiRuntime implements TuiRuntime {
     return parseModelCatalogResult(result)
   }
 
+  async saveImages(images: readonly TuiImageInput[]): Promise<TuiImageAttachmentRef[]> {
+    const client = this.requireClient()
+    this.requireCapability('imageAttachments')
+    const result = await client.request('cocode/attachment/saveImages', {
+      images: images.map((image) => ({
+        data: Buffer.from(image.data).toString('base64'),
+        mediaType: image.mediaType,
+        ...(image.name === undefined ? {} : { name: image.name }),
+      })),
+    })
+    if (!isRecord(result) || !Array.isArray(result.attachments)) {
+      throw new Error(`attachment/saveImages returned an invalid result: ${JSON.stringify(result)}`)
+    }
+    return result.attachments.map(parseImageAttachmentRef)
+  }
+
   async permissionMode(
     sessionId: string,
     mode?: string,
@@ -363,6 +381,7 @@ class SdkTuiRuntime implements TuiRuntime {
           planMode: companion.planMode,
           sessionList: companion.sessionList,
           modelList: companion.modelList,
+          imageAttachments: companion.imageAttachments,
           promptMode: companion.promptModes.includes('steer'),
           queueMode: companion.promptModes.includes('queue'),
         },
@@ -468,6 +487,7 @@ type CompanionCapabilities = {
   planMode: boolean
   sessionList: boolean
   modelList: boolean
+  imageAttachments: boolean
   interactions: 'notification-response'
   checkpoint: false
   skills: boolean
@@ -492,6 +512,7 @@ function parseCompanionCapabilities(value: unknown): CompanionCapabilities | und
     typeof value.planMode !== 'boolean' ||
     typeof value.sessionList !== 'boolean' ||
     (value.modelList !== undefined && typeof value.modelList !== 'boolean')
+    || (value.imageAttachments !== undefined && typeof value.imageAttachments !== 'boolean')
   ) {
     return undefined
   }
@@ -503,6 +524,7 @@ function parseCompanionCapabilities(value: unknown): CompanionCapabilities | und
     planMode: value.planMode,
     sessionList: value.sessionList,
     modelList: value.modelList === true,
+    imageAttachments: value.imageAttachments === true,
     interactions: 'notification-response',
     checkpoint: false,
     skills: value.skills === true,
@@ -559,6 +581,7 @@ function parseSkillEntries(value: unknown[]): SkillEntry[] {
       name: entry.name,
       description: entry.description,
       ...(typeof entry.whenToUse === 'string' ? { whenToUse: entry.whenToUse } : {}),
+      ...(typeof entry.source === 'string' ? { source: entry.source } : {}),
     })
   }
   return skills
@@ -577,8 +600,39 @@ function parseRuntimeAdvertisement(value: Record<string, unknown>): TuiRuntimeAd
     planMode: value.planMode === true,
     sessionList: value.sessionList === true,
     modelList: value.modelList === true,
+    imageAttachments: value.imageAttachments === true,
     checkpoint: false,
   }
+}
+
+function parseImageAttachmentRef(value: unknown): TuiImageAttachmentRef {
+  if (
+    !isRecord(value) ||
+    typeof value.attachmentId !== 'string' ||
+    !isImageMediaType(value.mediaType) ||
+    !isNonnegativeInteger(value.bytes) ||
+    !isNonnegativeInteger(value.width) ||
+    !isNonnegativeInteger(value.height) ||
+    (value.name !== undefined && typeof value.name !== 'string')
+  ) {
+    throw new Error(`attachment/saveImages returned an invalid attachment: ${JSON.stringify(value)}`)
+  }
+  return {
+    attachmentId: value.attachmentId,
+    mediaType: value.mediaType,
+    bytes: value.bytes,
+    width: value.width,
+    height: value.height,
+    ...(value.name === undefined ? {} : { name: value.name }),
+  }
+}
+
+function isImageMediaType(value: unknown): value is TuiImageAttachmentRef['mediaType'] {
+  return value === 'image/png' || value === 'image/jpeg' || value === 'image/webp' || value === 'image/gif'
+}
+
+function isNonnegativeInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
 }
 
 export function parseModelCatalogResult(value: unknown): TuiModelCatalog {

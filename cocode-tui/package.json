@@ -31,6 +31,7 @@
     "dist/companion-layout.mjs",
     "dist/companion-runner.mjs",
     "dist/companion.cordis.yml",
+    "dist/vision.mjs",
     "dist/companion.mjs",
     "docs",
     "README.md",

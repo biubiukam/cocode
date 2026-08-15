@@ -12,6 +12,7 @@ import type {
   TuiApprovalAnswer,
   TuiApprovalRequest,
   TuiRuntime,
+  TuiImageInput,
 } from '@cocode/tui-connection'
 import type { SelectModeResult } from './auth/store.ts'
 import type { AuthSnapshot, ResolvedAuth } from './auth/types.ts'
@@ -115,6 +116,7 @@ import {
 } from './question-coordinator.ts'
 import { refreshRuntimeCapabilities } from './capability-adapter.ts'
 import { PromptQueueCoordinator } from './prompt-queue-coordinator.ts'
+import type { DraftImage } from './prompt-queue.ts'
 import type { PromptQueuePickerState } from './prompt-queue-picker.ts'
 import { routeBoundaryPickerAction } from './action-router.ts'
 import {
@@ -136,6 +138,7 @@ import {
   moveChecklistSelection,
   type ChecklistState,
 } from './checklist.ts'
+import { ClipboardImageError, readClipboardImage } from './image-clipboard.ts'
 
 export type TuiAction =
   | { type: 'submit'; text: string }
@@ -174,6 +177,7 @@ export type TuiAction =
   | { type: 'skills.close' }
   | { type: 'skills.confirm' }
   | { type: 'model.open' }
+  | { type: 'image.paste' }
   | { type: 'model.setQuery'; query: string }
   | { type: 'model.move'; delta: number }
   | { type: 'model.close' }
@@ -232,6 +236,7 @@ export type TuiSnapshot = {
     disabled: boolean
     mask?: boolean
     attachments: readonly string[]
+    images: readonly { name: string; mediaType: string; bytes: number }[]
   }
   status: {
     line: string
@@ -320,6 +325,7 @@ export type TuiCommandCtx = {
   showSkillsPicker?: () => void
   showModelPicker?: () => void
   copyLatestAssistant?: () => void
+  pasteImage?: () => void
   toggleFocus?: () => void
   review?: (args: string) => void
   forkSession?: () => void
@@ -359,6 +365,7 @@ export type TuiAppOptions = {
     mode?: TerminalNotifyMode
     write?: (value: string) => void
   }
+  readClipboardImage?: () => Promise<TuiImageInput>
 }
 
 export function createTuiApp(options: TuiAppOptions): TuiApp {
@@ -387,6 +394,7 @@ class TuiAppImpl implements TuiApp {
   private agent: TuiSnapshot['agent'] = 'starting'
   private draft: DraftState = createDraft()
   private attachments: Array<{ path: string; token: string }> = []
+  private images: DraftImage[] = []
   private helpOpen = false
   private verbose = false
   private focusMode = false
@@ -401,6 +409,8 @@ class TuiAppImpl implements TuiApp {
   private locale: UiLocale
   private readonly auth: TuiAuthInfo | undefined
   private readonly terminalNotify: NonNullable<TuiAppOptions['terminalNotify']>
+  private readonly imageReader: () => Promise<TuiImageInput>
+  private imageSerial = 0
   private readonly activeSubagents = new Set<string>()
   private lastSubagent: TuiSubagentActivity['last']
   private readonly promptQueue = new PromptQueueCoordinator()
@@ -450,6 +460,7 @@ class TuiAppImpl implements TuiApp {
     this.locale = options.locale ?? 'en'
     this.terminalNotify =
       options.terminalNotify ?? (process.stdout.isTTY === true ? {} : { mode: 'off' })
+    this.imageReader = options.readClipboardImage ?? (() => readClipboardImage())
     this.questions = createQuestionCoordinator({ emit: () => this.emit() })
   }
 
@@ -553,6 +564,11 @@ class TuiAppImpl implements TuiApp {
           : composerPlaceholder(this.agent, this.locale),
         disabled,
         attachments: this.attachments.map((attachment) => attachment.path),
+        images: this.images.map((image) => ({
+          name: image.name,
+          mediaType: image.mediaType,
+          bytes: image.data.byteLength,
+        })),
         ...(this.capturingByok ? { mask: true } : {}),
       },
       status: {
@@ -644,18 +660,21 @@ class TuiAppImpl implements TuiApp {
         this.draft = replaceDraft(this.draft, action.text)
         this.interruptArmed = false
         this.pruneAttachments()
+        this.pruneImages()
         this.emit()
         return
       case 'insertDraft':
         this.draft = insertDraft(this.draft, action.text)
         this.interruptArmed = false
         this.pruneAttachments()
+        this.pruneImages()
         this.emit()
         return
       case 'deleteBackward':
         this.draft = backspaceDraft(this.draft)
         this.interruptArmed = false
         this.pruneAttachments()
+        this.pruneImages()
         this.emit()
         return
       case 'moveCursor':
@@ -849,6 +868,7 @@ class TuiAppImpl implements TuiApp {
         if (skill !== undefined) {
           this.draft = replaceDraft(this.draft, `/${skill.name} `)
           this.attachments = []
+          this.images = []
           this.notice = {
             tone: 'info',
             message: text(this.locale, 'skillReady', { name: skill.name }),
@@ -859,6 +879,9 @@ class TuiAppImpl implements TuiApp {
       }
       case 'model.open':
         void this.openModelPicker()
+        return
+      case 'image.paste':
+        void this.pasteImage()
         return
       case 'model.setQuery':
         if (this.modelPicker !== undefined) {
@@ -1068,6 +1091,7 @@ class TuiAppImpl implements TuiApp {
         this.interruptArmed = false
         this.resetSessionControls()
         this.attachments = []
+        this.images = []
         this.notice = {
           tone: 'info',
           message: `New session ${this.sessionId}`,
@@ -1081,6 +1105,7 @@ class TuiAppImpl implements TuiApp {
         this.checklist = undefined
         this.sessionTitleOverride = undefined
         this.attachments = []
+        this.images = []
         this.notice = { tone: 'info', message: 'Transcript cleared' }
         this.emit()
       },
@@ -1195,6 +1220,7 @@ class TuiAppImpl implements TuiApp {
         }
         this.copyText(readableNodeText(node))
       },
+      pasteImage: () => this.dispatch({ type: 'image.paste' }),
       toggleFocus: () => {
         this.focusMode = !this.focusMode
         this.notice = {
@@ -1371,6 +1397,7 @@ class TuiAppImpl implements TuiApp {
       this.resetSubagentActivity()
       this.clearQueuedPrompts()
       this.attachments = []
+      this.images = []
       await this.refreshSessionControls()
       this.agent = 'idle'
       this.notice = {
@@ -1448,6 +1475,7 @@ class TuiAppImpl implements TuiApp {
     this.history.push(`/review ${review.scope}`)
     this.draft = createDraft()
     this.attachments = []
+    this.images = []
     this.notice = { tone: 'info', message: text(this.locale, 'reviewSending') }
     void this.promptWithAttachments(review.prompt, []).catch((error: unknown) => {
       this.notice = { tone: 'error', message: errorMessage(error) }
@@ -1795,6 +1823,7 @@ class TuiAppImpl implements TuiApp {
       this.resetSubagentActivity()
       this.clearQueuedPrompts()
       this.attachments = []
+      this.images = []
       await this.refreshSessionControls()
       this.agent = 'idle'
       this.notice = {
@@ -1839,6 +1868,7 @@ class TuiAppImpl implements TuiApp {
       this.resetSubagentActivity()
       this.clearQueuedPrompts()
       this.attachments = []
+      this.images = []
       this.draft = replaceDraft(this.draft, item.text)
       await this.refreshSessionControls()
       this.agent = 'idle'
@@ -1863,11 +1893,13 @@ class TuiAppImpl implements TuiApp {
     }
     if (this.agent === 'running' && this.capabilities.promptMode) {
       const attachments = this.attachments.slice()
+      const images = this.images.slice()
       this.history.push(trimmed)
       this.draft = createDraft()
       this.attachments = []
+      this.images = []
       this.notice = { tone: 'info', message: text(this.locale, 'steerSending') }
-      void this.promptWithAttachments(trimmed, attachments, 'steer').catch((error: unknown) => {
+      void this.promptWithAttachments(trimmed, attachments, 'steer', images).catch((error: unknown) => {
         this.notice = { tone: 'error', message: errorMessage(error) }
         this.emit()
       })
@@ -1883,12 +1915,14 @@ class TuiAppImpl implements TuiApp {
       return
     }
     const attachments = this.attachments.slice()
+    const images = this.images.slice()
     this.history.push(trimmed)
     this.draft = createDraft()
     this.attachments = []
+    this.images = []
     this.notice = undefined
     this.interruptArmed = false
-    void this.promptWithAttachments(trimmed, attachments).catch((error: unknown) => {
+    void this.promptWithAttachments(trimmed, attachments, 'normal', images).catch((error: unknown) => {
       this.notice = { tone: 'error', message: errorMessage(error) }
       if (this.agent === 'running') this.agent = 'idle'
       this.emit()
@@ -1912,23 +1946,43 @@ class TuiAppImpl implements TuiApp {
   }
 
   private promptWithAttachments(
-    text: string,
+    promptText: string,
     attachments: readonly { path: string; token: string }[],
     mode: 'normal' | 'queue' | 'steer' = 'normal',
+    images: readonly DraftImage[] = [],
   ): Promise<string> {
-    if (attachments.length === 0) {
-      return this.runtime.prompt(this.sessionId, [{ type: 'text', text }], mode)
+    const visiblePromptText = images.reduce(
+      (value, image) => value.split(image.token).join(''),
+      promptText,
+    ).trim()
+    if (attachments.length === 0 && images.length === 0) {
+      return this.runtime.prompt(this.sessionId, [{ type: 'text', text: visiblePromptText }], mode)
     }
-    return loadFileContext({
+    const fileContext = loadFileContext({
       cwd: this.cwd,
       paths: attachments.map((attachment) => attachment.path),
-    }).then((files) => this.runtime.prompt(this.sessionId, buildPromptBlocks(text, files), mode))
+    })
+    const storedImages = images.length === 0
+      ? Promise.resolve([])
+      : this.runtime.saveImages === undefined
+      ? Promise.reject(new Error(text(this.locale, 'imageRuntimeUnavailable')))
+      : this.runtime.saveImages(images)
+    return Promise.all([fileContext, storedImages]).then(([files, imageRefs]) =>
+      this.runtime.prompt(
+        this.sessionId,
+        [
+          ...buildPromptBlocks(visiblePromptText, files),
+          ...imageRefs.map((attachment) => ({ type: 'image', attachment })),
+        ],
+        mode,
+      ),
+    )
   }
 
   private queueCurrentPrompt(): void {
     const trimmed = this.draft.text.trim()
     if (trimmed === '' || this.agent !== 'running') return
-    if (!this.promptQueue.add(trimmed, this.attachments.slice())) {
+    if (!this.promptQueue.add(trimmed, this.attachments.slice(), this.images.slice())) {
       this.notice = { tone: 'info', message: text(this.locale, 'queueFull') }
       this.emit()
       return
@@ -1936,6 +1990,7 @@ class TuiAppImpl implements TuiApp {
     this.history.push(trimmed)
     this.draft = createDraft()
     this.attachments = []
+    this.images = []
     this.notice = {
       tone: 'info',
       message: text(this.locale, 'queueAdded', {
@@ -1954,7 +2009,12 @@ class TuiAppImpl implements TuiApp {
     this.notice = { tone: 'info', message: text(this.locale, 'queueSending') }
     this.emit()
     const mode = this.capabilities.queueMode ? 'queue' : 'normal'
-    void this.promptWithAttachments(ticket.prompt.text, ticket.prompt.attachments, mode).catch(
+    void this.promptWithAttachments(
+      ticket.prompt.text,
+      ticket.prompt.attachments,
+      mode,
+      ticket.prompt.images,
+    ).catch(
       (error: unknown) => {
         if (sessionId !== this.sessionId || !this.promptQueue.restore(ticket)) return
         this.notice = { tone: 'error', message: errorMessage(error) }
@@ -2011,6 +2071,43 @@ class TuiAppImpl implements TuiApp {
     this.attachments = this.attachments.filter((attachment) =>
       this.draft.text.includes(attachment.token),
     )
+  }
+
+  private pruneImages(): void {
+    this.images = this.images.filter((image) => this.draft.text.includes(image.token))
+  }
+
+  private async pasteImage(): Promise<void> {
+    if (
+      this.capturingByok ||
+      this.agent === 'dead' ||
+      this.exiting ||
+      !this.capabilities.imageAttachments ||
+      this.runtime.saveImages === undefined
+    ) {
+      this.notice = { tone: 'error', message: text(this.locale, 'imageRuntimeUnavailable') }
+      this.emit()
+      return
+    }
+    if (this.images.length >= MAX_DRAFT_IMAGES) {
+      this.notice = { tone: 'error', message: text(this.locale, 'imageCountLimit') }
+      this.emit()
+      return
+    }
+    this.notice = { tone: 'info', message: text(this.locale, 'imageReading') }
+    this.emit()
+    try {
+      const input = await this.imageReader()
+      const serial = ++this.imageSerial
+      const name = `clipboard-${serial}.${imageExtension(input.mediaType)}`
+      const token = `[Image: ${name}]`
+      this.images = [...this.images, { ...input, id: `image-${serial}`, name, token }]
+      this.draft = insertDraft(this.draft, `${token} `)
+      this.notice = { tone: 'info', message: text(this.locale, 'imageAttached', { name }) }
+    } catch (error) {
+      this.notice = { tone: 'error', message: clipboardImageError(this.locale, error) }
+    }
+    this.emit()
   }
 
   private runCommand(line: string): void {
@@ -2160,6 +2257,7 @@ function runtimeCapabilityEntries(
     'planMode',
     'sessionList',
     'modelList',
+    'imageAttachments',
     'promptMode',
     'queueMode',
   ]
@@ -2221,3 +2319,24 @@ function safeSubagentId(value: string): string {
     .join('')
     .slice(0, 32)
 }
+
+function imageExtension(mediaType: TuiImageInput['mediaType']): string {
+  if (mediaType === 'image/jpeg') return 'jpg'
+  return mediaType.slice('image/'.length)
+}
+
+function clipboardImageError(locale: UiLocale, error: unknown): string {
+  if (!(error instanceof ClipboardImageError)) return errorMessage(error)
+  switch (error.code) {
+    case 'unavailable':
+      return text(locale, 'imageClipboardUnavailable')
+    case 'empty':
+      return text(locale, 'imageClipboardEmpty')
+    case 'too-large':
+      return text(locale, 'imageTooLarge')
+    case 'unsupported':
+      return text(locale, 'imageUnsupported')
+  }
+}
+
+const MAX_DRAFT_IMAGES = 20

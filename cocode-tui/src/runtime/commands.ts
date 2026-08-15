@@ -100,6 +100,14 @@ export function createBuiltinCommands(): CommandRegistry {
     ctx.copyLatestAssistant?.()
   })
   registry.register({
+    name: 'paste-image',
+    summary: 'Paste an image from the system clipboard',
+    summaryZh: '从系统剪贴板粘贴图片',
+    kind: 'local',
+    available: (caps) => caps.imageAttachments,
+    run: (ctx) => ctx.pasteImage?.(),
+  })
+  registry.register({
     name: 'todos',
     summary: 'Show the current task checklist',
     summaryZh: '查看当前任务清单',
