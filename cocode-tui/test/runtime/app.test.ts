@@ -435,6 +435,46 @@ describe('TuiApp', () => {
     }
   })
 
+  it('rebuilds all projections when forking a session with a seed', async () => {
+    const runtime = fakeRuntime()
+    runtime.fork = async () => ({
+      sessionId: 'forked-session',
+      seedLength: 2,
+      seed: [
+        {
+          type: 'session/title',
+          seq: 1,
+          time: 1,
+          data: { title: 'Forked title' },
+        },
+        {
+          type: 'user/message',
+          seq: 2,
+          time: 2,
+          data: { id: 'fork-user', content: [{ type: 'text', text: 'Forked prompt' }] },
+        },
+      ],
+    })
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 'source-session',
+      capabilities: { ...P0_CAPABILITIES, fork: true },
+    })
+    await app.start()
+
+    app.dispatch({ type: 'command', line: '/fork' })
+    await expect.poll(() => app.snapshot().header.sessionId).toBe('forked-session')
+    expect(app.snapshot().status.sessionTitle).toBe('Forked title')
+    expect(
+      app
+        .snapshot()
+        .nodes.some((node) => node.kind === 'user' && node.text.includes('Forked prompt')),
+    ).toBe(true)
+  })
+
   it('prompts only when idle', async () => {
     const runtime = fakeRuntime()
     const app = createTuiApp({

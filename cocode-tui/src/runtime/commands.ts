@@ -117,7 +117,7 @@ export function createBuiltinCommands(): CommandRegistry {
     name: 'resume',
     summary: 'List local session history for this workspace',
     kind: 'local',
-    available: (caps) => caps.sessionList === 'jsonl' && caps.open,
+    available: (caps) => caps.sessionList !== 'none' && caps.open,
     run: (ctx) => {
       void ctx.resumeSessions?.()
     },
@@ -188,7 +188,7 @@ export function createBuiltinCommands(): CommandRegistry {
     summary: 'Show the session tree from runtime metadata',
     summaryZh: '显示运行时会话树',
     kind: 'local',
-    available: (caps) => caps.sessionList === 'rpc',
+    available: (caps) => caps.sessionList !== 'none' && caps.open,
     run: (ctx) => {
       void ctx.showSessionTree?.()
     },
@@ -198,7 +198,7 @@ export function createBuiltinCommands(): CommandRegistry {
     summary: 'List sessions from the runtime when supported',
     summaryZh: '列出运行时会话（如果支持）',
     kind: 'local',
-    available: (caps) => caps.sessionList === 'rpc',
+    available: (caps) => caps.sessionList !== 'none' && caps.open,
     run: (ctx) => {
       void ctx.showSessionTree?.()
     },

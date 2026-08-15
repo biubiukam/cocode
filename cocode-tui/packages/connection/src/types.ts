@@ -67,7 +67,13 @@ export type TuiApprovalRequest = {
   reason?: string
 }
 
-export type TuiApprovalOutcome = 'allowed-once' | 'rejected' | 'cancelled' | 'unavailable'
+/** Approval choices accepted by the harness bridge. */
+export type TuiApprovalOutcome =
+  | 'allowed-once'
+  | 'allowed-for-turn'
+  | 'rejected'
+  | 'cancelled'
+  | 'unavailable'
 
 export type TuiApprovalAnswer = { outcome: TuiApprovalOutcome }
 

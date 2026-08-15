@@ -141,6 +141,11 @@ type UiKey =
   | 'forkCreated'
   | 'sessionTreeUnavailable'
   | 'sessionTreeEmpty'
+  | 'sessionTreeTitle'
+  | 'sessionTreeHint'
+  | 'sessionTreeQuery'
+  | 'sessionTreeLoading'
+  | 'sessionTreeOpenFailed'
 
 const TEXT: Record<UiLocale, Record<UiKey, string>> = {
   en: {
@@ -267,7 +272,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     reviewSending: 'Sending review context…',
     reviewUsage: 'Use /review, /review working-tree, staged, last-commit, or branch [base].',
     approvalTitle: 'Approval required',
-    approvalHint: 'enter/a allow once · d/n reject · esc cancel',
+    approvalHint: 'enter/a allow once · t allow for turn · d/n reject · esc cancel',
     approvalAllowed: 'Tool allowed once.',
     approvalRejected: 'Tool request rejected.',
     approvalUnavailable: 'Approval is unavailable; the tool request was not allowed.',
@@ -282,6 +287,11 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     forkCreated: 'Created a child session from the current conversation.',
     sessionTreeUnavailable: 'Runtime session tree is unavailable.',
     sessionTreeEmpty: 'No runtime sessions found.',
+    sessionTreeTitle: 'Sessions',
+    sessionTreeHint: 'type to filter · ↑↓ select · enter open · esc close',
+    sessionTreeQuery: 'filter: {query}',
+    sessionTreeLoading: 'Loading sessions…',
+    sessionTreeOpenFailed: 'The runtime could not open this session.',
   },
   zh: {
     session: '会话',
@@ -407,7 +417,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     reviewSending: '正在发送 Review 上下文…',
     reviewUsage: '使用 /review、/review working-tree、staged、last-commit 或 branch [base]。',
     approvalTitle: '需要审批',
-    approvalHint: '回车/a 允许一次 · d/n 拒绝 · Esc 取消',
+    approvalHint: '回车/a 允许一次 · t 允许本轮 · d/n 拒绝 · Esc 取消',
     approvalAllowed: '已允许本次工具调用。',
     approvalRejected: '已拒绝工具调用。',
     approvalUnavailable: '审批不可用，工具调用未获允许。',
@@ -422,6 +432,11 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     forkCreated: '已从当前对话创建子会话。',
     sessionTreeUnavailable: '当前运行时不支持会话树。',
     sessionTreeEmpty: '没有找到运行时会话。',
+    sessionTreeTitle: '会话列表',
+    sessionTreeHint: '输入过滤 · ↑↓ 选择 · 回车打开 · Esc 关闭',
+    sessionTreeQuery: '筛选：{query}',
+    sessionTreeLoading: '正在加载会话列表……',
+    sessionTreeOpenFailed: '运行时无法打开该会话。',
   },
 }
 

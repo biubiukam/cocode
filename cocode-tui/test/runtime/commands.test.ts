@@ -50,6 +50,9 @@ describe('commands', () => {
     expect(
       registry.find('resume', { ...P0_CAPABILITIES, sessionList: 'jsonl', open: true }),
     ).toBeDefined()
+    expect(
+      registry.find('resume', { ...P0_CAPABILITIES, sessionList: 'rpc', open: true }),
+    ).toBeDefined()
   })
 
   it('localizes the focus command summary in Chinese help', () => {

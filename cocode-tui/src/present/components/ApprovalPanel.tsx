@@ -17,6 +17,10 @@ export function ApprovalPanel(props: {
       props.dispatch({ type: 'approval.answer', outcome: 'allowed-once' })
       return
     }
+    if (input === 't') {
+      props.dispatch({ type: 'approval.answer', outcome: 'allowed-for-turn' })
+      return
+    }
     if (input === 'd' || input === 'n') {
       props.dispatch({ type: 'approval.answer', outcome: 'rejected' })
     }

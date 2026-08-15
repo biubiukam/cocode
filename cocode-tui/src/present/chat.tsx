@@ -14,6 +14,7 @@ import { Help } from './components/Help.tsx'
 import { HistorySearch } from './components/HistorySearch.tsx'
 import { MessageList } from './components/MessageList.tsx'
 import { ResumePicker } from './components/ResumePicker.tsx'
+import { SessionTreePicker } from './components/SessionTreePicker.tsx'
 import { RewindPicker } from './components/RewindPicker.tsx'
 import { QuestionPanel } from './components/QuestionPanel.tsx'
 import { SkillsPicker } from './components/SkillsPicker.tsx'
@@ -38,6 +39,7 @@ import { calculateChatLayout } from './chat-layout.ts'
 import { Inspector, INSPECTOR_WIDTH } from './components/Inspector.tsx'
 import { ReviewPicker } from './components/ReviewPicker.tsx'
 import { ApprovalPanel } from './components/ApprovalPanel.tsx'
+import { dispatchKeyCommand, moveSelection } from './chat-input.ts'
 
 export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
   const { app } = props
@@ -64,6 +66,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
     [snap.commands, snap.composer.text],
   )
   const resumeOpen = snap.resumePicker?.open === true
+  const sessionTreeOpen = snap.sessionTreePicker?.open === true
   const resumeItems = snap.resumePicker === undefined ? [] : visibleResumeItems(snap.resumePicker)
   const rewindState = snap.rewindPicker
   const rewindOpen = rewindState?.open === true
@@ -79,6 +82,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
     !rewindOpen &&
     !skillsOpen &&
     !resumeOpen &&
+    !sessionTreeOpen &&
     !historySearchOpen &&
     !snap.helpOpen &&
     !slashDismissed &&
@@ -94,6 +98,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
     !rewindOpen &&
     !skillsOpen &&
     !resumeOpen &&
+    !sessionTreeOpen &&
     !historySearchOpen &&
     !snap.helpOpen &&
     !slashOpen &&
@@ -116,8 +121,18 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
     fileItems: fileOpen ? fileItems.length : undefined,
     fileLoading: fileOpen && fileLoading,
     historyMatches: historySearchOpen ? historyItems.length : undefined,
-    resumeItems: resumeOpen ? resumeItems.length : undefined,
-    resumeSelected: resumeOpen ? snap.resumePicker?.selected : undefined,
+    resumeItems: sessionTreeOpen
+      ? snap.sessionTreePicker === undefined
+        ? 0
+        : snap.sessionTreePicker.items.length
+      : resumeOpen
+      ? resumeItems.length
+      : undefined,
+    resumeSelected: sessionTreeOpen
+      ? snap.sessionTreePicker?.selected
+      : resumeOpen
+      ? snap.resumePicker?.selected
+      : undefined,
     rewindItems: rewindOpen ? rewindState.items.length : undefined,
     rewindSelected: rewindOpen ? rewindState.selected : undefined,
     rewindConfirming: rewindOpen ? rewindState.confirming : undefined,
@@ -334,6 +349,35 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
       return
     }
 
+    if (snap.sessionTreePicker?.open === true) {
+      if (key.escape) {
+        app.dispatch({ type: 'sessionTree.close' })
+        return
+      }
+      if (key.upArrow || key.downArrow) {
+        app.dispatch({ type: 'sessionTree.move', delta: key.upArrow ? -1 : 1 })
+        return
+      }
+      if (key.return) {
+        app.dispatch({ type: 'sessionTree.confirm' })
+        return
+      }
+      if (key.backspace || key.delete) {
+        app.dispatch({
+          type: 'sessionTree.setQuery',
+          query: snap.sessionTreePicker.query.slice(0, -1),
+        })
+        return
+      }
+      if (input !== '' && !key.ctrl) {
+        app.dispatch({
+          type: 'sessionTree.setQuery',
+          query: snap.sessionTreePicker.query + input,
+        })
+      }
+      return
+    }
+
     if (historySearchOpen) {
       if (key.escape) {
         setHistorySearchOpen(false)
@@ -494,7 +538,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
         setSelectedMessageId(selectableMessages[selectableMessages.length - 1] ?? null)
         return
       }
-      runCommand(app, matched.id, snap.composer.text)
+      dispatchKeyCommand(app, matched.id, snap.composer.text)
       return
     }
     if (key.leftArrow) {
@@ -570,6 +614,14 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
       {snap.resumePicker?.open === true ? (
         <ResumePicker
           state={snap.resumePicker}
+          currentSessionId={snap.header.sessionId}
+          locale={snap.locale}
+          maxRows={layout.overlayRows}
+        />
+      ) : null}
+      {sessionTreeOpen && snap.sessionTreePicker !== undefined ? (
+        <SessionTreePicker
+          state={snap.sessionTreePicker}
           currentSessionId={snap.header.sessionId}
           locale={snap.locale}
           maxRows={layout.overlayRows}
@@ -702,41 +754,4 @@ function reviewRowsFor(state: TuiSnapshot['reviewPicker']): number {
   if (state.phase === 'scope') return state.scopes.length + 5
   if (state.phase === 'loading') return 7
   return Math.min(16, state.review.files.length + 8)
-}
-
-function moveSelection(index: number, delta: number, count: number): number {
-  if (count <= 0) return 0
-  return (((index + delta) % count) + count) % count
-}
-
-function runCommand(app: TuiApp, id: string, draft: string): void {
-  switch (id) {
-    case 'input.submit':
-      app.dispatch({ type: 'submit', text: draft })
-      return
-    case 'input.newline':
-      app.dispatch({ type: 'insertDraft', text: '\n' })
-      return
-    case 'session.interruptOrQuit':
-      app.dispatch({ type: 'interruptOrQuit' })
-      return
-    case 'app.quit':
-      app.dispatch({ type: 'quit' })
-      return
-    case 'app.redraw':
-      app.dispatch({ type: 'redraw' })
-      return
-    case 'transcript.toggleVerbose':
-      app.dispatch({ type: 'toggleVerbose' })
-      return
-    case 'help.toggle':
-      app.dispatch({ type: 'toggleHelp' })
-      return
-    case 'history.prev':
-      app.dispatch({ type: 'historyPrev' })
-      return
-    case 'history.next':
-      app.dispatch({ type: 'historyNext' })
-      return
-  }
 }

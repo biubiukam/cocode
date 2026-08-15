@@ -4,10 +4,8 @@
 
 import type {
   SkillEntry,
+  SessionEvent,
   TuiNotification,
-  TuiQuestionAnswer,
-  TuiQuestionItem,
-  TuiQuestionRequest,
   TuiCapabilitySnapshot,
   TuiApprovalAnswer,
   TuiApprovalRequest,
@@ -15,7 +13,7 @@ import type {
 } from '@cocode/tui-connection'
 import type { SelectModeResult } from './auth/store.ts'
 import type { AuthSnapshot, ResolvedAuth } from './auth/types.ts'
-import { createAssembler, type Assembler } from './assembler.ts'
+import type { Assembler } from './assembler.ts'
 import { P0_CAPABILITIES, type TuiCapabilities } from './capabilities.ts'
 import {
   CommandRegistry,
@@ -36,8 +34,12 @@ import {
   type DraftState,
 } from './draft.ts'
 import { buildPromptBlocks, loadFileContext } from './file-context.ts'
-import { replaySessionEvents } from './sessions-fs.ts'
-import { createSessionStateProjector, type SessionGoal, type SessionTodo } from './session-state.ts'
+import type { SessionStateProjector, SessionGoal, SessionTodo } from './session-state.ts'
+import {
+  createSessionId,
+  createSessionProjection,
+  loadSessionProjection,
+} from './session-lifecycle.ts'
 import { formatFileMention } from './file-mentions.ts'
 import { resolveWorkspaceInfo } from './workspace.ts'
 import { createAppCommandContext } from './command-context.ts'
@@ -84,7 +86,7 @@ import {
   submitCapturedByok,
   type ChannelSwitchHost,
 } from './channel-switch.ts'
-import { createTelemetryProjector, type TelemetrySnapshot } from './telemetry.ts'
+import type { TelemetryProjector, TelemetrySnapshot } from './telemetry.ts'
 import { copyToClipboard, readableNodeText } from './clipboard.ts'
 import { notifyTerminal, type TerminalNotifyMode } from './terminal-notify.ts'
 import {
@@ -103,6 +105,24 @@ import {
   type ReviewPickerState,
 } from './review-picker.ts'
 import { createApprovalState, type ApprovalState, type PendingApproval } from './approval.ts'
+import {
+  createQuestionCoordinator,
+  type QuestionCoordinator,
+  type TuiQuestionSnapshot,
+} from './question-coordinator.ts'
+import { refreshRuntimeCapabilities } from './capability-adapter.ts'
+import { createPromptQueue, type PromptQueue } from './prompt-queue.ts'
+import {
+  closeSessionTreePicker,
+  createSessionTreePicker,
+  moveSessionTreeSelection,
+  selectedSessionTreeItem,
+  setSessionTreeQuery,
+  type SessionTreePickerItem,
+  type SessionTreePickerState,
+} from './session-tree-picker.ts'
+import { buildSessionTree, flattenSessionTree } from './session-tree.ts'
+import { listSessionSummaries } from './sessions-fs.ts'
 
 export type TuiAction =
   | { type: 'submit'; text: string }
@@ -124,6 +144,10 @@ export type TuiAction =
   | { type: 'resume.move'; delta: number }
   | { type: 'resume.close' }
   | { type: 'resume.confirm' }
+  | { type: 'sessionTree.setQuery'; query: string }
+  | { type: 'sessionTree.move'; delta: number }
+  | { type: 'sessionTree.close' }
+  | { type: 'sessionTree.confirm' }
   | { type: 'rewind.open' }
   | { type: 'rewind.move'; delta: number }
   | { type: 'rewind.close' }
@@ -189,6 +213,7 @@ export type TuiSnapshot = {
   helpText: string
   commands: readonly { name: string; summary: string }[]
   resumePicker?: ResumePickerState
+  sessionTreePicker?: SessionTreePickerState
   rewindPicker?: RewindPickerState
   skillsPicker?: SkillsPickerState
   skills: readonly SkillEntry[]
@@ -198,34 +223,13 @@ export type TuiSnapshot = {
   exiting: boolean
 }
 
-export type TuiQuestionSnapshot = {
-  key: string
-  sessionId: string
-  question: TuiQuestionItem
-  position: number
-  total: number
-  answered: number
-}
+export type { TuiQuestionSnapshot }
 
 export type TuiApprovalSnapshot = ApprovalState
 
 export type TuiSubagentActivity = {
   running: number
   last?: { id: string; event: 'started' | 'finished' }
-}
-
-type QueuedPrompt = {
-  text: string
-  attachments: readonly { path: string; token: string }[]
-}
-
-type PendingQuestion = {
-  id: number
-  request: TuiQuestionRequest
-  index: number
-  answers: TuiQuestionAnswer['answers']
-  resolve: (answer: TuiQuestionAnswer) => void
-  reject: (error: Error) => void
 }
 
 export type TuiAuthInfo = {
@@ -311,8 +315,8 @@ class TuiAppImpl implements TuiApp {
   private runtimeCapabilitySnapshot: TuiCapabilitySnapshot | undefined
   private readonly commands: CommandRegistry
   private assembler: Assembler
-  private telemetry = createTelemetryProjector()
-  private sessionState = createSessionStateProjector()
+  private telemetry: TelemetryProjector
+  private sessionState: SessionStateProjector
   private readonly history = new InputHistory()
   private readonly listeners = new Set<() => void>()
   private unsubscribeRuntime: (() => void) | undefined
@@ -339,35 +343,38 @@ class TuiAppImpl implements TuiApp {
   private readonly terminalNotify: NonNullable<TuiAppOptions['terminalNotify']>
   private readonly activeSubagents = new Set<string>()
   private lastSubagent: TuiSubagentActivity['last']
-  private readonly queuedPrompts: QueuedPrompt[] = []
+  private readonly queuedPrompts: PromptQueue = createPromptQueue()
   private capturingByok = false
   private emitScheduled = false
   private closePromise: Promise<void> | undefined
   private resumePicker: ResumePickerState | undefined
+  private sessionTreePicker: SessionTreePickerState | undefined
+  private sessionTitleOverride: string | undefined
   private rewindPicker: RewindPickerState | undefined
   private skillsPicker: SkillsPickerState | undefined
   private skills: SkillEntry[] = []
-  private readonly questionQueue: PendingQuestion[] = []
-  private activeQuestion: PendingQuestion | undefined
+  private readonly questions: QuestionCoordinator
   private readonly approvalQueue: PendingApproval[] = []
   private activeApproval: PendingApproval | undefined
   private permissionMode = 'manual'
   private supportedPermissionModes: string[] = ['manual']
   private planMode = false
-  private questionSerial = 0
   private reviewPicker: ReviewPickerState | undefined
   private reviewRequest = 0
 
   constructor(options: TuiAppOptions) {
+    const projection = createSessionProjection()
     this.runtime = options.runtime
     this.cwd = options.cwd
     this.provider = options.provider
     this.model = options.model
-    this.sessionId = options.sessionId ?? crypto.randomUUID()
+    this.sessionId = options.sessionId ?? createSessionId()
     this.configuredCapabilities = options.capabilities ?? P0_CAPABILITIES
     this.capabilities = this.configuredCapabilities
     this.commands = options.commands ?? createBuiltinCommands()
-    this.assembler = createAssembler()
+    this.assembler = projection.assembler
+    this.telemetry = projection.telemetry
+    this.sessionState = projection.sessionState
     this.auth = options.auth
     this.diagnostics = options.diagnostics ?? {
       tty: true,
@@ -378,13 +385,14 @@ class TuiAppImpl implements TuiApp {
     this.locale = options.locale ?? 'en'
     this.terminalNotify =
       options.terminalNotify ?? (process.stdout.isTTY === true ? {} : { mode: 'off' })
+    this.questions = createQuestionCoordinator({ emit: () => this.emit() })
   }
 
   async start(): Promise<void> {
     this.agent = 'starting'
     this.emit()
     this.unsubscribeRuntime = this.runtime.subscribe((n) => this.onNotification(n))
-    this.unsubscribeQuestion = this.runtime.onQuestion?.((request) => this.askQuestion(request))
+    this.unsubscribeQuestion = this.runtime.onQuestion?.((request) => this.questions.ask(request))
     this.unsubscribeApproval = this.runtime.onApproval?.((request) => this.askApproval(request))
     this.unsubscribeRuntimeClose = this.runtime.onClose?.((error) => {
       if (this.exiting) return
@@ -437,7 +445,7 @@ class TuiAppImpl implements TuiApp {
         this.unsubscribeQuestion = undefined
         this.unsubscribeApproval?.()
         this.unsubscribeApproval = undefined
-        this.rejectQuestions(new Error('TUI closed before the question was answered'))
+        this.questions.rejectAll(new Error('TUI closed before the question was answered'))
         this.rejectApprovals(new Error('TUI closed before approval was answered'))
       },
       unsubscribeClose: () => {
@@ -492,7 +500,9 @@ class TuiAppImpl implements TuiApp {
         telemetry,
         todos: sessionState.todos,
         ...(sessionState.goal === undefined ? {} : { goal: sessionState.goal }),
-        ...(sessionState.title === undefined ? {} : { sessionTitle: sessionState.title }),
+        ...((this.sessionTitleOverride ?? sessionState.title) === undefined
+          ? {}
+          : { sessionTitle: this.sessionTitleOverride ?? sessionState.title }),
         ...(sessionState.agentPreset === undefined
           ? {}
           : { agentPreset: sessionState.agentPreset }),
@@ -503,7 +513,7 @@ class TuiAppImpl implements TuiApp {
           running: this.activeSubagents.size,
           ...(this.lastSubagent === undefined ? {} : { last: this.lastSubagent }),
         },
-        queueCount: this.queuedPrompts.length,
+        queueCount: this.queuedPrompts.size,
         focusMode: this.focusMode,
         permissionMode: this.permissionMode,
         planMode: this.planMode,
@@ -518,10 +528,11 @@ class TuiAppImpl implements TuiApp {
         summary: commandSummary(command, this.locale),
       })),
       resumePicker: this.resumePicker,
+      sessionTreePicker: this.sessionTreePicker,
       rewindPicker: this.rewindPicker,
       skillsPicker: this.skillsPicker,
       skills: this.skills,
-      question: this.questionSnapshot(),
+      question: this.questions.snapshot(),
       approval:
         this.activeApproval === undefined
           ? undefined
@@ -644,6 +655,32 @@ class TuiAppImpl implements TuiApp {
         this.emit()
         return
       }
+      case 'sessionTree.setQuery':
+        if (this.sessionTreePicker !== undefined) {
+          this.sessionTreePicker = setSessionTreeQuery(this.sessionTreePicker, action.query)
+          this.emit()
+        }
+        return
+      case 'sessionTree.move':
+        if (this.sessionTreePicker !== undefined) {
+          this.sessionTreePicker = moveSessionTreeSelection(this.sessionTreePicker, action.delta)
+          this.emit()
+        }
+        return
+      case 'sessionTree.close':
+        if (this.sessionTreePicker !== undefined) {
+          this.sessionTreePicker = closeSessionTreePicker(this.sessionTreePicker)
+          this.emit()
+        }
+        return
+      case 'sessionTree.confirm': {
+        if (this.sessionTreePicker === undefined) return
+        const selected = selectedSessionTreeItem(this.sessionTreePicker)
+        this.sessionTreePicker = closeSessionTreePicker(this.sessionTreePicker)
+        if (selected !== undefined) void this.openSessionTreeItem(selected)
+        this.emit()
+        return
+      }
       case 'rewind.open':
         this.openRewindPicker()
         return
@@ -707,10 +744,10 @@ class TuiAppImpl implements TuiApp {
         return
       }
       case 'question.answer':
-        this.answerQuestion(action.selected, action.custom)
+        this.questions.answer(action.selected, action.custom)
         return
       case 'question.cancel':
-        this.cancelQuestion()
+        this.questions.cancel()
         return
       case 'approval.answer':
         this.answerApproval(action.outcome)
@@ -796,12 +833,13 @@ class TuiAppImpl implements TuiApp {
     return createAppCommandContext({
       dispatch: (action) => this.dispatch(action),
       newSession: () => {
-        this.sessionId = crypto.randomUUID()
+        this.sessionId = createSessionId()
         this.assembler.reset()
         this.telemetry.reset()
         this.sessionState.reset()
+        this.sessionTitleOverride = undefined
         this.resetSubagentActivity()
-        this.queuedPrompts.length = 0
+        this.queuedPrompts.clear()
         this.attachments = []
         this.notice = {
           tone: 'info',
@@ -813,6 +851,7 @@ class TuiAppImpl implements TuiApp {
         this.assembler.reset()
         this.telemetry.reset()
         this.sessionState.reset()
+        this.sessionTitleOverride = undefined
         this.attachments = []
         this.notice = { tone: 'info', message: 'Transcript cleared' }
         this.emit()
@@ -898,6 +937,9 @@ class TuiAppImpl implements TuiApp {
         void this.switchModel(model)
       },
       locale: this.locale,
+      ...(this.capabilities.sessionList === 'rpc'
+        ? { resumeSessions: async () => await this.showSessionTree() }
+        : {}),
       showResumePicker: (sessions) => {
         this.helpOpen = false
         this.notice = undefined
@@ -961,7 +1003,8 @@ class TuiAppImpl implements TuiApp {
     try {
       const result = await this.runtime.fork(this.sessionId, this.assembler.snapshot().length)
       this.sessionId = result.sessionId
-      this.assembler.replaceWindow(result.seed)
+      this.sessionTitleOverride = undefined
+      this.replaceSessionProjection(result.seed)
       this.notice = { tone: 'info', message: text(this.locale, 'forkCreated') }
     } catch (error) {
       this.notice = {
@@ -977,31 +1020,94 @@ class TuiAppImpl implements TuiApp {
   }
 
   private async showSessionTree(): Promise<void> {
-    const list = this.runtime.listSessions
-    if (this.capabilities.sessionList !== 'rpc' || list === undefined) {
-      this.notice = { tone: 'info', message: text(this.locale, 'sessionTreeUnavailable') }
-      this.emit()
-      return
-    }
+    this.helpOpen = false
+    this.notice = { tone: 'info', message: text(this.locale, 'sessionTreeLoading') }
+    this.emit()
     try {
-      const sessions = await list.call(this.runtime, this.cwd)
-      const lines = sessions
-        .slice(0, 12)
-        .map(
-          (session) =>
-            `${session.parentSessionId === undefined ? '•' : '  ↳'} ${
-              session.title ?? session.sessionId
-            }`,
-        )
-      this.notice = {
-        tone: 'info',
-        message: lines.length === 0 ? text(this.locale, 'sessionTreeEmpty') : lines.join('\n'),
+      const items =
+        this.capabilities.sessionList === 'rpc' && this.runtime.listSessions !== undefined
+          ? await this.loadRpcSessionTree()
+          : await this.loadJsonlSessionTree()
+      if (items.length === 0) {
+        this.sessionTreePicker = undefined
+        this.notice = { tone: 'info', message: text(this.locale, 'sessionTreeEmpty') }
+      } else {
+        this.sessionTreePicker = createSessionTreePicker(items)
+        this.notice = undefined
       }
     } catch (error) {
+      this.sessionTreePicker = undefined
       this.notice = {
         tone: 'error',
         message: `${text(this.locale, 'sessionTreeUnavailable')}: ${errorMessage(error)}`,
       }
+    }
+    this.emit()
+  }
+
+  private async loadRpcSessionTree(): Promise<SessionTreePickerItem[]> {
+    const summaries = await this.runtime.listSessions?.(this.cwd)
+    if (summaries === undefined) return []
+    return makeSessionTreeItems(
+      summaries.map((summary) => ({
+        id: summary.sessionId,
+        createdAt: summary.createdAt,
+        cwd: summary.cwd,
+        title: summary.title,
+        parentSession: summary.parentSessionId,
+        seedLength: summary.seedLength,
+        path: '',
+        preview: undefined,
+        updatedAt: summary.updatedAt,
+      })),
+      'rpc',
+      this.sessionId,
+    )
+  }
+
+  private async loadJsonlSessionTree(): Promise<SessionTreePickerItem[]> {
+    const root = this.diagnostics.sessionRoot
+    if (root === undefined) return []
+    const result = await listSessionSummaries({ root, cwd: this.cwd, limit: 50 })
+    return makeSessionTreeItems(result.sessions, 'jsonl', this.sessionId)
+  }
+
+  private async openSessionTreeItem(item: SessionTreePickerItem): Promise<void> {
+    if (item.source === 'jsonl' && item.path !== undefined) {
+      await this.resumeSession(item.session.id, item.path)
+      return
+    }
+    if (!this.capabilities.open || this.runtime.open === undefined) {
+      this.notice = {
+        tone: 'info',
+        message: text(this.locale, 'resumeUnavailable', { session: item.session.id.slice(0, 8) }),
+      }
+      this.emit()
+      return
+    }
+    this.agent = 'starting'
+    this.notice = { tone: 'info', message: text(this.locale, 'resumeLoading') }
+    this.emit()
+    const previousSessionId = this.sessionId
+    try {
+      const opened = await this.runtime.open(item.session.id, previousSessionId)
+      if (!opened) throw new Error(text(this.locale, 'sessionTreeOpenFailed'))
+      this.sessionId = item.session.id
+      this.assembler.reset()
+      this.telemetry.reset()
+      this.sessionState.reset()
+      this.sessionTitleOverride = item.session.title
+      this.resetSubagentActivity()
+      this.queuedPrompts.clear()
+      this.attachments = []
+      this.agent = 'idle'
+      this.notice = {
+        tone: 'info',
+        message: text(this.locale, 'resumeLoaded', { session: item.session.id.slice(0, 8) }),
+      }
+    } catch (error) {
+      this.agent = 'idle'
+      this.notice = { tone: 'error', message: errorMessage(error) }
     }
     this.emit()
   }
@@ -1125,27 +1231,9 @@ class TuiAppImpl implements TuiApp {
   }
 
   private refreshRuntimeCapabilities(): void {
-    this.runtimeCapabilitySnapshot = this.runtime.getCapabilities?.()
-    if (this.runtimeCapabilitySnapshot?.source === 'runtime') {
-      this.capabilities = applyRuntimeCapabilities(
-        this.configuredCapabilities,
-        this.runtimeCapabilitySnapshot,
-      )
-    }
-  }
-
-  private askQuestion(request: TuiQuestionRequest): Promise<TuiQuestionAnswer> {
-    return new Promise<TuiQuestionAnswer>((resolve, reject) => {
-      this.questionQueue.push({
-        id: ++this.questionSerial,
-        request,
-        index: 0,
-        answers: [],
-        resolve,
-        reject,
-      })
-      this.startNextQuestion()
-    })
+    const state = refreshRuntimeCapabilities(this.runtime, this.configuredCapabilities)
+    this.runtimeCapabilitySnapshot = state.snapshot
+    this.capabilities = state.capabilities
   }
 
   private askApproval(request: TuiApprovalRequest): Promise<TuiApprovalAnswer> {
@@ -1273,62 +1361,6 @@ class TuiAppImpl implements TuiApp {
     this.emit()
   }
 
-  private startNextQuestion(): void {
-    if (this.activeQuestion !== undefined || this.questionQueue.length === 0) return
-    this.activeQuestion = this.questionQueue.shift()
-    this.emit()
-  }
-
-  private questionSnapshot(): TuiQuestionSnapshot | undefined {
-    const active = this.activeQuestion
-    if (active === undefined) return undefined
-    const question = active.request.questions[active.index]
-    if (question === undefined) return undefined
-    return {
-      key: `${active.id}-${active.index}`,
-      sessionId: active.request.sessionId,
-      question,
-      position: active.index + 1,
-      total: active.request.questions.length,
-      answered: active.answers.length,
-    }
-  }
-
-  private answerQuestion(selected: string[], custom?: string): void {
-    const active = this.activeQuestion
-    const question = active?.request.questions[active.index]
-    if (active === undefined || question === undefined) return
-    active.answers.push({
-      id: question.id,
-      selected: [...selected],
-      ...(custom === undefined || custom.trim() === '' ? {} : { custom: custom.trim() }),
-    })
-    active.index += 1
-    if (active.index >= active.request.questions.length) {
-      this.activeQuestion = undefined
-      active.resolve({ answers: [...active.answers] })
-      this.startNextQuestion()
-    }
-    this.emit()
-  }
-
-  private cancelQuestion(): void {
-    const active = this.activeQuestion
-    if (active === undefined) return
-    this.activeQuestion = undefined
-    active.reject(new Error('ask_user_question was interrupted before the user answered'))
-    this.startNextQuestion()
-    this.emit()
-  }
-
-  private rejectQuestions(error: Error): void {
-    const active = this.activeQuestion
-    this.activeQuestion = undefined
-    if (active !== undefined) active.reject(error)
-    for (const pending of this.questionQueue.splice(0)) pending.reject(error)
-    this.emit()
-  }
-
   private async switchModel(model: string): Promise<void> {
     const previous = this.model
     this.agent = 'starting'
@@ -1342,14 +1374,14 @@ class TuiAppImpl implements TuiApp {
       this.model = model
       this.runtimeName = info.name
       this.refreshRuntimeCapabilities()
-      this.sessionId = crypto.randomUUID()
+      this.sessionId = createSessionId()
       this.assembler.reset()
       this.telemetry.reset()
       this.sessionState.reset()
       this.permissionMode = 'manual'
       this.planMode = false
       this.resetSubagentActivity()
-      this.queuedPrompts.length = 0
+      this.queuedPrompts.clear()
       this.agent = 'idle'
       this.notice = {
         tone: 'info',
@@ -1393,21 +1425,16 @@ class TuiAppImpl implements TuiApp {
     this.emit()
     try {
       const previousSessionId = this.sessionId
-      const nextAssembler = createAssembler()
-      const nextTelemetry = createTelemetryProjector()
-      const nextSessionState = createSessionStateProjector()
-      await replaySessionEvents(path, (event) => {
-        nextAssembler.ingest(event)
-        nextTelemetry.ingest(event)
-        nextSessionState.ingest(event)
-      })
-      await this.runtime.open(sessionId, previousSessionId)
+      const nextProjection = await loadSessionProjection(path)
+      const opened = await this.runtime.open(sessionId, previousSessionId)
+      if (!opened) throw new Error(text(this.locale, 'sessionTreeOpenFailed'))
       this.sessionId = sessionId
-      this.assembler = nextAssembler
-      this.telemetry = nextTelemetry
-      this.sessionState = nextSessionState
+      this.assembler = nextProjection.assembler
+      this.telemetry = nextProjection.telemetry
+      this.sessionState = nextProjection.sessionState
+      this.sessionTitleOverride = undefined
       this.resetSubagentActivity()
-      this.queuedPrompts.length = 0
+      this.queuedPrompts.clear()
       this.attachments = []
       this.agent = 'idle'
       this.notice = {
@@ -1448,15 +1475,9 @@ class TuiAppImpl implements TuiApp {
     try {
       const result = await this.runtime.rewind(previousSessionId, item.seq, previousSessionId)
       this.sessionId = result.sessionId
-      this.assembler.replaceWindow(result.seed)
-      this.telemetry.reset()
-      this.sessionState.reset()
-      for (const event of result.seed) {
-        this.telemetry.ingest(event)
-        this.sessionState.ingest(event)
-      }
+      this.replaceSessionProjection(result.seed)
       this.resetSubagentActivity()
-      this.queuedPrompts.length = 0
+      this.queuedPrompts.clear()
       this.attachments = []
       this.draft = replaceDraft(this.draft, item.text)
       this.agent = 'idle'
@@ -1546,19 +1567,18 @@ class TuiAppImpl implements TuiApp {
   private queueCurrentPrompt(): void {
     const trimmed = this.draft.text.trim()
     if (trimmed === '' || this.agent !== 'running') return
-    if (this.queuedPrompts.length >= 8) {
+    if (!this.queuedPrompts.add({ text: trimmed, attachments: this.attachments.slice() })) {
       this.notice = { tone: 'info', message: text(this.locale, 'queueFull') }
       this.emit()
       return
     }
-    this.queuedPrompts.push({ text: trimmed, attachments: this.attachments.slice() })
     this.history.push(trimmed)
     this.draft = createDraft()
     this.attachments = []
     this.notice = {
       tone: 'info',
       message: text(this.locale, 'queueAdded', {
-        count: String(this.queuedPrompts.length),
+        count: String(this.queuedPrompts.size),
       }),
     }
     this.emit()
@@ -1566,13 +1586,13 @@ class TuiAppImpl implements TuiApp {
 
   private flushQueuedPrompt(): void {
     if (this.agent !== 'idle') return
-    const next = this.queuedPrompts.shift()
+    const next = this.queuedPrompts.take()
     if (next === undefined) return
     this.agent = 'running'
     this.notice = { tone: 'info', message: text(this.locale, 'queueSending') }
     this.emit()
     void this.promptWithAttachments(next.text, next.attachments).catch((error: unknown) => {
-      this.queuedPrompts.unshift(next)
+      this.queuedPrompts.restore(next)
       this.notice = { tone: 'error', message: errorMessage(error) }
       this.agent = 'idle'
       this.emit()
@@ -1610,13 +1630,14 @@ class TuiAppImpl implements TuiApp {
       ingest: (event) => {
         this.telemetry.ingest(event)
         this.sessionState.ingest(event)
+        if (event.type === 'session/title') this.sessionTitleOverride = undefined
         this.assembler.ingest(event)
       },
       isDeadOrExiting: () => this.agent === 'dead' || this.exiting,
       setAgent: (agent) => {
         const previous = this.agent
         this.agent = agent
-        if (previous === 'running' && agent === 'idle' && this.queuedPrompts.length === 0) {
+        if (previous === 'running' && agent === 'idle' && this.queuedPrompts.size === 0) {
           notifyTerminal({
             ...this.terminalNotify,
             title: 'Cocode',
@@ -1679,6 +1700,18 @@ class TuiAppImpl implements TuiApp {
     for (const listener of this.listeners) listener()
   }
 
+  private replaceSessionProjection(events: readonly SessionEvent[]): void {
+    const projection = createSessionProjection()
+    for (const event of events) {
+      projection.assembler.ingest(event)
+      projection.telemetry.ingest(event)
+      projection.sessionState.ingest(event)
+    }
+    this.assembler = projection.assembler
+    this.telemetry = projection.telemetry
+    this.sessionState = projection.sessionState
+  }
+
   private scheduleEmit(): void {
     if (this.emitScheduled) return
     this.emitScheduled = true
@@ -1689,23 +1722,33 @@ class TuiAppImpl implements TuiApp {
   }
 }
 
-function applyRuntimeCapabilities(
-  configured: TuiCapabilities,
-  runtime: TuiCapabilitySnapshot,
-): TuiCapabilities {
-  return {
-    ...configured,
-    cancel: runtime.capabilities.cancel,
-    open: runtime.capabilities.open,
-    fork: runtime.capabilities.fork,
-    rewind: runtime.capabilities.rewind,
-    skills: runtime.capabilities.skills,
-    approval: runtime.capabilities.approval,
-    permissionMode: runtime.capabilities.permissionMode,
-    planMode: runtime.capabilities.planMode,
-    promptMode: runtime.capabilities.promptMode,
-    sessionList: runtime.capabilities.sessionList ? 'rpc' : configured.sessionList,
-  }
+function makeSessionTreeItems(
+  sessions: ReadonlyArray<{
+    id: string
+    createdAt: number
+    updatedAt?: number
+    cwd?: string
+    title?: string
+    preview?: string
+    parentSession?: string
+    seedLength?: number
+    path: string
+  }>,
+  source: 'rpc' | 'jsonl',
+  currentSessionId: string,
+): SessionTreePickerItem[] {
+  const tree = buildSessionTree(sessions)
+  return flattenSessionTree(tree, currentSessionId).map((row) => {
+    const sourceSession = sessions.find((session) => session.id === row.session.id)
+    return {
+      ...row,
+      source,
+      ...(sourceSession?.path === undefined || sourceSession.path === ''
+        ? {}
+        : { path: sourceSession.path }),
+      ...(sourceSession?.updatedAt === undefined ? {} : { updatedAt: sourceSession.updatedAt }),
+    }
+  })
 }
 
 function safeSubagentId(value: string): string {

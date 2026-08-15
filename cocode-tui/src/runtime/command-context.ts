@@ -29,6 +29,7 @@ export type CommandContextOptions = {
   setModel?: TuiCommandCtx['setModel']
   locale?: UiLocale
   showResumePicker?: (sessions: readonly SessionSummary[]) => void
+  resumeSessions?: TuiCommandCtx['resumeSessions']
   showSkillsPicker?: TuiCommandCtx['showSkillsPicker']
   copyLatestAssistant?: TuiCommandCtx['copyLatestAssistant']
   toggleFocus?: TuiCommandCtx['toggleFocus']
@@ -63,6 +64,7 @@ export type AppCommandContextOptions = {
   setModel?: TuiCommandCtx['setModel']
   locale: UiLocale
   showResumePicker: (sessions: readonly SessionSummary[]) => void
+  resumeSessions?: TuiCommandCtx['resumeSessions']
   showSkillsPicker: TuiCommandCtx['showSkillsPicker']
   copyLatestAssistant?: TuiCommandCtx['copyLatestAssistant']
   toggleFocus?: TuiCommandCtx['toggleFocus']
@@ -98,26 +100,28 @@ export function createCommandContext(options: CommandContextOptions): TuiCommand
           : `AGENTS.md already exists: ${result.path}`,
       )
     },
-    resumeSessions: async () => {
-      if (options.sessionRoot === undefined) {
-        options.notice('error', formatError('SESSION_ROOT_UNAVAILABLE'))
-        return
-      }
-      try {
-        const result = await listSessionSummaries({
-          root: options.sessionRoot,
-          cwd: options.cwd,
-          limit: 50,
-        })
-        if (result.sessions.length === 0) {
-          options.notice('info', text(options.locale ?? 'en', 'resumeEmpty'))
+    resumeSessions:
+      options.resumeSessions ??
+      (async () => {
+        if (options.sessionRoot === undefined) {
+          options.notice('error', formatError('SESSION_ROOT_UNAVAILABLE'))
           return
         }
-        options.showResumePicker?.(result.sessions)
-      } catch {
-        options.notice('error', formatError('SESSION_ROOT_UNAVAILABLE'))
-      }
-    },
+        try {
+          const result = await listSessionSummaries({
+            root: options.sessionRoot,
+            cwd: options.cwd,
+            limit: 50,
+          })
+          if (result.sessions.length === 0) {
+            options.notice('info', text(options.locale ?? 'en', 'resumeEmpty'))
+            return
+          }
+          options.showResumePicker?.(result.sessions)
+        } catch {
+          options.notice('error', formatError('SESSION_ROOT_UNAVAILABLE'))
+        }
+      }),
     showSkillsPicker: options.showSkillsPicker,
     copyLatestAssistant: options.copyLatestAssistant,
     toggleFocus: options.toggleFocus,
@@ -163,6 +167,7 @@ export function createAppCommandContext(options: AppCommandContextOptions): TuiC
     setModel: options.setModel,
     locale: options.locale,
     showResumePicker: options.showResumePicker,
+    resumeSessions: options.resumeSessions,
     showSkillsPicker: options.showSkillsPicker,
     copyLatestAssistant: options.copyLatestAssistant,
     toggleFocus: options.toggleFocus,

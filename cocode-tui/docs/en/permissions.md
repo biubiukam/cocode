@@ -13,6 +13,6 @@ The harness enforces permission policy. The TUI displays the active mode and ret
 | `plan`      | Planning and reads only; the harness blocks writes                    |
 | `auto`      | Shown only when the runtime explicitly supports it                    |
 
-Press `Shift+Tab` to cycle modes. Use `Ctrl+M` when a terminal cannot report that key combination reliably. The current wire supports allow once, deny, and cancel. Allow-for-the-turn remains unavailable until the harness exposes a durable approval policy for it.
+Press `Shift+Tab` to cycle modes. Use `Ctrl+M` when a terminal cannot report that key combination reliably. The approval panel supports allow once (Enter or `a`), allow for the turn (`t`), deny, and cancel.
 
 Timeouts, runtime disconnects, and duplicate responses fail closed. Composer input cannot leak into an active approval panel. Legacy sessions without a permission field display as `manual`.
