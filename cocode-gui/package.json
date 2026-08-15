@@ -21,8 +21,8 @@
 	],
 	"scripts": {
 		"start": "node scripts/start-with-dsh-runtime.mjs",
-		"build:cocode-plugins": "corepack pnpm@10.34.5 --filter cocode-sidebar build && corepack pnpm@10.34.5 --filter cocode-account build",
-		"test:cocode-plugins": "corepack pnpm@10.34.5 --filter cocode-sidebar test",
+		"build:cocode-plugins": "corepack pnpm@10.34.5 --filter cocode-sidebar build && corepack pnpm@10.34.5 --filter cocode-account build && corepack pnpm@10.34.5 --filter cocode-shortcuts build",
+		"test:cocode-plugins": "corepack pnpm@10.34.5 --filter cocode-sidebar test && corepack pnpm@10.34.5 --filter cocode-shortcuts test",
 		"stage:dsh": "node scripts/stage-dsh-runtime.mjs",
 		"prepackage": "corepack pnpm@10.34.5 run build:cocode-plugins",
 		"package": "electron-forge package",

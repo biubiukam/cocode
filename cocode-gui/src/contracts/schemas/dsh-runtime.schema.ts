@@ -5,6 +5,7 @@ import type {
 	DshRuntimeBootstrapDto,
 	DshRuntimeRequestDto,
 } from "../ipc/dsh-runtime.contract"
+import { isDshRuntimeRequestPath } from "../dsh-runtime-path"
 
 const dshBootEntrySchema = z.object({
 	id: z.string().min(1),
@@ -36,7 +37,9 @@ const headerTupleSchema = z.custom<readonly [string, string]>(
 
 const dshRuntimeRequestSchema = z.object({
 	requestId: z.uuid(),
-	path: z.string().regex(/^\/(?:api|sidebar)(?:\/|\?|$)/),
+	path: z.string().refine(isDshRuntimeRequestPath, {
+		message: "Path is outside the allow-listed DSH HTTP surface.",
+	}),
 	method: z.enum(["GET", "HEAD", "POST"]),
 	headers: z.array(headerTupleSchema),
 	body: z.instanceof(Uint8Array).optional(),

@@ -36,6 +36,18 @@ test("rewrites sidebar HTTP routes through the sidecar request bridge", () => {
 	)
 })
 
+test("rewrites Cocode shortcut settings routes through the sidecar request bridge", () => {
+	assert.equal(
+		rewriteDshHttpUrl(
+			"http://localhost:5173/cocode/shortcuts/api/settings.get",
+			"http://localhost:5173",
+			"http://localhost:5173/",
+			"http://127.0.0.1:3080",
+		),
+		"http://127.0.0.1:3080/cocode/shortcuts/api/settings.get",
+	)
+})
+
 test("rewrites sidebar WebSockets to the DSH sidecar", () => {
 	assert.equal(
 		rewriteDshWebSocketUrl(

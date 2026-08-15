@@ -7,6 +7,7 @@ import type {
 	DshRuntimeRequestDto,
 	DshRuntimeResponseDto,
 } from "../../../../contracts/ipc/dsh-runtime.contract"
+import { isDshHttpPath } from "../../../../contracts/dsh-runtime-path"
 import { parseDshRuntimeBootstrap } from "../../../../contracts/schemas/dsh-runtime.schema"
 import { extractDshBootManifest, extractDshThemePreference } from "./dsh-runtime-bootstrap"
 import { createDshDesktopPatch } from "./dsh-desktop-patch"
@@ -174,15 +175,6 @@ export class DshRuntimeProcess {
 		if (this.runtimeUrl === null) throw new Error("DSH runtime is not ready.")
 		return this.runtimeUrl
 	}
-}
-
-function isDshHttpPath(pathname: string): boolean {
-	return (
-		pathname === "/api" ||
-		pathname.startsWith("/api/") ||
-		pathname === "/sidebar" ||
-		pathname.startsWith("/sidebar/")
-	)
 }
 
 async function waitForHttpReady(url: string, timeoutMs: number): Promise<void> {

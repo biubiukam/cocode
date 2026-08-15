@@ -2,7 +2,7 @@ import { BrowserWindow, shell } from "electron"
 import path from "node:path"
 import { registerDshWebSocketTransport } from "../security/register-dsh-websocket-transport"
 
-export const createMainWindow = (dshRuntimeUrl: string): void => {
+export const createMainWindow = (dshRuntimeUrl: string): BrowserWindow => {
 	const mainWindow = new BrowserWindow({
 		width: 1280,
 		height: 840,
@@ -44,4 +44,5 @@ export const createMainWindow = (dshRuntimeUrl: string): void => {
 			path.join(__dirname, "../renderer", MAIN_WINDOW_VITE_NAME, "index.html"),
 		)
 	}
+	return mainWindow
 }

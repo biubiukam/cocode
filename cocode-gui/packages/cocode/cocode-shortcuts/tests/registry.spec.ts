@@ -1,0 +1,172 @@
+// @vitest-environment jsdom
+
+import { describe, expect, it, vi } from "vitest"
+import type { ShortcutSettingsView } from "../src/settings.ts"
+import { ShortcutRegistry } from "../src/client/registry.ts"
+import { ShortcutSettingsController } from "../src/client/settings-controller.ts"
+
+function view(
+  bindings: ShortcutSettingsView["value"]["bindings"] = {},
+  revision = 0,
+): ShortcutSettingsView {
+  return {
+    value: { version: 1, bindings },
+    revision,
+    writable: true,
+  }
+}
+
+async function setup(
+  bindings: ShortcutSettingsView["value"]["bindings"] = {},
+): Promise<{
+  readonly controller: ShortcutSettingsController
+  readonly registry: ShortcutRegistry
+}> {
+  const controller = new ShortcutSettingsController({
+    get: async () => view(bindings),
+    update: async patch => view(patch.bindings ?? {}, 1),
+  })
+  await controller.reload()
+  return {
+    controller,
+    registry: new ShortcutRegistry({} as never, controller),
+  }
+}
+
+describe("ShortcutRegistry", () => {
+  it("merges user overrides, disabled commands, conflicts, scopes, and orphans", async () => {
+    const { registry } = await setup({
+      first: { combo: { key: "k", primary: true } },
+      second: { combo: { key: "k", primary: true }, scope: "global" },
+      disabled: { disabled: true },
+      orphan: { combo: { key: "F2" } },
+    })
+    registry.register({
+      id: "first",
+      title: "First",
+      defaultCombo: { key: "a", primary: true },
+      run: () => true,
+    })
+    registry.register({
+      id: "second",
+      title: "Second",
+      defaultCombo: { key: "b", primary: true },
+      globalCapable: true,
+      run: () => true,
+    })
+    registry.register({
+      id: "disabled",
+      title: "Disabled",
+      defaultCombo: { key: "d", primary: true },
+      run: () => true,
+    })
+
+    const snapshot = registry.getSnapshot()
+    expect(snapshot.bindings.map(binding => [binding.commandId, binding.scope])).toEqual([
+      ["first", "app"],
+      ["second", "global"],
+    ])
+    expect(snapshot.conflicts).toHaveLength(1)
+    expect(snapshot.orphaned).toEqual(["orphan"])
+  })
+
+  it("does not consume unmatched, text-entry, IME, or false-returning commands", async () => {
+    const { registry } = await setup()
+    const run = vi.fn(() => false)
+    registry.register({
+      id: "test",
+      title: "Test",
+      defaultCombo: { key: "k", primary: true },
+      run,
+    })
+    const dispose = registry.mount()
+
+    const unmatched = new KeyboardEvent("keydown", {
+      key: "x",
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    })
+    window.dispatchEvent(unmatched)
+    expect(unmatched.defaultPrevented).toBe(false)
+
+    const input = document.createElement("input")
+    document.body.append(input)
+    const textEntry = new KeyboardEvent("keydown", {
+      key: "k",
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    })
+    input.dispatchEvent(textEntry)
+    expect(run).not.toHaveBeenCalled()
+    expect(textEntry.defaultPrevented).toBe(false)
+
+    const composing = new KeyboardEvent("keydown", {
+      key: "k",
+      ctrlKey: true,
+      isComposing: true,
+      bubbles: true,
+      cancelable: true,
+    })
+    window.dispatchEvent(composing)
+    expect(run).not.toHaveBeenCalled()
+
+    const returnsFalse = new KeyboardEvent("keydown", {
+      key: "k",
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    })
+    window.dispatchEvent(returnsFalse)
+    expect(run).toHaveBeenCalledTimes(1)
+    expect(returnsFalse.defaultPrevented).toBe(false)
+
+    dispose()
+    window.dispatchEvent(new KeyboardEvent("keydown", {
+      key: "k",
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    }))
+    expect(run).toHaveBeenCalledTimes(1)
+  })
+
+  it("protects contentEditable and xterm targets", async () => {
+    const { registry } = await setup()
+    const run = vi.fn(() => true)
+    registry.register({
+      id: "test",
+      title: "Test",
+      defaultCombo: { key: "k", primary: true },
+      run,
+    })
+    const dispose = registry.mount()
+
+    const editable = document.createElement("div")
+    editable.contentEditable = "true"
+    document.body.append(editable)
+    Object.defineProperty(editable, "isContentEditable", { value: true })
+    editable.dispatchEvent(new KeyboardEvent("keydown", {
+      key: "k",
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    }))
+
+    const terminal = document.createElement("div")
+    terminal.className = "xterm"
+    const terminalInput = document.createElement("textarea")
+    terminal.append(terminalInput)
+    document.body.append(terminal)
+    terminalInput.dispatchEvent(new KeyboardEvent("keydown", {
+      key: "k",
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    }))
+
+    expect(run).not.toHaveBeenCalled()
+    dispose()
+  })
+})

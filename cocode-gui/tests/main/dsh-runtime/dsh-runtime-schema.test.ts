@@ -31,6 +31,18 @@ describe("DSH runtime IPC schemas", () => {
 		assert.equal(request.path, "/sidebar/api/fs.tree")
 	})
 
+	it("accepts Cocode shortcut settings requests", () => {
+		const request = parseDshRuntimeRequest({
+			requestId: "00000000-0000-4000-8000-000000000003",
+			path: "/cocode/shortcuts/api/settings.get",
+			method: "POST",
+			headers: [["content-type", "application/json"]],
+			body: new Uint8Array([123, 125]),
+		})
+
+		assert.equal(request.path, "/cocode/shortcuts/api/settings.get")
+	})
+
 	it("rejects non-allow-listed paths and malformed cancellation ids", () => {
 		assert.throws(() =>
 			parseDshRuntimeRequest({

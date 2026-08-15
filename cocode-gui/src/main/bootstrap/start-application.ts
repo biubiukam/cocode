@@ -1,4 +1,4 @@
-import { app } from "electron"
+import { app, type BrowserWindow } from "electron"
 import started from "electron-squirrel-startup"
 import { DshRuntimeProcess } from "../contexts/dsh-runtime/infrastructure/dsh-runtime-process"
 import { DshCloudConfigPort } from "../contexts/account/infrastructure/dsh-cloud-config-port"
@@ -15,6 +15,11 @@ import {
 import { registerApplicationLifecycle } from "../shell/lifecycle/register-application-lifecycle"
 import { createMainWindow } from "../shell/windows/create-main-window"
 import { createDatabaseModule, type DatabaseModule } from "./create-database-module"
+import { ShortcutService } from "../contexts/shortcuts/application/shortcut-service"
+import {
+	registerShortcutsIpc,
+	unregisterShortcutsIpc,
+} from "../contexts/shortcuts/presentation/ipc/register-shortcuts-ipc"
 
 export const startApplication = (): void => {
 	if (started) {
@@ -25,12 +30,17 @@ export const startApplication = (): void => {
 	let databaseModule: DatabaseModule | null = null
 	let dshRuntime: DshRuntimeProcess | null = null
 	let account: AccountService | null = null
+	let shortcuts: ShortcutService | null = null
+	let mainWindow: BrowserWindow | null = null
 	let dshUrl: string | null = null
 
 	registerApplicationLifecycle({
 		createWindow: () => {
 			if (!dshUrl) throw new Error("DSH runtime URL was not available after startup.")
-			createMainWindow(dshUrl)
+			mainWindow = createMainWindow(dshUrl)
+			mainWindow.once("closed", () => {
+				mainWindow = null
+			})
 		},
 		onReady: async () => {
 			databaseModule = createDatabaseModule(app.getPath("home"))
@@ -47,8 +57,14 @@ export const startApplication = (): void => {
 			)
 			registerAccountIpc(account)
 			void account.hydrate()
+			shortcuts = new ShortcutService(() => mainWindow)
+			registerShortcutsIpc(shortcuts)
 		},
 		onBeforeQuit: async () => {
+			unregisterShortcutsIpc()
+			shortcuts?.dispose()
+			shortcuts = null
+			mainWindow = null
 			unregisterAccountIpc()
 			account?.dispose()
 			account = null

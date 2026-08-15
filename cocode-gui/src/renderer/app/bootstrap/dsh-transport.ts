@@ -146,6 +146,8 @@ function isDshDesktopHttpPath(pathname: string): boolean {
 	return (
 		pathname === "/api" ||
 		pathname.startsWith("/api/") ||
+		pathname === "/cocode/shortcuts" ||
+		pathname.startsWith("/cocode/shortcuts/") ||
 		pathname === "/sidebar" ||
 		pathname.startsWith("/sidebar/")
 	)
