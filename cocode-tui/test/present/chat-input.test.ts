@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { TuiApp, TuiSnapshot } from '../../src/runtime/app.ts'
-import { dispatchComposerTab, dispatchKeyCommand, moveSelection } from '../../src/present/chat-input.ts'
+import {
+  dispatchComposerTab,
+  dispatchHelpInput,
+  dispatchKeyCommand,
+  moveSelection,
+} from '../../src/present/chat-input.ts'
 
 describe('chat input helpers', () => {
   it('wraps selection indexes and handles empty menus', () => {
@@ -20,6 +25,15 @@ describe('chat input helpers', () => {
       [{ type: 'insertDraft', text: '\n' }],
       [{ type: 'historyNext' }],
     ])
+  })
+
+  it('routes interrupt keys while help is open and consumes other input', () => {
+    const dispatch = vi.fn()
+    const app = { dispatch } as unknown as TuiApp
+
+    expect(dispatchHelpInput(app, '', { escape: true })).toBe(true)
+    expect(dispatchHelpInput(app, 'x', {})).toBe(true)
+    expect(dispatch.mock.calls).toEqual([[{ type: 'interruptOrQuit' }]])
   })
 
   it('queues a draft while running and toggles plan mode while idle', () => {

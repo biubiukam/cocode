@@ -39,6 +39,19 @@ export function dispatchKeyCommand(app: TuiApp, id: string, draft: string): void
   }
 }
 
+type HelpKey = {
+  escape?: boolean
+  ctrl?: boolean
+}
+
+/** Close the help overlay before the general interrupt/quit policy runs. */
+export function dispatchHelpInput(app: TuiApp, input: string, key: HelpKey): boolean {
+  if (key.escape || (key.ctrl && input === 'c')) {
+    app.dispatch({ type: 'interruptOrQuit' })
+  }
+  return true
+}
+
 /** Route the composer Tab key without stealing Tab from open completion panels. */
 export function dispatchComposerTab(app: TuiApp, snapshot: TuiSnapshot): boolean {
   if (snapshot.agent === 'running' && snapshot.composer.text.trim() !== '') {

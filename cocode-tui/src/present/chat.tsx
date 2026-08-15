@@ -68,6 +68,7 @@ import {
 } from './components/ChecklistStrip.tsx'
 import {
   dispatchComposerTab,
+  dispatchHelpInput,
   dispatchKeyCommand,
   dispatchPickerInput,
   moveSelection,
@@ -754,6 +755,10 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     if (editorBusy) return
     if (isMouseInput(input)) return
     if (modelSwitchOpen) return
+    if (snap.helpOpen) {
+      dispatchHelpInput(app, input, key)
+      return
+    }
     if (key.meta && input.toLowerCase() === 'm') {
       if (props.mouseSupported !== false) setMouseMode((enabled) => !enabled)
       return
