@@ -53,7 +53,7 @@ export function estimateNodeRows(
     }
     case 'notice':
       if (node.verboseOnly === true && !verbose) return 0
-      return lineCount(node.message)
+      return 1 + lineCount(node.message)
   }
 }
 

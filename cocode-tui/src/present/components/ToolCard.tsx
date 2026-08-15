@@ -8,7 +8,7 @@ import { formatDiffSummary } from '../../runtime/diff-summary.ts'
 
 export function ToolCard(props: { node: ToolNode; verbose: boolean; locale: UiLocale }) {
   const { node, verbose } = props
-  const mark = node.status === 'running' ? '…' : node.status === 'error' ? 'x' : 'ok'
+  const mark = node.status === 'running' ? '◌' : node.status === 'error' ? '×' : '✓'
   const color =
     node.status === 'error' ? theme.error : node.status === 'success' ? theme.success : theme.dim
   const state =
@@ -28,8 +28,9 @@ export function ToolCard(props: { node: ToolNode; verbose: boolean; locale: UiLo
   const detail = toolViewDetail(node.view)
   const diffSummary = node.view?.kind === 'diff' ? node.view.summary : undefined
   return (
-    <Box flexDirection="column" marginTop={1} paddingLeft={1}>
+    <Box flexDirection="column" marginTop={1} paddingLeft={3}>
       <Text color={color}>
+        <Text color={theme.mute}>↳ </Text>
         {mark} <Text bold>{node.name}</Text> · {state}
         {summary ? ` · ${summary}` : ''}
       </Text>

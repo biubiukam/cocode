@@ -47,15 +47,19 @@ export function MessageList(props: {
           const selected = props.selectedNodeId === key
           const expanded = props.expandedNodeIds?.has(key) === true
           return (
-            <Box key={`${node.kind}:${node.id}`}>
+            <Box key={`${node.kind}:${node.id}`} alignItems="flex-start">
               {props.selectedNodeId !== undefined ? (
-                <Text color={selected ? theme.brand : theme.mute}>{selected ? '› ' : '  '}</Text>
+                <Box marginTop={1}>
+                  <Text color={selected ? theme.brand : theme.mute}>{selected ? '› ' : '  '}</Text>
+                </Box>
               ) : null}
-              {renderNode(node, props.verbose, {
-                expanded,
-                locale: props.locale,
-                maxColumns: contentColumns,
-              })}
+              <Box flexDirection="column" flexGrow={1} minWidth={0}>
+                {renderNode(node, props.verbose, {
+                  expanded,
+                  locale: props.locale,
+                  maxColumns: contentColumns,
+                })}
+              </Box>
             </Box>
           )
         })
