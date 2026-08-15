@@ -1,4 +1,22 @@
 {
-  "extends": "./tsconfig.web.base.json",
-  "include": ["src/**/*.ts", "src/**/*.tsx"]
+	"compilerOptions": {
+		"target": "ESNext",
+		"module": "commonjs",
+		"types": ["node"],
+		"allowJs": true,
+		"skipLibCheck": true,
+		"esModuleInterop": true,
+		"noImplicitAny": true,
+		"sourceMap": true,
+		"baseUrl": ".",
+		"jsx": "react-jsx",
+		"paths": {
+			"@/*": ["src/renderer/*"],
+			"@deepseek-ai/dsh-client-web": ["src/renderer/types/dsh-client-web.d.ts"]
+		},
+		"outDir": "dist",
+		"moduleResolution": "node",
+		"resolveJsonModule": true
+	},
+	"exclude": ["packages/client", "packages/cocode", "vendor"]
 }

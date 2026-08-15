@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { defineConfig } from 'tsdown'
 
 const shared = {

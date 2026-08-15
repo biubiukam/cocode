@@ -1,4 +1,3 @@
-// @ts-nocheck
 /** String/symbol keyed dictionary type. */
 export type Dict<T = any, K extends string | symbol = string> = { [key in K]: T }
 /** Safely read `T[K]`, returning `never` when `K` is not a key of `T`. */

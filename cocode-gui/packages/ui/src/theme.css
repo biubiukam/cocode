@@ -1,5 +1,0 @@
-/**
- * Tailwind v3 reads the semantic utility mappings from `tailwind.config.cjs`.
- * The actual values remain in `tokens.css`, so the design tokens still have a
- * single source of truth.
- */

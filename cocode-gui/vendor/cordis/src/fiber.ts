@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { defineProperty, isNullable } from '@deepseek-ai/cosmokit'
 import type { Awaitable, Dict } from '@deepseek-ai/cosmokit'
 import { Context } from './context.ts'

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { isNullable } from './misc.ts'
 
 /** Return true when every item in `array2` is present in `array1`. */

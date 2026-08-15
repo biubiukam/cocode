@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { defineProperty } from '@deepseek-ai/cosmokit'
 import type { Context, Service } from './index.ts'
 

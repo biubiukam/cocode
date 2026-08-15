@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { defineProperty } from '@deepseek-ai/cosmokit'
 import type { Dict } from '@deepseek-ai/cosmokit'
 import type { StandardSchemaV1 } from '@standard-schema/spec'

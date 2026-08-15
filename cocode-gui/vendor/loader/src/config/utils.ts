@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { valueMap } from '@deepseek-ai/cosmokit'
 
 // eslint-disable-next-line no-new-func

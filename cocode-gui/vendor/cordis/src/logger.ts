@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { defineProperty, hyphenate } from '@deepseek-ai/cosmokit'
 import { Context } from './context.ts'
 import { Fiber } from './fiber.ts'

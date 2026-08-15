@@ -1,4 +1,3 @@
-// @ts-nocheck
 /** Array set and normalization helpers. */
 export * from './array.ts'
 /** Runtime type, binary, clone, and equality helpers. */

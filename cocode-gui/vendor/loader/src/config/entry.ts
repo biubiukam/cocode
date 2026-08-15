@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Context, Fiber, Inject } from '@deepseek-ai/cordis'
 import { deepEqual, isNullable } from '@deepseek-ai/cosmokit'
 import { Loader } from '../index.ts'

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Context, FiberState, Inject, Service, type Fiber } from '@deepseek-ai/cordis'
 import { defineProperty, isNullable, type Dict } from '@deepseek-ai/cosmokit'
 import { ModuleLoader } from './internal.ts'
@@ -66,7 +65,7 @@ export namespace Loader {
 export class Loader extends EntryTree {
   declare [Service.config]: Loader.Intercept
 
-  public envData = typeof process !== 'undefined' && process.env?.CORDIS_SHARED
+  public envData = process.env.CORDIS_SHARED
     ? JSON.parse(process.env.CORDIS_SHARED)
     : { startTime: Date.now() }
 

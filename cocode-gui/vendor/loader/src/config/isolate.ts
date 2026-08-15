@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Context } from '@deepseek-ai/cordis'
 import type { Dict } from '@deepseek-ai/cosmokit'
 import { Entry } from './entry.ts'

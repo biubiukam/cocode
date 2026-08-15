@@ -1,5 +1,11 @@
-vendor/
+.vite/
+coverage/
 dist/
-dist-electron/
-release/
-.dev/
+node_modules/
+out/
+docs/
+packages/client/
+packages/cocode/
+vendor/
+*.md
+pnpm-lock.yaml

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import type { Dict } from '@deepseek-ai/cosmokit'
 import { EventsService } from './events.ts'
 import { LoggerService } from './logger.ts'
