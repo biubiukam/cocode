@@ -117,8 +117,39 @@ describe('TuiCompanionGateway', () => {
       planMode: false,
       sessionList: false,
       modelList: false,
+      imageAttachments: false,
       interactions: 'notification-response',
       checkpoint: false,
+    })
+  })
+
+  it('preserves skill discovery sources for command namespacing', async () => {
+    const { gateway } = createGateway({
+      services: {
+        skills: {
+          async list() {
+            return [
+              {
+                name: 'review',
+                description: 'Review changes',
+                source: 'project-agents',
+                invocation: { userInvocable: true },
+              },
+            ]
+          },
+        },
+      },
+    })
+    await gateway.initialize({ cwd: PROJECT_CWD, provider: 'provider', model: 'model' })
+
+    await expect(gateway.listSkills({ sessionId: 'session-a' })).resolves.toEqual({
+      skills: [
+        {
+          name: 'review',
+          description: 'Review changes',
+          source: 'project-agents',
+        },
+      ],
     })
   })
 
@@ -199,6 +230,42 @@ describe('TuiCompanionGateway', () => {
 
     const calls = agents.get('session-a')?.calls
     expect(calls?.map((call) => call.kind)).toEqual(['followup', 'followup', 'steer'])
+  })
+
+  it('validates every image before persisting the batch', async () => {
+    const calls: string[] = []
+    const { gateway } = createGateway({
+      services: {
+        attachments: {
+          imageLimits: {
+            maxImageBytes: 1024,
+            maxImagesPerMessage: 2,
+            maxMessageImageBytes: 2048,
+            mediaTypes: ['image/png'],
+          },
+          async validateImage() {
+            calls.push('validate')
+          },
+          async saveImage(input: { data: Uint8Array; mediaType: 'image/png'; name?: string }) {
+            calls.push('save')
+            return {
+              attachmentId: `sha256:${'a'.repeat(64)}`,
+              mediaType: input.mediaType,
+              bytes: input.data.byteLength,
+              width: 1,
+              height: 1,
+              name: input.name,
+            }
+          },
+        },
+      },
+    })
+    await gateway.initialize({ cwd: PROJECT_CWD, provider: 'provider', model: 'model' })
+    await expect(gateway.saveImages({
+      images: [{ data: Buffer.from('png').toString('base64'), mediaType: 'image/png', name: 'clip.png' }],
+    })).resolves.toMatchObject({ attachments: [{ mediaType: 'image/png', name: 'clip.png' }] })
+    expect(calls).toEqual(['validate', 'save'])
+    expect(gateway.capabilities().imageAttachments).toBe(true)
   })
 
   it('rejects an unavailable optional service with an explicit error', async () => {

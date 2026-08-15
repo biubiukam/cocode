@@ -121,6 +121,11 @@ export function Composer(props: {
           {composer.attachments.map(formatFileMention).join(' · ')}
         </Text>
       ) : null}
+      {composer.images.length > 0 ? (
+        <Text color={theme.info} wrap="truncate-end">
+          image · {composer.images.map((image) => image.name).join(' · ')}
+        </Text>
+      ) : null}
     </Box>
   )
 }

@@ -1,4 +1,4 @@
-import { Box, Text, useInput } from 'ink'
+import { Text, useInput } from 'ink'
 import { useEffect, useRef, useState } from 'react'
 import type { TuiAction, TuiApprovalSnapshot } from '../../runtime/app.ts'
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
@@ -6,6 +6,7 @@ import { theme } from '../theme.ts'
 import { sanitizeSingleLine } from '../text-format.ts'
 import { isMouseInput, type TuiMousePointer } from '../mouse.ts'
 import { approvalActionAtRow } from '../mouse-hit.ts'
+import { PanelFrame } from './PanelFrame.tsx'
 
 export function ApprovalPanel(props: {
   state: TuiApprovalSnapshot
@@ -15,21 +16,29 @@ export function ApprovalPanel(props: {
   dispatch: (action: TuiAction) => void
 }) {
   const [hoveredAction, setHoveredAction] = useState<ReturnType<typeof approvalActionAtRow>>()
+  const [inputReady, setInputReady] = useState(false)
   const lastPointerId = useRef<number>()
 
   useEffect(() => {
+    setInputReady(false)
+    const timer = setTimeout(() => setInputReady(true), 700)
+    return () => clearTimeout(timer)
+  }, [props.state.request.callId, props.state.request.toolName])
+
+  useEffect(() => {
     const pointer = props.mousePointer
-    if (pointer === undefined || pointer.id === lastPointerId.current) return
+    if (!inputReady || pointer === undefined || pointer.id === lastPointerId.current) return
     lastPointerId.current = pointer.id
     const action = approvalActionAtRow(pointer.row, props.panelStartRow)
     setHoveredAction(action)
     if (pointer.action === 'press' && action !== undefined) {
       props.dispatch({ type: 'approval.answer', outcome: action })
     }
-  }, [props])
+  }, [inputReady, props])
 
   useInput((input, key) => {
     if (isMouseInput(input)) return
+    if (!inputReady) return
     if (key.escape || (key.ctrl && input === 'c')) {
       props.dispatch({ type: 'approval.cancel' })
       return
@@ -49,16 +58,17 @@ export function ApprovalPanel(props: {
 
   const request = props.state.request
   return (
-    <Box
-      flexDirection="column"
-      marginTop={1}
-      borderStyle="round"
+    <PanelFrame
+      title={text(props.locale, 'approvalTitle')}
+      footer={
+        inputReady
+          ? text(props.locale, 'approvalHint')
+          : props.locale === 'zh'
+          ? '请稍候…'
+          : 'Please wait…'
+      }
       borderColor={theme.accent}
-      paddingX={1}
     >
-      <Text color={theme.accent} bold>
-        {text(props.locale, 'approvalTitle')}
-      </Text>
       <Text color={theme.text} wrap="truncate-end">
         {sanitizeSingleLine(request.toolName)}
       </Text>
@@ -75,9 +85,6 @@ export function ApprovalPanel(props: {
       <Text color={theme.dim} wrap="truncate-end">
         {text(props.locale, 'approvalSource')}: {sanitizeSingleLine(request.source ?? 'runtime')}
       </Text>
-      <Text color={theme.mute} wrap="truncate-end">
-        {text(props.locale, 'approvalHint')}
-      </Text>
       <ApprovalAction
         active={hoveredAction === 'allowed-once'}
         label={props.locale === 'zh' ? '允许一次' : 'Allow once'}
@@ -93,7 +100,7 @@ export function ApprovalPanel(props: {
         label={props.locale === 'zh' ? '拒绝' : 'Deny'}
         shortcut="d / n"
       />
-    </Box>
+    </PanelFrame>
   )
 }
 

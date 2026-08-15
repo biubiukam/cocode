@@ -1,6 +1,9 @@
-import { Box, Text } from 'ink'
+import { Text } from 'ink'
 import { listWindowStart } from '../list-window.ts'
 import { theme } from '../theme.ts'
+import { PanelFrame } from './PanelFrame.tsx'
+import { SearchQueryLine } from './SearchQueryLine.tsx'
+import { SelectionRow } from './SelectionRow.tsx'
 
 export type ActionMenuItem = {
   id: string
@@ -16,6 +19,7 @@ export function ActionMenu(props: {
   selectedIndex: number
   maxRows?: number
   query?: string
+  queryPlaceholder?: string
   emptyLabel?: string
 }) {
   const selected = selectedIndexFor(props.selectedIndex, props.items.length)
@@ -28,28 +32,28 @@ export function ActionMenu(props: {
   const visible = capacity === 0 ? [] : props.items.slice(start, start + capacity)
 
   return (
-    <Box flexDirection="column" marginTop={1} borderStyle="round" borderColor={theme.border} paddingX={1}>
-      <Text color={theme.brand} bold>
-        {props.title} <Text color={theme.mute}>· {props.hint}</Text>
-      </Text>
+    <PanelFrame title={props.title} hint={props.hint}>
       {props.query !== undefined ? (
-        <Text color={theme.mute} wrap="truncate-end">
-          {props.query === '' ? '⌕ ' : `⌕ ${props.query}`}
-        </Text>
+        <SearchQueryLine
+          query={props.query}
+          placeholder={props.queryPlaceholder ?? 'type to filter'}
+        />
       ) : null}
       {visible.length > 0 ? visible.map((item, offset) => {
         const active = start + offset === selected
         return (
-          <Text key={item.id} color={active ? theme.text : theme.mute} inverse={active} wrap="truncate-end">
-            {active ? '›' : ' '} {item.label}
-            {item.description !== undefined ? <Text color={active ? theme.text : theme.dim}> · {item.description}</Text> : null}
-            {item.shortcut !== undefined ? <Text color={active ? theme.text : theme.dim}>  {item.shortcut}</Text> : null}
-          </Text>
+          <SelectionRow
+            key={item.id}
+            active={active}
+            label={item.label}
+            description={item.description}
+            shortcut={item.shortcut}
+          />
         )
       }) : (
         <Text color={theme.mute}>{props.emptyLabel ?? 'No actions'}</Text>
       )}
-    </Box>
+    </PanelFrame>
   )
 }
 

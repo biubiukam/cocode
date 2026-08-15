@@ -9,6 +9,7 @@ describe('builtin command contract', () => {
       'help',
       'exit',
       'clear',
+      'redraw',
       'status',
       'doctor',
       'theme',
@@ -61,7 +62,10 @@ describe('builtin command contract', () => {
 
   it('filters slash menu input without matching ordinary text', () => {
     const commands = createBuiltinCommands().list(P0_CAPABILITIES)
-    expect(filterCommands(commands, '/re').map((command) => command.name)).toEqual(['review'])
+    expect(filterCommands(commands, '/re').map((command) => command.name)).toEqual([
+      'redraw',
+      'review',
+    ])
     expect(filterCommands(commands, '/')).not.toHaveLength(0)
     expect(filterCommands(commands, 'review')).toEqual([])
     expect(parseSlash('/model deepseek-v4')).toEqual({ name: 'model', args: 'deepseek-v4' })
@@ -98,7 +102,12 @@ describe('builtin command contract', () => {
       command.run(ctx, command.name === 'theme' ? 'dark' : command.name === 'lang' ? 'en' : '')
     }
 
-    expect(actions).toEqual([{ type: 'toggleHelp' }, { type: 'quit' }, { type: 'compact' }])
+    expect(actions).toEqual([
+      { type: 'toggleHelp' },
+      { type: 'quit' },
+      { type: 'redraw' },
+      { type: 'compact' },
+    ])
     expect(calls).toEqual(
       new Set([
         'newSession',

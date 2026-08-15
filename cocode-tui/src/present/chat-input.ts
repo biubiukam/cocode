@@ -24,6 +24,12 @@ export function dispatchKeyCommand(app: TuiApp, id: string, draft: string): void
     case 'app.redraw':
       app.dispatch({ type: 'redraw' })
       return
+    case 'model.open':
+      app.dispatch({ type: 'model.open' })
+      return
+    case 'image.paste':
+      app.dispatch({ type: 'image.paste' })
+      return
     case 'transcript.toggleVerbose':
       app.dispatch({ type: 'toggleVerbose' })
       return

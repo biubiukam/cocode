@@ -147,6 +147,8 @@ DSH_CORDIS_CONFIG=companion/cordis.yml
 
 `/resume` 会读取本地 session header，支持关键词过滤和 `↑` `↓` 选择，以流式方式将选中 JSONL 的事件回放到临时投影，并要求 runtime 重新打开同一个持久化 session 后再替换当前 TUI。后续输入会继续写入选中的 session id。TUI 不负责跨进程写入锁；如果其它客户端正在写同一 session，请不要同时恢复。
 
+运行时会话树会用 `✓` 标记当前附加的 session，用 `◉` 标记当前 runtime 报告为运行中的 session，用 `·` 标记已知空闲的 session。这些 activity 标记来自当前 runtime 的实时通知，不表示跨进程写入锁。
+
 `/fork` 会打开用户消息选择器，按最新消息在前排列。使用 `↑`/`↓` 选择分支边界，再连续按两次回车确认。runtime 会通过 fork wire 创建子会话并替换当前活动 session。如果需要复制完整当前对话而不选择边界，使用 `/clone`。
 
 选择器每一行会显示该会话首条用户消息的短摘要。系统会移除控制字符和终端转义序列、合并空白，并限制为最多 72 个可见字符，避免长 prompt 撑开选择器。如果事件读取失败，会回退显示会话工作目录；两者都没有时显示「无摘要」。摘要只用于界面展示，不会修改持久化 JSONL。
@@ -168,6 +170,8 @@ DSH_CORDIS_CONFIG=companion/cordis.yml
 ## Runtime capability 边界
 
 只有 harness 的 `skills/list` 返回真实目录后，TUI 才会启用 `/skills`。如果 composition 没有挂载 `@deepseek-ai/dsh-skill` 及其 provider（例如 `@deepseek-ai/dsh-skill-filesystem`），命令会保持隐藏；探测失败或目录为空不会被展示成可用能力。
+
+Companion 默认挂载 Cocode 自己的 `cocode-vision` 插件，并启用 `autoRead`。发送的 Harness `image` block 会先转换为视觉证据，再交给当前文本模型；同时保留原始附件引用，支持原生视觉模型继续读取。视觉 provider 有两种：`cocode` 使用 Cocode 服务，默认视觉模型为 `gpt-luna`；`user` 使用用户配置的 OpenAI-compatible endpoint。用户配置可以写入 `$COCODE_HOME/vision.yaml`（默认 `~/.cocode/vision.yaml`），可参考 [vision.yaml.example](./vision.yaml.example)。`COCODE_VISION_PROVIDER`、`COCODE_VISION_USER_MODEL` 等环境变量优先级更高。账号切换到 Cocode 后，插件会自动复用账号生成的 `COCODE_LLM_PROVIDERS.cocode-cloud` endpoint 和 credential reference，不使用 cloud model 列表的首项。凭证只填写引用名，实际值由 Harness credentials service 管理，不进入 session log 或 TUI 设置。
 
 `/doctor` 中的 `caps-configured` 表示 TUI 根据配置和本地实现预期的能力，`caps-runtime` 表示初始化后对真实 JSON-RPC runtime 的探测结果。两者不一致时，以运行时结果为准；`caps-errors` 会列出被禁用能力的原因。探测使用随机、不存在的 session id，不会创建或修改用户会话。
 

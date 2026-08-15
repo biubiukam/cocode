@@ -59,6 +59,9 @@ export function createBuiltinCommands(): CommandRegistry {
   local('clear', 'Clear the projected transcript', (ctx) => {
     ctx.clearTranscript()
   })
+  local('redraw', 'Redraw the terminal without clearing the session', (ctx) => {
+    ctx.dispatch({ type: 'redraw' })
+  })
   local('status', 'Show session, model, and agent state', (ctx) => {
     ctx.showStatus()
   })
@@ -98,6 +101,14 @@ export function createBuiltinCommands(): CommandRegistry {
   })
   local('copy', 'Copy the latest assistant reply to the clipboard', (ctx) => {
     ctx.copyLatestAssistant?.()
+  })
+  registry.register({
+    name: 'paste-image',
+    summary: 'Paste an image from the system clipboard',
+    summaryZh: '从系统剪贴板粘贴图片',
+    kind: 'local',
+    available: (caps) => caps.imageAttachments,
+    run: (ctx) => ctx.pasteImage?.(),
   })
   registry.register({
     name: 'todos',
@@ -244,9 +255,9 @@ export function helpText(
   caps: TuiCapabilities,
   registry: CommandRegistry,
   locale: UiLocale = 'en',
+  additional: readonly Command[] = [],
 ): string {
-  const commands = registry
-    .list(caps)
+  const commands = [...registry.list(caps), ...additional]
     .map((command) => `/${command.name}  ${commandSummary(command, locale)}`)
     .join('\n')
   return [

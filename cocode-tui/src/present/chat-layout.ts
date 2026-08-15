@@ -118,7 +118,7 @@ function helpRows(lines: number | undefined): number {
 function slashRows(items: number | undefined): number {
   if (items === undefined) return 0
   const count = nonNegativeInteger(items)
-  return count + 4
+  return Math.max(1, count) + 4
 }
 
 function fileRows(items: number | undefined, loading = false): number {

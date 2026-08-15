@@ -4,6 +4,7 @@ import {
   createSessionTreePicker,
   moveSessionTreeSelection,
   selectedSessionTreeItem,
+  setSessionTreeActivity,
   setSessionTreeQuery,
   visibleSessionTreeItems,
 } from '../../src/runtime/session-tree-picker.ts'
@@ -51,5 +52,13 @@ describe('session tree picker', () => {
     const state = closeSessionTreePicker(createSessionTreePicker(items))
     expect(state.open).toBe(false)
     expect(selectedSessionTreeItem(state)?.session.id).toBe('root')
+  })
+
+  it('projects live activity without changing the picker selection', () => {
+    const state = createSessionTreePicker(items)
+    const running = setSessionTreeActivity(state, 'child', 'running')
+    expect(running.selected).toBe(state.selected)
+    expect(running.items.find((item) => item.session.id === 'child')?.activity).toBe('running')
+    expect(setSessionTreeActivity(running, 'missing', 'idle')).toBe(running)
   })
 })

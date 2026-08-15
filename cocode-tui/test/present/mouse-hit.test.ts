@@ -53,6 +53,14 @@ describe('mouse hit zones', () => {
       selectedIndex: 0,
       maxRows: 8,
     })).toBeUndefined()
+    expect(actionMenuItemIndexAtRow({
+      row: 15,
+      menuStartRow: 10,
+      itemCount: 4,
+      selectedIndex: 0,
+      maxRows: 9,
+      query: true,
+    })).toBe(1)
   })
 
   it('keeps pointer hits inside the inline popup region', () => {

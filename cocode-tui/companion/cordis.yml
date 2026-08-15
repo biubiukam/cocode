@@ -10,6 +10,9 @@
 - id: credentials
   name: '@deepseek-ai/dsh-credentials-local'
 
+- id: attachments
+  name: '@deepseek-ai/dsh-attachment-local'
+
 - id: llm-deepseek
   name: '@deepseek-ai/dsh-llm-deepseek'
   config:
@@ -26,11 +29,32 @@
 - id: subprocess
   name: '@deepseek-ai/dsh-subprocess-local'
 
-- id: bash
-  name: '@deepseek-ai/dsh-bash-local'
+- id: sandbox
+  name: '@deepseek-ai/dsh-sandbox-local'
+
+- id: sandbox-policy
+  name: '@deepseek-ai/dsh-sandbox-policy'
+  config:
+    mode: !!js "process.env.DSH_PERMISSION_MODE ?? 'workspace-write'"
+    workspaceRoot: !!js 'process.env.DSH_CWD ?? process.cwd()'
+
+- id: bash-sandbox
+  name: '@deepseek-ai/dsh-bash-sandbox'
+  disabled: !!js "process.platform === 'win32'"
   config:
     cwd: !!js 'process.env.DSH_CWD ?? process.cwd()'
     timeoutMs: 60000
+
+- id: pwsh-sandbox
+  name: '@deepseek-ai/dsh-pwsh-sandbox'
+  disabled: !!js "process.platform !== 'win32'"
+  config:
+    cwd: !!js 'process.env.DSH_CWD ?? process.cwd()'
+    timeoutMs: 60000
+
+- id: shell-env-windows
+  name: '@deepseek-ai/dsh-shell-env'
+  disabled: !!js "process.platform !== 'win32'"
 
 - id: agent-spine
   name: '@deepseek-ai/dsh-agent-spine-demo'
@@ -38,10 +62,24 @@
     persona: !!js "process.env.DSH_SYSTEM_PROMPT ?? 'You are a coding agent.'"
     workspaceContext: false
     skills:
-      enabled: false
-    toolBash:
-      enableRunInBackground: false
+      enabled: true
+    toolBash: !!js "process.platform === 'win32' ? false : { enableRunInBackground: false }"
     toolJobs: false
+
+- id: cocode-vision
+  name: '../packages/vision/src/index.ts'
+  config:
+    autoRead: true
+    fallbackToNative: true
+    provider: !!js "process.env.COCODE_VISION_PROVIDER ?? 'cocode'"
+    user:
+      endpoint: !!js 'process.env.COCODE_VISION_USER_ENDPOINT'
+      model: !!js 'process.env.COCODE_VISION_USER_MODEL'
+      credentialRef: !!js 'process.env.COCODE_VISION_USER_CREDENTIAL_REF'
+    cocode:
+      endpoint: !!js 'process.env.COCODE_VISION_ENDPOINT'
+      model: !!js 'process.env.COCODE_VISION_MODEL'
+      credentialRef: !!js 'process.env.COCODE_VISION_CREDENTIAL_REF'
 
 - id: sessions
   name: '@deepseek-ai/dsh-session-persistence-jsonl'
@@ -58,7 +96,27 @@
 - id: user-approval
   name: '@deepseek-ai/dsh-user-approval'
   config:
-    policy: ask
+    policy: !!js "(process.env.DSH_PERMISSION_MODE ?? 'workspace-write') === 'danger-full-access' ? 'never' : 'ask'"
+
+- id: permission-presets
+  name: '@deepseek-ai/dsh-permission-presets'
+  config:
+    presets:
+      read-only:
+        sandbox: read-only
+        approval: ask
+      workspace-write:
+        sandbox: workspace-write
+        approval: ask
+      danger-full-access:
+        sandbox: danger-full-access
+        approval: never
+
+- id: tool-pwsh
+  name: '@deepseek-ai/dsh-tool-pwsh'
+  disabled: !!js "process.platform !== 'win32'"
+  config:
+    enableRunInBackground: false
 
 - id: plan-mode
   name: '@deepseek-ai/dsh-plan-mode'
@@ -96,8 +154,8 @@
   config:
     allowParallelInProgress: true
 
-- id: fs-local
-  name: '@deepseek-ai/dsh-fs-local'
+- id: fs-sandbox
+  name: '@deepseek-ai/dsh-fs-sandbox'
   config:
     cwd: !!js 'process.env.DSH_CWD ?? process.cwd()'
 

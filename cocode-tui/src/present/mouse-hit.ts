@@ -37,12 +37,17 @@ export function actionMenuItemIndexAtRow(props: {
   itemCount: number
   selectedIndex: number
   maxRows: number
+  query?: boolean
 }): number | undefined {
   if (props.itemCount === 0) return undefined
-  const capacity = Math.max(0, Math.min(props.itemCount, Math.trunc(props.maxRows) - 4))
+  const queryRows = props.query === true ? 1 : 0
+  const capacity = Math.max(
+    0,
+    Math.min(props.itemCount, Math.trunc(props.maxRows) - 4 - queryRows),
+  )
   if (capacity === 0) return undefined
   const start = listWindowStart(props.selectedIndex, props.itemCount, capacity)
-  const index = props.row - (props.menuStartRow + 3)
+  const index = props.row - (props.menuStartRow + 3 + queryRows)
   const resolved = start + index
   return index >= 0 && index < capacity && resolved < props.itemCount ? resolved : undefined
 }

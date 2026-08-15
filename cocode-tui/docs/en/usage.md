@@ -148,6 +148,8 @@ Type `/` to open the command menu. Keep typing to filter by prefix. `Tab` or arr
 
 `/resume` reads local session headers, supports text filtering plus `↑` `↓` selection, streams the selected JSONL into a temporary projection, and asks the runtime to reopen the same persisted session before swapping it into the current TUI. Follow-up prompts use the selected session id and continue writing to that session. The TUI does not claim cross-process locking; avoid resuming a session that another client is currently writing.
 
+The runtime session tree marks the attached session with `✓`, live sessions reported as running with `◉`, and known idle sessions with `·`. These activity markers are best-effort notifications from the current runtime and do not claim cross-process locking.
+
 `/fork` opens a picker of user messages, newest first. Press `↑`/`↓` to choose a boundary, then press Enter twice to confirm. The runtime creates the child session and replaces the current live session through the fork wire. Use `/clone` when you want to copy the complete current conversation without choosing a boundary.
 
 Each picker row includes a short preview generated from the first user message in the session. Control characters and terminal escape sequences are removed, whitespace is collapsed, and the preview is capped at 72 visible characters so a long prompt cannot expand the picker. If the event cannot be read, the picker falls back to the session working directory; when neither value is available it shows `No summary`. The preview is display-only and does not modify the persisted JSONL.
@@ -169,6 +171,8 @@ If another TUI window is still open, `/use`, `/login`, and `/logout` refuse so t
 ## Runtime capability boundaries
 
 The `/skills` command is enabled only after `skills/list` returns a real catalog from the harness. A composition without `@deepseek-ai/dsh-skill` (and a provider such as `@deepseek-ai/dsh-skill-filesystem`) keeps the command hidden; an empty or failed probe is not presented as a usable feature.
+
+The companion mounts Cocode's own `cocode-vision` plugin with `autoRead` enabled. Harness `image` blocks are converted into visual evidence before the active text model runs, while the durable attachment reference is retained for native vision models. Choose `cocode` for the Cocode service, whose default vision model is `gpt-luna`, or `user` for a user-managed OpenAI-compatible endpoint. After switching the account to Cocode, the plugin automatically reuses the account-generated `COCODE_LLM_PROVIDERS.cocode-cloud` endpoint and credential reference; it does not select the first model from the cloud catalog. User settings can be persisted in `$COCODE_HOME/vision.yaml` (default `~/.cocode/vision.yaml`); use [vision.yaml.example](./vision.yaml.example) as a template. Environment variables such as `COCODE_VISION_PROVIDER` and `COCODE_VISION_USER_MODEL` override the file. Only credential references are configured here; Harness credentials owns the actual values, which never enter session logs or TUI settings.
 
 In `/doctor`, `caps-configured` is what the TUI expects from local configuration and implementation, while `caps-runtime` is the result of probing the live JSON-RPC runtime after initialization. When they differ, the runtime result wins; `caps-errors` explains disabled capabilities. Probes use a random, non-existent session id and do not create or mutate a user session.
 

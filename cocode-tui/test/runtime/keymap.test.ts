@@ -11,9 +11,12 @@ describe('keymap', () => {
     expect(matchKey({ raw: 'g', ctrl: true, empty: true })).toEqual({ id: 'editor.open' })
   })
 
-  it('preserves the default help and redraw bindings', () => {
+  it('keeps Ctrl+L model switching and a slash redraw fallback', () => {
     expect(matchKey({ raw: '?', shift: true, empty: true })).toEqual({ id: 'help.toggle' })
-    expect(matchKey({ raw: 'l', ctrl: true, empty: false })).toEqual({ id: 'app.redraw' })
+    expect(matchKey({ raw: 'l', ctrl: true, empty: false })).toEqual({ id: 'model.open' })
+    const keymap = resolveKeymap({ COCODE_TUI_KEYMAP: '{"model.open":"alt+l"}' })
+    expect(matchKey({ raw: 'l', ctrl: true, empty: false }, keymap)).toBeUndefined()
+    expect(matchKey({ raw: 'l', alt: true, empty: false }, keymap)).toEqual({ id: 'model.open' })
   })
 
   it('allows known commands to override their default bindings', () => {

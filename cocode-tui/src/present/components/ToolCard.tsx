@@ -10,6 +10,12 @@ import {
 } from '../../runtime/nodes/tool-view.ts'
 import { formatDiffSummary } from '../../runtime/diff-summary.ts'
 import { Markdown, StreamingMarkdown } from './Markdown.tsx'
+import {
+  formatElapsed,
+  toolArgumentSummary,
+  toolDisplayState,
+  toolErrorSummary,
+} from '../tool-display.ts'
 
 export function ToolCard(props: {
   node: ToolNode
@@ -18,24 +24,12 @@ export function ToolCard(props: {
   maxColumns?: number
 }) {
   const { node, verbose } = props
-  const mark = node.status === 'running' ? '◌' : node.status === 'error' ? '×' : '✓'
-  const color =
-    node.status === 'error' ? theme.error : node.status === 'success' ? theme.success : theme.dim
-  const state =
-    node.status === 'running'
-      ? props.locale === 'zh'
-        ? '运行中'
-        : 'running'
-      : node.status === 'error'
-      ? props.locale === 'zh'
-        ? '失败'
-        : 'error'
-      : props.locale === 'zh'
-      ? '完成'
-      : 'done'
+  const displayState = toolDisplayState(node, props.locale)
+  const elapsed = node.status === 'running' ? formatElapsed(node.time) : undefined
   const result = formatToolResult(node.result, verbose)
-  const summary = !verbose ? result ?? node.error?.code : undefined
+  const summary = !verbose ? result ?? toolErrorSummary(node.error) : undefined
   const detail = toolViewDetail(node.view)
+  const argumentSummary = !verbose ? toolArgumentSummary(node.args) : undefined
   const diffSummary = node.view?.kind === 'diff' ? node.view.summary : undefined
   const toolName = node.name === '' ? 'tool' : node.name
   const plan =
@@ -43,6 +37,10 @@ export function ToolCard(props: {
       ? extractPartialJsonStringArgument(node.args, 'plan')
       : undefined
   const planProgress = plan === undefined ? undefined : truncatePlanProgress(plan)
+  const isQuestionRunning = toolName === 'ask_user_question' && node.status === 'running'
+  const questionProgress = isQuestionRunning
+    ? extractPartialJsonStringArgument(node.args, 'question')
+    : undefined
   return (
     <Box
       flexDirection="column"
@@ -51,12 +49,19 @@ export function ToolCard(props: {
       width={props.maxColumns}
       minWidth={0}
     >
-      <Text color={color}>
+      <Text color={displayState.color}>
         <Text color={theme.mute}>↳ </Text>
-        {mark} <Text bold>{toolName}</Text> · {state}
+        {displayState.mark} <Text bold>{toolName}</Text> · {displayState.label}
+        {elapsed ? ` · ${elapsed}` : ''}
         {summary ? ` · ${summary}` : ''}
       </Text>
       {detail !== undefined ? <Text color={theme.mute}> {detail}</Text> : null}
+      {argumentSummary !== undefined ? (
+        <Text color={theme.dim} wrap="truncate-end">
+          {' '}
+          {argumentSummary}
+        </Text>
+      ) : null}
       {diffSummary !== undefined ? (
         <Text color={theme.info}> {formatDiffSummary(diffSummary)}</Text>
       ) : null}
@@ -66,20 +71,45 @@ export function ToolCard(props: {
             {text(props.locale, node.streaming ? 'planStreaming' : 'planReady')}
           </Text>
           {node.streaming ? (
-            <StreamingMarkdown text={planProgress} maxColumns={props.maxColumns} />
+            <StreamingMarkdown
+              text={planProgress}
+              maxColumns={props.maxColumns}
+            />
           ) : (
-            <Markdown text={planProgress} maxColumns={props.maxColumns} />
+            <Markdown
+              text={planProgress}
+              maxColumns={props.maxColumns}
+            />
           )}
         </Box>
       ) : null}
-      {verbose && node.args !== '' && planProgress === undefined ? (
+      {isQuestionRunning ? (
+        <Box flexDirection="column" paddingLeft={2}>
+          <Text color={theme.info} wrap="truncate-end">
+            {text(props.locale, node.streaming ? 'questionStreaming' : 'questionReady')}
+          </Text>
+          {questionProgress === undefined ? null : (
+            <Text color={theme.text} wrap="truncate-end">
+              {questionProgress}
+            </Text>
+          )}
+        </Box>
+      ) : null}
+      {verbose && node.args !== '' && planProgress === undefined && !isQuestionRunning ? (
         <Text color={theme.mute}> args {node.args}</Text>
       ) : null}
       {verbose && diffSummary === undefined && result !== undefined ? (
         <Text color={theme.tool}> {result}</Text>
       ) : null}
-      {verbose && diffSummary !== undefined ? <DiffLines summary={diffSummary} /> : null}
-      {verbose && node.error ? <Text color={theme.error}> {node.error.code}</Text> : null}
+      {verbose && diffSummary !== undefined ? (
+        <DiffLines summary={diffSummary} />
+      ) : null}
+      {verbose && node.error ? (
+        <Text color={theme.error} wrap="truncate-end">
+          {' '}
+          {toolErrorSummary(node.error) ?? node.error.code}
+        </Text>
+      ) : null}
     </Box>
   )
 }

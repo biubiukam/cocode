@@ -30,11 +30,16 @@ export class PromptQueueCoordinator {
     return this.pickerState
   }
 
-  add(text: string, attachments: QueuedPrompt['attachments']): boolean {
+  add(
+    text: string,
+    attachments: QueuedPrompt['attachments'],
+    images: QueuedPrompt['images'],
+  ): boolean {
     const added = this.queue.add({
       id: `queue-${++this.serial}`,
       text,
       attachments,
+      images,
     })
     if (added) this.syncPicker()
     return added
