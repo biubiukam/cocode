@@ -8,6 +8,7 @@ import { resolveCompanionRuntimeLayout } from '../../scripts/companion-layout.mj
 interface CompanionEntry {
   id?: string
   name?: string
+  disabled?: unknown
   config?: Record<string, unknown>
 }
 
@@ -53,5 +54,41 @@ describe('companion runtime layout', () => {
 
     expect(planMode?.name).toBe('@deepseek-ai/dsh-plan-mode')
     expect(planMode?.config?.section).toEqual(expect.stringMatching(/\S/))
+  })
+
+  it('mounts sandboxed tools behind one permission preset service', () => {
+    const source = readFileSync(
+      fileURLToPath(new URL('../../companion/cordis.yml', import.meta.url)),
+      'utf8',
+    )
+    const entries = parse(source, {
+      customTags: [{ tag: 'tag:yaml.org,2002:js', resolve: (value: string) => value }],
+    }) as CompanionEntry[]
+    const names = new Map(entries.map((entry) => [entry.id, entry.name]))
+    const approvalIndex = entries.findIndex((entry) => entry.id === 'user-approval')
+    const permissionIndex = entries.findIndex((entry) => entry.id === 'permission-presets')
+
+    expect(names.get('sandbox')).toBe('@deepseek-ai/dsh-sandbox-local')
+    expect(names.get('sandbox-policy')).toBe('@deepseek-ai/dsh-sandbox-policy')
+    expect(names.get('bash-sandbox')).toBe('@deepseek-ai/dsh-bash-sandbox')
+    expect(names.get('pwsh-sandbox')).toBe('@deepseek-ai/dsh-pwsh-sandbox')
+    expect(names.get('fs-sandbox')).toBe('@deepseek-ai/dsh-fs-sandbox')
+    expect(names.get('permission-presets')).toBe('@deepseek-ai/dsh-permission-presets')
+    expect(names.get('tool-pwsh')).toBe('@deepseek-ai/dsh-tool-pwsh')
+    expect(entries.find((entry) => entry.id === 'bash-sandbox')?.disabled).toContain(
+      "process.platform === 'win32'",
+    )
+    expect(entries.find((entry) => entry.id === 'pwsh-sandbox')?.disabled).toContain(
+      "process.platform !== 'win32'",
+    )
+    expect(entries.find((entry) => entry.id === 'tool-pwsh')?.disabled).toContain(
+      "process.platform !== 'win32'",
+    )
+    expect(entries.find((entry) => entry.id === 'permission-presets')?.config?.presets).toEqual({
+      'read-only': { sandbox: 'read-only', approval: 'ask' },
+      'workspace-write': { sandbox: 'workspace-write', approval: 'ask' },
+      'danger-full-access': { sandbox: 'danger-full-access', approval: 'never' },
+    })
+    expect(permissionIndex).toBeGreaterThan(approvalIndex)
   })
 })
