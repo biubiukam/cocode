@@ -3,6 +3,7 @@
  */
 
 import type { SessionEvent } from '@cocode/tui-connection'
+import type { DiffSummary } from '../diff-summary.ts'
 
 export type NodeMatch = { id: string; role: 'start' | 'update' }
 
@@ -61,7 +62,7 @@ export type ToolNode = {
 export type ToolView =
   | { kind: 'read'; path?: string }
   | { kind: 'search'; query?: string }
-  | { kind: 'diff'; paths?: readonly string[] }
+  | { kind: 'diff'; paths?: readonly string[]; summary?: DiffSummary }
   | { kind: 'terminal'; command?: string }
 
 export type NoticeNode = {

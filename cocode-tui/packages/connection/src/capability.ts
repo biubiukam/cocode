@@ -1,7 +1,7 @@
 /** Runtime capability probing for optional JSON-RPC methods. */
 
 import { randomUUID } from 'node:crypto'
-import type { SessionEvent, TuiCapabilitySnapshot } from './types.ts'
+import type { SessionEvent, TuiCapabilitySnapshot, TuiRuntimeAdvertisement } from './types.ts'
 
 type ProbeClient = {
   request(method: string, params?: object, timeoutMs?: number): Promise<unknown>
@@ -12,14 +12,28 @@ const CAPABILITY_PROBE_TIMEOUT_MS = 1_000
 /** Probe optional methods without creating or changing a user session. */
 export async function probeRuntimeCapabilities(
   client: ProbeClient,
-  options: { onRequest?: boolean; probeSessionId?: string } = {},
+  options: {
+    onRequest?: boolean
+    probeSessionId?: string
+    advertised?: TuiRuntimeAdvertisement
+  } = {},
 ): Promise<TuiCapabilitySnapshot> {
   const probeSessionId = options.probeSessionId ?? `cocode-capability-probe-${randomUUID()}`
   const capabilities = emptyCapabilities(options.onRequest === true)
+  if (options.advertised !== undefined) {
+    capabilities.approval = options.advertised.approval && options.onRequest === true
+    capabilities.permissionMode = options.advertised.permissionMode
+    capabilities.planMode = options.advertised.planMode
+    capabilities.sessionList = options.advertised.sessionList
+    capabilities.promptMode = options.advertised.promptModes.some((mode) => mode !== 'normal')
+  }
   const errors: TuiCapabilitySnapshot['errors'] = {}
 
   if (options.onRequest !== true) {
     errors.onRequest = 'SDK client does not expose onRequest'
+    if (options.advertised?.approval === true) {
+      errors.approval = 'runtime advertised approval but SDK client has no request handler'
+    }
   }
 
   const probes: {
@@ -61,6 +75,25 @@ export async function probeRuntimeCapabilities(
       unavailable: (error) =>
         /skills registry is not configured|skills.*unavailable/i.test(errorMessage(error)),
     },
+    {
+      name: 'sessionList',
+      method: 'session/list',
+      params: {},
+      validate: (result) => isRecord(result) && Array.isArray(result.sessions),
+    },
+    {
+      name: 'permissionMode',
+      method: 'permission/mode',
+      params: { sessionId: probeSessionId },
+      validate: (result) =>
+        isRecord(result) && typeof result.mode === 'string' && Array.isArray(result.supportedModes),
+    },
+    {
+      name: 'planMode',
+      method: 'plan/mode',
+      params: { sessionId: probeSessionId },
+      validate: (result) => isRecord(result) && typeof result.active === 'boolean',
+    },
   ]
 
   for (const probe of probes) {
@@ -86,7 +119,12 @@ export async function probeRuntimeCapabilities(
     }
   }
 
-  return { source: 'runtime', capabilities, errors }
+  return {
+    source: 'runtime',
+    capabilities,
+    errors,
+    ...(options.advertised === undefined ? {} : { modes: options.advertised }),
+  }
 }
 
 export function fallbackCapabilitySnapshot(): TuiCapabilitySnapshot {
@@ -115,6 +153,11 @@ function emptyCapabilities(onRequest: boolean): TuiCapabilitySnapshot['capabilit
     rewind: false,
     skills: false,
     onRequest,
+    approval: false,
+    permissionMode: false,
+    planMode: false,
+    sessionList: false,
+    promptMode: false,
   }
 }
 

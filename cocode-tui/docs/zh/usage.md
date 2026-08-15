@@ -14,9 +14,13 @@ DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 
 密钥可以通过首屏登录配置，也可以临时设置 `DEEPSEEK_API_KEY`。开发环境可用 `COCODE_HOME` 指向单独的配置目录。会话目录默认使用 `$DSH_HOME/sessions`；未设置 `DSH_HOME` 时使用 `~/.dsh/sessions`，也可以用 `DSH_SESSION_ROOT` 覆盖。
 
+同一份程序支持 Windows、macOS 和 Linux。Windows 未配置 `$VISUAL` 或 `$EDITOR` 时使用 `notepad.exe`；WSL 使用 Linux 进程语义，并可回退到 `clip.exe` 和 `explorer.exe`。使用 VS Code 等图形编辑器时，请配置带等待参数的命令。
+
 ## 界面分区
 
 终端呈现方式由 `COCODE_TUI_SCREEN` 控制：`inline`（默认）保留主屏和滚动历史，`alternate` 使用全屏备用缓冲区，退出时恢复原终端。Windows 旧版控制台不支持备用缓冲区时会自动回退到 `inline`。
+
+在 `tmux` 或 `screen` 中，TUI 会自动使用 inline 呈现并关闭终端通知，因为嵌套备用屏幕和 OSC 控制序列在这些环境下不稳定。
 
 - 顶部显示工作区、git 分支、session、provider、model 和实时 Agent 状态。
 - 中间是会话投影：`you`、`cocode`、思考内容和工具结果按节点分组显示。
@@ -40,6 +44,7 @@ DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 - `Ctrl+O` 切换详细模式，查看完整思考内容和工具输入输出。
 - 对话运行中，状态栏会显示「思考中…」。即使下一段流式输出暂时没有到达，也能和空闲状态区分开。状态栏还会显示最近一次 assistant 的输入/输出 token，以及 wire 已报告的当前子代理活动。收到可选事件后，还会显示解码 TPS、缓存命中率、上下文窗口占用比例、推理等级、当前工作状态、紧凑的上下文分段（`S/P/A/T/X` 分别表示系统、输入、回复、思考和工具）、待办进度、目标阶段和当前 agent preset。分段数值按文本长度估算，不代表 provider 的计费数据。
 - 当前任务运行时按 `Tab` 可将输入加入队列，最多 8 条；收到 `session.status=idle` 后按顺序自动发送。这是本地排队，不会打断当前任务，也不是 steer。
+- `/review` 打开只读 Git Review。选择 `working-tree`、`staged`、`last-commit` 或 `branch`，查看受限的文件与 Diff 摘要后按回车，将结构化 Review 上下文发送到当前会话。
 - `Esc` 在帮助、命令菜单等弹层中先关闭弹层；任务运行时第一次请求取消，第二次退出；空闲时连续按两次退出 TUI。
 - `Ctrl+L` 重绘界面，不清除会话内容。
 - 可用 `COCODE_TUI_KEYMAP` 以 JSON 对象覆盖快捷键，例如
@@ -73,6 +78,10 @@ DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 | `/export`                      | 将当前投影导出为 Markdown 文件                                       |
 | `/copy`                        | 复制最近一条 assistant 回复到系统剪贴板                              |
 | `/focus`                       | 显示或隐藏最近一轮用户消息及其后续节点                               |
+| `/review`                      | 使用受限的只读 Diff 预览检查当前 Git 改动                            |
+| `/permissions` / `/plan`       | 在运行时支持时切换权限模式或计划模式                                 |
+| `/fork` / `/clone`             | 从当前对话创建子会话                                                 |
+| `/tree` / `/sessions`          | 在支持会话列表时显示运行时会话关系                                   |
 | `/init`                        | 仅在缺少 `AGENTS.md` 时创建最小工作区模板                            |
 | `/theme dark` / `/theme light` | 切换显示主题                                                         |
 | `/lang zh` / `/lang en`        | 切换中英文界面                                                       |

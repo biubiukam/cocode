@@ -4,9 +4,10 @@ import { createReadStream } from 'node:fs'
 import { readdir, stat } from 'node:fs/promises'
 import { createInterface } from 'node:readline'
 import { createZstdDecompress } from 'node:zlib'
-import { join, posix, resolve, win32 } from 'node:path'
+import { join, resolve } from 'node:path'
 import type { SessionEvent } from '@cocode/tui-connection'
 import { blocksToText, isRecord } from './text.ts'
+import { pathForPlatform } from './platform.ts'
 
 export const SESSION_PREVIEW_MAX_LENGTH = 72
 
@@ -15,6 +16,9 @@ export type SessionSummary = {
   createdAt: number
   cwd?: string
   preview?: string
+  title?: string
+  parentSession?: string
+  seedLength?: number
   path: string
 }
 
@@ -58,6 +62,8 @@ type SessionHeader = {
   id: string
   createdAt: number
   cwd?: string
+  parentSession?: string
+  seedLength?: number
 }
 
 export async function listSessionSummaries(options: {
@@ -114,15 +120,15 @@ export async function listSessionSummaries(options: {
           skipped += 1
           continue
         }
-        let preview: string | undefined
+        let display: { preview?: string; title?: string } = {}
         try {
-          preview = await readFirstUserPreview(existing[0], existing[0] === compressed)
+          display = await readSessionDisplay(existing[0], existing[0] === compressed)
         } catch {
           // A broken or partially-written event stream must not hide a valid session header.
         }
         sessions.push({
           ...header,
-          ...(preview === undefined ? {} : { preview }),
+          ...display,
           path: existing[0],
         })
       } catch {
@@ -138,20 +144,29 @@ export async function listSessionSummaries(options: {
   return { sessions: sessions.slice(0, limit), skipped }
 }
 
-async function readFirstUserPreview(
+async function readSessionDisplay(
   path: string,
   compressed: boolean,
-): Promise<string | undefined> {
+): Promise<{ preview?: string; title?: string }> {
   const source = createReadStream(path)
   const output = compressed ? source.pipe(createZstdDecompress()) : source
   const lines = createInterface({ input: output })
+  let preview: string | undefined
+  let title: string | undefined
   try {
     for await (const line of lines) {
       const event = parseEvent(line)
-      if (event?.type !== 'user/message') continue
-      return previewText(userMessageText(event.data))
+      if (event?.type === 'user/message' && preview === undefined) {
+        preview = previewText(userMessageText(event.data))
+      }
+      if (event?.type === 'session/title' && isRecord(event.data)) {
+        title = previewText(typeof event.data.title === 'string' ? event.data.title : '')
+      }
     }
-    return undefined
+    return {
+      ...(preview === undefined ? {} : { preview }),
+      ...(title === undefined ? {} : { title }),
+    }
   } finally {
     lines.close()
     source.destroy()
@@ -233,7 +248,12 @@ function parseHeader(line: string): SessionHeader | undefined {
     typeof record.createdAt !== 'number' ||
     !Number.isSafeInteger(record.createdAt) ||
     record.createdAt < 0 ||
-    (record.cwd !== undefined && typeof record.cwd !== 'string')
+    (record.cwd !== undefined && typeof record.cwd !== 'string') ||
+    (record.parentSession !== undefined && typeof record.parentSession !== 'string') ||
+    (record.seedLength !== undefined &&
+      (typeof record.seedLength !== 'number' ||
+        !Number.isSafeInteger(record.seedLength) ||
+        record.seedLength < 0))
   ) {
     return undefined
   }
@@ -242,6 +262,8 @@ function parseHeader(line: string): SessionHeader | undefined {
     id: record.id,
     createdAt: record.createdAt,
     ...(record.cwd === undefined ? {} : { cwd: record.cwd }),
+    ...(record.parentSession === undefined ? {} : { parentSession: record.parentSession }),
+    ...(record.seedLength === undefined ? {} : { seedLength: record.seedLength }),
   }
 }
 
@@ -283,7 +305,7 @@ export function samePath(
   right: string,
   platform: NodeJS.Platform = process.platform,
 ): boolean {
-  const pathApi = platform === 'win32' ? win32 : posix
+  const pathApi = pathForPlatform(platform)
   const leftPath = pathApi.resolve(left)
   const rightPath = pathApi.resolve(right)
   return platform === 'win32'

@@ -7,6 +7,8 @@ export type TuiCapabilities = {
   open: boolean
   fork: boolean
   approval: boolean
+  permissionMode: boolean
+  planMode: boolean
   promptMode: boolean
   rewind: boolean
   sessionList: 'none' | 'jsonl' | 'rpc'
@@ -18,6 +20,8 @@ export const P0_CAPABILITIES: TuiCapabilities = {
   open: true,
   fork: true,
   approval: false,
+  permissionMode: false,
+  planMode: false,
   promptMode: false,
   rewind: true,
   sessionList: 'none',

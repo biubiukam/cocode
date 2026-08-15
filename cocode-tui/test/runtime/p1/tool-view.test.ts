@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { inferToolView, toolViewDetail } from '../../../src/runtime/nodes/tool-view.ts'
+import { parseDiffSummary } from '../../../src/runtime/diff-summary.ts'
 
 describe('tool view projection', () => {
   it('projects read tools with a file path', () => {
@@ -26,5 +27,9 @@ describe('tool view projection', () => {
   it('keeps unknown tools generic and tolerates malformed args', () => {
     expect(inferToolView('weather', '{broken')).toBeUndefined()
     expect(inferToolView('fs.read', '{broken')).toEqual({ kind: 'read' })
+  })
+
+  it('leaves unparseable diff output available for the text fallback', () => {
+    expect(parseDiffSummary('plain command output').files).toEqual([])
   })
 })

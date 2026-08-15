@@ -36,6 +36,8 @@ import { visibleResumeItems } from '../runtime/resume-picker.ts'
 import { editDraft } from '../runtime/external-editor.ts'
 import { calculateChatLayout } from './chat-layout.ts'
 import { Inspector, INSPECTOR_WIDTH } from './components/Inspector.tsx'
+import { ReviewPicker } from './components/ReviewPicker.tsx'
+import { ApprovalPanel } from './components/ApprovalPanel.tsx'
 
 export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
   const { app } = props
@@ -68,8 +70,12 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
   const skillsState = snap.skillsPicker
   const skillsOpen = skillsState?.open === true
   const questionOpen = snap.question !== undefined
+  const approvalOpen = snap.approval?.open === true
+  const reviewOpen = snap.reviewPicker?.open === true
   const slashOpen =
     !questionOpen &&
+    !approvalOpen &&
+    !reviewOpen &&
     !rewindOpen &&
     !skillsOpen &&
     !resumeOpen &&
@@ -83,6 +89,8 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
   )
   const fileVisible =
     !questionOpen &&
+    !approvalOpen &&
+    !reviewOpen &&
     !rewindOpen &&
     !skillsOpen &&
     !resumeOpen &&
@@ -121,6 +129,8 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
         : 6 +
           (snap.question.question.options?.length ?? 0) +
           Number(snap.question.question.detail !== undefined),
+    approvalRows: approvalOpen ? 6 : undefined,
+    reviewRows: reviewOpen ? reviewRowsFor(snap.reviewPicker) : undefined,
   })
   const messageMaxRows = layout.messageRows
   const wideInspector = stdout.columns >= 120
@@ -222,7 +232,23 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
 
   useInput((input, key) => {
     if (editorBusy) return
+    if (approvalOpen) return
     if (questionOpen) return
+    if (reviewOpen) {
+      if (key.escape) {
+        app.dispatch({ type: 'review.close' })
+        return
+      }
+      if (key.upArrow || key.downArrow) {
+        app.dispatch({ type: 'review.move', delta: key.upArrow ? -1 : 1 })
+        return
+      }
+      if (key.return) {
+        app.dispatch({ type: 'review.confirm' })
+        return
+      }
+      return
+    }
     if (rewindOpen) {
       if (key.escape) {
         app.dispatch({ type: 'rewind.close' })
@@ -420,6 +446,11 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
       }
     }
 
+    if ((key.tab && key.shift) || (key.ctrl && input === 'm')) {
+      app.dispatch({ type: 'permission.toggle' })
+      return
+    }
+
     if (key.tab && snap.agent === 'running' && snap.composer.text.trim() !== '') {
       app.dispatch({ type: 'queuePrompt' })
       return
@@ -558,6 +589,12 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
           dispatch={app.dispatch}
         />
       ) : null}
+      {approvalOpen && snap.approval !== undefined ? (
+        <ApprovalPanel state={snap.approval} locale={snap.locale} dispatch={app.dispatch} />
+      ) : null}
+      {reviewOpen && snap.reviewPicker !== undefined ? (
+        <ReviewPicker state={snap.reviewPicker} locale={snap.locale} maxRows={layout.overlayRows} />
+      ) : null}
       {snap.helpOpen ? (
         <Help text={snap.helpText} locale={snap.locale} maxRows={layout.overlayRows} />
       ) : null}
@@ -657,6 +694,14 @@ function hasStatusDetails(status: TuiSnapshot['status']): boolean {
     status.agentPreset !== undefined ||
     status.transcript !== undefined
   )
+}
+
+function reviewRowsFor(state: TuiSnapshot['reviewPicker']): number {
+  if (state === undefined) return 0
+  if (!state.open) return 0
+  if (state.phase === 'scope') return state.scopes.length + 5
+  if (state.phase === 'loading') return 7
+  return Math.min(16, state.review.files.length + 8)
 }
 
 function moveSelection(index: number, delta: number, count: number): number {

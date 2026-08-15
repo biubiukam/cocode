@@ -25,6 +25,7 @@ describe('commands', () => {
       'model',
       'export',
       'copy',
+      'review',
       'focus',
       'init',
       'new',
@@ -32,6 +33,8 @@ describe('commands', () => {
       'use',
       'login',
       'logout',
+      'fork',
+      'clone',
     ])
   })
 

@@ -4,6 +4,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawn } from 'node:child_process'
+import { defaultEditorCommand } from './platform.ts'
 
 const MAX_DRAFT_BYTES = 256 * 1024
 
@@ -76,15 +77,20 @@ function parsePosixEditorCommand(value: string): string[] {
 export async function editDraft(options: {
   text: string
   env?: NodeJS.ProcessEnv
+  platform?: NodeJS.Platform
   tempParent?: string
   runner?: EditorRunner
 }): Promise<string> {
   const env = options.env ?? process.env
+  const platform = options.platform ?? process.platform
   const configured = env.VISUAL?.trim() || env.EDITOR?.trim()
-  if (configured === undefined || configured === '') {
+  const command =
+    configured === undefined || configured === ''
+      ? defaultEditorCommand(platform)
+      : parseEditorCommand(configured, platform)
+  if (command === undefined || command.length === 0) {
     throw new Error('No $VISUAL or $EDITOR is configured.')
   }
-  const command = parseEditorCommand(configured)
   const executable = command[0]
   if (executable === undefined) throw new Error('Editor command is empty.')
   const directory = await mkdtemp(join(options.tempParent ?? tmpdir(), 'cocode-edit-'))

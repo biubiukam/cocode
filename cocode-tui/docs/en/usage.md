@@ -14,9 +14,13 @@ DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 
 Configure a key on the first-run gate, or set `DEEPSEEK_API_KEY` for this process. For development, point `COCODE_HOME` at a separate config directory. Sessions default to `$DSH_HOME/sessions`, or `~/.dsh/sessions` when `DSH_HOME` is unset; `DSH_SESSION_ROOT` can override it.
 
+The same build runs on Windows, macOS, and Linux. On Windows, `notepad.exe` is used when neither `$VISUAL` nor `$EDITOR` is configured. WSL uses Linux process semantics and can fall back to `clip.exe` and `explorer.exe`; configure a GUI editor with a wait flag when using an editor such as VS Code.
+
 ## Screen regions
 
 Set `COCODE_TUI_SCREEN=inline` (the default) to keep the main screen and scrollback, or `alternate` for a fullscreen alternate buffer that is restored on exit. Legacy Windows consoles without alternate-buffer support fall back to `inline`.
+
+Inside `tmux` or `screen`, the TUI automatically uses inline rendering and suppresses terminal notifications because nested alternate-screen and OSC sequences are not reliable there.
 
 - The header shows the workspace, git branch, session, provider, model, and live Agent state.
 - The transcript projects `you`, `cocode`, reasoning, and tool results as separate node groups.
@@ -40,6 +44,7 @@ Set `COCODE_TUI_SCREEN=inline` (the default) to keep the main screen and scrollb
 - `Ctrl+O` toggles verbose mode for full reasoning and tool I/O.
 - While a turn is running, the status line shows `thinking…` so a quiet interval before the next stream chunk is distinguishable from an idle runtime. It also shows the latest assistant input/output usage and current subagent activity when the wire reports it. When optional events are present, it also shows decode TPS, cache hit rate, context-window percentage, reasoning effort, current working activity, compact context segments (`S/P/A/T/X` for system, prompt, assistant, thinking, and tools), todo progress, goal phase, and the active agent preset. Segment values are estimates based on text length, not provider billing data.
 - While a turn is running, press `Tab` to queue the current draft. Up to eight queued prompts are sent in order after `session.status=idle`; this is local queuing, not steer or cancellation.
+- `/review` opens a read-only Git review. Choose `working-tree`, `staged`, `last-commit`, or `branch`; inspect the bounded summary, then press Enter to send the structured review context to the current session.
 - `Esc` closes overlays (help, command menu) first; while a turn is running, the first press requests cancellation and the second exits. When idle, press twice to quit.
 - `Ctrl+L` redraws the screen without clearing the session.
 - Set `COCODE_TUI_KEYMAP` to a JSON object to override shortcuts, for example
@@ -73,6 +78,10 @@ Type `/` to open the command menu. Keep typing to filter by prefix. `Tab` or arr
 | `/export`                      | Export the current projection as Markdown                                                         |
 | `/copy`                        | Copy the latest assistant reply to the system clipboard                                           |
 | `/focus`                       | Show or hide the latest user turn in the transcript                                               |
+| `/review`                      | Review Git changes with a bounded, read-only diff preview                                         |
+| `/permissions` / `/plan`       | Cycle permission mode or toggle plan mode when the runtime advertises them                        |
+| `/fork` / `/clone`             | Create a child session from the current conversation                                              |
+| `/tree` / `/sessions`          | Show runtime session lineage when session listing is available                                    |
 | `/init`                        | Create a minimal `AGENTS.md` only when the workspace has none                                     |
 | `/theme dark` / `/theme light` | Switch the display theme                                                                          |
 | `/lang zh` / `/lang en`        | Switch between Chinese and English UI                                                             |

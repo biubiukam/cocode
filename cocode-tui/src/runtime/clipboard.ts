@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
 import type { ChildProcessWithoutNullStreams } from 'node:child_process'
 import type { ConversationNode } from './nodes/types.ts'
+import { clipboardCommandCandidates } from './platform.ts'
 
 export type ClipboardCommand = {
   command: string
@@ -19,24 +20,20 @@ export type ClipboardSpawn = (
 
 export function clipboardCommands(
   platform: NodeJS.Platform = process.platform,
+  env: NodeJS.ProcessEnv = process.env,
 ): ClipboardCommand[] {
-  if (platform === 'darwin') return [{ command: 'pbcopy', args: [] }]
-  if (platform === 'win32') return [{ command: 'clip.exe', args: [] }]
-  if (platform === 'linux') {
-    return [
-      { command: 'wl-copy', args: [] },
-      { command: 'xclip', args: ['-selection', 'clipboard'] },
-      { command: 'xsel', args: ['--clipboard', '--input'] },
-    ]
-  }
-  return []
+  return clipboardCommandCandidates(platform, env)
 }
 
 export async function copyToClipboard(
   value: string,
-  options: { platform?: NodeJS.Platform; spawn?: ClipboardSpawn } = {},
+  options: {
+    platform?: NodeJS.Platform
+    env?: NodeJS.ProcessEnv
+    spawn?: ClipboardSpawn
+  } = {},
 ): Promise<ClipboardResult> {
-  const commands = clipboardCommands(options.platform)
+  const commands = clipboardCommands(options.platform, options.env)
   if (commands.length === 0) return { ok: false, reason: 'unsupported' }
   const spawnCommand = options.spawn ?? (spawn as unknown as ClipboardSpawn)
   for (const candidate of commands) {

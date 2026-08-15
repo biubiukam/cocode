@@ -7,6 +7,7 @@ import { asNumber, asString, blocksToText, isRecord, reasoningToText } from '../
 import type { AssistantNode, NodeDefinition, NoticeNode, ToolNode, UserNode } from './types.ts'
 import { NodeRegistry } from './registry.ts'
 import { inferToolView } from './tool-view.ts'
+import { parseDiffSummary } from '../diff-summary.ts'
 
 export function createBuiltinRegistry(): NodeRegistry {
   const registry = new NodeRegistry()
@@ -183,6 +184,10 @@ function applyToolResult(node: ToolNode, event: SessionEvent): ToolNode {
     (isRecord(block) && block.type === 'tool-result' && block.isError === true)
   node.status = isError ? 'error' : 'success'
   node.result = isRecord(block) ? blocksToText(block.content) : ''
+  if (node.view?.kind === 'diff' && node.result !== undefined) {
+    const summary = parseDiffSummary(node.result)
+    if (summary.files.length > 0) node.view = { ...node.view, summary }
+  }
   if (isRecord(data.error)) {
     node.error = {
       name: asString(data.error.name, 'Error'),

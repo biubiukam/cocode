@@ -4,8 +4,13 @@
 
 import type {
   TuiCapabilitySnapshot,
+  TuiApprovalAnswer,
+  TuiApprovalRequest,
   SessionEvent,
   SkillEntry,
+  TuiPromptMode,
+  TuiSessionSummary,
+  TuiRuntimeAdvertisement,
   TuiQuestionAnswer,
   TuiQuestionRequest,
   TuiInitialize,
@@ -35,6 +40,7 @@ class SdkTuiRuntime implements TuiRuntime {
   private subscription: { close(): void } | undefined
   private closing = false
   private questionHandler: ((request: TuiQuestionRequest) => Promise<TuiQuestionAnswer>) | undefined
+  private approvalHandler: ((request: TuiApprovalRequest) => Promise<TuiApprovalAnswer>) | undefined
   private clientRequestDisposer: (() => void) | undefined
   private capabilitySnapshot: TuiCapabilitySnapshot = fallbackCapabilitySnapshot()
 
@@ -42,7 +48,11 @@ class SdkTuiRuntime implements TuiRuntime {
     this.launch = launch
   }
 
-  async start(init: TuiInitialize): Promise<{ name: string; version: string }> {
+  async start(init: TuiInitialize): Promise<{
+    name: string
+    version: string
+    capabilities?: import('./types.ts').TuiRuntimeAdvertisement
+  }> {
     const { HarnessClient } = await import('@deepseek-ai/dsh-sdk-client')
     const client = new HarnessClient({
       command: this.launch.command,
@@ -62,10 +72,17 @@ class SdkTuiRuntime implements TuiRuntime {
         const disposer = onRequest.call(
           client,
           async (method: string, params: Record<string, unknown>) => {
-            if (method !== 'question/ask') throw new Error(`unknown server request: ${method}`)
-            const handler = this.questionHandler
-            if (handler === undefined) throw new Error('TUI has no question handler')
-            return handler(parseQuestionRequest(params))
+            if (method === 'question/ask') {
+              const handler = this.questionHandler
+              if (handler === undefined) throw new Error('TUI has no question handler')
+              return handler(parseQuestionRequest(params))
+            }
+            if (method === 'approval/request') {
+              const handler = this.approvalHandler
+              if (handler === undefined) return { outcome: 'unavailable' }
+              return handler(parseApprovalRequest(params))
+            }
+            throw new Error(`unknown server request: ${method}`)
           },
         )
         if (typeof disposer === 'function') this.clientRequestDisposer = disposer
@@ -74,6 +91,10 @@ class SdkTuiRuntime implements TuiRuntime {
       this.subscription = sub
       this.pump = this.readLoop(sub)
       const result = await client.initialize(init)
+      const advertised =
+        isRecord(result) && isRecord(result.capabilities)
+          ? parseRuntimeAdvertisement(result.capabilities)
+          : undefined
       const request = Reflect.get(client, 'request')
       this.capabilitySnapshot =
         typeof request === 'function'
@@ -82,10 +103,13 @@ class SdkTuiRuntime implements TuiRuntime {
                 request: (method, params, timeoutMs) =>
                   request.call(client, method, params, timeoutMs),
               },
-              { onRequest: onRequestAvailable },
+              { onRequest: onRequestAvailable, advertised },
             )
           : unavailableCapabilitySnapshot('SDK client does not expose request')
-      return result.serverInfo
+      return {
+        ...result.serverInfo,
+        ...(advertised === undefined ? {} : { capabilities: advertised }),
+      }
     } catch (error) {
       this.closing = true
       await this.close().catch(() => undefined)
@@ -96,7 +120,11 @@ class SdkTuiRuntime implements TuiRuntime {
   async restart(
     init: TuiInitialize,
     env?: NodeJS.ProcessEnv,
-  ): Promise<{ name: string; version: string }> {
+  ): Promise<{
+    name: string
+    version: string
+    capabilities?: import('./types.ts').TuiRuntimeAdvertisement
+  }> {
     await this.close()
     this.closing = false
     this.client = undefined
@@ -120,9 +148,17 @@ class SdkTuiRuntime implements TuiRuntime {
     }
   }
 
-  async prompt(sessionId: string, blocks: { type: string; text?: string }[]): Promise<string> {
+  async prompt(
+    sessionId: string,
+    blocks: { type: string; text?: string }[],
+    mode: TuiPromptMode = 'normal',
+  ): Promise<string> {
     const client = this.requireClient()
-    return client.prompt(sessionId, blocks as never)
+    const prompt = Reflect.get(client, 'prompt')
+    if (typeof prompt !== 'function') throw new Error('SDK client does not expose prompt')
+    return (
+      prompt as (sessionId: string, blocks: unknown, mode: TuiPromptMode) => Promise<string>
+    ).call(client, sessionId, blocks, mode)
   }
 
   async cancel(sessionId: string, keepInbox = false): Promise<boolean> {
@@ -188,10 +224,87 @@ class SdkTuiRuntime implements TuiRuntime {
     return parseSkillEntries(result.skills)
   }
 
+  async listSessions(cwd?: string): Promise<TuiSessionSummary[]> {
+    const client = this.requireClient()
+    this.requireCapability('sessionList')
+    const request = Reflect.get(client, 'listSessions')
+    const result =
+      typeof request === 'function'
+        ? await request.call(client, cwd)
+        : await client.request('session/list', cwd === undefined ? {} : { cwd })
+    const rows = Array.isArray(result)
+      ? result
+      : isRecord(result) && Array.isArray(result.sessions)
+      ? result.sessions
+      : undefined
+    if (rows === undefined)
+      throw new Error(`session/list returned no session list: ${JSON.stringify(result)}`)
+    return rows.map(parseSessionSummary)
+  }
+
+  async permissionMode(
+    sessionId: string,
+    mode?: string,
+  ): Promise<{ mode: string; supportedModes: string[] }> {
+    const client = this.requireClient()
+    this.requireCapability('permissionMode')
+    const request = Reflect.get(client, 'permissionMode')
+    const result =
+      typeof request === 'function'
+        ? await request.call(client, sessionId, mode)
+        : await client.request('permission/mode', {
+            sessionId,
+            ...(mode === undefined ? {} : { mode }),
+          })
+    if (
+      !isRecord(result) ||
+      typeof result.mode !== 'string' ||
+      !Array.isArray(result.supportedModes)
+    ) {
+      throw new Error(`permission/mode returned an invalid result: ${JSON.stringify(result)}`)
+    }
+    return {
+      mode: result.mode,
+      supportedModes: result.supportedModes.filter(
+        (value): value is string => typeof value === 'string',
+      ),
+    }
+  }
+
+  async planMode(
+    sessionId: string,
+    active?: boolean,
+  ): Promise<{ active: boolean; pending?: boolean }> {
+    const client = this.requireClient()
+    this.requireCapability('planMode')
+    const request = Reflect.get(client, 'planMode')
+    const result =
+      typeof request === 'function'
+        ? await request.call(client, sessionId, active)
+        : await client.request('plan/mode', {
+            sessionId,
+            ...(active === undefined ? {} : { active }),
+          })
+    if (!isRecord(result) || typeof result.active !== 'boolean') {
+      throw new Error(`plan/mode returned an invalid result: ${JSON.stringify(result)}`)
+    }
+    return {
+      active: result.active,
+      ...(typeof result.pending === 'boolean' ? { pending: result.pending } : {}),
+    }
+  }
+
   onQuestion(handler: (request: TuiQuestionRequest) => Promise<TuiQuestionAnswer>): () => void {
     this.questionHandler = handler
     return () => {
       if (this.questionHandler === handler) this.questionHandler = undefined
+    }
+  }
+
+  onApproval(handler: (request: TuiApprovalRequest) => Promise<TuiApprovalAnswer>): () => void {
+    this.approvalHandler = handler
+    return () => {
+      if (this.approvalHandler === handler) this.approvalHandler = undefined
     }
   }
 
@@ -309,6 +422,56 @@ function parseSkillEntries(value: unknown[]): SkillEntry[] {
     })
   }
   return skills
+}
+
+function parseRuntimeAdvertisement(value: Record<string, unknown>): TuiRuntimeAdvertisement {
+  const promptModes: TuiPromptMode[] = Array.isArray(value.promptModes)
+    ? value.promptModes.filter(
+        (mode): mode is TuiPromptMode => mode === 'normal' || mode === 'queue' || mode === 'steer',
+      )
+    : ['normal']
+  return {
+    promptModes,
+    approval: value.approval === true,
+    permissionMode: value.permissionMode === true,
+    planMode: value.planMode === true,
+    sessionList: value.sessionList === true,
+    checkpoint: false,
+  }
+}
+
+function parseApprovalRequest(params: Record<string, unknown>): TuiApprovalRequest {
+  if (typeof params.sessionId !== 'string' || typeof params.toolName !== 'string') {
+    throw new Error('invalid approval/request')
+  }
+  return {
+    sessionId: params.sessionId,
+    toolName: params.toolName,
+    ...(typeof params.callId === 'string' ? { callId: params.callId } : {}),
+    ...(typeof params.reason === 'string' ? { reason: params.reason } : {}),
+  }
+}
+
+function parseSessionSummary(value: unknown): TuiSessionSummary {
+  if (
+    !isRecord(value) ||
+    typeof value.sessionId !== 'string' ||
+    typeof value.createdAt !== 'number'
+  ) {
+    throw new Error(`session/list returned an invalid session: ${JSON.stringify(value)}`)
+  }
+  return {
+    sessionId: value.sessionId,
+    createdAt: value.createdAt,
+    ...(typeof value.updatedAt === 'number' ? { updatedAt: value.updatedAt } : {}),
+    ...(typeof value.cwd === 'string' ? { cwd: value.cwd } : {}),
+    ...(typeof value.parentSessionId === 'string'
+      ? { parentSessionId: value.parentSessionId }
+      : {}),
+    ...(typeof value.seedLength === 'number' ? { seedLength: value.seedLength } : {}),
+    ...(typeof value.title === 'string' ? { title: value.title } : {}),
+    ...(typeof value.eventCount === 'number' ? { eventCount: value.eventCount } : {}),
+  }
 }
 
 function mapNotification(notification: {

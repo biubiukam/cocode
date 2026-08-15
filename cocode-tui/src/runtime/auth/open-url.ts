@@ -3,10 +3,14 @@
  */
 
 import { spawn } from 'node:child_process'
+import { externalOpenCommandForPlatform } from '../platform.ts'
 
-export function openExternal(url: string): void {
+export function openExternal(
+  url: string,
+  options: { platform?: NodeJS.Platform; env?: NodeJS.ProcessEnv } = {},
+): void {
   try {
-    const target = externalOpenCommand(url)
+    const target = externalOpenCommand(url, options.platform, options.env)
     const child = spawn(target.command, target.args, { stdio: 'ignore', detached: true })
     child.once('error', () => undefined)
     child.unref()
@@ -18,8 +22,8 @@ export function openExternal(url: string): void {
 export function externalOpenCommand(
   url: string,
   platform: NodeJS.Platform = process.platform,
+  env: NodeJS.ProcessEnv = process.env,
 ): { command: string; args: string[] } {
-  if (platform === 'darwin') return { command: 'open', args: [url] }
-  if (platform === 'win32') return { command: 'explorer.exe', args: [url] }
-  return { command: 'xdg-open', args: [url] }
+  const target = externalOpenCommandForPlatform(url, platform, env)
+  return { command: target.command, args: [...target.args] }
 }

@@ -112,6 +112,35 @@ type UiKey =
   | 'focusStatusOn'
   | 'focusEnabled'
   | 'focusDisabled'
+  | 'reviewTitle'
+  | 'reviewHint'
+  | 'reviewLoading'
+  | 'reviewPreview'
+  | 'reviewScopeWorkingTree'
+  | 'reviewScopeStaged'
+  | 'reviewScopeLastCommit'
+  | 'reviewScopeBranch'
+  | 'reviewConfirm'
+  | 'reviewEmpty'
+  | 'reviewFailed'
+  | 'reviewSending'
+  | 'reviewUsage'
+  | 'approvalTitle'
+  | 'approvalHint'
+  | 'approvalAllowed'
+  | 'approvalRejected'
+  | 'approvalUnavailable'
+  | 'approvalTimedOut'
+  | 'permissionUnavailable'
+  | 'permissionChanged'
+  | 'planUnavailable'
+  | 'planEnabled'
+  | 'planDisabled'
+  | 'steerSending'
+  | 'forkUnavailable'
+  | 'forkCreated'
+  | 'sessionTreeUnavailable'
+  | 'sessionTreeEmpty'
 
 const TEXT: Record<UiLocale, Record<UiKey, string>> = {
   en: {
@@ -224,6 +253,35 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     focusStatusOn: 'focus: latest turn',
     focusEnabled: 'Focus mode enabled: showing the latest turn.',
     focusDisabled: 'Focus mode disabled: showing the full transcript.',
+    reviewTitle: 'Code review',
+    reviewHint: '↑↓ select · enter continue · esc close',
+    reviewLoading: 'Collecting a read-only Git diff…',
+    reviewPreview: 'enter send to Cocode · esc close',
+    reviewScopeWorkingTree: 'working tree (staged + unstaged)',
+    reviewScopeStaged: 'staged changes',
+    reviewScopeLastCommit: 'last commit',
+    reviewScopeBranch: 'current branch vs base',
+    reviewConfirm: 'Review this diff? Press enter to send · esc cancel',
+    reviewEmpty: 'No changes found for this review scope.',
+    reviewFailed: 'Review unavailable',
+    reviewSending: 'Sending review context…',
+    reviewUsage: 'Use /review, /review working-tree, staged, last-commit, or branch [base].',
+    approvalTitle: 'Approval required',
+    approvalHint: 'enter/a allow once · d/n reject · esc cancel',
+    approvalAllowed: 'Tool allowed once.',
+    approvalRejected: 'Tool request rejected.',
+    approvalUnavailable: 'Approval is unavailable; the tool request was not allowed.',
+    approvalTimedOut: 'Approval timed out; the tool request was cancelled.',
+    permissionUnavailable: 'Permission modes are unavailable in this runtime.',
+    permissionChanged: 'Permission mode: {mode}',
+    planUnavailable: 'Plan mode is unavailable in this runtime.',
+    planEnabled: 'Plan mode enabled.',
+    planDisabled: 'Plan mode disabled.',
+    steerSending: 'Sending follow-up at the next tool boundary…',
+    forkUnavailable: 'Session fork is unavailable or the turn is still running.',
+    forkCreated: 'Created a child session from the current conversation.',
+    sessionTreeUnavailable: 'Runtime session tree is unavailable.',
+    sessionTreeEmpty: 'No runtime sessions found.',
   },
   zh: {
     session: '会话',
@@ -335,6 +393,35 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     focusStatusOn: '聚焦：最近一轮',
     focusEnabled: '已开启聚焦模式：仅显示最近一轮。',
     focusDisabled: '已关闭聚焦模式：显示完整会话。',
+    reviewTitle: '代码 Review',
+    reviewHint: '↑↓ 选择 · 回车继续 · Esc 关闭',
+    reviewLoading: '正在读取只读 Git Diff…',
+    reviewPreview: '回车发送给 Cocode · Esc 关闭',
+    reviewScopeWorkingTree: '工作树（已暂存 + 未暂存）',
+    reviewScopeStaged: '已暂存改动',
+    reviewScopeLastCommit: '最近一次提交',
+    reviewScopeBranch: '当前分支相对基线',
+    reviewConfirm: '确认 Review 这份 Diff？回车发送 · Esc 取消',
+    reviewEmpty: '当前 Review 范围没有改动。',
+    reviewFailed: 'Review 不可用',
+    reviewSending: '正在发送 Review 上下文…',
+    reviewUsage: '使用 /review、/review working-tree、staged、last-commit 或 branch [base]。',
+    approvalTitle: '需要审批',
+    approvalHint: '回车/a 允许一次 · d/n 拒绝 · Esc 取消',
+    approvalAllowed: '已允许本次工具调用。',
+    approvalRejected: '已拒绝工具调用。',
+    approvalUnavailable: '审批不可用，工具调用未获允许。',
+    approvalTimedOut: '审批超时，工具调用已取消。',
+    permissionUnavailable: '当前运行时不支持权限模式。',
+    permissionChanged: '权限模式：{mode}',
+    planUnavailable: '当前运行时不支持计划模式。',
+    planEnabled: '已启用计划模式。',
+    planDisabled: '已关闭计划模式。',
+    steerSending: '将在下一个工具步骤完成后发送后续输入……',
+    forkUnavailable: '当前无法创建会话分支，或任务仍在运行。',
+    forkCreated: '已从当前对话创建子会话。',
+    sessionTreeUnavailable: '当前运行时不支持会话树。',
+    sessionTreeEmpty: '没有找到运行时会话。',
   },
 }
 

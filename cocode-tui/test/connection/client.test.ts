@@ -17,6 +17,11 @@ describe('runtime capability negotiation', () => {
         rewind: false,
         skills: false,
         onRequest: false,
+        approval: false,
+        permissionMode: false,
+        planMode: false,
+        sessionList: false,
+        promptMode: false,
       },
       errors: { onRequest: 'runtime capability probe has not run' },
     })
@@ -43,10 +48,15 @@ describe('runtime capability negotiation', () => {
         rewind: true,
         skills: true,
         onRequest: true,
+        approval: false,
+        permissionMode: true,
+        planMode: true,
+        sessionList: true,
+        promptMode: false,
       },
       errors: {},
     })
-    expect(calls).toHaveLength(5)
+    expect(calls).toHaveLength(8)
     expect(calls.every((call) => call.timeoutMs === 1_000)).toBe(true)
     expect(calls[0]?.params).toEqual({ sessionId: 'probe-session', keepInbox: true })
     expect(calls[3]?.params).toEqual({
@@ -72,6 +82,11 @@ describe('runtime capability negotiation', () => {
       rewind: false,
       skills: false,
       onRequest: false,
+      approval: false,
+      permissionMode: false,
+      planMode: false,
+      sessionList: false,
+      promptMode: false,
     })
     expect(snapshot.errors).toEqual({
       cancel: 'protocol method is not supported by the runtime',
@@ -79,6 +94,9 @@ describe('runtime capability negotiation', () => {
       fork: 'protocol method is not supported by the runtime',
       rewind: 'protocol method is not supported by the runtime',
       skills: 'protocol method is not supported by the runtime',
+      sessionList: 'protocol method is not supported by the runtime',
+      permissionMode: 'protocol method is not supported by the runtime',
+      planMode: 'protocol method is not supported by the runtime',
       onRequest: 'SDK client does not expose onRequest',
     })
   })

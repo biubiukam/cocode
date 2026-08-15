@@ -32,6 +32,10 @@ export type CommandContextOptions = {
   showSkillsPicker?: TuiCommandCtx['showSkillsPicker']
   copyLatestAssistant?: TuiCommandCtx['copyLatestAssistant']
   toggleFocus?: TuiCommandCtx['toggleFocus']
+  review?: TuiCommandCtx['review']
+  forkSession?: TuiCommandCtx['forkSession']
+  cloneSession?: TuiCommandCtx['cloneSession']
+  showSessionTree?: TuiCommandCtx['showSessionTree']
 }
 
 export type AppCommandContextOptions = {
@@ -62,6 +66,10 @@ export type AppCommandContextOptions = {
   showSkillsPicker: TuiCommandCtx['showSkillsPicker']
   copyLatestAssistant?: TuiCommandCtx['copyLatestAssistant']
   toggleFocus?: TuiCommandCtx['toggleFocus']
+  review?: TuiCommandCtx['review']
+  forkSession?: TuiCommandCtx['forkSession']
+  cloneSession?: TuiCommandCtx['cloneSession']
+  showSessionTree?: TuiCommandCtx['showSessionTree']
 }
 
 export function createCommandContext(options: CommandContextOptions): TuiCommandCtx {
@@ -113,6 +121,10 @@ export function createCommandContext(options: CommandContextOptions): TuiCommand
     showSkillsPicker: options.showSkillsPicker,
     copyLatestAssistant: options.copyLatestAssistant,
     toggleFocus: options.toggleFocus,
+    review: options.review,
+    forkSession: options.forkSession,
+    cloneSession: options.cloneSession,
+    showSessionTree: options.showSessionTree,
   }
 }
 
@@ -154,5 +166,9 @@ export function createAppCommandContext(options: AppCommandContextOptions): TuiC
     showSkillsPicker: options.showSkillsPicker,
     copyLatestAssistant: options.copyLatestAssistant,
     toggleFocus: options.toggleFocus,
+    review: options.review,
+    forkSession: options.forkSession,
+    cloneSession: options.cloneSession,
+    showSessionTree: options.showSessionTree,
   })
 }

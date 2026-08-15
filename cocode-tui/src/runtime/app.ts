@@ -9,6 +9,8 @@ import type {
   TuiQuestionItem,
   TuiQuestionRequest,
   TuiCapabilitySnapshot,
+  TuiApprovalAnswer,
+  TuiApprovalRequest,
   TuiRuntime,
 } from '@cocode/tui-connection'
 import type { SelectModeResult } from './auth/store.ts'
@@ -85,6 +87,22 @@ import {
 import { createTelemetryProjector, type TelemetrySnapshot } from './telemetry.ts'
 import { copyToClipboard, readableNodeText } from './clipboard.ts'
 import { notifyTerminal, type TerminalNotifyMode } from './terminal-notify.ts'
+import {
+  collectGitReview,
+  parseReviewScope,
+  type GitReview,
+  type ReviewScope,
+} from './git-review.ts'
+import {
+  closeReviewPicker,
+  createReviewPicker,
+  moveReviewSelection,
+  selectedReviewScope,
+  setReviewLoading,
+  setReviewPreview,
+  type ReviewPickerState,
+} from './review-picker.ts'
+import { createApprovalState, type ApprovalState, type PendingApproval } from './approval.ts'
 
 export type TuiAction =
   | { type: 'submit'; text: string }
@@ -116,8 +134,15 @@ export type TuiAction =
   | { type: 'skills.confirm' }
   | { type: 'question.answer'; selected: string[]; custom?: string }
   | { type: 'question.cancel' }
+  | { type: 'approval.answer'; outcome: TuiApprovalAnswer['outcome'] }
+  | { type: 'approval.cancel' }
+  | { type: 'permission.toggle' }
+  | { type: 'plan.toggle' }
   | { type: 'queuePrompt' }
   | { type: 'copyNode'; nodeKey: string }
+  | { type: 'review.move'; delta: number }
+  | { type: 'review.close' }
+  | { type: 'review.confirm' }
 
 export type { TuiCapabilities }
 
@@ -154,6 +179,8 @@ export type TuiSnapshot = {
     subagents?: TuiSubagentActivity
     queueCount: number
     focusMode: boolean
+    permissionMode: string
+    planMode: boolean
   }
   helpOpen: boolean
   verbose: boolean
@@ -166,6 +193,8 @@ export type TuiSnapshot = {
   skillsPicker?: SkillsPickerState
   skills: readonly SkillEntry[]
   question?: TuiQuestionSnapshot
+  approval?: ApprovalState
+  reviewPicker?: ReviewPickerState
   exiting: boolean
 }
 
@@ -177,6 +206,8 @@ export type TuiQuestionSnapshot = {
   total: number
   answered: number
 }
+
+export type TuiApprovalSnapshot = ApprovalState
 
 export type TuiSubagentActivity = {
   running: number
@@ -229,6 +260,10 @@ export type TuiCommandCtx = {
   showSkillsPicker?: () => void
   copyLatestAssistant?: () => void
   toggleFocus?: () => void
+  review?: (args: string) => void
+  forkSession?: () => void
+  cloneSession?: () => void
+  showSessionTree?: () => Promise<void>
 }
 
 export type TuiApp = {
@@ -283,6 +318,7 @@ class TuiAppImpl implements TuiApp {
   private unsubscribeRuntime: (() => void) | undefined
   private unsubscribeRuntimeClose: (() => void) | undefined
   private unsubscribeQuestion: (() => void) | undefined
+  private unsubscribeApproval: (() => void) | undefined
   private sessionId: string
   private agent: TuiSnapshot['agent'] = 'starting'
   private draft: DraftState = createDraft()
@@ -313,7 +349,14 @@ class TuiAppImpl implements TuiApp {
   private skills: SkillEntry[] = []
   private readonly questionQueue: PendingQuestion[] = []
   private activeQuestion: PendingQuestion | undefined
+  private readonly approvalQueue: PendingApproval[] = []
+  private activeApproval: PendingApproval | undefined
+  private permissionMode = 'manual'
+  private supportedPermissionModes: string[] = ['manual']
+  private planMode = false
   private questionSerial = 0
+  private reviewPicker: ReviewPickerState | undefined
+  private reviewRequest = 0
 
   constructor(options: TuiAppOptions) {
     this.runtime = options.runtime
@@ -342,6 +385,7 @@ class TuiAppImpl implements TuiApp {
     this.emit()
     this.unsubscribeRuntime = this.runtime.subscribe((n) => this.onNotification(n))
     this.unsubscribeQuestion = this.runtime.onQuestion?.((request) => this.askQuestion(request))
+    this.unsubscribeApproval = this.runtime.onApproval?.((request) => this.askApproval(request))
     this.unsubscribeRuntimeClose = this.runtime.onClose?.((error) => {
       if (this.exiting) return
       this.agent = 'dead'
@@ -364,6 +408,7 @@ class TuiAppImpl implements TuiApp {
       this.initError = undefined
       this.notice = undefined
       this.workspaceBranch = (await resolveWorkspaceInfo(this.cwd)).branch
+      await this.refreshPermissionMode()
       await this.loadSkills()
       if (this.exiting) return
     } catch (error) {
@@ -390,7 +435,10 @@ class TuiAppImpl implements TuiApp {
         this.unsubscribeRuntime = undefined
         this.unsubscribeQuestion?.()
         this.unsubscribeQuestion = undefined
+        this.unsubscribeApproval?.()
+        this.unsubscribeApproval = undefined
         this.rejectQuestions(new Error('TUI closed before the question was answered'))
+        this.rejectApprovals(new Error('TUI closed before approval was answered'))
       },
       unsubscribeClose: () => {
         this.unsubscribeRuntimeClose?.()
@@ -457,6 +505,8 @@ class TuiAppImpl implements TuiApp {
         },
         queueCount: this.queuedPrompts.length,
         focusMode: this.focusMode,
+        permissionMode: this.permissionMode,
+        planMode: this.planMode,
       },
       helpOpen: this.helpOpen,
       verbose: this.verbose,
@@ -472,6 +522,11 @@ class TuiAppImpl implements TuiApp {
       skillsPicker: this.skillsPicker,
       skills: this.skills,
       question: this.questionSnapshot(),
+      approval:
+        this.activeApproval === undefined
+          ? undefined
+          : createApprovalState(this.activeApproval.request),
+      reviewPicker: this.reviewPicker,
       exiting: this.exiting,
     }
   }
@@ -657,11 +712,39 @@ class TuiAppImpl implements TuiApp {
       case 'question.cancel':
         this.cancelQuestion()
         return
+      case 'approval.answer':
+        this.answerApproval(action.outcome)
+        return
+      case 'approval.cancel':
+        this.answerApproval('cancelled')
+        return
+      case 'permission.toggle':
+        void this.togglePermissionMode()
+        return
+      case 'plan.toggle':
+        void this.togglePlanMode()
+        return
       case 'queuePrompt':
         this.queueCurrentPrompt()
         return
       case 'copyNode':
         this.copyNode(action.nodeKey)
+        return
+      case 'review.move':
+        if (this.reviewPicker !== undefined) {
+          this.reviewPicker = moveReviewSelection(this.reviewPicker, action.delta)
+          this.emit()
+        }
+        return
+      case 'review.close':
+        if (this.reviewPicker !== undefined) {
+          this.reviewRequest += 1
+          this.reviewPicker = closeReviewPicker()
+          this.emit()
+        }
+        return
+      case 'review.confirm':
+        this.confirmReview()
         return
     }
   }
@@ -858,7 +941,141 @@ class TuiAppImpl implements TuiApp {
         }
         this.emit()
       },
+      review: (args) => this.openReview(args),
+      forkSession: () => {
+        void this.forkSession()
+      },
+      cloneSession: () => {
+        void this.cloneSession()
+      },
+      showSessionTree: () => this.showSessionTree(),
     })
+  }
+
+  private async forkSession(): Promise<void> {
+    if (!this.capabilities.fork || this.agent !== 'idle') {
+      this.notice = { tone: 'info', message: text(this.locale, 'forkUnavailable') }
+      this.emit()
+      return
+    }
+    try {
+      const result = await this.runtime.fork(this.sessionId, this.assembler.snapshot().length)
+      this.sessionId = result.sessionId
+      this.assembler.replaceWindow(result.seed)
+      this.notice = { tone: 'info', message: text(this.locale, 'forkCreated') }
+    } catch (error) {
+      this.notice = {
+        tone: 'error',
+        message: `${text(this.locale, 'forkUnavailable')}: ${errorMessage(error)}`,
+      }
+    }
+    this.emit()
+  }
+
+  private async cloneSession(): Promise<void> {
+    await this.forkSession()
+  }
+
+  private async showSessionTree(): Promise<void> {
+    const list = this.runtime.listSessions
+    if (this.capabilities.sessionList !== 'rpc' || list === undefined) {
+      this.notice = { tone: 'info', message: text(this.locale, 'sessionTreeUnavailable') }
+      this.emit()
+      return
+    }
+    try {
+      const sessions = await list.call(this.runtime, this.cwd)
+      const lines = sessions
+        .slice(0, 12)
+        .map(
+          (session) =>
+            `${session.parentSessionId === undefined ? '•' : '  ↳'} ${
+              session.title ?? session.sessionId
+            }`,
+        )
+      this.notice = {
+        tone: 'info',
+        message: lines.length === 0 ? text(this.locale, 'sessionTreeEmpty') : lines.join('\n'),
+      }
+    } catch (error) {
+      this.notice = {
+        tone: 'error',
+        message: `${text(this.locale, 'sessionTreeUnavailable')}: ${errorMessage(error)}`,
+      }
+    }
+    this.emit()
+  }
+
+  private openReview(args: string): void {
+    if (this.agent !== 'idle') {
+      this.notice = { tone: 'info', message: text(this.locale, 'turnBusy') }
+      this.emit()
+      return
+    }
+    if (args.trim() === '') {
+      this.reviewRequest += 1
+      this.helpOpen = false
+      this.notice = undefined
+      this.reviewPicker = createReviewPicker()
+      this.emit()
+      return
+    }
+    const parsed = parseReviewScope(args)
+    if (parsed === undefined) {
+      this.notice = { tone: 'info', message: text(this.locale, 'reviewUsage') }
+      this.emit()
+      return
+    }
+    void this.loadReview(parsed.scope, parsed.base)
+  }
+
+  private async loadReview(scope: ReviewScope, base?: string): Promise<void> {
+    const request = ++this.reviewRequest
+    this.helpOpen = false
+    this.notice = undefined
+    this.reviewPicker = setReviewLoading(scope, base)
+    this.emit()
+    try {
+      const review = await collectGitReview(this.cwd, scope, base)
+      if (request !== this.reviewRequest) return
+      if (review.files.length === 0) {
+        this.reviewPicker = undefined
+        this.notice = { tone: 'info', message: text(this.locale, 'reviewEmpty') }
+      } else {
+        this.reviewPicker = setReviewPreview(review)
+      }
+    } catch (error) {
+      if (request !== this.reviewRequest) return
+      this.reviewPicker = undefined
+      this.notice = {
+        tone: 'error',
+        message: `${text(this.locale, 'reviewFailed')}: ${errorMessage(error)}`,
+      }
+    }
+    this.emit()
+  }
+
+  private confirmReview(): void {
+    const picker = this.reviewPicker
+    if (picker === undefined || !picker.open) return
+    if (picker.phase === 'scope') {
+      const scope = selectedReviewScope(picker)
+      if (scope !== undefined) void this.loadReview(scope)
+      return
+    }
+    if (picker.phase !== 'preview') return
+    const review: GitReview = picker.review
+    this.reviewRequest += 1
+    this.reviewPicker = undefined
+    this.history.push(`/review ${review.scope}`)
+    this.draft = createDraft()
+    this.attachments = []
+    this.notice = { tone: 'info', message: text(this.locale, 'reviewSending') }
+    void this.promptWithAttachments(review.prompt, []).catch((error: unknown) => {
+      this.notice = { tone: 'error', message: errorMessage(error) }
+      this.emit()
+    })
+    this.emit()
   }
 
   private copyNode(key: string): void {
@@ -929,6 +1146,131 @@ class TuiAppImpl implements TuiApp {
       })
       this.startNextQuestion()
     })
+  }
+
+  private askApproval(request: TuiApprovalRequest): Promise<TuiApprovalAnswer> {
+    return new Promise<TuiApprovalAnswer>((resolve, reject) => {
+      const pending: PendingApproval = { request, resolve, reject }
+      this.approvalQueue.push(pending)
+      this.startNextApproval()
+    })
+  }
+
+  private startNextApproval(): void {
+    if (this.activeApproval !== undefined || this.approvalQueue.length === 0) return
+    this.activeApproval = this.approvalQueue.shift()
+    const active = this.activeApproval
+    if (active !== undefined) {
+      active.timeout = setTimeout(() => {
+        if (this.activeApproval !== active) return
+        this.activeApproval = undefined
+        active.resolve({ outcome: 'cancelled' })
+        this.notice = { tone: 'info', message: text(this.locale, 'approvalTimedOut') }
+        this.startNextApproval()
+        this.emit()
+      }, 120_000)
+    }
+    this.emit()
+  }
+
+  private answerApproval(outcome: TuiApprovalAnswer['outcome']): void {
+    const active = this.activeApproval
+    if (active === undefined) return
+    this.activeApproval = undefined
+    if (active.timeout !== undefined) clearTimeout(active.timeout)
+    active.resolve({ outcome })
+    this.notice = {
+      tone: 'info',
+      message: text(
+        this.locale,
+        outcome === 'allowed-once' ? 'approvalAllowed' : 'approvalRejected',
+      ),
+    }
+    this.startNextApproval()
+    this.emit()
+  }
+
+  private rejectApprovals(error: Error): void {
+    const active = this.activeApproval
+    this.activeApproval = undefined
+    if (active !== undefined) {
+      if (active.timeout !== undefined) clearTimeout(active.timeout)
+      active.resolve({ outcome: 'unavailable' })
+    }
+    for (const pending of this.approvalQueue.splice(0)) {
+      if (pending.timeout !== undefined) clearTimeout(pending.timeout)
+      pending.resolve({ outcome: 'unavailable' })
+    }
+    if (error.message !== '')
+      this.notice = { tone: 'info', message: text(this.locale, 'approvalUnavailable') }
+    this.emit()
+  }
+
+  private async togglePermissionMode(): Promise<void> {
+    if (!this.capabilities.permissionMode || this.runtime.permissionMode === undefined) {
+      this.notice = { tone: 'info', message: text(this.locale, 'permissionUnavailable') }
+      this.emit()
+      return
+    }
+    try {
+      const current = await this.runtime.permissionMode(this.sessionId)
+      this.permissionMode = current.mode
+      this.supportedPermissionModes =
+        current.supportedModes.length > 0 ? current.supportedModes : ['manual']
+      const index = this.supportedPermissionModes.indexOf(this.permissionMode)
+      const next =
+        this.supportedPermissionModes[(index + 1) % this.supportedPermissionModes.length] ??
+        'manual'
+      const result = await this.runtime.permissionMode(this.sessionId, next)
+      this.permissionMode = result.mode
+      this.supportedPermissionModes =
+        result.supportedModes.length > 0 ? result.supportedModes : this.supportedPermissionModes
+      this.notice = {
+        tone: 'info',
+        message: text(this.locale, 'permissionChanged', { mode: this.permissionMode }),
+      }
+    } catch (error) {
+      this.notice = {
+        tone: 'error',
+        message: `${text(this.locale, 'permissionUnavailable')}: ${errorMessage(error)}`,
+      }
+    }
+    this.emit()
+  }
+
+  private async refreshPermissionMode(): Promise<void> {
+    if (!this.capabilities.permissionMode || this.runtime.permissionMode === undefined) return
+    try {
+      const result = await this.runtime.permissionMode(this.sessionId)
+      this.permissionMode = result.mode
+      this.supportedPermissionModes =
+        result.supportedModes.length > 0 ? result.supportedModes : ['manual']
+    } catch {
+      this.permissionMode = 'manual'
+      this.supportedPermissionModes = ['manual']
+    }
+  }
+
+  private async togglePlanMode(): Promise<void> {
+    if (!this.capabilities.planMode || this.runtime.planMode === undefined) {
+      this.notice = { tone: 'info', message: text(this.locale, 'planUnavailable') }
+      this.emit()
+      return
+    }
+    try {
+      const result = await this.runtime.planMode(this.sessionId, !this.planMode)
+      this.planMode = result.active
+      this.notice = {
+        tone: 'info',
+        message: text(this.locale, result.active ? 'planEnabled' : 'planDisabled'),
+      }
+    } catch (error) {
+      this.notice = {
+        tone: 'error',
+        message: `${text(this.locale, 'planUnavailable')}: ${errorMessage(error)}`,
+      }
+    }
+    this.emit()
   }
 
   private startNextQuestion(): void {
@@ -1004,6 +1346,8 @@ class TuiAppImpl implements TuiApp {
       this.assembler.reset()
       this.telemetry.reset()
       this.sessionState.reset()
+      this.permissionMode = 'manual'
+      this.planMode = false
       this.resetSubagentActivity()
       this.queuedPrompts.length = 0
       this.agent = 'idle'
@@ -1135,6 +1479,19 @@ class TuiAppImpl implements TuiApp {
       this.runCommand(trimmed)
       return
     }
+    if (this.agent === 'running' && this.capabilities.promptMode) {
+      const attachments = this.attachments.slice()
+      this.history.push(trimmed)
+      this.draft = createDraft()
+      this.attachments = []
+      this.notice = { tone: 'info', message: text(this.locale, 'steerSending') }
+      void this.promptWithAttachments(trimmed, attachments, 'steer').catch((error: unknown) => {
+        this.notice = { tone: 'error', message: errorMessage(error) }
+        this.emit()
+      })
+      this.emit()
+      return
+    }
     if (this.agent !== 'idle') {
       this.notice = {
         tone: 'info',
@@ -1175,14 +1532,15 @@ class TuiAppImpl implements TuiApp {
   private promptWithAttachments(
     text: string,
     attachments: readonly { path: string; token: string }[],
+    mode: 'normal' | 'queue' | 'steer' = 'normal',
   ): Promise<string> {
     if (attachments.length === 0) {
-      return this.runtime.prompt(this.sessionId, [{ type: 'text', text }])
+      return this.runtime.prompt(this.sessionId, [{ type: 'text', text }], mode)
     }
     return loadFileContext({
       cwd: this.cwd,
       paths: attachments.map((attachment) => attachment.path),
-    }).then((files) => this.runtime.prompt(this.sessionId, buildPromptBlocks(text, files)))
+    }).then((files) => this.runtime.prompt(this.sessionId, buildPromptBlocks(text, files), mode))
   }
 
   private queueCurrentPrompt(): void {
@@ -1214,6 +1572,7 @@ class TuiAppImpl implements TuiApp {
     this.notice = { tone: 'info', message: text(this.locale, 'queueSending') }
     this.emit()
     void this.promptWithAttachments(next.text, next.attachments).catch((error: unknown) => {
+      this.queuedPrompts.unshift(next)
       this.notice = { tone: 'error', message: errorMessage(error) }
       this.agent = 'idle'
       this.emit()
@@ -1341,6 +1700,11 @@ function applyRuntimeCapabilities(
     fork: runtime.capabilities.fork,
     rewind: runtime.capabilities.rewind,
     skills: runtime.capabilities.skills,
+    approval: runtime.capabilities.approval,
+    permissionMode: runtime.capabilities.permissionMode,
+    planMode: runtime.capabilities.planMode,
+    promptMode: runtime.capabilities.promptMode,
+    sessionList: runtime.capabilities.sessionList ? 'rpc' : configured.sessionList,
   }
 }
 

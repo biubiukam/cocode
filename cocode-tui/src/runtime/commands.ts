@@ -91,6 +91,16 @@ export function createBuiltinCommands(): CommandRegistry {
     ctx.copyLatestAssistant?.()
   })
   registry.register({
+    name: 'review',
+    summary: 'Review Git changes in the current workspace',
+    summaryZh: 'Review 当前工作区的 Git 改动',
+    kind: 'local',
+    available: () => true,
+    run: (ctx, args) => {
+      ctx.review?.(args)
+    },
+  })
+  registry.register({
     name: 'focus',
     summary: 'Toggle the latest-turn focus view',
     summaryZh: '切换最近一轮聚焦视图',
@@ -139,6 +149,58 @@ export function createBuiltinCommands(): CommandRegistry {
     available: (caps) => caps.skills,
     run: (ctx) => {
       ctx.showSkillsPicker?.()
+    },
+  })
+  registry.register({
+    name: 'permissions',
+    summary: 'Cycle runtime permission mode',
+    summaryZh: '切换运行时权限模式',
+    kind: 'local',
+    available: (caps) => caps.permissionMode,
+    run: (ctx) => ctx.dispatch({ type: 'permission.toggle' }),
+  })
+  registry.register({
+    name: 'plan',
+    summary: 'Toggle runtime plan mode',
+    summaryZh: '切换计划模式',
+    kind: 'local',
+    available: (caps) => caps.planMode,
+    run: (ctx) => ctx.dispatch({ type: 'plan.toggle' }),
+  })
+  registry.register({
+    name: 'fork',
+    summary: 'Create a child session from the current conversation',
+    summaryZh: '从当前对话创建子会话',
+    kind: 'local',
+    available: (caps) => caps.fork,
+    run: (ctx) => ctx.forkSession?.(),
+  })
+  registry.register({
+    name: 'clone',
+    summary: 'Clone the current conversation into a new session',
+    summaryZh: '将当前对话复制到新会话',
+    kind: 'local',
+    available: (caps) => caps.fork,
+    run: (ctx) => ctx.cloneSession?.(),
+  })
+  registry.register({
+    name: 'tree',
+    summary: 'Show the session tree from runtime metadata',
+    summaryZh: '显示运行时会话树',
+    kind: 'local',
+    available: (caps) => caps.sessionList === 'rpc',
+    run: (ctx) => {
+      void ctx.showSessionTree?.()
+    },
+  })
+  registry.register({
+    name: 'sessions',
+    summary: 'List sessions from the runtime when supported',
+    summaryZh: '列出运行时会话（如果支持）',
+    kind: 'local',
+    available: (caps) => caps.sessionList === 'rpc',
+    run: (ctx) => {
+      void ctx.showSessionTree?.()
     },
   })
 

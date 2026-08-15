@@ -1,5 +1,7 @@
 /** Best-effort terminal notifications for completed turns. */
 
+import { detectTerminalEnvironment } from './platform.ts'
+
 export type TerminalNotifyMode = 'auto' | 'off' | 'osc9' | 'osc777'
 
 export function parseTerminalNotifyMode(value: string | undefined): TerminalNotifyMode {
@@ -24,9 +26,17 @@ export function notifyTerminal(options: {
   title: string
   body: string
   write?: (value: string) => void
+  platform?: NodeJS.Platform
+  env?: NodeJS.ProcessEnv
 }): boolean {
+  const environment = detectTerminalEnvironment({
+    platform: options.platform,
+    env: options.env,
+    stdoutIsTTY: true,
+  })
+  if (!environment.supportsNotifications) return false
   const sequence = buildTerminalNotification({
-    mode: options.mode ?? parseTerminalNotifyMode(process.env.COCODE_TUI_NOTIFY),
+    mode: options.mode ?? parseTerminalNotifyMode((options.env ?? process.env).COCODE_TUI_NOTIFY),
     title: options.title,
     body: options.body,
   })
