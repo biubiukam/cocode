@@ -20,6 +20,8 @@
 		"arm64"
 	],
 	"scripts": {
+		"dev": "node scripts/start-with-dsh-runtime.mjs",
+		"dev:web": "vite --config vite.renderer.config.ts --port 5273",
 		"start": "node scripts/start-with-dsh-runtime.mjs",
 		"build:cocode-plugins": "corepack pnpm@10.34.5 --filter cocode-sidebar build && corepack pnpm@10.34.5 --filter cocode-account build",
 		"test:cocode-plugins": "corepack pnpm@10.34.5 --filter cocode-sidebar test",

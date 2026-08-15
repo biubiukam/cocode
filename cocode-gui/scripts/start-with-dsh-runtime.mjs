@@ -75,9 +75,10 @@ try {
 
 function waitForClientWatcher(child) {
 	return new Promise((resolve, reject) => {
+		const timeoutMs = Number(process.env.DSH_CLIENT_WATCH_TIMEOUT_MS ?? 300_000)
 		const timer = setTimeout(() => {
 			reject(new Error("Timed out waiting for the DSH client watcher initial build."))
-		}, 60_000)
+		}, timeoutMs)
 		const finish = (error) => {
 			clearTimeout(timer)
 			child.off("message", onMessage)

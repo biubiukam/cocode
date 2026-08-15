@@ -25,6 +25,19 @@ import { PLATFORM_MODULES } from './web/src/platform.ts'
 const CSS_VIRTUAL_PREFIX = '\0dsh-css:'
 const CSS_VIRTUAL_SUFFIX = '.mjs'
 
+/** Map a physical stylesheet to a repo-relative virtual id (stable across machines). */
+function toCssVirtualId(absPath: string): string {
+	const repoRelative = relative(REPOSITORY_ROOT, absPath).split(sep).join('/')
+	const key = repoRelative.startsWith('..') ? absPath : repoRelative
+	return CSS_VIRTUAL_PREFIX + key + CSS_VIRTUAL_SUFFIX
+}
+
+/** Resolve a repo-relative virtual id back to an absolute filesystem path. */
+function fromCssVirtualId(virtualId: string): string {
+	const key = virtualId.slice(CSS_VIRTUAL_PREFIX.length, -CSS_VIRTUAL_SUFFIX.length)
+	return key.startsWith('/') || /^[A-Za-z]:/.test(key) ? key : resolvePath(REPOSITORY_ROOT, key)
+}
+
 /**
  * Wire/type layers a client bundle may inline: browser-safe contracts
  * with no runtime identity to share (no Symbol/instanceof/singleton state).
@@ -66,16 +79,20 @@ const RUNTIME_STORE_EXEMPTION = '@deepseek-ai/dsh-client-runtime/client'
 export const CLIENT_EXTERNALS: readonly string[] = [...PLATFORM_MODULES, RUNTIME_STORE_EXEMPTION]
 
 const REPOSITORY_ROOT = fileURLToPath(new URL('../..', import.meta.url))
-const DSH_SOURCE_ROOT = process.env.DSH_SOURCE_ROOT ?? resolvePath(REPOSITORY_ROOT, '../deepseek-harness')
+const DSH_SOURCE_ROOT = process.env.DSH_SOURCE_ROOT ?? resolvePath(REPOSITORY_ROOT, '../cocode-harness')
 const DSH_SOURCE_REQUIRE = createRequire(resolvePath(DSH_SOURCE_ROOT, 'package.json'))
+const GUI_REQUIRE = createRequire(resolvePath(REPOSITORY_ROOT, 'package.json'))
 
 function resolveDevDependency(specifier: string): string | undefined {
-  try {
-    return DSH_SOURCE_REQUIRE.resolve(specifier)
-  } catch {
-    const hoisted = resolvePath(DSH_SOURCE_ROOT, 'node_modules/.pnpm/node_modules', specifier)
-    return existsSync(resolvePath(hoisted, 'package.json')) ? hoisted : undefined
-  }
+	for (const resolver of [GUI_REQUIRE, DSH_SOURCE_REQUIRE]) {
+		try {
+			return resolver.resolve(specifier)
+		} catch {
+			// try the next resolver root
+		}
+	}
+	const hoisted = resolvePath(DSH_SOURCE_ROOT, 'node_modules/.pnpm/node_modules', specifier)
+	return existsSync(resolvePath(hoisted, 'package.json')) ? hoisted : undefined
 }
 
 const DEV_DEPENDENCY_ALIASES = Object.fromEntries(
@@ -256,11 +273,11 @@ function clientConfig(id: string, entry: string): UserConfig {
       resolveId(source: string, importer: string | undefined) {
         if (!source.endsWith('.module.css')) return null
         const abs = importer !== undefined ? sourceAssetPath(source, importer) : source
-        return CSS_VIRTUAL_PREFIX + abs + CSS_VIRTUAL_SUFFIX
+        return toCssVirtualId(abs)
       },
       async load(virtualId: string) {
         if (!virtualId.startsWith(CSS_VIRTUAL_PREFIX)) return null
-        const fileId = virtualId.slice(CSS_VIRTUAL_PREFIX.length, -CSS_VIRTUAL_SUFFIX.length)
+        const fileId = fromCssVirtualId(virtualId)
         // The virtual id otherwise hides the physical stylesheet from Rolldown's watch graph.
         this.addWatchFile(fileId)
         const source = await readFile(fileId)

@@ -10,7 +10,7 @@
     "node": "^22.19 || >=24"
   },
   "scripts": {
-    "dev": "node --import tsx/esm src/main.tsx",
+    "dev": "node scripts/dev.mjs",
     "start": "node ./bin/cocode-tui.mjs",
     "typecheck": "tsc --noEmit && pnpm -r typecheck",
     "test": "vitest run",
