@@ -81,7 +81,8 @@ Type `/` to open the command menu. Keep typing to filter by prefix. `Tab` or arr
 | `/review`                      | Review Git changes with a bounded, read-only diff preview                                         |
 | `/permissions` / `/plan`       | Cycle permission mode or toggle plan mode when the runtime advertises them                        |
 | `/fork` / `/clone`             | Create a child session from the current conversation                                              |
-| `/tree` / `/sessions`          | Show runtime session lineage when session listing is available                                    |
+| `/tree`                        | Show the session tree; uses RPC metadata first and JSONL fallback when available                  |
+| `/sessions`                    | Show the runtime session list; available only when RPC session listing is advertised              |
 | `/init`                        | Create a minimal `AGENTS.md` only when the workspace has none                                     |
 | `/theme dark` / `/theme light` | Switch the display theme                                                                          |
 | `/lang zh` / `/lang en`        | Switch between Chinese and English UI                                                             |

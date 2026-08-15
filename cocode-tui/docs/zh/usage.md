@@ -81,7 +81,8 @@ DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 | `/review`                      | 使用受限的只读 Diff 预览检查当前 Git 改动                            |
 | `/permissions` / `/plan`       | 在运行时支持时切换权限模式或计划模式                                 |
 | `/fork` / `/clone`             | 从当前对话创建子会话                                                 |
-| `/tree` / `/sessions`          | 在支持会话列表时显示运行时会话关系                                   |
+| `/tree`                        | 显示会话树；优先使用 RPC 元数据，不可用时回退到 JSONL                |
+| `/sessions`                    | 显示运行时会话列表；只有 runtime 广告 RPC 会话列表时可用             |
 | `/init`                        | 仅在缺少 `AGENTS.md` 时创建最小工作区模板                            |
 | `/theme dark` / `/theme light` | 切换显示主题                                                         |
 | `/lang zh` / `/lang en`        | 切换中英文界面                                                       |
