@@ -37,11 +37,16 @@ export function mouseWheelDelta(
 const SGR_MOUSE = /\u001b\[<([0-9]+);([0-9]+);([0-9]+)([mM])/g
 const SGR_MOUSE_INPUT = /^(?:\[<[0-9]+;[0-9]+;[0-9]+[mM])+$/
 const SGR_MOUSE_FRAGMENT = /^(?:\[<[0-9;]*(?:[mM])?)+$/
+const CURSOR_MOVEMENT_FRAGMENT = /^(?:\[?[ABCD])+$/
 
-/** Recognize SGR mouse input after Ink optionally removes the leading ESC byte. */
+/** Recognize mouse input and split CSI fragments that Ink would otherwise insert. */
 export function isMouseInput(input: string): boolean {
   const normalized = input.replaceAll('\u001b', '')
-  return SGR_MOUSE_INPUT.test(normalized) || SGR_MOUSE_FRAGMENT.test(normalized)
+  return (
+    SGR_MOUSE_INPUT.test(normalized) ||
+    SGR_MOUSE_FRAGMENT.test(normalized) ||
+    (normalized.includes('[') && CURSOR_MOVEMENT_FRAGMENT.test(normalized))
+  )
 }
 
 export function createMouseDecoder(onEvent: (event: TuiMouseEvent) => void): {

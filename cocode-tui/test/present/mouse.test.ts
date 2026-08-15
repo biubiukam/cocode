@@ -73,4 +73,10 @@ describe('terminal mouse support', () => {
     expect(isMouseInput('[<64;23;')).toBe(true)
     expect(isMouseInput('hello')).toBe(false)
   })
+
+  it('ignores cursor movement fragments emitted by option-click selection', () => {
+    expect(isMouseInput('[D')).toBe(true)
+    expect(isMouseInput('[D[D[D[D')).toBe(true)
+    expect(isMouseInput('\u001b[D[D[D')).toBe(true)
+  })
 })
