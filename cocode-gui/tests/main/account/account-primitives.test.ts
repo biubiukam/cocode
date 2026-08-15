@@ -256,6 +256,35 @@ test("Agency client never sends a non-ck value to the model catalog", async () =
 	}
 })
 
+test("Agency client calculates rolling account usage from credit and usage windows", async () => {
+	const originalFetch = globalThis.fetch
+	const requests: string[] = []
+	let usageCalls = 0
+	globalThis.fetch = (async (input, init) => {
+		const url = String(input)
+		requests.push(url)
+		assert.equal(new Headers(init?.headers).get("authorization"), "Bearer identity-token")
+		if (url.includes("/v1/me/model-credit")) {
+			return new Response(JSON.stringify({ plan: "pro", granted_microusd: 100, settled_microusd: 25, reserved_microusd: 5 }), { status: 200 })
+		}
+		if (url.includes("/v1/me/model-usage")) {
+			usageCalls += 1
+			return new Response(JSON.stringify({ fresh_at: "2026-08-15T00:00:00.000Z", totals: { billable_microusd: usageCalls === 1 ? 10 : 20 } }), { status: 200 })
+		}
+		return new Response("{}", { status: 404 })
+	}) as typeof fetch
+	try {
+		const usage = await new AgencyClient("https://cocode.agency").accountUsage("identity-token")
+		assert.equal(usage.plan, "pro")
+		assert.equal(usage.fiveHour, 50)
+		assert.equal(usage.week, 40)
+		assert.equal(usage.month, 30)
+		assert.equal(requests.length, 3)
+	} finally {
+		globalThis.fetch = originalFetch
+	}
+})
+
 test("Agency client revokes the refresh token using the native token contract", async () => {
 	const originalFetch = globalThis.fetch
 	let body: unknown

@@ -10,9 +10,12 @@ type AccountSnapshot = {
         providerId: "cocode-cloud";
     };
     usage?: {
+        plan?: string;
         fiveHour?: number;
         week?: number;
         month?: number;
+        syncedAt?: string;
+        error?: string;
     };
     error?: {
         code: string;

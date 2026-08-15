@@ -90,6 +90,13 @@ function agency(overrides: Record<string, unknown> = {}): {
 				return { secret: "ck_test", id: "key-test", name: "Cocode Device — test-host" }
 			},
 			models: async () => [{ id: "cloud-model", name: "Cloud Model" }],
+			accountUsage: async () => ({
+				plan: "pro",
+				fiveHour: 10,
+				week: 20,
+				month: 30,
+				syncedAt: "2026-08-15T00:00:00.000Z",
+			}),
 			revoke: async (token: string) => {
 				revoked.push(token)
 			},

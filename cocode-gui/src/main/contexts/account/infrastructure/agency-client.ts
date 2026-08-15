@@ -43,6 +43,25 @@ type AgencyProfile = {
 
 export type AgencyModel = { readonly id: string; readonly name: string }
 export type CreatedApiKey = { readonly secret: string; readonly id: string; readonly name: string }
+export type AgencyAccountUsage = {
+	readonly plan: string
+	readonly fiveHour: number
+	readonly week: number
+	readonly month: number
+	readonly syncedAt: string
+}
+
+type AgencyModelCredit = {
+	readonly plan?: string
+	readonly granted_microusd?: number
+	readonly settled_microusd?: number
+	readonly reserved_microusd?: number
+}
+
+type AgencyModelUsage = {
+	readonly fresh_at?: string
+	readonly totals?: { readonly billable_microusd?: number }
+}
 
 const DEFAULT_ORIGIN = "https://cocode.agency"
 
@@ -255,6 +274,30 @@ export class AgencyClient {
 		return [...new Map(models.map((model) => [model.id, model])).values()]
 	}
 
+	async accountUsage(accessToken: string): Promise<AgencyAccountUsage> {
+		const now = new Date()
+		const to = now.toISOString()
+		const fiveHoursAgo = new Date(now.getTime() - 5 * 60 * 60 * 1000).toISOString()
+		const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
+		const [credit, fiveHourUsage, weekUsage] = await Promise.all([
+			this.request<AgencyModelCredit>("/v1/me/model-credit", { method: "GET", token: accessToken }),
+			this.request<AgencyModelUsage>(`/v1/me/model-usage?from=${encodeURIComponent(fiveHoursAgo)}&to=${encodeURIComponent(to)}`, { method: "GET", token: accessToken }),
+			this.request<AgencyModelUsage>(`/v1/me/model-usage?from=${encodeURIComponent(weekAgo)}&to=${encodeURIComponent(to)}`, { method: "GET", token: accessToken }),
+		])
+		if (credit.status !== 200 || fiveHourUsage.status !== 200 || weekUsage.status !== 200)
+			throw new AgencyHttpError("could not load account usage", Math.max(credit.status, fiveHourUsage.status, weekUsage.status))
+		const granted = finiteNumber(credit.value.granted_microusd)
+		const settled = finiteNumber(credit.value.settled_microusd)
+		const reserved = finiteNumber(credit.value.reserved_microusd)
+		return {
+			plan: credit.value.plan?.trim() || "unknown",
+			fiveHour: usagePercent(finiteNumber(fiveHourUsage.value.totals?.billable_microusd), granted / 5),
+			week: usagePercent(finiteNumber(weekUsage.value.totals?.billable_microusd), granted / 2),
+			month: usagePercent(settled + reserved, granted),
+			syncedAt: latestTimestamp(fiveHourUsage.value.fresh_at, weekUsage.value.fresh_at) ?? to,
+		}
+	}
+
 	async revoke(refreshToken: string): Promise<void> {
 		try {
 			await this.request("/v1/auth/token/revoke", {
@@ -295,4 +338,19 @@ export class AgencyClient {
 		}
 		return { status: response.status, value }
 	}
+}
+
+function finiteNumber(value: number | undefined): number {
+	return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 0
+}
+
+function usagePercent(used: number, limit: number): number {
+	if (limit <= 0) return 0
+	return Math.max(0, Math.min(100, Math.round((used / limit) * 100)))
+}
+
+function latestTimestamp(...values: (string | undefined)[]): string | undefined {
+	return values
+		.filter((value): value is string => typeof value === "string" && !Number.isNaN(Date.parse(value)))
+		.sort((left, right) => Date.parse(right) - Date.parse(left))[0]
 }

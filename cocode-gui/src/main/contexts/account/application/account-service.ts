@@ -78,6 +78,13 @@ type AccountAgency = {
 	profile(accessToken: string): Promise<AccountProfile>
 	createDesktopKey(accessToken: string): Promise<CreatedApiKey>
 	models(apiKey: string): Promise<AgencyModel[]>
+	accountUsage(accessToken: string): Promise<{
+		readonly plan: string
+		readonly fiveHour: number
+		readonly week: number
+		readonly month: number
+		readonly syncedAt: string
+	}>
 	revoke(refreshToken: string): Promise<void>
 }
 
@@ -298,7 +305,27 @@ export class AccountService {
 
 	async snapshot(): Promise<AccountSnapshot> {
 		await this.ensureLoaded()
-		return this.snapshotValue
+		if (this.snapshotValue.phase !== "signed-in") return this.snapshotValue
+		const state = await this.identity.read()
+		if (state === undefined) return this.snapshotValue
+		try {
+			this.assertIdentityOrigin(state)
+			const current = await this.ensureIdentityAccess(state)
+			const usage = await this.agency.accountUsage(current.accessToken)
+			const snapshot = { ...this.snapshotValue, usage }
+			this.publish(snapshot)
+			return snapshot
+		} catch (error) {
+			const snapshot: AccountSnapshot = {
+				...this.snapshotValue,
+				usage: {
+					...this.snapshotValue.usage,
+					error: safeError(error, "usage-unavailable").message,
+				},
+			}
+			this.publish(snapshot)
+			return snapshot
+		}
 	}
 
 	async signIn(): Promise<AccountSnapshot> {

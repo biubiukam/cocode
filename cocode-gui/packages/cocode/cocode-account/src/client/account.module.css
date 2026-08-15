@@ -356,6 +356,8 @@
 }
 
 .panelAction {
+  display: flex;
+  align-items: center;
   min-height: 42px;
   padding: 0 13px;
   border: 1px solid var(--dsw-alias-border-l2);
@@ -365,10 +367,30 @@
   cursor: pointer;
   font: inherit;
   text-align: left;
+  text-decoration: none;
 }
 
 .panelAction:hover {
   background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.panelAction:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-focus, currentColor);
+  outline-offset: 1px;
+}
+
+.panelAction:active {
+  transform: scale(0.98);
+}
+
+.providerHelpCard {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 14px;
+  background: var(--dsw-alias-bg-layer-2);
 }
 
 @media (prefers-reduced-motion: reduce) {

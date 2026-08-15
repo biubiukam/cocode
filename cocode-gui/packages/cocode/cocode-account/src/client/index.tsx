@@ -1,4 +1,4 @@
-import { createElement, useEffect, useRef, useState, useSyncExternalStore } from "react"
+import { createElement, Fragment, useEffect, useRef, useState, useSyncExternalStore } from "react"
 import type { MouseEvent as ReactMouseEvent, ReactNode } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import type { ClientContext } from "@deepseek-ai/dsh-client-runtime/client"
@@ -17,7 +17,7 @@ type AccountSnapshot = {
   phase: "signed-out" | "signing-in" | "provisioning" | "signed-in" | "error"
   profile: { displayName: string; email?: string } | null
   cloud: { status: "absent" | "ready" | "conflict" | "error"; providerId: "cocode-cloud" }
-  usage?: { fiveHour?: number; week?: number; month?: number }
+  usage?: { plan?: string; fiveHour?: number; week?: number; month?: number; syncedAt?: string; error?: string }
   error?: { code: string; message: string }
 }
 
@@ -180,6 +180,16 @@ class AccountStore {
     }
   }
 
+  async refresh(): Promise<void> {
+    const account = window.desktopApi?.account
+    if (account === undefined) return
+    try {
+      this.set(await account.snapshot())
+    } catch (error) {
+      this.set({ ...this.snapshot, usage: { ...this.snapshot.usage, error: safeMessage(error) } })
+    }
+  }
+
   dispose(): void {
     this.off?.()
     this.off = undefined
@@ -234,9 +244,11 @@ class ProviderStore {
   }
 
   private select(providers: readonly ConfigurableProviderView[]): ProviderSummary | null {
-    const local = providers.filter(provider => provider.provider !== "cocode-cloud" && provider.active)
+    const active = providers.filter(provider => provider.active)
     const preferred = this.connection.hostDescription.getSnapshot()?.provider
-    const provider = local.find(candidate => candidate.provider === preferred) ?? local[0]
+    const provider = active.find(candidate => candidate.provider === preferred)
+      ?? active.find(candidate => candidate.provider !== "cocode-cloud")
+      ?? active[0]
     return provider === undefined ? null : { id: provider.provider, name: provider.displayName }
   }
 
@@ -351,6 +363,13 @@ function snapshotUsage(snapshot: AccountSnapshot, key: "fiveHour" | "week" | "mo
   return snapshot.usage?.[key]
 }
 
+function usageSyncLabel(snapshot: AccountSnapshot): string {
+  if (snapshot.usage?.error !== undefined) return `同步失败：${snapshot.usage.error}`
+  if (snapshot.usage?.syncedAt === undefined) return "正在同步账号用量…"
+  const date = new Date(snapshot.usage.syncedAt)
+  return Number.isNaN(date.getTime()) ? "账号用量已同步" : `更新于 ${date.toLocaleString()}`
+}
+
 type MenuGlyphKind = "account" | "usage" | "settings" | "help" | "logout"
 
 function MenuGlyph({ kind }: { readonly kind: MenuGlyphKind }): ReturnType<typeof createElement> {
@@ -372,6 +391,9 @@ function AccountPanel({ kind, snapshot, provider, onClose }: {
 }): ReturnType<typeof createElement> {
   const t = copy()
   const title = kind === "usage" ? t.planUsage : t.help
+  const isCloud = provider?.id === "cocode-cloud"
+    || (provider === null && (snapshot.cloud.status === "ready" || snapshot.cloud.status === "conflict"))
+  const providerLabel = isCloud ? "Cocode Cloud" : provider?.name ?? "当前 Provider"
   const usageMetric = (label: string, value: number | undefined): ReturnType<typeof createElement> => {
     const percentage = typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(100, Math.round(value))) : undefined
     return createElement("div", { className: css.usageMetric },
@@ -380,15 +402,15 @@ function AccountPanel({ kind, snapshot, provider, onClose }: {
         createElement("strong", { className: css.usageMetricPercent }, percentage === undefined ? "—" : `${percentage}%`),
       ),
       createElement("div", { className: css.usageTrack }, createElement("span", { className: css.usageFill, style: { width: `${percentage ?? 0}%` } })),
-      createElement("span", { className: css.panelSecondary }, percentage === undefined ? "暂未同步" : "已使用"),
+      createElement("span", { className: css.panelSecondary }, percentage === undefined ? (snapshot.usage?.error === undefined ? "正在同步" : "同步失败") : "已使用"),
     )
   }
   const body = kind === "usage"
       ? createElement("div", { className: css.panelStack },
           createElement("div", { className: css.planCard },
             createElement("span", { className: css.panelEyebrow }, "当前套餐"),
-            createElement("strong", { className: css.planName }, "尚未同步"),
-            createElement("span", { className: css.panelSecondary }, "套餐与用量将在账号服务同步后显示"),
+            createElement("strong", { className: css.planName }, snapshot.usage?.plan?.toUpperCase() ?? (snapshot.usage?.error === undefined ? "正在同步…" : "同步失败")),
+            createElement("span", { className: css.panelSecondary }, usageSyncLabel(snapshot)),
           ),
           createElement("div", { className: css.usageGrid },
             usageMetric("5 小时限额", snapshotUsage(snapshot, "fiveHour")),
@@ -398,11 +420,17 @@ function AccountPanel({ kind, snapshot, provider, onClose }: {
           createElement("p", { className: css.panelHint }, "百分比代表当前周期已使用额度。本地 Provider 的请求不会计入 Cocode Cloud 用量。"),
         )
       : createElement("div", { className: css.panelStack },
-          createElement("p", { className: css.panelIntro }, "遇到问题时，可以先查看模型与 Provider 配置，再提交反馈。"),
-          createElement("button", { type: "button", className: css.panelAction, onClick: () => { onClose(); requestSettings("models") } }, "打开模型与 Provider"),
-          createElement("button", { type: "button", className: css.panelAction, onClick: () => { window.open("https://cocode.agency", "_blank", "noopener,noreferrer") } }, "访问 Cocode 文档"),
-          createElement("button", { type: "button", className: css.panelAction, onClick: () => { window.open("mailto:support@cocode.agency?subject=Cocode%20反馈", "_blank") } }, "发送反馈邮件"),
-          createElement("p", { className: css.panelHint }, provider === null ? "当前未配置 Provider。" : `当前 Provider：${provider.name}`),
+          createElement("div", { className: css.providerHelpCard },
+            createElement("span", { className: css.panelEyebrow }, "当前 Provider"),
+            createElement("strong", { className: css.planName }, providerLabel),
+            createElement("span", { className: css.panelSecondary }, isCloud ? "账号云模型与 Cocode Cloud 服务" : "本地 Provider 与凭证配置"),
+          ),
+          createElement("p", { className: css.panelIntro }, isCloud
+            ? "Cocode Cloud 的账号、套餐和云模型问题，可以先打开个人中心；模型选择和本地配置仍在模型设置中管理。"
+            : "当前使用的是本地 Provider。连接、模型不可用或凭证问题，可以从 Provider 设置开始排查。"),
+          isCloud ? createElement("a", { className: css.panelAction, href: ACCOUNT_CENTER_URL, target: "_blank", rel: "noreferrer" }, "打开 Cocode 个人中心") : null,
+          createElement("a", { className: css.panelAction, href: "https://cocode.agency", target: "_blank", rel: "noreferrer" }, "访问 Cocode 文档"),
+          createElement("a", { className: css.panelAction, href: "mailto:support@cocode.agency?subject=Cocode%20反馈" }, "发送反馈邮件"),
         )
   return createElement("div", { className: css.panelOverlay, role: "presentation", onMouseDown: (event: ReactMouseEvent<HTMLDivElement>) => { if (event.target === event.currentTarget) onClose() } },
     createElement("section", { className: css.panel, role: "dialog", "aria-modal": "true", "aria-label": title },
@@ -463,49 +491,56 @@ function AccountAction({ wide, store, providers }: AccountProps): ReturnType<typ
     else if (id === "models") requestSettings("models")
     else if (id === "settings") requestSettings()
     else if (id === "account") openAccountCenter()
-    else if (id === "usage" || id === "help") setPanel(id)
+    else if (id === "usage") {
+      setPanel(id)
+      void store.refresh()
+    } else if (id === "help") setPanel(id)
   }
   return createElement(
-    Menu,
-    {
-      open,
-      side: "top",
-      align: "start",
-      portal: true,
-      dense: true,
-      items: entries,
-      onClose: () => { setOpen(false) },
-      onSelect: select,
-      className: css.menuRoot,
-      anchor: createElement(
-        "button",
-        {
-          type: "button",
-          title,
-          className: wide ? css.trigger : `${css.trigger} ${css.rail}`,
-          "aria-haspopup": "menu",
-          "aria-expanded": open,
-          disabled: busy,
-          onClick: () => { setOpen(value => !value) },
-        },
-        createElement(
-          "span",
-          { className: `${css.avatar} ${signedIn ? css.accountAvatar : provider === null ? css.guestAvatar : css.providerAvatar}` },
-          signedIn
-            ? initialOf(primary)
-            : provider === null
-              ? createElement(IconUserOutline16, { size: 18 })
-              : createElement(IconApiOutline14, { size: 18 }),
+    Fragment,
+    null,
+    createElement(
+      Menu,
+      {
+        open,
+        side: "top",
+        align: "start",
+        portal: true,
+        dense: true,
+        items: entries,
+        onClose: () => { setOpen(false) },
+        onSelect: select,
+        className: css.menuRoot,
+        anchor: createElement(
+          "button",
+          {
+            type: "button",
+            title,
+            className: wide ? css.trigger : `${css.trigger} ${css.rail}`,
+            "aria-haspopup": "menu",
+            "aria-expanded": open,
+            disabled: busy,
+            onClick: () => { setOpen(value => !value) },
+          },
+          createElement(
+            "span",
+            { className: `${css.avatar} ${signedIn ? css.accountAvatar : provider === null ? css.guestAvatar : css.providerAvatar}` },
+            signedIn
+              ? initialOf(primary)
+              : provider === null
+                ? createElement(IconUserOutline16, { size: 18 })
+                : createElement(IconApiOutline14, { size: 18 }),
+          ),
+          wide && createElement(
+            "span",
+            { className: css.copy },
+            createElement("span", { className: css.primary }, primary),
+            secondary === null ? null : createElement("span", { className: css.secondary }, secondary),
+          ),
+          wide && createElement(IconChevronUpOutline14, { className: css.chevron, size: 14 }),
         ),
-        wide && createElement(
-          "span",
-          { className: css.copy },
-          createElement("span", { className: css.primary }, primary),
-          secondary === null ? null : createElement("span", { className: css.secondary }, secondary),
-        ),
-        wide && createElement(IconChevronUpOutline14, { className: css.chevron, size: 14 }),
-      ),
-    },
+      },
+    ),
     panel === null ? null : createElement(AccountPanel, { kind: panel, snapshot, provider, onClose: () => setPanel(null) }),
   )
 }
