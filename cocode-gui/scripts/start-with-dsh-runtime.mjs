@@ -3,13 +3,16 @@ import {
 	existsSync,
 	mkdtempSync,
 	mkdirSync,
+	openSync,
 	readdirSync,
 	readFileSync,
 	renameSync,
 	rmSync,
 	statSync,
+	closeSync,
 	writeFileSync,
 } from "node:fs"
+import { createHash } from "node:crypto"
 import os from "node:os"
 import path from "node:path"
 
@@ -23,11 +26,16 @@ const runtimeRoot =
 		: mkdtempSync(path.join(os.tmpdir(), "dsh-desktop-dev-")))
 const stageScript = path.resolve("scripts/stage-dsh-runtime.mjs")
 const clientWatcherScript = path.resolve("scripts/watch-dsh-client.mjs")
+const devLockPath = resolveDevLockPath()
 let clientWatcher
 let electron
 let stopping = false
+let devLock
 
 try {
+	devLock = await acquireDevLock(devLockPath)
+	await stopLegacyDevProcesses()
+	await stopOrphanedElectronProcesses()
 	if (useRuntimeCache) ensureRuntimeStaged(runtimeRoot)
 	else if (!configuredRuntimeRoot) stageRuntime(runtimeRoot)
 
@@ -79,6 +87,128 @@ try {
 	await waitForChildExit(clientWatcher)
 	if (!configuredRuntimeRoot && !useRuntimeCache)
 		rmSync(runtimeRoot, { recursive: true, force: true })
+	releaseDevLock(devLockPath, devLock)
+}
+
+function resolveDevLockPath() {
+	const key = createHash("sha256").update(path.resolve(process.cwd())).digest("hex").slice(0, 16)
+	const root = process.env.XDG_RUNTIME_DIR ?? os.tmpdir()
+	return path.join(root, `cocode-gui-${key}.lock`)
+}
+
+async function acquireDevLock(lockPath) {
+	mkdirSync(path.dirname(lockPath), { recursive: true })
+	for (let attempt = 0; attempt < 2; attempt += 1) {
+		try {
+			const fd = openSync(lockPath, "wx")
+			writeFileSync(fd, `${process.pid}\n${path.resolve(process.cwd())}\n`)
+			closeSync(fd)
+			return { pid: process.pid }
+		} catch (error) {
+			if (error?.code !== "EEXIST") throw error
+			const previous = readLock(lockPath)
+			if (!previous || !isProcessAlive(previous.pid)) {
+				rmSync(lockPath, { force: true })
+				continue
+			}
+			if (!isCocodeDevProcess(previous.pid)) {
+				throw new Error(`Cocode GUI lock is held by an unrelated process (pid=${previous.pid}).`)
+			}
+			console.log(`[cocode] stopping previous GUI dev instance (pid=${previous.pid})`)
+			await stopProcess(previous.pid)
+			rmSync(lockPath, { force: true })
+		}
+	}
+	throw new Error(`Unable to acquire Cocode GUI dev lock at ${lockPath}.`)
+}
+
+function readLock(lockPath) {
+	try {
+		const [pidText, cwd] = readFileSync(lockPath, "utf8").trim().split(/\s*\n\s*/)
+		const pid = Number(pidText)
+		return Number.isInteger(pid) && pid > 0 ? { pid, cwd } : undefined
+	} catch { return undefined }
+}
+
+function isProcessAlive(pid) {
+	try { process.kill(pid, 0); return true } catch (error) { return error?.code === "EPERM" }
+}
+
+function isCocodeDevProcess(pid) {
+	const result = spawnSync("ps", ["-p", String(pid), "-o", "command="], { encoding: "utf8" })
+	const command = result.stdout?.trim() ?? ""
+	return command.includes("start-with-dsh-runtime.mjs")
+}
+
+async function stopLegacyDevProcesses() {
+	if (process.platform === "win32") return
+	const result = spawnSync("ps", ["-axo", "pid=,command="], { encoding: "utf8" })
+	for (const line of result.stdout?.split("\n") ?? []) {
+		const match = line.trim().match(/^(\d+)\s+(.+)$/)
+		if (!match) continue
+		const pid = Number(match[1])
+		if (pid === process.pid || !match[2].includes("start-with-dsh-runtime.mjs")) continue
+		if (resolveProcessCwd(pid) !== path.resolve(process.cwd())) continue
+		console.log(`[cocode] stopping legacy GUI dev instance (pid=${pid})`)
+		await stopProcess(pid, true)
+	}
+}
+
+async function stopOrphanedElectronProcesses() {
+	if (process.platform === "win32") return
+	const executable = path.join(
+		path.resolve(process.cwd()),
+		"node_modules",
+		"electron",
+		"dist",
+		"Electron.app",
+		"Contents",
+		"MacOS",
+		"Electron",
+	)
+	const result = spawnSync("ps", ["-axo", "pid=,command="], { encoding: "utf8" })
+	for (const line of result.stdout?.split("\n") ?? []) {
+		const match = line.trim().match(/^(\d+)\s+(.+)$/)
+		if (!match || !match[2].startsWith(`${executable} `)) continue
+		const pid = Number(match[1])
+		if (resolveProcessCwd(pid) !== path.resolve(process.cwd())) continue
+		console.log(`[cocode] stopping orphaned Electron instance (pid=${pid})`)
+		await stopProcess(pid)
+	}
+}
+
+function resolveProcessCwd(pid) {
+	const result = spawnSync("lsof", ["-a", "-p", String(pid), "-d", "cwd", "-Fn"], {
+		encoding: "utf8",
+	})
+	const pathname = result.stdout?.split("\n").find((line) => line.startsWith("n"))
+	return pathname?.slice(1)
+}
+
+async function stopProcess(pid, force = false) {
+	try { process.kill(pid, "SIGTERM") } catch (error) {
+		if (error?.code === "ESRCH") return
+		throw error
+	}
+	await waitForProcessExit(pid, 8_000)
+	if (force && isProcessAlive(pid)) {
+		process.kill(pid, "SIGKILL")
+		await waitForProcessExit(pid, 2_000)
+	}
+	if (isProcessAlive(pid)) throw new Error(`Cocode GUI dev process ${pid} did not stop.`)
+}
+
+async function waitForProcessExit(pid, timeoutMs) {
+	const deadline = Date.now() + timeoutMs
+	while (Date.now() < deadline && isProcessAlive(pid)) {
+		await new Promise((resolve) => setTimeout(resolve, 100))
+	}
+}
+
+function releaseDevLock(lockPath, lock) {
+	if (!lock || lock.pid !== process.pid) return
+	const current = readLock(lockPath)
+	if (current?.pid === process.pid) rmSync(lockPath, { force: true })
 }
 
 function resolveDefaultRuntimeRoot() {

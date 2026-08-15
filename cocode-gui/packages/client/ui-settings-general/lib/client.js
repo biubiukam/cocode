@@ -36,25 +36,25 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var SettingsRoot_module_css_default = {
-			"overlay": "eCSlTa_overlay",
-			"navList": "eCSlTa_navList",
-			"actions": "eCSlTa_actions",
-			"options": "eCSlTa_options",
-			"rail": "eCSlTa_rail",
-			"trigger": "eCSlTa_trigger",
-			"active": "eCSlTa_active",
-			"header": "eCSlTa_header",
-			"mask": "eCSlTa_mask",
-			"navTitle": "eCSlTa_navTitle",
-			"content": "eCSlTa_content",
-			"navCell": "eCSlTa_navCell",
-			"nav": "eCSlTa_nav",
-			"navIcon": "eCSlTa_navIcon",
-			"navLabel": "eCSlTa_navLabel",
 			"close": "eCSlTa_close",
-			"triggerLabel": "eCSlTa_triggerLabel",
+			"panel": "eCSlTa_panel",
 			"hiddenLabel": "eCSlTa_hiddenLabel",
-			"panel": "eCSlTa_panel"
+			"navLabel": "eCSlTa_navLabel",
+			"rail": "eCSlTa_rail",
+			"header": "eCSlTa_header",
+			"options": "eCSlTa_options",
+			"mask": "eCSlTa_mask",
+			"active": "eCSlTa_active",
+			"triggerLabel": "eCSlTa_triggerLabel",
+			"nav": "eCSlTa_nav",
+			"navTitle": "eCSlTa_navTitle",
+			"navList": "eCSlTa_navList",
+			"navCell": "eCSlTa_navCell",
+			"actions": "eCSlTa_actions",
+			"navIcon": "eCSlTa_navIcon",
+			"content": "eCSlTa_content",
+			"overlay": "eCSlTa_overlay",
+			"trigger": "eCSlTa_trigger"
 		};
 		//#endregion
 		//#region packages/client/ui-settings-general/src/client/SettingsRoot.tsx

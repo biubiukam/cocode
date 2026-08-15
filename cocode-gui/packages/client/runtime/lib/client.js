@@ -6,7 +6,7 @@ window.__ModuleLoader__.load({
 		Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
 		let _deepseek_ai_cordis = require("@deepseek-ai/cordis");
 		let _deepseek_ai_dsh_client_ui_slots = require("@deepseek-ai/dsh-client-ui-slots");
-		//#region src/client/slots.ts
+		//#region packages/client/runtime/src/client/slots.ts
 		/**
 		* SlotRegistry: the cordis Service layer of the slot system over the pure
 		* SlotCore (ui-slots owns registration semantics, the declaration ledger,
@@ -333,7 +333,7 @@ window.__ModuleLoader__.load({
 			return this.ctx.effect(() => this["_register"](options, component), "slots.register()");
 		};
 		//#endregion
-		//#region ../../host/apiproxy/src/api/rpc.ts
+		//#region node_modules/@deepseek-ai/dsh-host-apiproxy/lib/types/api/rpc.js
 		/**
 		* Fold a transport exception into the RpcResult error branch (unified error
 		* API; 'internal' as the catch-all code). Lives with RpcResult so every
@@ -352,7 +352,7 @@ window.__ModuleLoader__.load({
 			};
 		}
 		//#endregion
-		//#region ../../../node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/core.js
+		//#region node_modules/zod/v4/core/core.js
 		var _a$1;
 		function $constructor(name, initializer, params) {
 			function init(inst, def) {
@@ -411,7 +411,7 @@ window.__ModuleLoader__.load({
 			return globalConfig;
 		}
 		//#endregion
-		//#region ../../../node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/util.js
+		//#region node_modules/zod/v4/core/util.js
 		function getEnumValues(entries) {
 			const numericValues = Object.values(entries).filter((v) => typeof v === "number");
 			return Object.entries(entries).filter(([k, _]) => numericValues.indexOf(+k) === -1).map(([_, v]) => v);
@@ -445,7 +445,7 @@ window.__ModuleLoader__.load({
 			if (Math.abs(ratio - roundedRatio) < tolerance) return 0;
 			return ratio - roundedRatio;
 		}
-		const EVALUATING = /* @__PURE__*/ Symbol("evaluating");
+		const EVALUATING = /* @__PURE__ */ Symbol("evaluating");
 		function defineLazy(object, key, getter) {
 			let value = void 0;
 			Object.defineProperty(object, key, {
@@ -486,7 +486,7 @@ window.__ModuleLoader__.load({
 		function isObject(data) {
 			return typeof data === "object" && data !== null && !Array.isArray(data);
 		}
-		const allowsEval = /* @__PURE__*/ cached(() => {
+		const allowsEval = /* @__PURE__ */ cached(() => {
 			if (globalConfig.jitless) return false;
 			if (typeof navigator !== "undefined" && navigator?.userAgent?.includes("Cloudflare")) return false;
 			try {
@@ -513,7 +513,7 @@ window.__ModuleLoader__.load({
 			if (o instanceof Set) return new Set(o);
 			return o;
 		}
-		const propertyKeyTypes = /* @__PURE__*/ new Set([
+		const propertyKeyTypes = /* @__PURE__ */ new Set([
 			"string",
 			"number",
 			"symbol"
@@ -723,7 +723,7 @@ window.__ModuleLoader__.load({
 			return { ...iss };
 		}
 		//#endregion
-		//#region ../../../node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/errors.js
+		//#region node_modules/zod/v4/core/errors.js
 		const initializer$1 = (inst, def) => {
 			inst.name = "$ZodError";
 			Object.defineProperty(inst, "_zod", {
@@ -783,7 +783,7 @@ window.__ModuleLoader__.load({
 			return fieldErrors;
 		}
 		//#endregion
-		//#region ../../../node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/parse.js
+		//#region node_modules/zod/v4/core/parse.js
 		const _parse = (_Err) => (schema, value, _ctx, _params) => {
 			const ctx = _ctx ? {
 				..._ctx,
@@ -795,7 +795,7 @@ window.__ModuleLoader__.load({
 			}, ctx);
 			if (result instanceof Promise) throw new $ZodAsyncError();
 			if (result.issues.length) {
-				const e = new ((_params?.Err) ?? _Err)(result.issues.map((iss) => finalizeIssue(iss, ctx, config())));
+				const e = new (_params?.Err ?? _Err)(result.issues.map((iss) => finalizeIssue(iss, ctx, config())));
 				captureStackTrace(e, _params?.callee);
 				throw e;
 			}
@@ -812,7 +812,7 @@ window.__ModuleLoader__.load({
 			}, ctx);
 			if (result instanceof Promise) result = await result;
 			if (result.issues.length) {
-				const e = new ((params?.Err) ?? _Err)(result.issues.map((iss) => finalizeIssue(iss, ctx, config())));
+				const e = new (params?.Err ?? _Err)(result.issues.map((iss) => finalizeIssue(iss, ctx, config())));
 				captureStackTrace(e, params?.callee);
 				throw e;
 			}
@@ -836,7 +836,7 @@ window.__ModuleLoader__.load({
 				data: result.value
 			};
 		};
-		const safeParse$1 = /* @__PURE__*/ _safeParse($ZodRealError);
+		const safeParse$1 = /* @__PURE__ */ _safeParse($ZodRealError);
 		const _safeParseAsync = (_Err) => async (schema, value, _ctx) => {
 			const ctx = _ctx ? {
 				..._ctx,
@@ -855,7 +855,7 @@ window.__ModuleLoader__.load({
 				data: result.value
 			};
 		};
-		const safeParseAsync$1 = /* @__PURE__*/ _safeParseAsync($ZodRealError);
+		const safeParseAsync$1 = /* @__PURE__ */ _safeParseAsync($ZodRealError);
 		const _encode = (_Err) => (schema, value, _ctx) => {
 			const ctx = _ctx ? {
 				..._ctx,
@@ -897,7 +897,7 @@ window.__ModuleLoader__.load({
 			return _safeParseAsync(_Err)(schema, value, _ctx);
 		};
 		//#endregion
-		//#region ../../../node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/regexes.js
+		//#region node_modules/zod/v4/core/regexes.js
 		/**
 		* @deprecated CUID v1 is deprecated by its authors due to information leakage
 		* (timestamps embedded in the id). Use {@link cuid2} instead.
@@ -935,7 +935,7 @@ window.__ModuleLoader__.load({
 		const httpProtocol = /^https?$/;
 		const e164 = /^\+[1-9]\d{6,14}$/;
 		const dateSource = `(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))`;
-		const date$1 = /*@__PURE__*/ new RegExp(`^${dateSource}$`);
+		const date$1 = /* @__PURE__ */ new RegExp(`^${dateSource}$`);
 		function timeSource(args) {
 			const hhmm = `(?:[01]\\d|2[0-3]):[0-5]\\d`;
 			return typeof args.precision === "number" ? args.precision === -1 ? `${hhmm}` : args.precision === 0 ? `${hhmm}:[0-5]\\d` : `${hhmm}:[0-5]\\d\\.\\d{${args.precision}}` : `${hhmm}(?::[0-5]\\d(?:\\.\\d+)?)?`;
@@ -960,8 +960,8 @@ window.__ModuleLoader__.load({
 		const lowercase = /^[^A-Z]*$/;
 		const uppercase = /^[^a-z]*$/;
 		//#endregion
-		//#region ../../../node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/checks.js
-		const $ZodCheck = /*@__PURE__*/ $constructor("$ZodCheck", (inst, def) => {
+		//#region node_modules/zod/v4/core/checks.js
+		const $ZodCheck = /* @__PURE__ */ $constructor("$ZodCheck", (inst, def) => {
 			var _a;
 			inst._zod ?? (inst._zod = {});
 			inst._zod.def = def;
@@ -972,7 +972,7 @@ window.__ModuleLoader__.load({
 			bigint: "bigint",
 			object: "date"
 		};
-		const $ZodCheckLessThan = /*@__PURE__*/ $constructor("$ZodCheckLessThan", (inst, def) => {
+		const $ZodCheckLessThan = /* @__PURE__ */ $constructor("$ZodCheckLessThan", (inst, def) => {
 			$ZodCheck.init(inst, def);
 			const origin = numericOriginMap[typeof def.value];
 			inst._zod.onattach.push((inst) => {
@@ -994,7 +994,7 @@ window.__ModuleLoader__.load({
 				});
 			};
 		});
-		const $ZodCheckGreaterThan = /*@__PURE__*/ $constructor("$ZodCheckGreaterThan", (inst, def) => {
+		const $ZodCheckGreaterThan = /* @__PURE__ */ $constructor("$ZodCheckGreaterThan", (inst, def) => {
 			$ZodCheck.init(inst, def);
 			const origin = numericOriginMap[typeof def.value];
 			inst._zod.onattach.push((inst) => {
@@ -1016,7 +1016,7 @@ window.__ModuleLoader__.load({
 				});
 			};
 		});
-		const $ZodCheckMultipleOf = /*@__PURE__*/ $constructor("$ZodCheckMultipleOf", (inst, def) => {
+		const $ZodCheckMultipleOf = /* @__PURE__ */ $constructor("$ZodCheckMultipleOf", (inst, def) => {
 			$ZodCheck.init(inst, def);
 			inst._zod.onattach.push((inst) => {
 				var _a;
@@ -1035,7 +1035,7 @@ window.__ModuleLoader__.load({
 				});
 			};
 		});
-		const $ZodCheckNumberFormat = /*@__PURE__*/ $constructor("$ZodCheckNumberFormat", (inst, def) => {
+		const $ZodCheckNumberFormat = /* @__PURE__ */ $constructor("$ZodCheckNumberFormat", (inst, def) => {
 			$ZodCheck.init(inst, def);
 			def.format = def.format || "float64";
 			const isInt = def.format?.includes("int");
@@ -1106,7 +1106,7 @@ window.__ModuleLoader__.load({
 				});
 			};
 		});
-		const $ZodCheckMaxLength = /*@__PURE__*/ $constructor("$ZodCheckMaxLength", (inst, def) => {
+		const $ZodCheckMaxLength = /* @__PURE__ */ $constructor("$ZodCheckMaxLength", (inst, def) => {
 			var _a;
 			$ZodCheck.init(inst, def);
 			(_a = inst._zod.def).when ?? (_a.when = (payload) => {
@@ -1132,7 +1132,7 @@ window.__ModuleLoader__.load({
 				});
 			};
 		});
-		const $ZodCheckMinLength = /*@__PURE__*/ $constructor("$ZodCheckMinLength", (inst, def) => {
+		const $ZodCheckMinLength = /* @__PURE__ */ $constructor("$ZodCheckMinLength", (inst, def) => {
 			var _a;
 			$ZodCheck.init(inst, def);
 			(_a = inst._zod.def).when ?? (_a.when = (payload) => {
@@ -1158,7 +1158,7 @@ window.__ModuleLoader__.load({
 				});
 			};
 		});
-		const $ZodCheckLengthEquals = /*@__PURE__*/ $constructor("$ZodCheckLengthEquals", (inst, def) => {
+		const $ZodCheckLengthEquals = /* @__PURE__ */ $constructor("$ZodCheckLengthEquals", (inst, def) => {
 			var _a;
 			$ZodCheck.init(inst, def);
 			(_a = inst._zod.def).when ?? (_a.when = (payload) => {
@@ -1194,7 +1194,7 @@ window.__ModuleLoader__.load({
 				});
 			};
 		});
-		const $ZodCheckStringFormat = /*@__PURE__*/ $constructor("$ZodCheckStringFormat", (inst, def) => {
+		const $ZodCheckStringFormat = /* @__PURE__ */ $constructor("$ZodCheckStringFormat", (inst, def) => {
 			var _a, _b;
 			$ZodCheck.init(inst, def);
 			inst._zod.onattach.push((inst) => {
@@ -1220,7 +1220,7 @@ window.__ModuleLoader__.load({
 			});
 			else (_b = inst._zod).check ?? (_b.check = () => {});
 		});
-		const $ZodCheckRegex = /*@__PURE__*/ $constructor("$ZodCheckRegex", (inst, def) => {
+		const $ZodCheckRegex = /* @__PURE__ */ $constructor("$ZodCheckRegex", (inst, def) => {
 			$ZodCheckStringFormat.init(inst, def);
 			inst._zod.check = (payload) => {
 				def.pattern.lastIndex = 0;
@@ -1236,15 +1236,15 @@ window.__ModuleLoader__.load({
 				});
 			};
 		});
-		const $ZodCheckLowerCase = /*@__PURE__*/ $constructor("$ZodCheckLowerCase", (inst, def) => {
+		const $ZodCheckLowerCase = /* @__PURE__ */ $constructor("$ZodCheckLowerCase", (inst, def) => {
 			def.pattern ?? (def.pattern = lowercase);
 			$ZodCheckStringFormat.init(inst, def);
 		});
-		const $ZodCheckUpperCase = /*@__PURE__*/ $constructor("$ZodCheckUpperCase", (inst, def) => {
+		const $ZodCheckUpperCase = /* @__PURE__ */ $constructor("$ZodCheckUpperCase", (inst, def) => {
 			def.pattern ?? (def.pattern = uppercase);
 			$ZodCheckStringFormat.init(inst, def);
 		});
-		const $ZodCheckIncludes = /*@__PURE__*/ $constructor("$ZodCheckIncludes", (inst, def) => {
+		const $ZodCheckIncludes = /* @__PURE__ */ $constructor("$ZodCheckIncludes", (inst, def) => {
 			$ZodCheck.init(inst, def);
 			const escapedRegex = escapeRegex(def.includes);
 			const pattern = new RegExp(typeof def.position === "number" ? `^.{${def.position}}${escapedRegex}` : escapedRegex);
@@ -1267,7 +1267,7 @@ window.__ModuleLoader__.load({
 				});
 			};
 		});
-		const $ZodCheckStartsWith = /*@__PURE__*/ $constructor("$ZodCheckStartsWith", (inst, def) => {
+		const $ZodCheckStartsWith = /* @__PURE__ */ $constructor("$ZodCheckStartsWith", (inst, def) => {
 			$ZodCheck.init(inst, def);
 			const pattern = new RegExp(`^${escapeRegex(def.prefix)}.*`);
 			def.pattern ?? (def.pattern = pattern);
@@ -1289,7 +1289,7 @@ window.__ModuleLoader__.load({
 				});
 			};
 		});
-		const $ZodCheckEndsWith = /*@__PURE__*/ $constructor("$ZodCheckEndsWith", (inst, def) => {
+		const $ZodCheckEndsWith = /* @__PURE__ */ $constructor("$ZodCheckEndsWith", (inst, def) => {
 			$ZodCheck.init(inst, def);
 			const pattern = new RegExp(`.*${escapeRegex(def.suffix)}$`);
 			def.pattern ?? (def.pattern = pattern);
@@ -1311,14 +1311,14 @@ window.__ModuleLoader__.load({
 				});
 			};
 		});
-		const $ZodCheckOverwrite = /*@__PURE__*/ $constructor("$ZodCheckOverwrite", (inst, def) => {
+		const $ZodCheckOverwrite = /* @__PURE__ */ $constructor("$ZodCheckOverwrite", (inst, def) => {
 			$ZodCheck.init(inst, def);
 			inst._zod.check = (payload) => {
 				payload.value = def.tx(payload.value);
 			};
 		});
 		//#endregion
-		//#region ../../../node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/doc.js
+		//#region node_modules/zod/v4/core/doc.js
 		var Doc = class {
 			constructor(args = []) {
 				this.content = [];
@@ -1349,15 +1349,15 @@ window.__ModuleLoader__.load({
 			}
 		};
 		//#endregion
-		//#region ../../../node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/versions.js
+		//#region node_modules/zod/v4/core/versions.js
 		const version = {
 			major: 4,
 			minor: 4,
 			patch: 3
 		};
 		//#endregion
-		//#region ../../../node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/schemas.js
-		const $ZodType = /*@__PURE__*/ $constructor("$ZodType", (inst, def) => {
+		//#region node_modules/zod/v4/core/schemas.js
+		const $ZodType = /* @__PURE__ */ $constructor("$ZodType", (inst, def) => {
 			var _a;
 			inst ?? (inst = {});
 			inst._zod.def = def;
@@ -1446,7 +1446,7 @@ window.__ModuleLoader__.load({
 				version: 1
 			}));
 		});
-		const $ZodString = /*@__PURE__*/ $constructor("$ZodString", (inst, def) => {
+		const $ZodString = /* @__PURE__ */ $constructor("$ZodString", (inst, def) => {
 			$ZodType.init(inst, def);
 			inst._zod.pattern = [...inst?._zod.bag?.patterns ?? []].pop() ?? string$1(inst._zod.bag);
 			inst._zod.parse = (payload, _) => {
@@ -1463,15 +1463,15 @@ window.__ModuleLoader__.load({
 				return payload;
 			};
 		});
-		const $ZodStringFormat = /*@__PURE__*/ $constructor("$ZodStringFormat", (inst, def) => {
+		const $ZodStringFormat = /* @__PURE__ */ $constructor("$ZodStringFormat", (inst, def) => {
 			$ZodCheckStringFormat.init(inst, def);
 			$ZodString.init(inst, def);
 		});
-		const $ZodGUID = /*@__PURE__*/ $constructor("$ZodGUID", (inst, def) => {
+		const $ZodGUID = /* @__PURE__ */ $constructor("$ZodGUID", (inst, def) => {
 			def.pattern ?? (def.pattern = guid);
 			$ZodStringFormat.init(inst, def);
 		});
-		const $ZodUUID = /*@__PURE__*/ $constructor("$ZodUUID", (inst, def) => {
+		const $ZodUUID = /* @__PURE__ */ $constructor("$ZodUUID", (inst, def) => {
 			if (def.version) {
 				const v = {
 					v1: 1,
@@ -1488,11 +1488,11 @@ window.__ModuleLoader__.load({
 			} else def.pattern ?? (def.pattern = uuid());
 			$ZodStringFormat.init(inst, def);
 		});
-		const $ZodEmail = /*@__PURE__*/ $constructor("$ZodEmail", (inst, def) => {
+		const $ZodEmail = /* @__PURE__ */ $constructor("$ZodEmail", (inst, def) => {
 			def.pattern ?? (def.pattern = email);
 			$ZodStringFormat.init(inst, def);
 		});
-		const $ZodURL = /*@__PURE__*/ $constructor("$ZodURL", (inst, def) => {
+		const $ZodURL = /* @__PURE__ */ $constructor("$ZodURL", (inst, def) => {
 			$ZodStringFormat.init(inst, def);
 			inst._zod.check = (payload) => {
 				try {
@@ -1549,11 +1549,11 @@ window.__ModuleLoader__.load({
 				}
 			};
 		});
-		const $ZodEmoji = /*@__PURE__*/ $constructor("$ZodEmoji", (inst, def) => {
+		const $ZodEmoji = /* @__PURE__ */ $constructor("$ZodEmoji", (inst, def) => {
 			def.pattern ?? (def.pattern = emoji());
 			$ZodStringFormat.init(inst, def);
 		});
-		const $ZodNanoID = /*@__PURE__*/ $constructor("$ZodNanoID", (inst, def) => {
+		const $ZodNanoID = /* @__PURE__ */ $constructor("$ZodNanoID", (inst, def) => {
 			def.pattern ?? (def.pattern = nanoid);
 			$ZodStringFormat.init(inst, def);
 		});
@@ -1562,48 +1562,48 @@ window.__ModuleLoader__.load({
 		* (timestamps embedded in the id). Use {@link $ZodCUID2} instead.
 		* See https://github.com/paralleldrive/cuid.
 		*/
-		const $ZodCUID = /*@__PURE__*/ $constructor("$ZodCUID", (inst, def) => {
+		const $ZodCUID = /* @__PURE__ */ $constructor("$ZodCUID", (inst, def) => {
 			def.pattern ?? (def.pattern = cuid);
 			$ZodStringFormat.init(inst, def);
 		});
-		const $ZodCUID2 = /*@__PURE__*/ $constructor("$ZodCUID2", (inst, def) => {
+		const $ZodCUID2 = /* @__PURE__ */ $constructor("$ZodCUID2", (inst, def) => {
 			def.pattern ?? (def.pattern = cuid2);
 			$ZodStringFormat.init(inst, def);
 		});
-		const $ZodULID = /*@__PURE__*/ $constructor("$ZodULID", (inst, def) => {
+		const $ZodULID = /* @__PURE__ */ $constructor("$ZodULID", (inst, def) => {
 			def.pattern ?? (def.pattern = ulid);
 			$ZodStringFormat.init(inst, def);
 		});
-		const $ZodXID = /*@__PURE__*/ $constructor("$ZodXID", (inst, def) => {
+		const $ZodXID = /* @__PURE__ */ $constructor("$ZodXID", (inst, def) => {
 			def.pattern ?? (def.pattern = xid);
 			$ZodStringFormat.init(inst, def);
 		});
-		const $ZodKSUID = /*@__PURE__*/ $constructor("$ZodKSUID", (inst, def) => {
+		const $ZodKSUID = /* @__PURE__ */ $constructor("$ZodKSUID", (inst, def) => {
 			def.pattern ?? (def.pattern = ksuid);
 			$ZodStringFormat.init(inst, def);
 		});
-		const $ZodISODateTime = /*@__PURE__*/ $constructor("$ZodISODateTime", (inst, def) => {
+		const $ZodISODateTime = /* @__PURE__ */ $constructor("$ZodISODateTime", (inst, def) => {
 			def.pattern ?? (def.pattern = datetime$1(def));
 			$ZodStringFormat.init(inst, def);
 		});
-		const $ZodISODate = /*@__PURE__*/ $constructor("$ZodISODate", (inst, def) => {
+		const $ZodISODate = /* @__PURE__ */ $constructor("$ZodISODate", (inst, def) => {
 			def.pattern ?? (def.pattern = date$1);
 			$ZodStringFormat.init(inst, def);
 		});
-		const $ZodISOTime = /*@__PURE__*/ $constructor("$ZodISOTime", (inst, def) => {
+		const $ZodISOTime = /* @__PURE__ */ $constructor("$ZodISOTime", (inst, def) => {
 			def.pattern ?? (def.pattern = time$1(def));
 			$ZodStringFormat.init(inst, def);
 		});
-		const $ZodISODuration = /*@__PURE__*/ $constructor("$ZodISODuration", (inst, def) => {
+		const $ZodISODuration = /* @__PURE__ */ $constructor("$ZodISODuration", (inst, def) => {
 			def.pattern ?? (def.pattern = duration$1);
 			$ZodStringFormat.init(inst, def);
 		});
-		const $ZodIPv4 = /*@__PURE__*/ $constructor("$ZodIPv4", (inst, def) => {
+		const $ZodIPv4 = /* @__PURE__ */ $constructor("$ZodIPv4", (inst, def) => {
 			def.pattern ?? (def.pattern = ipv4);
 			$ZodStringFormat.init(inst, def);
 			inst._zod.bag.format = `ipv4`;
 		});
-		const $ZodIPv6 = /*@__PURE__*/ $constructor("$ZodIPv6", (inst, def) => {
+		const $ZodIPv6 = /* @__PURE__ */ $constructor("$ZodIPv6", (inst, def) => {
 			def.pattern ?? (def.pattern = ipv6);
 			$ZodStringFormat.init(inst, def);
 			inst._zod.bag.format = `ipv6`;
@@ -1621,11 +1621,11 @@ window.__ModuleLoader__.load({
 				}
 			};
 		});
-		const $ZodCIDRv4 = /*@__PURE__*/ $constructor("$ZodCIDRv4", (inst, def) => {
+		const $ZodCIDRv4 = /* @__PURE__ */ $constructor("$ZodCIDRv4", (inst, def) => {
 			def.pattern ?? (def.pattern = cidrv4);
 			$ZodStringFormat.init(inst, def);
 		});
-		const $ZodCIDRv6 = /*@__PURE__*/ $constructor("$ZodCIDRv6", (inst, def) => {
+		const $ZodCIDRv6 = /* @__PURE__ */ $constructor("$ZodCIDRv6", (inst, def) => {
 			def.pattern ?? (def.pattern = cidrv6);
 			$ZodStringFormat.init(inst, def);
 			inst._zod.check = (payload) => {
@@ -1660,7 +1660,7 @@ window.__ModuleLoader__.load({
 				return false;
 			}
 		}
-		const $ZodBase64 = /*@__PURE__*/ $constructor("$ZodBase64", (inst, def) => {
+		const $ZodBase64 = /* @__PURE__ */ $constructor("$ZodBase64", (inst, def) => {
 			def.pattern ?? (def.pattern = base64);
 			$ZodStringFormat.init(inst, def);
 			inst._zod.bag.contentEncoding = "base64";
@@ -1680,7 +1680,7 @@ window.__ModuleLoader__.load({
 			const base64 = data.replace(/[-_]/g, (c) => c === "-" ? "+" : "/");
 			return isValidBase64(base64.padEnd(Math.ceil(base64.length / 4) * 4, "="));
 		}
-		const $ZodBase64URL = /*@__PURE__*/ $constructor("$ZodBase64URL", (inst, def) => {
+		const $ZodBase64URL = /* @__PURE__ */ $constructor("$ZodBase64URL", (inst, def) => {
 			def.pattern ?? (def.pattern = base64url);
 			$ZodStringFormat.init(inst, def);
 			inst._zod.bag.contentEncoding = "base64url";
@@ -1695,7 +1695,7 @@ window.__ModuleLoader__.load({
 				});
 			};
 		});
-		const $ZodE164 = /*@__PURE__*/ $constructor("$ZodE164", (inst, def) => {
+		const $ZodE164 = /* @__PURE__ */ $constructor("$ZodE164", (inst, def) => {
 			def.pattern ?? (def.pattern = e164);
 			$ZodStringFormat.init(inst, def);
 		});
@@ -1714,7 +1714,7 @@ window.__ModuleLoader__.load({
 				return false;
 			}
 		}
-		const $ZodJWT = /*@__PURE__*/ $constructor("$ZodJWT", (inst, def) => {
+		const $ZodJWT = /* @__PURE__ */ $constructor("$ZodJWT", (inst, def) => {
 			$ZodStringFormat.init(inst, def);
 			inst._zod.check = (payload) => {
 				if (isValidJWT(payload.value, def.alg)) return;
@@ -1727,7 +1727,7 @@ window.__ModuleLoader__.load({
 				});
 			};
 		});
-		const $ZodNumber = /*@__PURE__*/ $constructor("$ZodNumber", (inst, def) => {
+		const $ZodNumber = /* @__PURE__ */ $constructor("$ZodNumber", (inst, def) => {
 			$ZodType.init(inst, def);
 			inst._zod.pattern = inst._zod.bag.pattern ?? number$1;
 			inst._zod.parse = (payload, _ctx) => {
@@ -1747,15 +1747,15 @@ window.__ModuleLoader__.load({
 				return payload;
 			};
 		});
-		const $ZodNumberFormat = /*@__PURE__*/ $constructor("$ZodNumberFormat", (inst, def) => {
+		const $ZodNumberFormat = /* @__PURE__ */ $constructor("$ZodNumberFormat", (inst, def) => {
 			$ZodCheckNumberFormat.init(inst, def);
 			$ZodNumber.init(inst, def);
 		});
-		const $ZodUnknown = /*@__PURE__*/ $constructor("$ZodUnknown", (inst, def) => {
+		const $ZodUnknown = /* @__PURE__ */ $constructor("$ZodUnknown", (inst, def) => {
 			$ZodType.init(inst, def);
 			inst._zod.parse = (payload) => payload;
 		});
-		const $ZodNever = /*@__PURE__*/ $constructor("$ZodNever", (inst, def) => {
+		const $ZodNever = /* @__PURE__ */ $constructor("$ZodNever", (inst, def) => {
 			$ZodType.init(inst, def);
 			inst._zod.parse = (payload, _ctx) => {
 				payload.issues.push({
@@ -1771,7 +1771,7 @@ window.__ModuleLoader__.load({
 			if (result.issues.length) final.issues.push(...prefixIssues(index, result.issues));
 			final.value[index] = result.value;
 		}
-		const $ZodArray = /*@__PURE__*/ $constructor("$ZodArray", (inst, def) => {
+		const $ZodArray = /* @__PURE__ */ $constructor("$ZodArray", (inst, def) => {
 			$ZodType.init(inst, def);
 			inst._zod.parse = (payload, ctx) => {
 				const input = payload.value;
@@ -1862,7 +1862,7 @@ window.__ModuleLoader__.load({
 				return payload;
 			});
 		}
-		const $ZodObject = /*@__PURE__*/ $constructor("$ZodObject", (inst, def) => {
+		const $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
 			$ZodType.init(inst, def);
 			if (!Object.getOwnPropertyDescriptor(def, "shape")?.get) {
 				const sh = def.shape;
@@ -1918,7 +1918,7 @@ window.__ModuleLoader__.load({
 				return handleCatchall(proms, input, payload, ctx, _normalized.value, inst);
 			};
 		});
-		const $ZodObjectJIT = /*@__PURE__*/ $constructor("$ZodObjectJIT", (inst, def) => {
+		const $ZodObjectJIT = /* @__PURE__ */ $constructor("$ZodObjectJIT", (inst, def) => {
 			$ZodObject.init(inst, def);
 			const superParse = inst._zod.parse;
 			const _normalized = cached(() => normalizeDef(def));
@@ -2058,7 +2058,7 @@ window.__ModuleLoader__.load({
 			});
 			return final;
 		}
-		const $ZodUnion = /*@__PURE__*/ $constructor("$ZodUnion", (inst, def) => {
+		const $ZodUnion = /* @__PURE__ */ $constructor("$ZodUnion", (inst, def) => {
 			$ZodType.init(inst, def);
 			defineLazy(inst._zod, "optin", () => def.options.some((o) => o._zod.optin === "optional") ? "optional" : void 0);
 			defineLazy(inst._zod, "optout", () => def.options.some((o) => o._zod.optout === "optional") ? "optional" : void 0);
@@ -2095,7 +2095,7 @@ window.__ModuleLoader__.load({
 				});
 			};
 		});
-		const $ZodDiscriminatedUnion = /*@__PURE__*/ $constructor("$ZodDiscriminatedUnion", (inst, def) => {
+		const $ZodDiscriminatedUnion = /* @__PURE__ */ $constructor("$ZodDiscriminatedUnion", (inst, def) => {
 			def.inclusive = false;
 			$ZodUnion.init(inst, def);
 			const _super = inst._zod.parse;
@@ -2151,7 +2151,7 @@ window.__ModuleLoader__.load({
 				return payload;
 			};
 		});
-		const $ZodIntersection = /*@__PURE__*/ $constructor("$ZodIntersection", (inst, def) => {
+		const $ZodIntersection = /* @__PURE__ */ $constructor("$ZodIntersection", (inst, def) => {
 			$ZodType.init(inst, def);
 			inst._zod.parse = (payload, ctx) => {
 				const input = payload.value;
@@ -2250,7 +2250,7 @@ window.__ModuleLoader__.load({
 			result.value = merged.data;
 			return result;
 		}
-		const $ZodEnum = /*@__PURE__*/ $constructor("$ZodEnum", (inst, def) => {
+		const $ZodEnum = /* @__PURE__ */ $constructor("$ZodEnum", (inst, def) => {
 			$ZodType.init(inst, def);
 			const values = getEnumValues(def.entries);
 			const valuesSet = new Set(values);
@@ -2268,7 +2268,7 @@ window.__ModuleLoader__.load({
 				return payload;
 			};
 		});
-		const $ZodLiteral = /*@__PURE__*/ $constructor("$ZodLiteral", (inst, def) => {
+		const $ZodLiteral = /* @__PURE__ */ $constructor("$ZodLiteral", (inst, def) => {
 			$ZodType.init(inst, def);
 			if (def.values.length === 0) throw new Error("Cannot create literal schema with no valid values");
 			const values = new Set(def.values);
@@ -2286,7 +2286,7 @@ window.__ModuleLoader__.load({
 				return payload;
 			};
 		});
-		const $ZodTransform = /*@__PURE__*/ $constructor("$ZodTransform", (inst, def) => {
+		const $ZodTransform = /* @__PURE__ */ $constructor("$ZodTransform", (inst, def) => {
 			$ZodType.init(inst, def);
 			inst._zod.optin = "optional";
 			inst._zod.parse = (payload, ctx) => {
@@ -2310,7 +2310,7 @@ window.__ModuleLoader__.load({
 			};
 			return result;
 		}
-		const $ZodOptional = /*@__PURE__*/ $constructor("$ZodOptional", (inst, def) => {
+		const $ZodOptional = /* @__PURE__ */ $constructor("$ZodOptional", (inst, def) => {
 			$ZodType.init(inst, def);
 			inst._zod.optin = "optional";
 			inst._zod.optout = "optional";
@@ -2332,7 +2332,7 @@ window.__ModuleLoader__.load({
 				return def.innerType._zod.run(payload, ctx);
 			};
 		});
-		const $ZodExactOptional = /*@__PURE__*/ $constructor("$ZodExactOptional", (inst, def) => {
+		const $ZodExactOptional = /* @__PURE__ */ $constructor("$ZodExactOptional", (inst, def) => {
 			$ZodOptional.init(inst, def);
 			defineLazy(inst._zod, "values", () => def.innerType._zod.values);
 			defineLazy(inst._zod, "pattern", () => def.innerType._zod.pattern);
@@ -2340,7 +2340,7 @@ window.__ModuleLoader__.load({
 				return def.innerType._zod.run(payload, ctx);
 			};
 		});
-		const $ZodNullable = /*@__PURE__*/ $constructor("$ZodNullable", (inst, def) => {
+		const $ZodNullable = /* @__PURE__ */ $constructor("$ZodNullable", (inst, def) => {
 			$ZodType.init(inst, def);
 			defineLazy(inst._zod, "optin", () => def.innerType._zod.optin);
 			defineLazy(inst._zod, "optout", () => def.innerType._zod.optout);
@@ -2356,7 +2356,7 @@ window.__ModuleLoader__.load({
 				return def.innerType._zod.run(payload, ctx);
 			};
 		});
-		const $ZodDefault = /*@__PURE__*/ $constructor("$ZodDefault", (inst, def) => {
+		const $ZodDefault = /* @__PURE__ */ $constructor("$ZodDefault", (inst, def) => {
 			$ZodType.init(inst, def);
 			inst._zod.optin = "optional";
 			defineLazy(inst._zod, "values", () => def.innerType._zod.values);
@@ -2378,7 +2378,7 @@ window.__ModuleLoader__.load({
 			if (payload.value === void 0) payload.value = def.defaultValue;
 			return payload;
 		}
-		const $ZodPrefault = /*@__PURE__*/ $constructor("$ZodPrefault", (inst, def) => {
+		const $ZodPrefault = /* @__PURE__ */ $constructor("$ZodPrefault", (inst, def) => {
 			$ZodType.init(inst, def);
 			inst._zod.optin = "optional";
 			defineLazy(inst._zod, "values", () => def.innerType._zod.values);
@@ -2388,7 +2388,7 @@ window.__ModuleLoader__.load({
 				return def.innerType._zod.run(payload, ctx);
 			};
 		});
-		const $ZodNonOptional = /*@__PURE__*/ $constructor("$ZodNonOptional", (inst, def) => {
+		const $ZodNonOptional = /* @__PURE__ */ $constructor("$ZodNonOptional", (inst, def) => {
 			$ZodType.init(inst, def);
 			defineLazy(inst._zod, "values", () => {
 				const v = def.innerType._zod.values;
@@ -2409,7 +2409,7 @@ window.__ModuleLoader__.load({
 			});
 			return payload;
 		}
-		const $ZodCatch = /*@__PURE__*/ $constructor("$ZodCatch", (inst, def) => {
+		const $ZodCatch = /* @__PURE__ */ $constructor("$ZodCatch", (inst, def) => {
 			$ZodType.init(inst, def);
 			inst._zod.optin = "optional";
 			defineLazy(inst._zod, "optout", () => def.innerType._zod.optout);
@@ -2443,7 +2443,7 @@ window.__ModuleLoader__.load({
 				return payload;
 			};
 		});
-		const $ZodPipe = /*@__PURE__*/ $constructor("$ZodPipe", (inst, def) => {
+		const $ZodPipe = /* @__PURE__ */ $constructor("$ZodPipe", (inst, def) => {
 			$ZodType.init(inst, def);
 			defineLazy(inst._zod, "values", () => def.in._zod.values);
 			defineLazy(inst._zod, "optin", () => def.in._zod.optin);
@@ -2471,7 +2471,7 @@ window.__ModuleLoader__.load({
 				fallback: left.fallback
 			}, ctx);
 		}
-		const $ZodReadonly = /*@__PURE__*/ $constructor("$ZodReadonly", (inst, def) => {
+		const $ZodReadonly = /* @__PURE__ */ $constructor("$ZodReadonly", (inst, def) => {
 			$ZodType.init(inst, def);
 			defineLazy(inst._zod, "propValues", () => def.innerType._zod.propValues);
 			defineLazy(inst._zod, "values", () => def.innerType._zod.values);
@@ -2488,7 +2488,7 @@ window.__ModuleLoader__.load({
 			payload.value = Object.freeze(payload.value);
 			return payload;
 		}
-		const $ZodCustom = /*@__PURE__*/ $constructor("$ZodCustom", (inst, def) => {
+		const $ZodCustom = /* @__PURE__ */ $constructor("$ZodCustom", (inst, def) => {
 			$ZodCheck.init(inst, def);
 			$ZodType.init(inst, def);
 			inst._zod.parse = (payload, _) => {
@@ -2515,7 +2515,7 @@ window.__ModuleLoader__.load({
 			}
 		}
 		//#endregion
-		//#region ../../../node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/registries.js
+		//#region node_modules/zod/v4/core/registries.js
 		var _a;
 		var $ZodRegistry = class {
 			constructor() {
@@ -2562,15 +2562,15 @@ window.__ModuleLoader__.load({
 		(_a = globalThis).__zod_globalRegistry ?? (_a.__zod_globalRegistry = registry());
 		const globalRegistry = globalThis.__zod_globalRegistry;
 		//#endregion
-		//#region ../../../node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/api.js
-		// @__NO_SIDE_EFFECTS__
+		//#region node_modules/zod/v4/core/api.js
+		/* @__NO_SIDE_EFFECTS__ */
 		function _string(Class, params) {
 			return new Class({
 				type: "string",
 				...normalizeParams(params)
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _email(Class, params) {
 			return new Class({
 				type: "string",
@@ -2580,7 +2580,7 @@ window.__ModuleLoader__.load({
 				...normalizeParams(params)
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _guid(Class, params) {
 			return new Class({
 				type: "string",
@@ -2590,7 +2590,7 @@ window.__ModuleLoader__.load({
 				...normalizeParams(params)
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _uuid(Class, params) {
 			return new Class({
 				type: "string",
@@ -2600,7 +2600,7 @@ window.__ModuleLoader__.load({
 				...normalizeParams(params)
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _uuidv4(Class, params) {
 			return new Class({
 				type: "string",
@@ -2611,7 +2611,7 @@ window.__ModuleLoader__.load({
 				...normalizeParams(params)
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _uuidv6(Class, params) {
 			return new Class({
 				type: "string",
@@ -2622,7 +2622,7 @@ window.__ModuleLoader__.load({
 				...normalizeParams(params)
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _uuidv7(Class, params) {
 			return new Class({
 				type: "string",
@@ -2633,7 +2633,7 @@ window.__ModuleLoader__.load({
 				...normalizeParams(params)
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _url(Class, params) {
 			return new Class({
 				type: "string",
@@ -2643,7 +2643,7 @@ window.__ModuleLoader__.load({
 				...normalizeParams(params)
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _emoji(Class, params) {
 			return new Class({
 				type: "string",
@@ -2653,7 +2653,7 @@ window.__ModuleLoader__.load({
 				...normalizeParams(params)
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _nanoid(Class, params) {
 			return new Class({
 				type: "string",
@@ -2668,7 +2668,7 @@ window.__ModuleLoader__.load({
 		* (timestamps embedded in the id). Use {@link _cuid2} instead.
 		* See https://github.com/paralleldrive/cuid.
 		*/
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _cuid(Class, params) {
 			return new Class({
 				type: "string",
@@ -2678,7 +2678,7 @@ window.__ModuleLoader__.load({
 				...normalizeParams(params)
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _cuid2(Class, params) {
 			return new Class({
 				type: "string",
@@ -2688,7 +2688,7 @@ window.__ModuleLoader__.load({
 				...normalizeParams(params)
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _ulid(Class, params) {
 			return new Class({
 				type: "string",
@@ -2698,7 +2698,7 @@ window.__ModuleLoader__.load({
 				...normalizeParams(params)
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _xid(Class, params) {
 			return new Class({
 				type: "string",
@@ -2708,7 +2708,7 @@ window.__ModuleLoader__.load({
 				...normalizeParams(params)
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _ksuid(Class, params) {
 			return new Class({
 				type: "string",
@@ -2718,7 +2718,7 @@ window.__ModuleLoader__.load({
 				...normalizeParams(params)
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _ipv4(Class, params) {
 			return new Class({
 				type: "string",
@@ -2728,7 +2728,7 @@ window.__ModuleLoader__.load({
 				...normalizeParams(params)
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _ipv6(Class, params) {
 			return new Class({
 				type: "string",
@@ -2738,7 +2738,7 @@ window.__ModuleLoader__.load({
 				...normalizeParams(params)
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _cidrv4(Class, params) {
 			return new Class({
 				type: "string",
@@ -2748,7 +2748,7 @@ window.__ModuleLoader__.load({
 				...normalizeParams(params)
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _cidrv6(Class, params) {
 			return new Class({
 				type: "string",
@@ -2758,7 +2758,7 @@ window.__ModuleLoader__.load({
 				...normalizeParams(params)
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _base64(Class, params) {
 			return new Class({
 				type: "string",
@@ -2768,7 +2768,7 @@ window.__ModuleLoader__.load({
 				...normalizeParams(params)
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _base64url(Class, params) {
 			return new Class({
 				type: "string",
@@ -2778,7 +2778,7 @@ window.__ModuleLoader__.load({
 				...normalizeParams(params)
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _e164(Class, params) {
 			return new Class({
 				type: "string",
@@ -2788,7 +2788,7 @@ window.__ModuleLoader__.load({
 				...normalizeParams(params)
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _jwt(Class, params) {
 			return new Class({
 				type: "string",
@@ -2798,7 +2798,7 @@ window.__ModuleLoader__.load({
 				...normalizeParams(params)
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _isoDateTime(Class, params) {
 			return new Class({
 				type: "string",
@@ -2810,7 +2810,7 @@ window.__ModuleLoader__.load({
 				...normalizeParams(params)
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _isoDate(Class, params) {
 			return new Class({
 				type: "string",
@@ -2819,7 +2819,7 @@ window.__ModuleLoader__.load({
 				...normalizeParams(params)
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _isoTime(Class, params) {
 			return new Class({
 				type: "string",
@@ -2829,7 +2829,7 @@ window.__ModuleLoader__.load({
 				...normalizeParams(params)
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _isoDuration(Class, params) {
 			return new Class({
 				type: "string",
@@ -2838,7 +2838,7 @@ window.__ModuleLoader__.load({
 				...normalizeParams(params)
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _number(Class, params) {
 			return new Class({
 				type: "number",
@@ -2846,7 +2846,7 @@ window.__ModuleLoader__.load({
 				...normalizeParams(params)
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _int(Class, params) {
 			return new Class({
 				type: "number",
@@ -2856,18 +2856,18 @@ window.__ModuleLoader__.load({
 				...normalizeParams(params)
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _unknown(Class) {
 			return new Class({ type: "unknown" });
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _never(Class, params) {
 			return new Class({
 				type: "never",
 				...normalizeParams(params)
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _lt(value, params) {
 			return new $ZodCheckLessThan({
 				check: "less_than",
@@ -2876,7 +2876,7 @@ window.__ModuleLoader__.load({
 				inclusive: false
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _lte(value, params) {
 			return new $ZodCheckLessThan({
 				check: "less_than",
@@ -2885,7 +2885,7 @@ window.__ModuleLoader__.load({
 				inclusive: true
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _gt(value, params) {
 			return new $ZodCheckGreaterThan({
 				check: "greater_than",
@@ -2894,7 +2894,7 @@ window.__ModuleLoader__.load({
 				inclusive: false
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _gte(value, params) {
 			return new $ZodCheckGreaterThan({
 				check: "greater_than",
@@ -2903,7 +2903,7 @@ window.__ModuleLoader__.load({
 				inclusive: true
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _multipleOf(value, params) {
 			return new $ZodCheckMultipleOf({
 				check: "multiple_of",
@@ -2911,7 +2911,7 @@ window.__ModuleLoader__.load({
 				value
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _maxLength(maximum, params) {
 			return new $ZodCheckMaxLength({
 				check: "max_length",
@@ -2919,7 +2919,7 @@ window.__ModuleLoader__.load({
 				maximum
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _minLength(minimum, params) {
 			return new $ZodCheckMinLength({
 				check: "min_length",
@@ -2927,7 +2927,7 @@ window.__ModuleLoader__.load({
 				minimum
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _length(length, params) {
 			return new $ZodCheckLengthEquals({
 				check: "length_equals",
@@ -2935,7 +2935,7 @@ window.__ModuleLoader__.load({
 				length
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _regex(pattern, params) {
 			return new $ZodCheckRegex({
 				check: "string_format",
@@ -2944,7 +2944,7 @@ window.__ModuleLoader__.load({
 				pattern
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _lowercase(params) {
 			return new $ZodCheckLowerCase({
 				check: "string_format",
@@ -2952,7 +2952,7 @@ window.__ModuleLoader__.load({
 				...normalizeParams(params)
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _uppercase(params) {
 			return new $ZodCheckUpperCase({
 				check: "string_format",
@@ -2960,7 +2960,7 @@ window.__ModuleLoader__.load({
 				...normalizeParams(params)
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _includes(includes, params) {
 			return new $ZodCheckIncludes({
 				check: "string_format",
@@ -2969,7 +2969,7 @@ window.__ModuleLoader__.load({
 				includes
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _startsWith(prefix, params) {
 			return new $ZodCheckStartsWith({
 				check: "string_format",
@@ -2978,7 +2978,7 @@ window.__ModuleLoader__.load({
 				prefix
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _endsWith(suffix, params) {
 			return new $ZodCheckEndsWith({
 				check: "string_format",
@@ -2987,34 +2987,34 @@ window.__ModuleLoader__.load({
 				suffix
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _overwrite(tx) {
 			return new $ZodCheckOverwrite({
 				check: "overwrite",
 				tx
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _normalize(form) {
 			return /* @__PURE__ */ _overwrite((input) => input.normalize(form));
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _trim() {
 			return /* @__PURE__ */ _overwrite((input) => input.trim());
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _toLowerCase() {
 			return /* @__PURE__ */ _overwrite((input) => input.toLowerCase());
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _toUpperCase() {
 			return /* @__PURE__ */ _overwrite((input) => input.toUpperCase());
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _slugify() {
 			return /* @__PURE__ */ _overwrite((input) => slugify(input));
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _array(Class, element, params) {
 			return new Class({
 				type: "array",
@@ -3022,7 +3022,7 @@ window.__ModuleLoader__.load({
 				...normalizeParams(params)
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _custom(Class, fn, _params) {
 			const norm = normalizeParams(_params);
 			norm.abort ?? (norm.abort = true);
@@ -3033,7 +3033,7 @@ window.__ModuleLoader__.load({
 				...norm
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _refine(Class, fn, _params) {
 			return new Class({
 				type: "custom",
@@ -3042,7 +3042,7 @@ window.__ModuleLoader__.load({
 				...normalizeParams(_params)
 			});
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _superRefine(fn, params) {
 			const ch = /* @__PURE__ */ _check((payload) => {
 				payload.addIssue = (issue$2) => {
@@ -3061,7 +3061,7 @@ window.__ModuleLoader__.load({
 			}, params);
 			return ch;
 		}
-		// @__NO_SIDE_EFFECTS__
+		/* @__NO_SIDE_EFFECTS__ */
 		function _check(fn, params) {
 			const ch = new $ZodCheck({
 				check: "custom",
@@ -3071,7 +3071,7 @@ window.__ModuleLoader__.load({
 			return ch;
 		}
 		//#endregion
-		//#region ../../../node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/to-json-schema.js
+		//#region node_modules/zod/v4/core/to-json-schema.js
 		function initializeContext(params) {
 			let target = params?.target ?? "draft-2020-12";
 			if (target === "draft-4") target = "draft-04";
@@ -3364,7 +3364,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			return finalize$1(ctx, schema);
 		};
 		//#endregion
-		//#region ../../../node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/json-schema-processors.js
+		//#region node_modules/zod/v4/core/json-schema-processors.js
 		const formatMap = {
 			guid: "uuid",
 			url: "uri",
@@ -3416,6 +3416,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 		const neverProcessor = (_schema, _ctx, json, _params) => {
 			json.not = {};
 		};
+		const unknownProcessor = (_schema, _ctx, _json, _params) => {};
 		const enumProcessor = (schema, _ctx, json, _params) => {
 			const def = schema._zod.def;
 			const values = getEnumValues(def.entries);
@@ -3590,29 +3591,29 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			seen.ref = def.innerType;
 		};
 		//#endregion
-		//#region ../../../node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/classic/iso.js
-		const ZodISODateTime = /*@__PURE__*/ $constructor("ZodISODateTime", (inst, def) => {
+		//#region node_modules/zod/v4/classic/iso.js
+		const ZodISODateTime = /* @__PURE__ */ $constructor("ZodISODateTime", (inst, def) => {
 			$ZodISODateTime.init(inst, def);
 			ZodStringFormat.init(inst, def);
 		});
 		function datetime(params) {
 			return /* @__PURE__ */ _isoDateTime(ZodISODateTime, params);
 		}
-		const ZodISODate = /*@__PURE__*/ $constructor("ZodISODate", (inst, def) => {
+		const ZodISODate = /* @__PURE__ */ $constructor("ZodISODate", (inst, def) => {
 			$ZodISODate.init(inst, def);
 			ZodStringFormat.init(inst, def);
 		});
 		function date(params) {
 			return /* @__PURE__ */ _isoDate(ZodISODate, params);
 		}
-		const ZodISOTime = /*@__PURE__*/ $constructor("ZodISOTime", (inst, def) => {
+		const ZodISOTime = /* @__PURE__ */ $constructor("ZodISOTime", (inst, def) => {
 			$ZodISOTime.init(inst, def);
 			ZodStringFormat.init(inst, def);
 		});
 		function time(params) {
 			return /* @__PURE__ */ _isoTime(ZodISOTime, params);
 		}
-		const ZodISODuration = /*@__PURE__*/ $constructor("ZodISODuration", (inst, def) => {
+		const ZodISODuration = /* @__PURE__ */ $constructor("ZodISODuration", (inst, def) => {
 			$ZodISODuration.init(inst, def);
 			ZodStringFormat.init(inst, def);
 		});
@@ -3620,7 +3621,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			return /* @__PURE__ */ _isoDuration(ZodISODuration, params);
 		}
 		//#endregion
-		//#region ../../../node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/classic/errors.js
+		//#region node_modules/zod/v4/classic/errors.js
 		const initializer = (inst, issues) => {
 			$ZodError.init(inst, issues);
 			inst.name = "ZodError";
@@ -3640,9 +3641,9 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 				} }
 			});
 		};
-		const ZodRealError = /*@__PURE__*/ $constructor("ZodError", initializer, { Parent: Error });
+		const ZodRealError = /* @__PURE__ */ $constructor("ZodError", initializer, { Parent: Error });
 		//#endregion
-		//#region ../../../node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/classic/parse.js
+		//#region node_modules/zod/v4/classic/parse.js
 		const parse = /* @__PURE__ */ _parse(ZodRealError);
 		const parseAsync = /* @__PURE__ */ _parseAsync(ZodRealError);
 		const safeParse = /* @__PURE__ */ _safeParse(ZodRealError);
@@ -3656,7 +3657,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 		const safeEncodeAsync = /* @__PURE__ */ _safeEncodeAsync(ZodRealError);
 		const safeDecodeAsync = /* @__PURE__ */ _safeDecodeAsync(ZodRealError);
 		//#endregion
-		//#region ../../../node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/classic/schemas.js
+		//#region node_modules/zod/v4/classic/schemas.js
 		const _installedGroups = /* @__PURE__ */ new WeakMap();
 		function _installLazyMethods(inst, group, methods) {
 			const proto = Object.getPrototypeOf(inst);
@@ -3693,7 +3694,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 				});
 			}
 		}
-		const ZodType = /*@__PURE__*/ $constructor("ZodType", (inst, def) => {
+		const ZodType = /* @__PURE__ */ $constructor("ZodType", (inst, def) => {
 			$ZodType.init(inst, def);
 			Object.assign(inst["~standard"], { jsonSchema: {
 				input: createStandardJSONSchemaMethod(inst, "input"),
@@ -3819,7 +3820,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			return inst;
 		});
 		/** @internal */
-		const _ZodString = /*@__PURE__*/ $constructor("_ZodString", (inst, def) => {
+		const _ZodString = /* @__PURE__ */ $constructor("_ZodString", (inst, def) => {
 			$ZodString.init(inst, def);
 			ZodType.init(inst, def);
 			inst._zod.processJSONSchema = (ctx, json, params) => stringProcessor(inst, ctx, json, params);
@@ -3875,7 +3876,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 				}
 			});
 		});
-		const ZodString = /*@__PURE__*/ $constructor("ZodString", (inst, def) => {
+		const ZodString = /* @__PURE__ */ $constructor("ZodString", (inst, def) => {
 			$ZodString.init(inst, def);
 			_ZodString.init(inst, def);
 			inst.email = (params) => inst.check(/* @__PURE__ */ _email(ZodEmail, params));
@@ -3909,31 +3910,31 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 		function string(params) {
 			return /* @__PURE__ */ _string(ZodString, params);
 		}
-		const ZodStringFormat = /*@__PURE__*/ $constructor("ZodStringFormat", (inst, def) => {
+		const ZodStringFormat = /* @__PURE__ */ $constructor("ZodStringFormat", (inst, def) => {
 			$ZodStringFormat.init(inst, def);
 			_ZodString.init(inst, def);
 		});
-		const ZodEmail = /*@__PURE__*/ $constructor("ZodEmail", (inst, def) => {
+		const ZodEmail = /* @__PURE__ */ $constructor("ZodEmail", (inst, def) => {
 			$ZodEmail.init(inst, def);
 			ZodStringFormat.init(inst, def);
 		});
-		const ZodGUID = /*@__PURE__*/ $constructor("ZodGUID", (inst, def) => {
+		const ZodGUID = /* @__PURE__ */ $constructor("ZodGUID", (inst, def) => {
 			$ZodGUID.init(inst, def);
 			ZodStringFormat.init(inst, def);
 		});
-		const ZodUUID = /*@__PURE__*/ $constructor("ZodUUID", (inst, def) => {
+		const ZodUUID = /* @__PURE__ */ $constructor("ZodUUID", (inst, def) => {
 			$ZodUUID.init(inst, def);
 			ZodStringFormat.init(inst, def);
 		});
-		const ZodURL = /*@__PURE__*/ $constructor("ZodURL", (inst, def) => {
+		const ZodURL = /* @__PURE__ */ $constructor("ZodURL", (inst, def) => {
 			$ZodURL.init(inst, def);
 			ZodStringFormat.init(inst, def);
 		});
-		const ZodEmoji = /*@__PURE__*/ $constructor("ZodEmoji", (inst, def) => {
+		const ZodEmoji = /* @__PURE__ */ $constructor("ZodEmoji", (inst, def) => {
 			$ZodEmoji.init(inst, def);
 			ZodStringFormat.init(inst, def);
 		});
-		const ZodNanoID = /*@__PURE__*/ $constructor("ZodNanoID", (inst, def) => {
+		const ZodNanoID = /* @__PURE__ */ $constructor("ZodNanoID", (inst, def) => {
 			$ZodNanoID.init(inst, def);
 			ZodStringFormat.init(inst, def);
 		});
@@ -3942,59 +3943,59 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 		* (timestamps embedded in the id). Use {@link ZodCUID2} instead.
 		* See https://github.com/paralleldrive/cuid.
 		*/
-		const ZodCUID = /*@__PURE__*/ $constructor("ZodCUID", (inst, def) => {
+		const ZodCUID = /* @__PURE__ */ $constructor("ZodCUID", (inst, def) => {
 			$ZodCUID.init(inst, def);
 			ZodStringFormat.init(inst, def);
 		});
-		const ZodCUID2 = /*@__PURE__*/ $constructor("ZodCUID2", (inst, def) => {
+		const ZodCUID2 = /* @__PURE__ */ $constructor("ZodCUID2", (inst, def) => {
 			$ZodCUID2.init(inst, def);
 			ZodStringFormat.init(inst, def);
 		});
-		const ZodULID = /*@__PURE__*/ $constructor("ZodULID", (inst, def) => {
+		const ZodULID = /* @__PURE__ */ $constructor("ZodULID", (inst, def) => {
 			$ZodULID.init(inst, def);
 			ZodStringFormat.init(inst, def);
 		});
-		const ZodXID = /*@__PURE__*/ $constructor("ZodXID", (inst, def) => {
+		const ZodXID = /* @__PURE__ */ $constructor("ZodXID", (inst, def) => {
 			$ZodXID.init(inst, def);
 			ZodStringFormat.init(inst, def);
 		});
-		const ZodKSUID = /*@__PURE__*/ $constructor("ZodKSUID", (inst, def) => {
+		const ZodKSUID = /* @__PURE__ */ $constructor("ZodKSUID", (inst, def) => {
 			$ZodKSUID.init(inst, def);
 			ZodStringFormat.init(inst, def);
 		});
-		const ZodIPv4 = /*@__PURE__*/ $constructor("ZodIPv4", (inst, def) => {
+		const ZodIPv4 = /* @__PURE__ */ $constructor("ZodIPv4", (inst, def) => {
 			$ZodIPv4.init(inst, def);
 			ZodStringFormat.init(inst, def);
 		});
-		const ZodIPv6 = /*@__PURE__*/ $constructor("ZodIPv6", (inst, def) => {
+		const ZodIPv6 = /* @__PURE__ */ $constructor("ZodIPv6", (inst, def) => {
 			$ZodIPv6.init(inst, def);
 			ZodStringFormat.init(inst, def);
 		});
-		const ZodCIDRv4 = /*@__PURE__*/ $constructor("ZodCIDRv4", (inst, def) => {
+		const ZodCIDRv4 = /* @__PURE__ */ $constructor("ZodCIDRv4", (inst, def) => {
 			$ZodCIDRv4.init(inst, def);
 			ZodStringFormat.init(inst, def);
 		});
-		const ZodCIDRv6 = /*@__PURE__*/ $constructor("ZodCIDRv6", (inst, def) => {
+		const ZodCIDRv6 = /* @__PURE__ */ $constructor("ZodCIDRv6", (inst, def) => {
 			$ZodCIDRv6.init(inst, def);
 			ZodStringFormat.init(inst, def);
 		});
-		const ZodBase64 = /*@__PURE__*/ $constructor("ZodBase64", (inst, def) => {
+		const ZodBase64 = /* @__PURE__ */ $constructor("ZodBase64", (inst, def) => {
 			$ZodBase64.init(inst, def);
 			ZodStringFormat.init(inst, def);
 		});
-		const ZodBase64URL = /*@__PURE__*/ $constructor("ZodBase64URL", (inst, def) => {
+		const ZodBase64URL = /* @__PURE__ */ $constructor("ZodBase64URL", (inst, def) => {
 			$ZodBase64URL.init(inst, def);
 			ZodStringFormat.init(inst, def);
 		});
-		const ZodE164 = /*@__PURE__*/ $constructor("ZodE164", (inst, def) => {
+		const ZodE164 = /* @__PURE__ */ $constructor("ZodE164", (inst, def) => {
 			$ZodE164.init(inst, def);
 			ZodStringFormat.init(inst, def);
 		});
-		const ZodJWT = /*@__PURE__*/ $constructor("ZodJWT", (inst, def) => {
+		const ZodJWT = /* @__PURE__ */ $constructor("ZodJWT", (inst, def) => {
 			$ZodJWT.init(inst, def);
 			ZodStringFormat.init(inst, def);
 		});
-		const ZodNumber = /*@__PURE__*/ $constructor("ZodNumber", (inst, def) => {
+		const ZodNumber = /* @__PURE__ */ $constructor("ZodNumber", (inst, def) => {
 			$ZodNumber.init(inst, def);
 			ZodType.init(inst, def);
 			inst._zod.processJSONSchema = (ctx, json, params) => numberProcessor(inst, ctx, json, params);
@@ -4055,22 +4056,22 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 		function number(params) {
 			return /* @__PURE__ */ _number(ZodNumber, params);
 		}
-		const ZodNumberFormat = /*@__PURE__*/ $constructor("ZodNumberFormat", (inst, def) => {
+		const ZodNumberFormat = /* @__PURE__ */ $constructor("ZodNumberFormat", (inst, def) => {
 			$ZodNumberFormat.init(inst, def);
 			ZodNumber.init(inst, def);
 		});
 		function int(params) {
 			return /* @__PURE__ */ _int(ZodNumberFormat, params);
 		}
-		const ZodUnknown = /*@__PURE__*/ $constructor("ZodUnknown", (inst, def) => {
+		const ZodUnknown = /* @__PURE__ */ $constructor("ZodUnknown", (inst, def) => {
 			$ZodUnknown.init(inst, def);
 			ZodType.init(inst, def);
-			inst._zod.processJSONSchema = (ctx, json, params) => void 0;
+			inst._zod.processJSONSchema = (ctx, json, params) => unknownProcessor(inst, ctx, json, params);
 		});
 		function unknown() {
 			return /* @__PURE__ */ _unknown(ZodUnknown);
 		}
-		const ZodNever = /*@__PURE__*/ $constructor("ZodNever", (inst, def) => {
+		const ZodNever = /* @__PURE__ */ $constructor("ZodNever", (inst, def) => {
 			$ZodNever.init(inst, def);
 			ZodType.init(inst, def);
 			inst._zod.processJSONSchema = (ctx, json, params) => neverProcessor(inst, ctx, json, params);
@@ -4078,7 +4079,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 		function never(params) {
 			return /* @__PURE__ */ _never(ZodNever, params);
 		}
-		const ZodArray = /*@__PURE__*/ $constructor("ZodArray", (inst, def) => {
+		const ZodArray = /* @__PURE__ */ $constructor("ZodArray", (inst, def) => {
 			$ZodArray.init(inst, def);
 			ZodType.init(inst, def);
 			inst._zod.processJSONSchema = (ctx, json, params) => arrayProcessor(inst, ctx, json, params);
@@ -4104,7 +4105,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 		function array(element, params) {
 			return /* @__PURE__ */ _array(ZodArray, element, params);
 		}
-		const ZodObject = /*@__PURE__*/ $constructor("ZodObject", (inst, def) => {
+		const ZodObject = /* @__PURE__ */ $constructor("ZodObject", (inst, def) => {
 			$ZodObjectJIT.init(inst, def);
 			ZodType.init(inst, def);
 			inst._zod.processJSONSchema = (ctx, json, params) => objectProcessor(inst, ctx, json, params);
@@ -4175,7 +4176,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 				...normalizeParams(params)
 			});
 		}
-		const ZodUnion = /*@__PURE__*/ $constructor("ZodUnion", (inst, def) => {
+		const ZodUnion = /* @__PURE__ */ $constructor("ZodUnion", (inst, def) => {
 			$ZodUnion.init(inst, def);
 			ZodType.init(inst, def);
 			inst._zod.processJSONSchema = (ctx, json, params) => unionProcessor(inst, ctx, json, params);
@@ -4188,7 +4189,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 				...normalizeParams(params)
 			});
 		}
-		const ZodDiscriminatedUnion = /*@__PURE__*/ $constructor("ZodDiscriminatedUnion", (inst, def) => {
+		const ZodDiscriminatedUnion = /* @__PURE__ */ $constructor("ZodDiscriminatedUnion", (inst, def) => {
 			ZodUnion.init(inst, def);
 			$ZodDiscriminatedUnion.init(inst, def);
 		});
@@ -4200,7 +4201,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 				...normalizeParams(params)
 			});
 		}
-		const ZodIntersection = /*@__PURE__*/ $constructor("ZodIntersection", (inst, def) => {
+		const ZodIntersection = /* @__PURE__ */ $constructor("ZodIntersection", (inst, def) => {
 			$ZodIntersection.init(inst, def);
 			ZodType.init(inst, def);
 			inst._zod.processJSONSchema = (ctx, json, params) => intersectionProcessor(inst, ctx, json, params);
@@ -4212,7 +4213,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 				right
 			});
 		}
-		const ZodEnum = /*@__PURE__*/ $constructor("ZodEnum", (inst, def) => {
+		const ZodEnum = /* @__PURE__ */ $constructor("ZodEnum", (inst, def) => {
 			$ZodEnum.init(inst, def);
 			ZodType.init(inst, def);
 			inst._zod.processJSONSchema = (ctx, json, params) => enumProcessor(inst, ctx, json, params);
@@ -4249,7 +4250,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 				...normalizeParams(params)
 			});
 		}
-		const ZodLiteral = /*@__PURE__*/ $constructor("ZodLiteral", (inst, def) => {
+		const ZodLiteral = /* @__PURE__ */ $constructor("ZodLiteral", (inst, def) => {
 			$ZodLiteral.init(inst, def);
 			ZodType.init(inst, def);
 			inst._zod.processJSONSchema = (ctx, json, params) => literalProcessor(inst, ctx, json, params);
@@ -4266,7 +4267,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 				...normalizeParams(params)
 			});
 		}
-		const ZodTransform = /*@__PURE__*/ $constructor("ZodTransform", (inst, def) => {
+		const ZodTransform = /* @__PURE__ */ $constructor("ZodTransform", (inst, def) => {
 			$ZodTransform.init(inst, def);
 			ZodType.init(inst, def);
 			inst._zod.processJSONSchema = (ctx, json, params) => transformProcessor(inst, ctx, json, params);
@@ -4300,7 +4301,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 				transform: fn
 			});
 		}
-		const ZodOptional = /*@__PURE__*/ $constructor("ZodOptional", (inst, def) => {
+		const ZodOptional = /* @__PURE__ */ $constructor("ZodOptional", (inst, def) => {
 			$ZodOptional.init(inst, def);
 			ZodType.init(inst, def);
 			inst._zod.processJSONSchema = (ctx, json, params) => optionalProcessor(inst, ctx, json, params);
@@ -4312,7 +4313,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 				innerType
 			});
 		}
-		const ZodExactOptional = /*@__PURE__*/ $constructor("ZodExactOptional", (inst, def) => {
+		const ZodExactOptional = /* @__PURE__ */ $constructor("ZodExactOptional", (inst, def) => {
 			$ZodExactOptional.init(inst, def);
 			ZodType.init(inst, def);
 			inst._zod.processJSONSchema = (ctx, json, params) => optionalProcessor(inst, ctx, json, params);
@@ -4324,7 +4325,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 				innerType
 			});
 		}
-		const ZodNullable = /*@__PURE__*/ $constructor("ZodNullable", (inst, def) => {
+		const ZodNullable = /* @__PURE__ */ $constructor("ZodNullable", (inst, def) => {
 			$ZodNullable.init(inst, def);
 			ZodType.init(inst, def);
 			inst._zod.processJSONSchema = (ctx, json, params) => nullableProcessor(inst, ctx, json, params);
@@ -4336,7 +4337,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 				innerType
 			});
 		}
-		const ZodDefault = /*@__PURE__*/ $constructor("ZodDefault", (inst, def) => {
+		const ZodDefault = /* @__PURE__ */ $constructor("ZodDefault", (inst, def) => {
 			$ZodDefault.init(inst, def);
 			ZodType.init(inst, def);
 			inst._zod.processJSONSchema = (ctx, json, params) => defaultProcessor(inst, ctx, json, params);
@@ -4352,7 +4353,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 				}
 			});
 		}
-		const ZodPrefault = /*@__PURE__*/ $constructor("ZodPrefault", (inst, def) => {
+		const ZodPrefault = /* @__PURE__ */ $constructor("ZodPrefault", (inst, def) => {
 			$ZodPrefault.init(inst, def);
 			ZodType.init(inst, def);
 			inst._zod.processJSONSchema = (ctx, json, params) => prefaultProcessor(inst, ctx, json, params);
@@ -4367,7 +4368,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 				}
 			});
 		}
-		const ZodNonOptional = /*@__PURE__*/ $constructor("ZodNonOptional", (inst, def) => {
+		const ZodNonOptional = /* @__PURE__ */ $constructor("ZodNonOptional", (inst, def) => {
 			$ZodNonOptional.init(inst, def);
 			ZodType.init(inst, def);
 			inst._zod.processJSONSchema = (ctx, json, params) => nonoptionalProcessor(inst, ctx, json, params);
@@ -4380,7 +4381,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 				...normalizeParams(params)
 			});
 		}
-		const ZodCatch = /*@__PURE__*/ $constructor("ZodCatch", (inst, def) => {
+		const ZodCatch = /* @__PURE__ */ $constructor("ZodCatch", (inst, def) => {
 			$ZodCatch.init(inst, def);
 			ZodType.init(inst, def);
 			inst._zod.processJSONSchema = (ctx, json, params) => catchProcessor(inst, ctx, json, params);
@@ -4394,7 +4395,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 				catchValue: typeof catchValue === "function" ? catchValue : () => catchValue
 			});
 		}
-		const ZodPipe = /*@__PURE__*/ $constructor("ZodPipe", (inst, def) => {
+		const ZodPipe = /* @__PURE__ */ $constructor("ZodPipe", (inst, def) => {
 			$ZodPipe.init(inst, def);
 			ZodType.init(inst, def);
 			inst._zod.processJSONSchema = (ctx, json, params) => pipeProcessor(inst, ctx, json, params);
@@ -4408,7 +4409,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 				out
 			});
 		}
-		const ZodReadonly = /*@__PURE__*/ $constructor("ZodReadonly", (inst, def) => {
+		const ZodReadonly = /* @__PURE__ */ $constructor("ZodReadonly", (inst, def) => {
 			$ZodReadonly.init(inst, def);
 			ZodType.init(inst, def);
 			inst._zod.processJSONSchema = (ctx, json, params) => readonlyProcessor(inst, ctx, json, params);
@@ -4420,7 +4421,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 				innerType
 			});
 		}
-		const ZodCustom = /*@__PURE__*/ $constructor("ZodCustom", (inst, def) => {
+		const ZodCustom = /* @__PURE__ */ $constructor("ZodCustom", (inst, def) => {
 			$ZodCustom.init(inst, def);
 			ZodType.init(inst, def);
 			inst._zod.processJSONSchema = (ctx, json, params) => customProcessor(inst, ctx, json, params);
@@ -4435,7 +4436,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			return /* @__PURE__ */ _superRefine(fn, params);
 		}
 		//#endregion
-		//#region ../../host/apiproxy/src/api/rpc.schema.ts
+		//#region node_modules/@deepseek-ai/dsh-host-apiproxy/lib/types/api/rpc.schema.js
 		/**
 		* Message-layer zod schemas: the four wire full forms + error body +
 		* carrier receipt. The payload slot is unknown in the full-form schemas — business payloads
@@ -4743,7 +4744,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			reason: union([literal("not-pending"), literal("bad-response")])
 		})]);
 		//#endregion
-		//#region ../../../node_modules/.pnpm/zustand@4.4.7_@types+react@18.3.31_immer@10.2.0_react@18.3.1/node_modules/zustand/esm/vanilla.mjs
+		//#region node_modules/zustand/esm/vanilla.mjs
 		const createStoreImpl = (createState) => {
 			let state;
 			const listeners = /* @__PURE__ */ new Set();
@@ -4774,7 +4775,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 		};
 		const createStore = (createState) => createState ? createStoreImpl(createState) : createStoreImpl;
 		//#endregion
-		//#region ../../../node_modules/.pnpm/zustand@4.4.7_@types+react@18.3.31_immer@10.2.0_react@18.3.1/node_modules/zustand/esm/middleware.mjs
+		//#region node_modules/zustand/esm/middleware.mjs
 		const subscribeWithSelectorImpl = (fn) => (set, get, api) => {
 			const origSubscribe = api.subscribe;
 			api.subscribe = (selector, optListener, options) => {
@@ -4797,7 +4798,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 		};
 		const subscribeWithSelector = subscribeWithSelectorImpl;
 		//#endregion
-		//#region ../../../node_modules/.pnpm/zustand@4.4.7_@types+react@18.3.31_immer@10.2.0_react@18.3.1/node_modules/zustand/esm/shallow.mjs
+		//#region node_modules/zustand/esm/shallow.mjs
 		function shallow$1(objA, objB) {
 			if (Object.is(objA, objB)) return true;
 			if (typeof objA !== "object" || objA === null || typeof objB !== "object" || objB === null) return false;
@@ -4817,7 +4818,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			return true;
 		}
 		//#endregion
-		//#region ../../../node_modules/.pnpm/immer@10.2.0/node_modules/immer/dist/immer.mjs
+		//#region node_modules/immer/dist/immer.mjs
 		var NOTHING = Symbol.for("immer-nothing");
 		var DRAFTABLE = Symbol.for("immer-draftable");
 		var DRAFT_STATE = Symbol.for("immer-state");
@@ -5345,7 +5346,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 		}
 		var produce = new Immer2().produce;
 		//#endregion
-		//#region src/client/contract/store.ts
+		//#region packages/client/runtime/src/client/contract/store.ts
 		/**
 		* Snapshot store engine (zustand vanilla + immer + subscribeWithSelector +
 		* rafFlush middleware + opt-in persist + dev freeze) plus the declarative
@@ -5505,7 +5506,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			};
 		}
 		//#endregion
-		//#region src/client/agents/scope.ts
+		//#region packages/client/runtime/src/client/agents/scope.ts
 		/**
 		* Client Agent-scope primitive: mint a Cordis context tagged with the owning
 		* Agent's identity. The mechanism mirrors the host `dsh-scope` architecture
@@ -5558,7 +5559,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			return ctx[kScope];
 		}
 		//#endregion
-		//#region src/client/ordered-baseline.ts
+		//#region packages/client/runtime/src/client/ordered-baseline.ts
 		/**
 		* Merge an authoritative baseline without moving identities already visible to
 		* the client. Baseline-only identities are inserted relative to the nearest
@@ -5595,7 +5596,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			return merged;
 		}
 		//#endregion
-		//#region src/client/sessions/lineage.ts
+		//#region packages/client/runtime/src/client/sessions/lineage.ts
 		/**
 		* Summaries -> flat list with lineage indentation. Root and sibling order
 		* follows the established input order; this projection never re-sorts a
@@ -5639,10 +5640,9 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			return out;
 		}
 		//#endregion
-		//#region src/client/sessions/notifier.ts
+		//#region packages/client/runtime/src/client/sessions/notifier.ts
 		/** Subscription + batched notification primitive (shared by Session and SessionManager). */
 		var Notifier = class {
-			rebuild;
 			listeners = /* @__PURE__ */ new Set();
 			dirty = false;
 			notifyPending = false;
@@ -5723,7 +5723,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			}
 		};
 		//#endregion
-		//#region src/client/sessions/projection-store.ts
+		//#region packages/client/runtime/src/client/sessions/projection-store.ts
 		/**
 		* One session's projection values. Framework semantics, uniform across every
 		* key: a baseline seeds rows at its cut, a push frame updates one row, and in
@@ -5847,7 +5847,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			}
 		};
 		//#endregion
-		//#region src/client/contract/conversation.ts
+		//#region packages/client/runtime/src/client/contract/conversation.ts
 		/**
 		* Build a stable collision-free key for one Definition-local business identity.
 		* @param kind - Definition kind.
@@ -5858,7 +5858,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			return `${kind.length}:${kind}${id}`;
 		}
 		//#endregion
-		//#region src/client/sessions/conversation-location-index.ts
+		//#region packages/client/runtime/src/client/sessions/conversation-location-index.ts
 		var MutableLocationDataStore = class {
 			entries = /* @__PURE__ */ new Map();
 			get(key) {
@@ -6267,7 +6267,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			throw new Error(`conversation Step data "${data.key}" requires a step`);
 		}
 		//#endregion
-		//#region src/client/sessions/conversation-assembler.ts
+		//#region packages/client/runtime/src/client/sessions/conversation-assembler.ts
 		const PUBLICATION_RANK = {
 			none: 0,
 			"animation-frame": 1,
@@ -6331,8 +6331,6 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 		* contiguous Event window and materializes registered view snapshots.
 		*/
 		var ConversationNodeAssembler = class {
-			eventDefinitions;
-			viewDefinitions;
 			contexts = /* @__PURE__ */ new Map();
 			contextsByKind = /* @__PURE__ */ new Map();
 			contextsBySeq = /* @__PURE__ */ new Map();
@@ -6875,7 +6873,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			return state;
 		}
 		//#endregion
-		//#region src/client/sessions/conversation.ts
+		//#region packages/client/runtime/src/client/sessions/conversation.ts
 		/**
 		* core ContentBlock[] -> AssistantBlock[] (classifier shared by finalized messages and partial block-end).
 		* @param content - core content blocks verbatim.
@@ -6943,7 +6941,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			}
 		};
 		//#endregion
-		//#region src/client/sessions/pending.ts
+		//#region packages/client/runtime/src/client/sessions/pending.ts
 		/** Key prefixes, one per kind (the key doubles as the Session pending-map key). */
 		const KEY_PREFIX = {
 			approval: "a",
@@ -7004,7 +7002,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			}
 		};
 		//#endregion
-		//#region src/client/time-zone.ts
+		//#region packages/client/runtime/src/client/time-zone.ts
 		/** Browser-owned time-zone sampling for prompt RPC provenance. */
 		/**
 		* Resolve the current browser IANA zone for one outbound operation.
@@ -7017,7 +7015,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			return timeZone;
 		}
 		//#endregion
-		//#region src/client/sessions/queue-mirror.ts
+		//#region packages/client/runtime/src/client/sessions/queue-mirror.ts
 		const QUEUE_PREVIEW_CHARS = 200;
 		function previewOf(content) {
 			const flat = content.map((block) => block.type === "text" ? block.text : `[${block.type}]`).join(" ").replace(/\s+/g, " ").trim();
@@ -7082,10 +7080,6 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 		* remaining public members are manager/runtime entry points.
 		*/
 		var Session = class {
-			sessionId;
-			api;
-			remote;
-			options;
 			events = [];
 			/** Wire views aligned with `events` by index (envelope-level annotations; undefined = no view).
 			*  Kept parallel rather than merged so `events` stays the raw log slice (model-visible ⟺ logged). */
@@ -7590,6 +7584,12 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 					let { result } = await this.history({ maxMessages: 50 });
 					if (generation !== this.openGeneration) return;
 					if (!result.ok) {
+						if (result.error.code === "session-not-found") {
+							this.options.onMissing?.(this.sessionId);
+							this.openState = "cold";
+							this.openError = null;
+							return;
+						}
 						this.openState = "error";
 						this.openError = result.error;
 						return;
@@ -7768,7 +7768,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			return promptAttempted ? "engaging" : "blank";
 		}
 		//#endregion
-		//#region src/client/sessions/manager.ts
+		//#region packages/client/runtime/src/client/sessions/manager.ts
 		/** Stable identity of a frame retained until an uninstantiated Session can consume it. */
 		function bufferedRequestKey(envelope) {
 			const frame = envelope.payload;
@@ -7793,9 +7793,6 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 		}
 		/** Instance cluster + frame entry + the session list. */
 		var SessionManager = class {
-			api;
-			remote;
-			conversation;
 			sessions = /* @__PURE__ */ new Map();
 			/** Pre-instantiation buffer for answerable requests and the queued-turn snapshot, which history
 			*  cannot reconstruct on open. Live requests remain until resolution; queue and replay duplicates
@@ -7972,6 +7969,21 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 							kind: "engaged",
 							sessionId: engaged.sessionId
 						});
+					},
+					onMissing: (missingId) => {
+						this.recordMutation({
+							kind: "remove",
+							sessionId: missingId
+						});
+						this.pendingBuffers.delete(missingId);
+						this.pendingInteractions.delete(missingId);
+						this.completedNotifications.delete(missingId);
+						this.prevRunning.delete(missingId);
+						this.projectionStores.delete(missingId);
+						this.addresses.delete(missingId);
+						if (this.selected === missingId) this.selected = void 0;
+						this.sessions.delete(missingId);
+						this.notifier.notifyNow();
 					},
 					projections: this.projectionStore(sessionId),
 					...this.conversation === void 0 ? {} : { conversation: this.conversation }
@@ -8633,14 +8645,13 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			return candidate.code === "workspace-attach-failed" ? candidate.details.sessionId : void 0;
 		}
 		//#endregion
-		//#region src/client/sessions/provide.ts
+		//#region packages/client/runtime/src/client/sessions/provide.ts
 		/**
 		* Provider roster + materialization + current projection. The channel owns
 		* every rule a provider contribution must satisfy; owners keep only their
 		* per-session bundle storage and the definition of "current".
 		*/
 		var SessionProvideChannel = class {
-			host;
 			providers = [];
 			maybeInfoCache;
 			/** Latest published current bundle (identity comparison dedupes republish). */
@@ -8782,11 +8793,9 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			}
 		};
 		//#endregion
-		//#region src/client/sessions/service.ts
+		//#region packages/client/runtime/src/client/sessions/service.ts
 		/** Structured session-create failure. */
 		var SessionCreateError = class extends Error {
-			rpcError;
-			requestedSessionId;
 			name = "SessionCreateError";
 			/**
 			* @param rpcError - Host business or folded transport error.
@@ -8800,8 +8809,6 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 		};
 		/** Structured session-fork failure. */
 		var SessionForkError = class extends Error {
-			rpcError;
-			sourceSessionId;
 			name = "SessionForkError";
 			/**
 			* @param rpcError - Host business or folded transport error.
@@ -8853,7 +8860,6 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 		}
 		/** Root sessions service: list store, current selection, object-layer manager, scope tree, bindings, and breadcrumb routes. */
 		var SessionRuntime = class {
-			rootCtx;
 			/**
 			* The wire schema's own result bound, re-exposed for presentation plugins as
 			* injected data. Not per-connection state: the `session.search` response
@@ -9337,14 +9343,13 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			}
 		};
 		//#endregion
-		//#region src/client/workspaces/workspace.ts
+		//#region packages/client/runtime/src/client/workspaces/workspace.ts
 		/**
 		* Observable Workspace object whose identity survives Host materialization.
 		* Local instances retain their create input and failure state; materialized
 		* instances expose the latest Host view.
 		*/
 		var Workspace = class {
-			api;
 			view;
 			intent;
 			materialization = null;
@@ -9445,10 +9450,9 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			return input.path.replace(/[\\/]+$/, "").split(/[\\/]/).pop() ?? input.path;
 		}
 		//#endregion
-		//#region src/client/workspaces/manager.ts
+		//#region packages/client/runtime/src/client/workspaces/manager.ts
 		/** Workspace object cluster driven by one list baseline and changed-frame upserts. */
 		var WorkspaceManager = class {
-			api;
 			items = [];
 			itemViewsSource = null;
 			itemViewsCache = [];
@@ -9787,10 +9791,9 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			];
 		}
 		//#endregion
-		//#region src/client/workspaces/service.ts
+		//#region packages/client/runtime/src/client/workspaces/service.ts
 		/** Structured create failure for UI flows that distinguish Host business errors. */
 		var WorkspaceCreateError = class extends Error {
-			rpcError;
 			constructor(rpcError) {
 				super(`workspace create failed: ${rpcError.code}: ${rpcError.message}`);
 				this.rpcError = rpcError;
@@ -9799,7 +9802,6 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 		};
 		/** Structured browse failure so the directory browser can branch on Host business codes. */
 		var DirectoryBrowseError = class extends Error {
-			rpcError;
 			constructor(rpcError) {
 				super(`directory browse failed: ${rpcError.code}: ${rpcError.message}`);
 				this.rpcError = rpcError;
@@ -9808,8 +9810,6 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 		};
 		/** Real Workspace object layer and Host actions. */
 		var WorkspaceRuntime = class {
-			api;
-			sessions;
 			/** UI-facing immutable projection; the manager remains wire truth. */
 			list;
 			/** Workspace baseline and frame owner. */
@@ -10095,7 +10095,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			return selected;
 		}
 		//#endregion
-		//#region src/client/conversation/definition-registry.ts
+		//#region packages/client/runtime/src/client/conversation/definition-registry.ts
 		/** Shared lifecycle and stable-entry storage for one Conversation Definition registry. */
 		var ConversationDefinitionRegistry = class extends _deepseek_ai_cordis.Service {
 			definitions = /* @__PURE__ */ new Map();
@@ -10149,7 +10149,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			}
 		};
 		//#endregion
-		//#region src/client/conversation/event-registry.ts
+		//#region packages/client/runtime/src/client/conversation/event-registry.ts
 		/** Runtime registry of independently owned Conversation business Definitions. */
 		var ConversationEventRegistry = class extends ConversationDefinitionRegistry {
 			fallback;
@@ -10200,7 +10200,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			if (definition.target === void 0 !== (definition.buildViewNode === void 0)) throw new Error(`conversation Definition "${definition.kind}" must declare target and buildViewNode together`);
 		}
 		//#endregion
-		//#region src/client/conversation/view-registry.ts
+		//#region packages/client/runtime/src/client/conversation/view-registry.ts
 		/** Runtime registry of per-target Conversation snapshot builders. */
 		var ConversationViewRegistry = class extends ConversationDefinitionRegistry {
 			/** @param ctx - owning Client Runtime context. */
@@ -10217,7 +10217,16 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			}
 		};
 		//#endregion
-		//#region ../../core/session/src/surface.ts
+		//#region node_modules/@deepseek-ai/dsh-session/lib/types/surface.js
+		/**
+		* Surface layer on top of the session event log: an ordered view of events
+		* that produce LLM messages. The append-only log remains the source of truth.
+		*
+		* Browser-safe: web clients consume this subpath export, so it must stay free
+		* of `node:` imports (they break the vite bundle).
+		*
+		* @module @deepseek-ai/dsh-session/surface
+		*/
 		/** Runtime counterpart of the message-producing event union. */
 		const SURFACE_EVENT_TYPES = new Set([
 			"user/message",
@@ -10258,7 +10267,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			return isSurfaceEvent(event) && event.surfaceOp !== "append";
 		}
 		//#endregion
-		//#region src/client/sessions/subagent-lineage.ts
+		//#region packages/client/runtime/src/client/sessions/subagent-lineage.ts
 		/**
 		* Index every subagent descendant under each ancestor it reaches through an
 		* uninterrupted subagent-origin chain. Cycles fail soft and orphan owners
@@ -10289,7 +10298,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			return indexed;
 		}
 		//#endregion
-		//#region src/client/workspaces/path.ts
+		//#region packages/client/runtime/src/client/workspaces/path.ts
 		/**
 		* Resolve a workspace-relative path into the Host-facing spelling used by openPath.
 		* @param cwd - session workspace root, when known.
@@ -10302,7 +10311,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			return `${cwd.replace(/[/\\]+$/, "")}/${path.replace(/^[/\\]+/, "")}`;
 		}
 		//#endregion
-		//#region src/client/sessions/partial.ts
+		//#region packages/client/runtime/src/client/sessions/partial.ts
 		/**
 		* Create the empty client projection for one streamed Assistant block kind.
 		* @param blockType - wire block kind.
@@ -10331,7 +10340,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			}
 		}
 		//#endregion
-		//#region ../../llm/llm/src/message.ts
+		//#region node_modules/@deepseek-ai/dsh-llm/lib/types/message.js
 		/**
 		* Whether a stream chunk carries visible model output (the first-token
 		* boundary shared by client step timing and the whole-log sessionStats
@@ -10349,7 +10358,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			}
 		}
 		//#endregion
-		//#region src/client/sessions/context-provenance.ts
+		//#region packages/client/runtime/src/client/sessions/context-provenance.ts
 		/** One durable source narrowed to the readable-record shape; null for anything else. */
 		function asRecord(value) {
 			return typeof value === "object" && value !== null && !Array.isArray(value) ? value : null;
@@ -10441,7 +10450,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			return form !== null && KNOWN_FORMS.includes(form) ? form : null;
 		}
 		//#endregion
-		//#region src/client/sessions/failure-display.ts
+		//#region packages/client/runtime/src/client/sessions/failure-display.ts
 		/**
 		* Convert a durable failure into copy that is safe to expose in the GUI.
 		* @param failure - Failure value preserved by the session event.
@@ -10454,7 +10463,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			return typeof record.message === "string" ? record.message : JSON.stringify(failure);
 		}
 		//#endregion
-		//#region src/client/index.ts
+		//#region packages/client/runtime/src/client/index.ts
 		/** Required services: the wire handle and Client Typert registry. */
 		const inject = [
 			"connection",

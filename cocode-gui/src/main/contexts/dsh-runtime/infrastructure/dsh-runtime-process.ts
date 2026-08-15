@@ -12,6 +12,7 @@ import { parseDshRuntimeBootstrap } from "../../../../contracts/schemas/dsh-runt
 import { extractDshBootManifest, extractDshThemePreference } from "./dsh-runtime-bootstrap"
 import { createDshDesktopPatch } from "./dsh-desktop-patch"
 import { resolveDshHome } from "./dsh-home"
+import { quarantineCorruptDshSessions } from "./dsh-session-recovery"
 
 const STARTUP_TIMEOUT_MS = 60_000
 const STOP_TIMEOUT_MS = 10_000
@@ -31,6 +32,7 @@ export class DshRuntimeProcess {
 		const runtimeRoot = resolveRuntimeRoot()
 		const entry = resolveRuntimeEntry(runtimeRoot)
 		const home = resolveDshHome()
+		quarantineCorruptDshSessions(home)
 		const workspace = path.join(home, "workspaces", "default")
 		mkdirSync(workspace, { recursive: true })
 		const desktopPatch = path.join(app.getPath("userData"), "dsh-desktop.patch.yml")

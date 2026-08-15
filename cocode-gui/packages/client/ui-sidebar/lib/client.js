@@ -33,29 +33,29 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var SidebarRoot_module_css_default = {
-			"quietBars": "pp2yRW_quietBars",
-			"logoRow": "pp2yRW_logoRow",
-			"collapsed": "pp2yRW_collapsed",
-			"railFish": "pp2yRW_railFish",
-			"brandText": "pp2yRW_brandText",
-			"fading": "pp2yRW_fading",
+			"titlebarDragRegion": "pp2yRW_titlebarDragRegion",
+			"railIn": "pp2yRW_railIn",
 			"footArea": "pp2yRW_footArea",
-			"settingsArea": "pp2yRW_settingsArea",
+			"rail-fade-in": "pp2yRW_rail-fade-in",
+			"newSessionLabel": "pp2yRW_newSessionLabel",
+			"wide": "pp2yRW_wide",
+			"logoRow": "pp2yRW_logoRow",
+			"quietBars": "pp2yRW_quietBars",
+			"collapsed": "pp2yRW_collapsed",
 			"footerActions": "pp2yRW_footerActions",
+			"regionArea": "pp2yRW_regionArea",
+			"panelIcon": "pp2yRW_panelIcon",
 			"wide-in": "pp2yRW_wide-in",
 			"newSession": "pp2yRW_newSession",
-			"wide": "pp2yRW_wide",
+			"fading": "pp2yRW_fading",
 			"rail-in": "pp2yRW_rail-in",
-			"railIn": "pp2yRW_railIn",
-			"brand": "pp2yRW_brand",
 			"iconButton": "pp2yRW_iconButton",
-			"rail-fade-in": "pp2yRW_rail-fade-in",
-			"panelIcon": "pp2yRW_panelIcon",
-			"titlebarDragRegion": "pp2yRW_titlebarDragRegion",
 			"root": "pp2yRW_root",
 			"toggle": "pp2yRW_toggle",
-			"newSessionLabel": "pp2yRW_newSessionLabel",
-			"regionArea": "pp2yRW_regionArea"
+			"brandText": "pp2yRW_brandText",
+			"brand": "pp2yRW_brand",
+			"railFish": "pp2yRW_railFish",
+			"settingsArea": "pp2yRW_settingsArea"
 		};
 		//#endregion
 		//#region packages/client/ui-sidebar/src/client/SidebarRoot.tsx
