@@ -143,10 +143,16 @@ export function SettingsRoot(props: SettingsRootComponentProps) {
     <>
       <button
         type="button"
+        data-dsh-settings-trigger
         className={clsx(css.trigger, !wide && css.rail)}
         aria-haspopup="dialog"
         aria-expanded={open}
-        onClick={() => { setOpen(true) }}
+        onClick={(event) => {
+          const requested = event.currentTarget.dataset.dshSettingsSectionRequest
+          delete event.currentTarget.dataset.dshSettingsSectionRequest
+          setActiveId(requested)
+          setOpen(true)
+        }}
       >
         {renderSlot('settings.trigger', { wide })}
       </button>

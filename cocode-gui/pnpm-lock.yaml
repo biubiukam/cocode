@@ -282,9 +282,18 @@ importers:
 
   packages/cocode/cocode-account:
     devDependencies:
+      '@deepseek-ai/dsh-api-remotes':
+        specifier: ^0.1.0-rc.6
+        version: 0.1.0-rc.6(83d9c5c9b8349236135a0a0b0d2ee7ec)
+      '@deepseek-ai/dsh-client-connection':
+        specifier: ^0.1.0-rc.6
+        version: 0.1.0-rc.6(74b1e373a98551f8dcfec393a9dea855)
       '@deepseek-ai/dsh-client-runtime':
         specifier: ^0.1.0-rc.6
         version: 0.1.0-rc.6(6ef9bea1ffb02b7be9333a18bfeaf17e)
+      '@deepseek-ai/dsh-client-ui-primitives':
+        specifier: ^0.1.0-rc.6
+        version: 0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1))
       '@deepseek-ai/dsh-client-ui-slots':
         specifier: ^0.1.0-rc.6
         version: 0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1))

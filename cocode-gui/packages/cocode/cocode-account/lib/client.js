@@ -6,6 +6,31 @@ window.__ModuleLoader__.load({
 		Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
 		let react = require("react");
 		let react_dom_client = require("react-dom/client");
+		let _deepseek_ai_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-primitives");
+		//#region \0dsh-css:packages/cocode/cocode-account/src/client/account.module.css.mjs
+		const css = ".Jlr38G_menuRoot{width:100%;display:flex}.Jlr38G_trigger{width:100%;min-width:0;height:48px;color:var(--dsw-alias-label-primary);cursor:pointer;font:inherit;text-align:left;transition-property:background-color,transform;transition-duration:.14s;transition-timing-function:var(--ds-ease-in-out);background:0 0;border:none;border-radius:14px;align-items:center;gap:10px;padding:6px 10px;display:flex}.Jlr38G_trigger:hover,.Jlr38G_trigger[aria-expanded=true]{background:var(--dsw-alias-interactive-bg-hover)}.Jlr38G_trigger:active:not(:disabled){transform:scale(.96)}.Jlr38G_trigger:focus-visible{outline:2px solid var(--dsw-alias-state-focus,currentColor);outline-offset:1px}.Jlr38G_trigger:disabled{cursor:wait;opacity:.65}.Jlr38G_avatar{border-radius:10px;flex:none;justify-content:center;align-items:center;width:32px;height:32px;font-size:13px;font-weight:600;line-height:1;display:inline-flex}.Jlr38G_accountAvatar{background:var(--dsw-alias-accent-fill,#2f7cf6);color:var(--dsw-alias-label-on-color,white)}.Jlr38G_providerAvatar{background:var(--dsw-alias-bg-layer-2);box-shadow:inset 0 0 0 1px var(--dsw-alias-border-l2);color:var(--dsw-alias-label-primary)}.Jlr38G_guestAvatar{box-shadow:inset 0 0 0 1px var(--dsw-alias-border-l2);color:var(--dsw-alias-label-secondary);background:0 0}.Jlr38G_copy{flex-direction:column;flex:1;gap:1px;min-width:0;display:flex}.Jlr38G_primary,.Jlr38G_secondary{text-overflow:ellipsis;white-space:nowrap;overflow:hidden}.Jlr38G_primary{color:var(--dsw-alias-label-primary);font-size:14px;font-weight:500;line-height:20px}.Jlr38G_secondary{color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:15px}.Jlr38G_chevron{color:var(--dsw-alias-label-tertiary);transition:transform .14s var(--ds-ease-in-out);flex:none}.Jlr38G_trigger[aria-expanded=true] .Jlr38G_chevron{transform:rotate(180deg)}.Jlr38G_trigger.Jlr38G_rail{border-radius:50%;width:36px;height:36px;padding:2px}.Jlr38G_rail .Jlr38G_avatar{border-radius:50%;width:32px;height:32px}@media (prefers-reduced-motion:reduce){.Jlr38G_trigger,.Jlr38G_chevron{transition:none}}";
+		const tagId = "cocode-account/account.module.css";
+		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId) + "]") === null) {
+			const tag = document.createElement("style");
+			tag.dataset.plugin = "cocode-account";
+			tag.dataset.pluginCss = tagId;
+			tag.textContent = css;
+			document.head.appendChild(tag);
+		}
+		var account_module_css_default = {
+			"accountAvatar": "Jlr38G_accountAvatar",
+			"copy": "Jlr38G_copy",
+			"chevron": "Jlr38G_chevron",
+			"primary": "Jlr38G_primary",
+			"rail": "Jlr38G_rail",
+			"avatar": "Jlr38G_avatar",
+			"trigger": "Jlr38G_trigger",
+			"menuRoot": "Jlr38G_menuRoot",
+			"guestAvatar": "Jlr38G_guestAvatar",
+			"providerAvatar": "Jlr38G_providerAvatar",
+			"secondary": "Jlr38G_secondary"
+		};
+		//#endregion
 		//#region src/client/index.tsx
 		const EMPTY = {
 			phase: "signed-out",
@@ -29,7 +54,14 @@ window.__ModuleLoader__.load({
 				later: "稍后配置",
 				conflict: "本机已有同名 Provider 或凭证，请先在模型设置中处理冲突。",
 				cleanupPending: "本地账号已退出，Cocode Cloud 配置将在运行时恢复后继续清理。",
-				reauthentication: "请在浏览器中重新认证 Cocode 账号（十分钟内完成），然后点击重试。"
+				reauthentication: "请在浏览器中重新认证 Cocode 账号（十分钟内完成），然后点击重试。",
+				account: "Cocode 账号",
+				customProvider: "自定义 Provider",
+				noProvider: "登录或配置 Provider",
+				models: "模型与 Provider",
+				settings: "设置",
+				signOut: "退出登录",
+				providerId: "Provider ID："
 			},
 			en: {
 				signIn: "Sign in to Cocode",
@@ -44,9 +76,18 @@ window.__ModuleLoader__.load({
 				later: "Configure later",
 				conflict: "A provider or credential with the reserved Cocode name already exists. Resolve it in Models settings first.",
 				cleanupPending: "The local account is signed out. Cloud configuration cleanup will resume when the runtime is available.",
-				reauthentication: "Reauthenticate your Cocode account in the browser within ten minutes, then retry."
+				reauthentication: "Reauthenticate your Cocode account in the browser within ten minutes, then retry.",
+				account: "Cocode account",
+				customProvider: "Custom provider",
+				noProvider: "Sign in or configure a provider",
+				models: "Models & providers",
+				settings: "Settings",
+				signOut: "Sign out",
+				providerId: "Provider ID: "
 			}
 		};
+		/** Stable DOM hook owned by the settings shell's trigger. */
+		const SETTINGS_TRIGGER = "[data-dsh-settings-trigger]";
 		function copy() {
 			return document.documentElement.lang.toLowerCase().startsWith("zh") || navigator.language.toLowerCase().startsWith("zh") ? COPY.zh : COPY.en;
 		}
@@ -153,6 +194,47 @@ window.__ModuleLoader__.load({
 				for (const listener of [...this.listeners]) listener();
 			}
 		};
+		var ProviderStore = class {
+			connection;
+			snapshot = null;
+			providers = [];
+			listeners = /* @__PURE__ */ new Set();
+			generation = 0;
+			constructor(connection) {
+				this.connection = connection;
+			}
+			getSnapshot = () => this.snapshot;
+			subscribe = (listener) => {
+				this.listeners.add(listener);
+				return () => this.listeners.delete(listener);
+			};
+			refreshSelection() {
+				this.publish(this.select(this.providers));
+			}
+			async load() {
+				const generation = ++this.generation;
+				try {
+					const response = await this.connection.api.llm.providers({});
+					if (!response.result.ok || generation !== this.generation) return;
+					this.providers = response.result.value.providers;
+					this.publish(this.select(this.providers));
+				} catch {}
+			}
+			select(providers) {
+				const local = providers.filter((provider) => provider.provider !== "cocode-cloud" && provider.active);
+				const preferred = this.connection.hostDescription.getSnapshot()?.provider;
+				const provider = local.find((candidate) => candidate.provider === preferred) ?? local[0];
+				return provider === void 0 ? null : {
+					id: provider.provider,
+					name: provider.displayName
+				};
+			}
+			publish(next) {
+				if (this.snapshot?.id === next?.id && this.snapshot?.name === next?.name) return;
+				this.snapshot = next;
+				for (const listener of [...this.listeners]) listener();
+			}
+		};
 		function safeMessage(error) {
 			return (error instanceof Error ? error.message : String(error)).replace(/ck_[A-Za-z0-9_-]+/g, "[redacted]");
 		}
@@ -235,45 +317,175 @@ window.__ModuleLoader__.load({
 				disabled: busy
 			}, busy ? t.waiting : t.signIn))));
 		}
-		function AccountAction({ wide, store }) {
-			const snapshot = (0, react.useSyncExternalStore)(store.subscribe, store.getSnapshot, store.getSnapshot);
-			const canSignOut = snapshot.phase === "signed-in" || snapshot.phase === "provisioning" || snapshot.error?.code === "cleanup-pending";
-			const t = copy();
-			const title = accountError(snapshot) ?? (canSignOut ? t.signOutTitle : t.signInTitle);
-			return (0, react.createElement)("button", {
-				type: "button",
-				title,
-				onClick: () => {
-					canSignOut ? store.deactivate() : snapshot.phase === "error" ? store.retry() : store.activate();
-				},
-				disabled: snapshot.phase === "signing-in" || snapshot.phase === "provisioning",
-				style: {
-					width: wide ? "100%" : "40px",
-					minHeight: "32px",
-					padding: wide ? "0 10px" : "0",
-					border: "1px solid var(--dsw-alias-border-l2, rgba(128,128,128,.25))",
-					borderRadius: "8px",
-					background: "transparent",
-					color: "var(--dsw-alias-label-secondary, currentColor)",
-					cursor: "pointer",
-					font: "inherit",
-					fontSize: "12px",
-					overflow: "hidden",
-					textOverflow: "ellipsis",
-					whiteSpace: "nowrap"
-				}
-			}, labelOf(snapshot, wide));
+		function requestSettings(sectionId) {
+			const trigger = document.querySelector(SETTINGS_TRIGGER);
+			if (trigger === null) return;
+			if (sectionId === void 0) delete trigger.dataset.dshSettingsSectionRequest;
+			else trigger.dataset.dshSettingsSectionRequest = sectionId;
+			trigger.click();
 		}
-		const inject = ["slots"];
+		function initialOf(value) {
+			return [...value.trim()][0]?.toUpperCase() ?? "C";
+		}
+		function AccountAction({ wide, store, providers }) {
+			const snapshot = (0, react.useSyncExternalStore)(store.subscribe, store.getSnapshot, store.getSnapshot);
+			const provider = (0, react.useSyncExternalStore)(providers.subscribe, providers.getSnapshot, providers.getSnapshot);
+			const [open, setOpen] = (0, react.useState)(false);
+			const signedIn = snapshot.phase === "signed-in" || snapshot.phase === "provisioning";
+			const t = copy();
+			const busy = snapshot.phase === "signing-in" || snapshot.phase === "provisioning";
+			const primary = signedIn ? snapshot.profile?.displayName ?? "Cocode" : provider?.name ?? labelOf(snapshot, true);
+			const secondary = signedIn ? t.account : provider === null ? t.noProvider : t.customProvider;
+			const title = accountError(snapshot) ?? primary;
+			const entries = signedIn ? [
+				{
+					type: "label",
+					id: "identity",
+					text: primary
+				},
+				...snapshot.profile?.email === void 0 ? [] : [{
+					type: "label",
+					id: "email",
+					text: snapshot.profile.email
+				}],
+				{
+					type: "separator",
+					id: "identity-separator"
+				},
+				{
+					id: "settings",
+					label: t.settings,
+					icon: (0, react.createElement)(_deepseek_ai_dsh_client_ui_primitives.IconSettingsOutline16, { size: 16 })
+				},
+				{
+					id: "sign-out",
+					label: t.signOut,
+					danger: true,
+					icon: (0, react.createElement)(_deepseek_ai_dsh_client_ui_primitives.IconUserOutline16, { size: 16 })
+				}
+			] : provider === null ? [
+				{
+					type: "label",
+					id: "identity",
+					text: "Cocode"
+				},
+				{
+					id: "sign-in",
+					label: t.signIn,
+					icon: (0, react.createElement)(_deepseek_ai_dsh_client_ui_primitives.IconUserOutline16, { size: 16 })
+				},
+				{
+					id: "models",
+					label: t.models,
+					icon: (0, react.createElement)(_deepseek_ai_dsh_client_ui_primitives.IconDataOutline16, { size: 16 })
+				},
+				{
+					type: "separator",
+					id: "settings-separator"
+				},
+				{
+					id: "settings",
+					label: t.settings,
+					icon: (0, react.createElement)(_deepseek_ai_dsh_client_ui_primitives.IconSettingsOutline16, { size: 16 })
+				}
+			] : [
+				{
+					type: "label",
+					id: "provider",
+					text: provider.name
+				},
+				...provider.id === provider.name ? [] : [{
+					type: "label",
+					id: "provider-id",
+					text: `${t.providerId}${provider.id}`
+				}],
+				{
+					type: "separator",
+					id: "provider-separator"
+				},
+				{
+					id: "models",
+					label: t.models,
+					icon: (0, react.createElement)(_deepseek_ai_dsh_client_ui_primitives.IconDataOutline16, { size: 16 })
+				},
+				{
+					id: "sign-in",
+					label: t.signIn,
+					icon: (0, react.createElement)(_deepseek_ai_dsh_client_ui_primitives.IconUserOutline16, { size: 16 })
+				},
+				{
+					id: "settings",
+					label: t.settings,
+					icon: (0, react.createElement)(_deepseek_ai_dsh_client_ui_primitives.IconSettingsOutline16, { size: 16 })
+				}
+			];
+			const select = (id) => {
+				setOpen(false);
+				if (id === "sign-in") store.activate();
+				else if (id === "sign-out") store.deactivate();
+				else if (id === "models") requestSettings("models");
+				else if (id === "settings") requestSettings();
+			};
+			return (0, react.createElement)(_deepseek_ai_dsh_client_ui_primitives.Menu, {
+				open,
+				side: "top",
+				align: "start",
+				portal: true,
+				dense: true,
+				items: entries,
+				onClose: () => {
+					setOpen(false);
+				},
+				onSelect: select,
+				className: account_module_css_default.menuRoot,
+				anchor: (0, react.createElement)("button", {
+					type: "button",
+					title,
+					className: wide ? account_module_css_default.trigger : `${account_module_css_default.trigger} ${account_module_css_default.rail}`,
+					"aria-haspopup": "menu",
+					"aria-expanded": open,
+					disabled: busy,
+					onClick: () => {
+						setOpen((value) => !value);
+					}
+				}, (0, react.createElement)("span", { className: `${account_module_css_default.avatar} ${signedIn ? account_module_css_default.accountAvatar : provider === null ? account_module_css_default.guestAvatar : account_module_css_default.providerAvatar}` }, signedIn ? initialOf(primary) : provider === null ? (0, react.createElement)(_deepseek_ai_dsh_client_ui_primitives.IconUserOutline16, { size: 18 }) : (0, react.createElement)(_deepseek_ai_dsh_client_ui_primitives.IconApiOutline14, { size: 18 })), wide && (0, react.createElement)("span", { className: account_module_css_default.copy }, (0, react.createElement)("span", { className: account_module_css_default.primary }, primary), (0, react.createElement)("span", { className: account_module_css_default.secondary }, secondary)), wide && (0, react.createElement)(_deepseek_ai_dsh_client_ui_primitives.IconChevronUpOutline14, {
+					className: account_module_css_default.chevron,
+					size: 14
+				}))
+			});
+		}
 		function apply(ctx) {
 			const store = new AccountStore();
+			const connection = ctx.get("connection");
+			const providers = new ProviderStore(connection);
 			ctx.effect(() => () => store.dispose(), "cocode-account: dispose store");
+			ctx.effect(() => {
+				const refresh = () => {
+					providers.load();
+				};
+				const disposers = [
+					connection.hostDescription.subscribe(() => {
+						providers.refreshSelection();
+					}),
+					ctx.remote.$on("llm/adapters-updated", refresh),
+					ctx.remote.$on("settings/document-updated", refresh),
+					ctx.remote.$on("credentials/updated", refresh),
+					ctx.on("connection/reset", refresh)
+				];
+				refresh();
+				return () => {
+					for (const dispose of disposers) dispose();
+				};
+			}, "cocode-account: provider summary");
 			const slots = ctx.slots;
 			slots.inject("sidebar.footer.action", () => slots.register({
 				name: "sidebar.footer.action",
 				id: "cocode-account",
 				order: -100,
-				inject: () => ({ store })
+				inject: () => ({
+					store,
+					providers
+				})
 			}, AccountAction));
 			slots.inject("settings.onboarding", () => slots.register({
 				name: "settings.onboarding",
@@ -284,17 +496,30 @@ window.__ModuleLoader__.load({
 		}
 		function mountStandalone(target) {
 			const store = new AccountStore();
+			const providers = new ProviderStore({
+				api: { llm: { models: async () => ({ result: {
+					ok: true,
+					value: {
+						groups: [],
+						failures: []
+					}
+				} }) } },
+				hostDescription: {
+					getSnapshot: () => void 0,
+					subscribe: () => () => {}
+				}
+			});
 			let root;
 			root = (0, react_dom_client.createRoot)(target);
 			root.render((0, react.createElement)(AccountAction, {
 				wide: true,
-				store
+				store,
+				providers
 			}));
 			return () => root?.unmount();
 		}
 		//#endregion
 		exports.apply = apply;
-		exports.inject = inject;
 		exports.mountStandalone = mountStandalone;
 		return module.exports;
 	}

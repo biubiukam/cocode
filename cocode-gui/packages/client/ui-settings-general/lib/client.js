@@ -10,7 +10,7 @@ window.__ModuleLoader__.load({
 		let _deepseek_ai_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-primitives");
 		let react_jsx_runtime = require("react/jsx-runtime");
 		let _deepseek_ai_dsh_client_runtime_client = require("@deepseek-ai/dsh-client-runtime/client");
-		//#region ../../../node_modules/.pnpm/clsx@2.1.1/node_modules/clsx/dist/clsx.mjs
+		//#region node_modules/clsx/dist/clsx.mjs
 		function r(e) {
 			var t, f, n = "";
 			if ("string" == typeof e || "number" == typeof e) n += e;
@@ -25,8 +25,8 @@ window.__ModuleLoader__.load({
 			return n;
 		}
 		//#endregion
-		//#region \0dsh-css:/Users/kambiu/worker/open/deepseek-harness/packages/client/ui-settings-general/src/client/SettingsRoot.module.css.mjs
-		const css$3 = ".vvq5ma_trigger{box-sizing:border-box;cursor:pointer;width:calc(100% + 8px);height:34px;color:var(--dsw-alias-label-primary);background:0 0;border:none;border-radius:12px;flex:none;align-items:center;gap:8px;margin:4px -4px;padding:6px 2px 6px 10px;font-family:inherit;font-size:14px;line-height:22px;display:flex;overflow:hidden}.vvq5ma_trigger:hover{background:var(--dsw-alias-interactive-bg-hover)}.vvq5ma_trigger.vvq5ma_rail{border-radius:50%;justify-content:center;gap:0;width:36px;height:36px;margin:8px 0 10px;padding:0}.vvq5ma_triggerLabel{white-space:nowrap;overflow:hidden}.vvq5ma_overlay{z-index:1000;justify-content:center;align-items:center;display:flex;position:fixed;inset:0}.vvq5ma_mask{background:var(--dsw-alias-bg-mask-1);backdrop-filter:var(--dsw-mask-blur);position:absolute;inset:0}.vvq5ma_panel{z-index:1;background:var(--dsw-alias-bg-layer-2);width:800px;max-width:calc(100vw - 48px);height:min(800px,100vh - 48px);box-shadow:var(--dsw-shadow-lv3);--dsh-scrollbar-thumb:var(--dsw-alias-scrollbar-bg-l2);--dsh-scrollbar-thumb-hover:var(--dsw-alias-scrollbar-hover-l2);border-radius:24px;display:flex;position:relative;overflow:hidden}.vvq5ma_nav{box-sizing:border-box;flex-direction:column;flex:none;gap:18px;width:188px;padding:22px 12px 0;display:flex}.vvq5ma_navTitle{color:var(--dsw-alias-label-primary);padding:0 12px;font-size:16px;font-weight:500;line-height:24px}.vvq5ma_navList{flex-direction:column;gap:4px;display:flex}.vvq5ma_navCell{box-sizing:border-box;cursor:pointer;height:40px;color:var(--dsw-alias-label-primary);text-align:left;background:0 0;border:none;border-radius:12px;align-items:center;gap:8px;padding:9px 16px 9px 12px;font-family:inherit;font-size:14px;font-weight:400;line-height:22px;display:flex}.vvq5ma_navCell:hover{background:var(--dsw-specific-sidebar-nav-item-hover)}.vvq5ma_navCell.vvq5ma_active{background:var(--dsw-specific-sidebar-nav-item-active)}.vvq5ma_navIcon{flex:none}.vvq5ma_navLabel{white-space:nowrap;text-overflow:ellipsis;flex:1;min-width:0;overflow:hidden}.vvq5ma_content{flex-direction:column;flex:1;min-width:0;display:flex}.vvq5ma_header{box-sizing:border-box;flex:none;justify-content:space-between;align-items:flex-start;gap:8px;height:54px;padding:20px 14px 8px 10px;display:flex}.vvq5ma_actions{justify-content:flex-end;align-items:center;gap:8px;min-width:0;margin-left:auto;display:flex}.vvq5ma_close{cursor:pointer;width:28px;height:28px;color:var(--dsw-alias-label-primary);background:0 0;border:none;border-radius:28px;justify-content:center;align-items:center;padding:0;display:inline-flex}.vvq5ma_close:hover{background:var(--dsw-alias-interactive-bg-hover)}.vvq5ma_options{flex:1;min-height:0;padding:0 24px 24px;overflow-y:auto}.vvq5ma_hiddenLabel{clip:rect(0 0 0 0);white-space:nowrap;width:1px;height:1px;position:absolute;overflow:hidden}";
+		//#region \0dsh-css:packages/client/ui-settings-general/src/client/SettingsRoot.module.css.mjs
+		const css$3 = ".eCSlTa_trigger{box-sizing:border-box;cursor:pointer;width:calc(100% + 8px);height:34px;color:var(--dsw-alias-label-primary);background:0 0;border:none;border-radius:12px;flex:none;align-items:center;gap:8px;margin:4px -4px;padding:6px 2px 6px 10px;font-family:inherit;font-size:14px;line-height:22px;display:flex;overflow:hidden}.eCSlTa_trigger:hover{background:var(--dsw-alias-interactive-bg-hover)}.eCSlTa_trigger.eCSlTa_rail{border-radius:50%;justify-content:center;gap:0;width:36px;height:36px;margin:8px 0 10px;padding:0}.eCSlTa_triggerLabel{white-space:nowrap;overflow:hidden}.eCSlTa_overlay{z-index:1000;justify-content:center;align-items:center;display:flex;position:fixed;inset:0}.eCSlTa_mask{background:var(--dsw-alias-bg-mask-1);backdrop-filter:var(--dsw-mask-blur);position:absolute;inset:0}.eCSlTa_panel{z-index:1;background:var(--dsw-alias-bg-layer-2);width:800px;max-width:calc(100vw - 48px);height:min(800px,100vh - 48px);box-shadow:var(--dsw-shadow-lv3);--dsh-scrollbar-thumb:var(--dsw-alias-scrollbar-bg-l2);--dsh-scrollbar-thumb-hover:var(--dsw-alias-scrollbar-hover-l2);border-radius:24px;display:flex;position:relative;overflow:hidden}.eCSlTa_nav{box-sizing:border-box;flex-direction:column;flex:none;gap:18px;width:188px;padding:22px 12px 0;display:flex}.eCSlTa_navTitle{color:var(--dsw-alias-label-primary);padding:0 12px;font-size:16px;font-weight:500;line-height:24px}.eCSlTa_navList{flex-direction:column;gap:4px;display:flex}.eCSlTa_navCell{box-sizing:border-box;cursor:pointer;height:40px;color:var(--dsw-alias-label-primary);text-align:left;background:0 0;border:none;border-radius:12px;align-items:center;gap:8px;padding:9px 16px 9px 12px;font-family:inherit;font-size:14px;font-weight:400;line-height:22px;display:flex}.eCSlTa_navCell:hover{background:var(--dsw-specific-sidebar-nav-item-hover)}.eCSlTa_navCell.eCSlTa_active{background:var(--dsw-specific-sidebar-nav-item-active)}.eCSlTa_navIcon{flex:none}.eCSlTa_navLabel{white-space:nowrap;text-overflow:ellipsis;flex:1;min-width:0;overflow:hidden}.eCSlTa_content{flex-direction:column;flex:1;min-width:0;display:flex}.eCSlTa_header{box-sizing:border-box;flex:none;justify-content:space-between;align-items:flex-start;gap:8px;height:54px;padding:20px 14px 8px 10px;display:flex}.eCSlTa_actions{justify-content:flex-end;align-items:center;gap:8px;min-width:0;margin-left:auto;display:flex}.eCSlTa_close{cursor:pointer;width:28px;height:28px;color:var(--dsw-alias-label-primary);background:0 0;border:none;border-radius:28px;justify-content:center;align-items:center;padding:0;display:inline-flex}.eCSlTa_close:hover{background:var(--dsw-alias-interactive-bg-hover)}.eCSlTa_options{flex:1;min-height:0;padding:0 24px 24px;overflow-y:auto}.eCSlTa_hiddenLabel{clip:rect(0 0 0 0);white-space:nowrap;width:1px;height:1px;position:absolute;overflow:hidden}";
 		const tagId$3 = "@deepseek-ai/dsh-client-ui-settings-general/SettingsRoot.module.css";
 		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId$3) + "]") === null) {
 			const tag = document.createElement("style");
@@ -36,28 +36,28 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var SettingsRoot_module_css_default = {
-			"panel": "vvq5ma_panel",
-			"navTitle": "vvq5ma_navTitle",
-			"trigger": "vvq5ma_trigger",
-			"header": "vvq5ma_header",
-			"overlay": "vvq5ma_overlay",
-			"navIcon": "vvq5ma_navIcon",
-			"nav": "vvq5ma_nav",
-			"options": "vvq5ma_options",
-			"navList": "vvq5ma_navList",
-			"navCell": "vvq5ma_navCell",
-			"close": "vvq5ma_close",
-			"content": "vvq5ma_content",
-			"actions": "vvq5ma_actions",
-			"rail": "vvq5ma_rail",
-			"mask": "vvq5ma_mask",
-			"triggerLabel": "vvq5ma_triggerLabel",
-			"navLabel": "vvq5ma_navLabel",
-			"active": "vvq5ma_active",
-			"hiddenLabel": "vvq5ma_hiddenLabel"
+			"overlay": "eCSlTa_overlay",
+			"navList": "eCSlTa_navList",
+			"actions": "eCSlTa_actions",
+			"options": "eCSlTa_options",
+			"rail": "eCSlTa_rail",
+			"trigger": "eCSlTa_trigger",
+			"active": "eCSlTa_active",
+			"header": "eCSlTa_header",
+			"mask": "eCSlTa_mask",
+			"navTitle": "eCSlTa_navTitle",
+			"content": "eCSlTa_content",
+			"navCell": "eCSlTa_navCell",
+			"nav": "eCSlTa_nav",
+			"navIcon": "eCSlTa_navIcon",
+			"navLabel": "eCSlTa_navLabel",
+			"close": "eCSlTa_close",
+			"triggerLabel": "eCSlTa_triggerLabel",
+			"hiddenLabel": "eCSlTa_hiddenLabel",
+			"panel": "eCSlTa_panel"
 		};
 		//#endregion
-		//#region src/client/SettingsRoot.tsx
+		//#region packages/client/ui-settings-general/src/client/SettingsRoot.tsx
 		/**
 		* Settings shell root: the sidebar-foot trigger row plus the centered modal
 		* panel (figma 501:29947, 1080x700) with the section nav rail. The shell is
@@ -203,10 +203,14 @@ window.__ModuleLoader__.load({
 			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
 				/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
 					type: "button",
+					"data-dsh-settings-trigger": true,
 					className: clsx(SettingsRoot_module_css_default.trigger, !wide && SettingsRoot_module_css_default.rail),
 					"aria-haspopup": "dialog",
 					"aria-expanded": open,
-					onClick: () => {
+					onClick: (event) => {
+						const requested = event.currentTarget.dataset.dshSettingsSectionRequest;
+						delete event.currentTarget.dataset.dshSettingsSectionRequest;
+						setActiveId(requested);
 						setOpen(true);
 					},
 					children: renderSlot("settings.trigger", { wide })
@@ -228,8 +232,8 @@ window.__ModuleLoader__.load({
 			] });
 		}
 		//#endregion
-		//#region \0dsh-css:/Users/kambiu/worker/open/deepseek-harness/packages/client/ui-settings-general/src/client/chrome.module.css.mjs
-		const css$2 = ".kLf_IW_triggerLabel{white-space:nowrap;overflow:hidden}";
+		//#region \0dsh-css:packages/client/ui-settings-general/src/client/chrome.module.css.mjs
+		const css$2 = ".PicMBa_triggerLabel{white-space:nowrap;overflow:hidden}";
 		const tagId$2 = "@deepseek-ai/dsh-client-ui-settings-general/chrome.module.css";
 		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId$2) + "]") === null) {
 			const tag = document.createElement("style");
@@ -238,9 +242,9 @@ window.__ModuleLoader__.load({
 			tag.textContent = css$2;
 			document.head.appendChild(tag);
 		}
-		var chrome_module_css_default = { "triggerLabel": "kLf_IW_triggerLabel" };
+		var chrome_module_css_default = { "triggerLabel": "PicMBa_triggerLabel" };
 		//#endregion
-		//#region src/client/chrome.tsx
+		//#region packages/client/ui-settings-general/src/client/chrome.tsx
 		/**
 		* Shell chrome content registered into the shell's trigger/header seats: the
 		* trigger row icon + label (figma sidebar foot) and the panel title text.
@@ -275,8 +279,8 @@ window.__ModuleLoader__.load({
 			return /* @__PURE__ */ (0, react_jsx_runtime.jsx)(react_jsx_runtime.Fragment, { children: t("close") });
 		}
 		//#endregion
-		//#region \0dsh-css:/Users/kambiu/worker/open/deepseek-harness/packages/client/ui-settings-general/src/client/GeneralSection.module.css.mjs
-		const css$1 = ".BDKN_a_section{flex-direction:column;width:100%;display:flex}.BDKN_a_section>[data-slot=\"settings.general.item\"]>:last-child{border-bottom:none}";
+		//#region \0dsh-css:packages/client/ui-settings-general/src/client/GeneralSection.module.css.mjs
+		const css$1 = "._1yhVrG_section{flex-direction:column;width:100%;display:flex}._1yhVrG_section>[data-slot=\"settings.general.item\"]>:last-child{border-bottom:none}";
 		const tagId$1 = "@deepseek-ai/dsh-client-ui-settings-general/GeneralSection.module.css";
 		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId$1) + "]") === null) {
 			const tag = document.createElement("style");
@@ -285,9 +289,9 @@ window.__ModuleLoader__.load({
 			tag.textContent = css$1;
 			document.head.appendChild(tag);
 		}
-		var GeneralSection_module_css_default = { "section": "BDKN_a_section" };
+		var GeneralSection_module_css_default = { "section": "_1yhVrG_section" };
 		//#endregion
-		//#region src/client/GeneralSection.tsx
+		//#region packages/client/ui-settings-general/src/client/GeneralSection.tsx
 		/**
 		* Render the General section content column.
 		* @param props - composed slot props (contract/slots.ts).
@@ -300,8 +304,8 @@ window.__ModuleLoader__.load({
 			});
 		}
 		//#endregion
-		//#region \0dsh-css:/Users/kambiu/worker/open/deepseek-harness/packages/client/ui-settings-general/src/client/SettingsDocumentAction.module.css.mjs
-		const css = ".JDfFkq_action{align-items:center;gap:8px;min-width:0;display:flex}.JDfFkq_error{max-width:180px;color:var(--dsw-alias-state-error-primary);text-overflow:ellipsis;white-space:nowrap;font-size:12px;line-height:18px;overflow:hidden}";
+		//#region \0dsh-css:packages/client/ui-settings-general/src/client/SettingsDocumentAction.module.css.mjs
+		const css = ".Zo3obq_action{align-items:center;gap:8px;min-width:0;display:flex}.Zo3obq_error{max-width:180px;color:var(--dsw-alias-state-error-primary);text-overflow:ellipsis;white-space:nowrap;font-size:12px;line-height:18px;overflow:hidden}";
 		const tagId = "@deepseek-ai/dsh-client-ui-settings-general/SettingsDocumentAction.module.css";
 		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId) + "]") === null) {
 			const tag = document.createElement("style");
@@ -311,11 +315,11 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var SettingsDocumentAction_module_css_default = {
-			"error": "JDfFkq_error",
-			"action": "JDfFkq_action"
+			"action": "Zo3obq_action",
+			"error": "Zo3obq_error"
 		};
 		//#endregion
-		//#region src/client/SettingsDocumentAction.tsx
+		//#region packages/client/ui-settings-general/src/client/SettingsDocumentAction.tsx
 		/** Optional settings-header action for opening a file-backed Host document. */
 		/**
 		* Render the open-document action only after Host metadata confirms document availability.
@@ -346,13 +350,12 @@ window.__ModuleLoader__.load({
 			});
 		}
 		//#endregion
-		//#region src/client/settings-document-store.ts
+		//#region packages/client/ui-settings-general/src/client/settings-document-store.ts
 		function messageOf(error) {
 			return error instanceof Error ? error.message : String(error);
 		}
 		/** Loads local-document availability and invokes the pathless Host-owned open operation. */
 		var SettingsDocumentStore = class {
-			api;
 			/** uSES-safe state source shared by the registered header action. */
 			store = (0, _deepseek_ai_dsh_client_runtime_client.createSnapshotStore)({
 				status: "idle",
@@ -432,7 +435,7 @@ window.__ModuleLoader__.load({
 			controller.load();
 		}
 		//#endregion
-		//#region src/client/locales.ts
+		//#region packages/client/ui-settings-general/src/client/locales.ts
 		/** Shell chrome and General-nav dictionaries; feature rows own their copy. */
 		/** Simplified Chinese dictionary (the key-set source of truth). */
 		const zh = {
@@ -453,7 +456,7 @@ window.__ModuleLoader__.load({
 			"general.nav": "General"
 		};
 		//#endregion
-		//#region src/client/index.ts
+		//#region packages/client/ui-settings-general/src/client/index.ts
 		/** Dictionary namespace owned by this plugin (shell chrome + General copy). */
 		const NS = "settings";
 		/**

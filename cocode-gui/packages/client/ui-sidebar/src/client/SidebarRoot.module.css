@@ -342,6 +342,13 @@
   display: flex;
 }
 
+/* Product footer actions may own the unified account/provider menu. When one
+   is present, keep Settings mounted as the modal controller but hide its
+   duplicate trigger; the footer action activates that controller directly. */
+.footArea:has(.footerActions > *) .settingsArea {
+  display: none;
+}
+
 .collapsed .footArea {
   align-items: center;
 }

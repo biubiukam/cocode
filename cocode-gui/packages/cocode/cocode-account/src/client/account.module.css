@@ -1,0 +1,131 @@
+.menuRoot {
+  display: flex;
+  width: 100%;
+}
+
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  height: 48px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition-property: background-color, transform;
+  transition-duration: 140ms;
+  transition-timing-function: var(--ds-ease-in-out);
+}
+
+.trigger:hover,
+.trigger[aria-expanded='true'] {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.trigger:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.trigger:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-focus, currentColor);
+  outline-offset: 1px;
+}
+
+.trigger:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.avatar {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.accountAvatar {
+  background: var(--dsw-alias-accent-fill, #2f7cf6);
+  color: var(--dsw-alias-label-on-color, white);
+}
+
+.providerAvatar {
+  background: var(--dsw-alias-bg-layer-2);
+  box-shadow: inset 0 0 0 1px var(--dsw-alias-border-l2);
+  color: var(--dsw-alias-label-primary);
+}
+
+.guestAvatar {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--dsw-alias-border-l2);
+  color: var(--dsw-alias-label-secondary);
+}
+
+.copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.primary,
+.secondary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.primary {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.secondary {
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.chevron {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary);
+  transition: transform 140ms var(--ds-ease-in-out);
+}
+
+.trigger[aria-expanded='true'] .chevron {
+  transform: rotate(180deg);
+}
+
+.trigger.rail {
+  width: 36px;
+  height: 36px;
+  padding: 2px;
+  border-radius: 50%;
+}
+
+.rail .avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trigger,
+  .chevron {
+    transition: none;
+  }
+}
