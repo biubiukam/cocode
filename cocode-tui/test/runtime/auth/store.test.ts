@@ -357,7 +357,7 @@ describe('AuthStore', () => {
       refreshToken: 'old-refresh',
       accessExpiresAt: Date.now() + 1_000,
       personalKeyId: 'key-1',
-      personalKeyName: 'Cocode TUI',
+      personalKeyName: 'Cocode Device — test-host',
     })
     let refreshCalls = 0
     const store = await createAuthStore({

@@ -1,3 +1,5 @@
+import { deviceKeyName } from "./device-name"
+
 type AgencyResponse<T> = { readonly status: number; readonly value: T }
 
 export class AgencyHttpError extends Error {
@@ -40,6 +42,7 @@ type AgencyProfile = {
 }
 
 export type AgencyModel = { readonly id: string; readonly name: string }
+export type CreatedApiKey = { readonly secret: string; readonly id: string; readonly name: string }
 
 const DEFAULT_ORIGIN = "https://cocode.agency"
 
@@ -112,7 +115,7 @@ export class AgencyClient {
 				method: "POST",
 				body: {
 					client_id: "cocode-desktop",
-					device_label: "Cocode Desktop",
+					device_label: deviceKeyName(),
 					redirect_uri: input.redirectUri,
 					state: input.state,
 					code_challenge: input.codeChallenge,
@@ -208,27 +211,31 @@ export class AgencyClient {
 		}
 	}
 
-	async createDesktopKey(accessToken: string): Promise<string> {
-		const response = await this.request<{ secret?: string }>("/v1/me/api-keys", {
+	async createDesktopKey(accessToken: string): Promise<CreatedApiKey> {
+		const name = deviceKeyName()
+		const response = await this.request<{ secret?: string; id?: string }>("/v1/me/api-keys", {
 			method: "POST",
 			token: accessToken,
-			body: { name: "Cocode Desktop", scopes: ["models:read", "inference:write"] },
+			body: { name, scopes: ["models:read", "inference:write"] },
 		})
 		const secret = response.value.secret?.trim()
+		const id = response.value.id?.trim()
 		if (
 			(response.status !== 201 && response.status !== 200) ||
 			typeof secret !== "string" ||
+			typeof id !== "string" ||
+			id === "" ||
 			!/^ck_[A-Za-z0-9_-]+$/.test(secret)
 		) {
 			const detail = problemDetail(response.value)
 			throw new AgencyHttpError(
-				`could not create a desktop API key (HTTP ${String(response.status)})${
+				`could not create a device API key (HTTP ${String(response.status)})${
 					detail === undefined ? "" : `: ${detail}`
 				}`,
 				response.status,
 			)
 		}
-		return secret
+		return { secret, id, name }
 	}
 
 	async models(apiKey: string): Promise<AgencyModel[]> {

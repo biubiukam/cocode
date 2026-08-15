@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { patchCredential } from '../../../src/runtime/auth/credentials.ts'
+import { deviceKeyName } from '../../../src/runtime/auth/device-name.ts'
 import { resolveAuth } from '../../../src/runtime/auth/resolve.ts'
 import { patchCloudRoute } from '../../../src/runtime/auth/settings.ts'
 
@@ -19,6 +20,11 @@ afterEach(async () => {
 })
 
 describe('resolveAuth', () => {
+  it('uses deterministic device-oriented API key names', () => {
+    expect(deviceKeyName('  my   laptop  ')).toBe('Cocode Device — my laptop')
+    expect(deviceKeyName('   ')).toBe('Cocode Device')
+    expect(deviceKeyName('x'.repeat(100))).toHaveLength('Cocode Device — '.length + 80)
+  })
   it('prefers process env over the credential file', async () => {
     const home = await tempHome()
     await patchCredential(home, 'DEEPSEEK_API_KEY', 'sk-file')

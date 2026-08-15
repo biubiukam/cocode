@@ -87,7 +87,7 @@ function agency(overrides: Record<string, unknown> = {}): {
 			profile: async () => ({ displayName: "Cocode User" }),
 			createDesktopKey: async () => {
 				createdKeys.push("ck_test")
-				return "ck_test"
+				return { secret: "ck_test", id: "key-test", name: "Cocode Device — test-host" }
 			},
 			models: async () => [{ id: "cloud-model", name: "Cloud Model" }],
 			revoke: async (token: string) => {
@@ -139,7 +139,7 @@ test("provider conflicts are reported before a cloud key or DSH write", async ()
 					value: {
 						providers: {
 							"cocode-cloud": {
-								api: "openai-responses",
+								api: "openai-completions",
 								baseURL: "https://other.example/v1",
 								apiKeyEnv: "OTHER_KEY",
 							},
@@ -271,6 +271,75 @@ test("reconciles a pre-existing reserved cloud credential", async () => {
 	assert.deepEqual(writes, ["credential:set", "route:set"])
 })
 
+test("reuses a ready device cloud route without minting another API key", async () => {
+	const identity = new MemoryVault(
+		validIdentity({
+			personalKeyId: "key-from-tui",
+			personalKeyName: "Cocode Device — test-host",
+		}),
+	)
+	const { client, createdKeys } = agency()
+	let writes = 0
+	const route = {
+		displayName: "Cocode Cloud",
+		api: "openai-completions",
+		baseURL: "https://cocode.agency/v1",
+		apiKeyEnv: "COCODE_CLOUD_API_KEY",
+		models: [{ id: "cloud-model", name: "Cloud Model" }],
+	}
+	const dsh = {
+		currentDefault: async () => ({ provider: "cocode-cloud", model: "cloud-model" }),
+		describeSettings: async () => ({
+			writable: true,
+			namespaces: [
+				{
+					ns: "llm-pi-ai",
+					revision: 3,
+					value: { providers: { "cocode-cloud": route } },
+				},
+			],
+		}),
+		describeCredentials: async () => ({
+			COCODE_CLOUD_API_KEY: { configured: true, writable: true },
+		}),
+		providers: async (): Promise<ProviderView[]> => [
+			{
+				provider: "cocode-cloud",
+				displayName: "Cocode Cloud",
+				settingsNs: "llm-pi-ai",
+				settingsPath: ["providers", "cocode-cloud"],
+				active: true,
+			},
+		],
+		models: async (): Promise<ModelGroup[]> => [
+			{
+				id: "cocode-cloud",
+				name: "Cocode Cloud",
+				models: [{ id: "cloud-model", name: "Cloud Model" }],
+			},
+		],
+		mutateSettings: async () => {
+			writes += 1
+		},
+		setCredential: async () => {
+			writes += 1
+		},
+		unsetCredential: async () => {
+			writes += 1
+		},
+	} as never
+
+	const snapshot = await new AccountService(dsh, client, dependencies(identity).deps).signIn()
+	assert.equal(snapshot.phase, "signed-in")
+	assert.equal(snapshot.cloud.status, "ready")
+	assert.deepEqual(createdKeys, [])
+	assert.equal(writes, 0)
+	assert.deepEqual(identity.value?.managedRoute, {
+		baseURL: "https://cocode.agency/v1",
+		apiKeyEnv: "COCODE_CLOUD_API_KEY",
+	})
+})
+
 test("failed provider activation rolls back the managed route and credential", async () => {
 	const identity = new MemoryVault(validIdentity())
 	const { client, createdKeys } = agency()
@@ -325,7 +394,7 @@ test("failed provider activation rolls back the managed route and credential", a
 	assert.equal(credentialConfigured, false)
 	assert.deepEqual(mutations, ["credential:set", "route:set", "route:unset", "credential:unset"])
 	// The key is retained in the Main-only vault so a retry does not mint a
-	// second Desktop key after a later DSH activation failure.
+	// second device key after a later DSH activation failure.
 	assert.equal(cloudKey.value, "ck_test")
 	await service.signIn()
 	assert.deepEqual(createdKeys, ["ck_test"])
@@ -377,7 +446,7 @@ test("sign out restores a cloud default before removing only the managed provide
 	let current: DefaultSelection = { provider: "cocode-cloud", model: "cloud-model" }
 	let route: Record<string, unknown> | undefined = {
 		displayName: "Cocode Cloud",
-		api: "openai-responses",
+		api: "openai-completions",
 		baseURL: "https://cocode.agency/v1",
 		apiKeyEnv: "COCODE_CLOUD_API_KEY",
 		models: [{ id: "cloud-model", name: "Cloud Model" }],
@@ -499,7 +568,7 @@ test("a desktop-key reauthentication requirement clears identity during hydrate"
 	const { client } = agency({
 		createDesktopKey: async () => {
 			throw new AgencyHttpError(
-				"could not create a desktop API key (HTTP 403): reauthentication_required",
+				"could not create a device API key (HTTP 403): reauthentication_required",
 				403,
 			)
 		},
@@ -549,11 +618,11 @@ test("desktop-key reauthentication opens a browser reauth gate before retry", as
 			keyAttempts += 1
 			if (keyAttempts === 1) {
 				throw new AgencyHttpError(
-					"could not create a desktop API key (HTTP 403): Reauthenticate this browser session within ten minutes before creating a personal API key.",
+					"could not create a device API key (HTTP 403): Reauthenticate this browser session within ten minutes before creating a personal API key.",
 					403,
 				)
 			}
-			return "ck_fresh"
+			return { secret: "ck_fresh", id: "key-fresh", name: "Cocode Device — test-host" }
 		},
 	})
 	const settings = (): SettingsNamespace[] => [

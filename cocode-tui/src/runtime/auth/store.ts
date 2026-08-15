@@ -3,6 +3,7 @@
  */
 
 import { deleteAccount, readAccount, writeAccount } from './account.ts'
+import { withAccountLock } from './account-lock.ts'
 import { patchCredential, readCredentials } from './credentials.ts'
 import {
   listHostedModels,
@@ -273,6 +274,15 @@ class AuthStoreImpl implements AuthStore {
   async logout(): Promise<void> {
     if (await this.homeIsBusy()) throw new HomeBusyError()
     const operation = this.beginOperation()
+    const firstError = await withAccountLock(this.accountHome, () => this.performLogout(operation))
+    this.profile = undefined
+    this.cloudModels = undefined
+    await this.hydrate()
+    this.emit()
+    if (firstError !== undefined) throw firstError
+  }
+
+  private async performLogout(operation: Operation): Promise<unknown> {
     let firstError: unknown
     let account: AccountRecord | undefined
     try {
@@ -294,11 +304,7 @@ class AuthStoreImpl implements AuthStore {
         firstError ??= error
       }
     }
-    this.profile = undefined
-    this.cloudModels = undefined
-    await this.hydrate()
-    this.emit()
-    if (firstError !== undefined) throw firstError
+    return firstError
   }
 
   private envLocked(mode: 'byok' | 'cocode'): boolean {
@@ -408,52 +414,47 @@ class AuthStoreImpl implements AuthStore {
       }
       const profile = await loadProfile(origin, account.accessToken, this.client, poll.signal)
       this.ensureCurrent(operation)
-      const existing = await readAccount(this.accountHome)
-      const credentials = await readCredentials(this.dshHome)
-      const reusable =
-        existing?.personalKeyId !== undefined &&
-        credentials[CLOUD_KEY_REF]?.trim() !== undefined &&
-        credentials[CLOUD_KEY_REF]?.trim() !== ''
-      let secret = credentials[CLOUD_KEY_REF]?.trim()
-      if (!reusable || secret === undefined) {
-        const minted = await mintPersonalKey(origin, account.accessToken, this.client, poll.signal)
-        this.ensureCurrent(operation)
-        secret = minted.secret
-        account = {
-          ...account,
-          personalKeyId: minted.id,
-          personalKeyName: KEY_NAME,
+      await withAccountLock(this.accountHome, async () => {
+        const existing = await readAccount(this.accountHome)
+        const credentials = await readCredentials(this.dshHome)
+        let secret = credentials[CLOUD_KEY_REF]?.trim()
+        const reusable = existing?.origin === origin && secret !== undefined && secret !== ''
+        if (!reusable || secret === undefined) {
+          const minted = await mintPersonalKey(origin, account.accessToken, this.client, poll.signal)
+          this.ensureCurrent(operation)
+          secret = minted.secret
+          account = {
+            ...account,
+            personalKeyId: minted.id,
+            personalKeyName: KEY_NAME,
+          }
+        } else {
+          account = {
+            ...account,
+            personalKeyId: existing.personalKeyId,
+            personalKeyName: existing.personalKeyName ?? KEY_NAME,
+          }
         }
-      } else {
-        account = {
-          ...account,
-          personalKeyId: existing.personalKeyId,
-          personalKeyName: existing.personalKeyName ?? KEY_NAME,
+        const models = await listHostedModels(origin, secret, this.client, poll.signal)
+        this.ensureCurrent(operation)
+        if (models.length === 0) throw new TuiError('AUTH_NO_HOSTED_MODELS')
+        this.cloudModels = models
+        const settingsBackup = await captureCloudSettings(this.dshHome)
+        const previousCloudKey = credentials[CLOUD_KEY_REF]
+        try {
+          this.ensureCurrent(operation)
+          if (!reusable) await patchCredential(this.dshHome, CLOUD_KEY_REF, secret)
+          this.ensureCurrent(operation)
+          await removeCloudRoute(this.dshHome)
+          await patchAgentDefaultModel(this.dshHome, CLOUD_PROVIDER, models[0].id)
+          this.ensureCurrent(operation)
+          await writeAccount(this.accountHome, account)
+        } catch (error) {
+          this.cloudModels = undefined
+          await this.restoreLoginState(existing, previousCloudKey, settingsBackup)
+          throw error
         }
-      }
-      const models = await listHostedModels(origin, secret, this.client, poll.signal)
-      this.ensureCurrent(operation)
-      if (models.length === 0) {
-        throw new TuiError('AUTH_NO_HOSTED_MODELS')
-      }
-      this.cloudModels = models
-      const settingsBackup = await captureCloudSettings(this.dshHome)
-      const previousCloudKey = credentials[CLOUD_KEY_REF]
-      try {
-        this.ensureCurrent(operation)
-        if (!reusable && secret !== undefined) {
-          await patchCredential(this.dshHome, CLOUD_KEY_REF, secret)
-        }
-        this.ensureCurrent(operation)
-        await removeCloudRoute(this.dshHome)
-        await patchAgentDefaultModel(this.dshHome, CLOUD_PROVIDER, models[0].id)
-        this.ensureCurrent(operation)
-        await writeAccount(this.accountHome, account)
-      } catch (error) {
-        this.cloudModels = undefined
-        await this.restoreLoginState(existing, previousCloudKey, settingsBackup)
-        throw error
-      }
+      })
       this.ensureCurrent(operation)
       this.profile = profile
       await this.hydrate(operation.signal)

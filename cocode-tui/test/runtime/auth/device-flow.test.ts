@@ -5,6 +5,7 @@ import {
   revokeToken,
   startDeviceAuthorization,
 } from '../../../src/runtime/auth/device-flow.ts'
+import { KEY_NAME } from '../../../src/runtime/auth/types.ts'
 
 function json(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -15,8 +16,10 @@ function json(status: number, body: unknown): Response {
 
 describe('device-flow', () => {
   it('starts an authorization', async () => {
-    const fetchImpl: typeof fetch = async () =>
-      json(201, {
+    let requestBody: Record<string, unknown> | undefined
+    const fetchImpl: typeof fetch = async (_input, init) => {
+      requestBody = JSON.parse(String(init?.body)) as Record<string, unknown>
+      return json(201, {
         device_code: 'dc',
         user_code: 'WDJB-MJHT',
         verification_uri: 'https://cocode.agency/device',
@@ -24,10 +27,13 @@ describe('device-flow', () => {
         expires_in: 600,
         interval: 1,
       })
+    }
     const started = await startDeviceAuthorization('https://cocode.agency', {
       fetch: fetchImpl,
     })
     expect(started.user_code).toBe('WDJB-MJHT')
+    expect(requestBody?.device_label).toBe(KEY_NAME)
+    expect(String(requestBody?.device_label)).toMatch(/^Cocode Device(?: — .+)?$/)
   })
 
   it('polls until a token arrives', async () => {
@@ -135,10 +141,15 @@ describe('device-flow', () => {
   })
 
   it('returns the minted secret once', async () => {
+    let requestBody: Record<string, unknown> | undefined
     const minted = await mintPersonalKey('https://cocode.agency', 'at', {
-      fetch: async () => json(201, { secret: 'ck_live_secret', id: 'key-1' }),
+      fetch: async (_input, init) => {
+        requestBody = JSON.parse(String(init?.body)) as Record<string, unknown>
+        return json(201, { secret: 'ck_live_secret', id: 'key-1' })
+      },
     })
     expect(minted).toEqual({ secret: 'ck_live_secret', id: 'key-1' })
+    expect(requestBody?.name).toBe(KEY_NAME)
   })
 
   it('rejects unsafe verification URLs', async () => {

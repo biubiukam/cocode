@@ -1,16 +1,89 @@
 import assert from "node:assert/strict"
 import { createHash } from "node:crypto"
+import { mkdtemp, readFile, rm, stat } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import test from "node:test"
 import { createPkce } from "../../../src/main/contexts/account/application/account-service"
 import { AgencyClient } from "../../../src/main/contexts/account/infrastructure/agency-client"
 import { listenForCallback } from "../../../src/main/contexts/account/infrastructure/callback-server"
 import { DshCloudConfigPort } from "../../../src/main/contexts/account/infrastructure/dsh-cloud-config-port"
+import { deviceKeyName } from "../../../src/main/contexts/account/infrastructure/device-name"
+import { SharedAccountStore } from "../../../src/main/contexts/account/infrastructure/shared-account-store"
 import * as accountHostPlugin from "../../../packages/cocode/cocode-account/src/index"
 
 test("PKCE challenge is the base64url SHA-256 of the verifier", () => {
 	const { verifier, challenge } = createPkce()
 	assert.match(verifier, /^[A-Za-z0-9_-]+$/)
 	assert.equal(challenge, createHash("sha256").update(verifier).digest("base64url"))
+})
+
+test("device API key names are deterministic and device-oriented", () => {
+	assert.equal(deviceKeyName("  my   laptop  "), "Cocode Device — my laptop")
+	assert.equal(deviceKeyName("   "), "Cocode Device")
+	assert.equal(deviceKeyName("x".repeat(100)).length, "Cocode Device — ".length + 80)
+})
+
+test("shared account store writes the TUI-compatible private account file", async () => {
+	const home = await mkdtemp(join(tmpdir(), "cocode-gui-account-"))
+	try {
+		const legacy = {
+			read: async (): Promise<undefined> => undefined,
+			clear: async (): Promise<void> => undefined,
+		}
+		const store = new SharedAccountStore(home, legacy)
+		await store.write({
+			origin: "https://cocode.agency",
+			accessToken: "access",
+			refreshToken: "refresh",
+			accessExpiresAt: 1710000000000,
+			personalKeyId: "key-1",
+			personalKeyName: "Cocode Device — test-host",
+		})
+		const yaml = await readFile(join(home, "account.yaml"), "utf8")
+		assert.match(yaml, /access_token: access/)
+		assert.match(yaml, /personal_key_name: Cocode Device — test-host/)
+		assert.doesNotMatch(yaml, /ck_|sk-/)
+		assert.deepEqual(await new SharedAccountStore(home, legacy).read(), {
+			origin: "https://cocode.agency",
+			accessToken: "access",
+			refreshToken: "refresh",
+			accessExpiresAt: 1710000000000,
+			personalKeyId: "key-1",
+			personalKeyName: "Cocode Device — test-host",
+		})
+		if (process.platform !== "win32") {
+			assert.equal((await stat(home)).mode & 0o777, 0o700)
+			assert.equal((await stat(join(home, "account.yaml"))).mode & 0o777, 0o600)
+		}
+	} finally {
+		await rm(home, { recursive: true, force: true })
+	}
+})
+
+test("shared account store migrates a legacy GUI identity once", async () => {
+	const home = await mkdtemp(join(tmpdir(), "cocode-gui-account-"))
+	let clearCalls = 0
+	const legacyIdentity = {
+		origin: "https://cocode.agency",
+		accessToken: "legacy-access",
+		refreshToken: "legacy-refresh",
+		accessExpiresAt: 1710000000000,
+	}
+	try {
+		const store = new SharedAccountStore(home, {
+			read: async () => legacyIdentity,
+			clear: async () => {
+				clearCalls += 1
+			},
+		})
+		assert.deepEqual(await store.read(), legacyIdentity)
+		assert.match(await readFile(join(home, "account.yaml"), "utf8"), /legacy-access/)
+		await store.clear()
+		assert.equal(clearCalls, 1)
+	} finally {
+		await rm(home, { recursive: true, force: true })
+	}
 })
 
 test("Cocode account host entry is a valid DSH plugin", () => {
@@ -121,7 +194,7 @@ test("Agency client accepts only ck-prefixed inference keys", async () => {
 	try {
 		await assert.rejects(
 			new AgencyClient("https://cocode.agency").createDesktopKey("identity-token"),
-			/could not create a desktop API key/,
+			/could not create a device API key/,
 		)
 	} finally {
 		globalThis.fetch = originalFetch
@@ -130,16 +203,20 @@ test("Agency client accepts only ck-prefixed inference keys", async () => {
 
 test("Agency client trims a desktop key and preserves a safe API problem detail", async () => {
 	const originalFetch = globalThis.fetch
-	globalThis.fetch = (async () =>
-		new Response(JSON.stringify({ secret: " ck_live_secret ", id: "key-1" }), {
+	let requestBody: Record<string, unknown> | undefined
+	globalThis.fetch = (async (_input, init) => {
+		requestBody = JSON.parse(String(init?.body)) as Record<string, unknown>
+		return new Response(JSON.stringify({ secret: " ck_live_secret ", id: "key-1" }), {
 			status: 201,
 			headers: { "content-type": "application/json" },
-		})) as typeof fetch
+		})
+	}) as typeof fetch
 	try {
-		assert.equal(
+		assert.deepEqual(
 			await new AgencyClient("https://cocode.agency").createDesktopKey("identity-token"),
-			"ck_live_secret",
+			{ secret: "ck_live_secret", id: "key-1", name: deviceKeyName() },
 		)
+		assert.equal(requestBody?.name, deviceKeyName())
 
 		globalThis.fetch = (async () =>
 			new Response(

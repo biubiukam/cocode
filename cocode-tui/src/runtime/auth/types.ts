@@ -2,13 +2,16 @@
  * Shared product constants for auth and cloud routing.
  */
 
+import { deviceKeyName } from './device-name.ts'
+
 export const DEFAULT_ORIGIN = 'https://cocode.agency'
 export const DEFAULT_PROVIDER = 'deepseek-official'
 export const DEFAULT_MODEL = 'deepseek-v4-flash'
 export const CLOUD_PROVIDER = 'cocode-cloud'
 export const CLOUD_KEY_REF = 'COCODE_CLOUD_API_KEY'
 export const DEEPSEEK_KEY_REF = 'DEEPSEEK_API_KEY'
-export const KEY_NAME = 'Cocode TUI'
+export { deviceKeyName } from './device-name.ts'
+export const KEY_NAME = deviceKeyName()
 
 export const DEVICE_SCOPES = [
   'profile:read',
