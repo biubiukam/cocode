@@ -567,6 +567,131 @@ describe('TuiApp', () => {
     expect(app.snapshot().status.queueCount).toBe(0)
   })
 
+  it('opens queue management and restores a queued prompt to the front', async () => {
+    const runtime = fakeRuntime()
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+    })
+    await app.start()
+    app.dispatch({ type: 'submit', text: 'first' })
+    runtime.emit({
+      method: 'session.status',
+      params: { sessionId: 's1', status: 'running' },
+    })
+    app.dispatch({ type: 'setDraft', text: 'second' })
+    app.dispatch({ type: 'queuePrompt' })
+    app.dispatch({ type: 'setDraft', text: 'third' })
+    app.dispatch({ type: 'queuePrompt' })
+
+    app.dispatch({ type: 'command', line: '/queue' })
+    expect(app.snapshot().queuePicker?.items.map((item) => item.text)).toEqual(['second', 'third'])
+    app.dispatch({ type: 'queue.move', delta: 1 })
+    app.dispatch({ type: 'queue.restore' })
+    expect(app.snapshot().queuePicker?.items.map((item) => item.text)).toEqual(['third', 'second'])
+    expect(app.snapshot().status.queueCount).toBe(2)
+
+    app.dispatch({ type: 'queue.delete' })
+    expect(app.snapshot().queuePicker?.items.map((item) => item.text)).toEqual(['second'])
+    expect(app.snapshot().status.queueCount).toBe(1)
+  })
+
+  it('shows a notice instead of opening an empty queue picker', async () => {
+    const app = createTuiApp({
+      runtime: fakeRuntime(),
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+      locale: 'en',
+    })
+    await app.start()
+
+    app.dispatch({ type: 'command', line: '/queue' })
+
+    expect(app.snapshot().queuePicker).toBeUndefined()
+    expect(app.snapshot().notice?.message).toBe('No queued prompts.')
+  })
+
+  it('restores a failed queued prompt and retries it from the picker', async () => {
+    const runtime = fakeRuntime()
+    const prompt = runtime.prompt.bind(runtime)
+    let failOnce = true
+    runtime.prompt = async (sessionId, blocks, mode) => {
+      const value = typeof blocks[0]?.text === 'string' ? blocks[0].text : ''
+      if (value === 'second' && failOnce) {
+        failOnce = false
+        runtime.prompts.push({ sessionId, text: value })
+        throw new Error('send failed')
+      }
+      return prompt(sessionId, blocks, mode)
+    }
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+    })
+    await app.start()
+    app.dispatch({ type: 'submit', text: 'first' })
+    runtime.emit({ method: 'session.status', params: { sessionId: 's1', status: 'running' } })
+    app.dispatch({ type: 'setDraft', text: 'second' })
+    app.dispatch({ type: 'queuePrompt' })
+
+    runtime.emit({ method: 'session.status', params: { sessionId: 's1', status: 'idle' } })
+    await vi.waitFor(() => expect(app.snapshot().status.queueCount).toBe(1))
+    expect(app.snapshot().agent).toBe('idle')
+
+    app.dispatch({ type: 'command', line: '/queue' })
+    app.dispatch({ type: 'queue.restore' })
+
+    await vi.waitFor(() => expect(app.snapshot().status.queueCount).toBe(0))
+    expect(runtime.prompts.map((item) => item.text)).toEqual(['first', 'second', 'second'])
+    expect(app.snapshot().agent).toBe('running')
+  })
+
+  it('does not restore a failed prompt after switching sessions', async () => {
+    const runtime = fakeRuntime()
+    const prompt = runtime.prompt.bind(runtime)
+    let rejectQueuedPrompt: ((error: Error) => void) | undefined
+    runtime.prompt = async (sessionId, blocks, mode) => {
+      const value = typeof blocks[0]?.text === 'string' ? blocks[0].text : ''
+      if (value === 'second') {
+        runtime.prompts.push({ sessionId, text: value })
+        return new Promise<string>((_resolve, reject) => {
+          rejectQueuedPrompt = reject
+        })
+      }
+      return prompt(sessionId, blocks, mode)
+    }
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+    })
+    await app.start()
+    app.dispatch({ type: 'submit', text: 'first' })
+    runtime.emit({ method: 'session.status', params: { sessionId: 's1', status: 'running' } })
+    app.dispatch({ type: 'setDraft', text: 'second' })
+    app.dispatch({ type: 'queuePrompt' })
+    runtime.emit({ method: 'session.status', params: { sessionId: 's1', status: 'idle' } })
+    await vi.waitFor(() => expect(rejectQueuedPrompt).toBeTypeOf('function'))
+
+    app.dispatch({ type: 'command', line: '/new' })
+    rejectQueuedPrompt?.(new Error('late failure'))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(app.snapshot().header.sessionId).not.toBe('s1')
+    expect(app.snapshot().status.queueCount).toBe(0)
+    expect(app.snapshot().agent).toBe('idle')
+  })
+
   it('ingests session.event into nodes', async () => {
     const runtime = fakeRuntime()
     const app = createTuiApp({

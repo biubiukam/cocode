@@ -1,6 +1,7 @@
 /** Local prompt queue used while the runtime is processing a turn. */
 
 export type QueuedPrompt = {
+  id: string
   text: string
   attachments: readonly { path: string; token: string }[]
 }
@@ -8,9 +9,11 @@ export type QueuedPrompt = {
 export type PromptQueue = {
   readonly size: number
   readonly limit: number
+  readonly items: readonly QueuedPrompt[]
   add(prompt: QueuedPrompt): boolean
   take(): QueuedPrompt | undefined
   restore(prompt: QueuedPrompt): void
+  replace(prompts: readonly QueuedPrompt[]): void
   clear(): void
 }
 
@@ -25,6 +28,9 @@ export function createPromptQueue(limit = 8): PromptQueue {
     get limit() {
       return normalizedLimit
     },
+    get items() {
+      return [...prompts]
+    },
     add(prompt) {
       if (prompts.length >= normalizedLimit) return false
       prompts.push(prompt)
@@ -35,6 +41,9 @@ export function createPromptQueue(limit = 8): PromptQueue {
     },
     restore(prompt) {
       prompts.unshift(prompt)
+    },
+    replace(next) {
+      prompts.splice(0, prompts.length, ...next.slice(0, normalizedLimit))
     },
     clear() {
       prompts.length = 0

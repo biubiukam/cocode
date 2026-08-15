@@ -35,6 +35,7 @@ describe('commands', () => {
       'logout',
       'fork',
       'clone',
+      'queue',
     ])
   })
 

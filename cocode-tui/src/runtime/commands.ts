@@ -203,6 +203,14 @@ export function createBuiltinCommands(): CommandRegistry {
       void ctx.showSessionTree?.()
     },
   })
+  registry.register({
+    name: 'queue',
+    summary: 'Inspect queued prompts',
+    summaryZh: '查看待发送输入队列',
+    kind: 'local',
+    available: () => true,
+    run: (ctx) => ctx.showQueuePicker?.(),
+  })
 
   return registry
 }

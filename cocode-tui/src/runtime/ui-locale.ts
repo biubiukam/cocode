@@ -79,6 +79,13 @@ type UiKey =
   | 'queueAdded'
   | 'queueFull'
   | 'queueSending'
+  | 'queueTitle'
+  | 'queueHint'
+  | 'queueQuery'
+  | 'queueEmpty'
+  | 'queueAttachments'
+  | 'queueDeleted'
+  | 'queueRestored'
   | 'turnComplete'
   | 'turnBusy'
   | 'cancelRequested'
@@ -225,6 +232,13 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     queueAdded: 'Queued prompt ({count}); it will send when the current turn finishes.',
     queueFull: 'Prompt queue is full (8).',
     queueSending: 'Sending queued prompt…',
+    queueTitle: 'Prompt queue',
+    queueHint: 'type to filter · ↑↓ select · enter prioritize/retry · ctrl+d remove · esc close',
+    queueQuery: 'filter: {query}',
+    queueEmpty: 'No queued prompts.',
+    queueAttachments: '{count} attachments',
+    queueDeleted: 'Queued prompt deleted.',
+    queueRestored: 'Queued prompt restored to the front of the queue.',
     turnComplete: 'Turn complete',
     turnBusy: 'Turn in progress. Press Tab to queue this prompt.',
     cancelRequested: 'Cancel requested; waiting for the runtime to become idle.',
@@ -370,6 +384,13 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     queueAdded: '已加入队列（{count} 条），当前任务结束后自动发送。',
     queueFull: '输入队列已满（最多 8 条）。',
     queueSending: '正在发送队列中的输入…',
+    queueTitle: '输入队列',
+    queueHint: '输入过滤 · ↑↓ 选择 · Enter 置顶/重试 · Ctrl+D 删除 · Esc 关闭',
+    queueQuery: '筛选：{query}',
+    queueEmpty: '当前没有排队中的输入。',
+    queueAttachments: '{count} 个附件',
+    queueDeleted: '已删除队列中的输入。',
+    queueRestored: '已将队列输入恢复到队首。',
     turnComplete: '本轮任务已完成',
     turnBusy: '当前任务仍在运行，按 Tab 可将输入加入队列。',
     cancelRequested: '已请求取消，等待运行时进入空闲状态。',

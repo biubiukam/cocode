@@ -34,11 +34,13 @@ import { visibleTail } from './visible-tail.ts'
 import { focusConversationNodes } from '../runtime/focus.ts'
 import { text } from '../runtime/ui-locale.ts'
 import { visibleResumeItems } from '../runtime/resume-picker.ts'
+import { visiblePromptQueueItems } from '../runtime/prompt-queue-picker.ts'
 import { editDraft } from '../runtime/external-editor.ts'
 import { calculateChatLayout } from './chat-layout.ts'
 import { Inspector, INSPECTOR_WIDTH } from './components/Inspector.tsx'
 import { ReviewPicker } from './components/ReviewPicker.tsx'
 import { ApprovalPanel } from './components/ApprovalPanel.tsx'
+import { QueuePicker } from './components/QueuePicker.tsx'
 import { dispatchKeyCommand, moveSelection } from './chat-input.ts'
 
 export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
@@ -67,6 +69,8 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
   )
   const resumeOpen = snap.resumePicker?.open === true
   const sessionTreeOpen = snap.sessionTreePicker?.open === true
+  const queueOpen = snap.queuePicker?.open === true
+  const queueItems = snap.queuePicker === undefined ? [] : visiblePromptQueueItems(snap.queuePicker)
   const resumeItems = snap.resumePicker === undefined ? [] : visibleResumeItems(snap.resumePicker)
   const rewindState = snap.rewindPicker
   const rewindOpen = rewindState?.open === true
@@ -83,6 +87,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
     !skillsOpen &&
     !resumeOpen &&
     !sessionTreeOpen &&
+    !queueOpen &&
     !historySearchOpen &&
     !snap.helpOpen &&
     !slashDismissed &&
@@ -99,6 +104,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
     !skillsOpen &&
     !resumeOpen &&
     !sessionTreeOpen &&
+    !queueOpen &&
     !historySearchOpen &&
     !snap.helpOpen &&
     !slashOpen &&
@@ -121,14 +127,18 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
     fileItems: fileOpen ? fileItems.length : undefined,
     fileLoading: fileOpen && fileLoading,
     historyMatches: historySearchOpen ? historyItems.length : undefined,
-    resumeItems: sessionTreeOpen
+    resumeItems: queueOpen
+      ? queueItems.length
+      : sessionTreeOpen
       ? snap.sessionTreePicker === undefined
         ? 0
         : snap.sessionTreePicker.items.length
       : resumeOpen
       ? resumeItems.length
       : undefined,
-    resumeSelected: sessionTreeOpen
+    resumeSelected: queueOpen
+      ? snap.queuePicker?.selected
+      : sessionTreeOpen
       ? snap.sessionTreePicker?.selected
       : resumeOpen
       ? snap.resumePicker?.selected
@@ -374,6 +384,40 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
           type: 'sessionTree.setQuery',
           query: snap.sessionTreePicker.query + input,
         })
+      }
+      return
+    }
+
+    if (snap.queuePicker?.open === true) {
+      if (key.escape) {
+        app.dispatch({ type: 'queue.close' })
+        return
+      }
+      if (key.upArrow || key.downArrow) {
+        app.dispatch({ type: 'queue.move', delta: key.upArrow ? -1 : 1 })
+        return
+      }
+      if (key.return || (key.ctrl && input === 'r')) {
+        app.dispatch({ type: 'queue.restore' })
+        return
+      }
+      if (key.ctrl && input === 'd') {
+        app.dispatch({ type: 'queue.delete' })
+        return
+      }
+      if (key.backspace || key.delete) {
+        app.dispatch({
+          type: 'queue.setQuery',
+          query: snap.queuePicker.query.slice(0, -1),
+        })
+        return
+      }
+      if (input !== '' && !key.ctrl && !key.meta) {
+        app.dispatch({
+          type: 'queue.setQuery',
+          query: snap.queuePicker.query + input,
+        })
+        return
       }
       return
     }
@@ -626,6 +670,9 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
           locale={snap.locale}
           maxRows={layout.overlayRows}
         />
+      ) : null}
+      {queueOpen && snap.queuePicker !== undefined ? (
+        <QueuePicker state={snap.queuePicker} locale={snap.locale} maxRows={layout.overlayRows} />
       ) : null}
       {rewindOpen ? (
         <RewindPicker state={rewindState} locale={snap.locale} maxRows={layout.overlayRows} />

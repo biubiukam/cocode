@@ -44,6 +44,7 @@ Inside `tmux` or `screen`, the TUI automatically uses inline rendering and suppr
 - `Ctrl+O` toggles verbose mode for full reasoning and tool I/O.
 - While a turn is running, the status line shows `thinking…` so a quiet interval before the next stream chunk is distinguishable from an idle runtime. It also shows the latest assistant input/output usage and current subagent activity when the wire reports it. When optional events are present, it also shows decode TPS, cache hit rate, context-window percentage, reasoning effort, current working activity, compact context segments (`S/P/A/T/X` for system, prompt, assistant, thinking, and tools), todo progress, goal phase, and the active agent preset. Segment values are estimates based on text length, not provider billing data.
 - While a turn is running, press `Tab` to queue the current draft. Up to eight queued prompts are sent in order after `session.status=idle`; this is local queuing, not steer or cancellation.
+- Use `/queue` while prompts are queued to inspect them. Type to filter, use `↑`/`↓` to select, `Enter` to move the selected prompt to the front, and `Ctrl+D` to remove it. When the runtime is idle after a send failure, `Enter` retries the selected prompt immediately. The picker closes with `Esc`; an empty queue produces a notice instead of an empty overlay. Queued text is not written to the session log until it is actually sent. If sending fails, the prompt is restored to the front. The local queue is cleared when the runtime restarts or the session changes.
 - `/review` opens a read-only Git review. Choose `working-tree`, `staged`, `last-commit`, or `branch`; inspect the bounded summary, then press Enter to send the structured review context to the current session.
 - `Esc` closes overlays (help, command menu) first; while a turn is running, the first press requests cancellation and the second exits. When idle, press twice to quit.
 - `Ctrl+L` redraws the screen without clearing the session.
@@ -79,6 +80,7 @@ Type `/` to open the command menu. Keep typing to filter by prefix. `Tab` or arr
 | `/copy`                        | Copy the latest assistant reply to the system clipboard                                           |
 | `/focus`                       | Show or hide the latest user turn in the transcript                                               |
 | `/review`                      | Review Git changes with a bounded, read-only diff preview                                         |
+| `/queue`                       | Inspect, reorder, or remove local queued prompts                                                  |
 | `/permissions` / `/plan`       | Cycle permission mode or toggle plan mode when the runtime advertises them                        |
 | `/fork` / `/clone`             | Create a child session from the current conversation                                              |
 | `/tree`                        | Show the session tree; uses RPC metadata first and JSONL fallback when available                  |

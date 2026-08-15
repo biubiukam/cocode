@@ -112,7 +112,8 @@ import {
   type TuiQuestionSnapshot,
 } from './question-coordinator.ts'
 import { refreshRuntimeCapabilities } from './capability-adapter.ts'
-import { createPromptQueue, type PromptQueue } from './prompt-queue.ts'
+import { PromptQueueCoordinator } from './prompt-queue-coordinator.ts'
+import type { PromptQueuePickerState } from './prompt-queue-picker.ts'
 import {
   closeSessionTreePicker,
   createSessionTreePicker,
@@ -164,6 +165,12 @@ export type TuiAction =
   | { type: 'permission.toggle' }
   | { type: 'plan.toggle' }
   | { type: 'queuePrompt' }
+  | { type: 'queue.open' }
+  | { type: 'queue.setQuery'; query: string }
+  | { type: 'queue.move'; delta: number }
+  | { type: 'queue.close' }
+  | { type: 'queue.delete' }
+  | { type: 'queue.restore' }
   | { type: 'copyNode'; nodeKey: string }
   | { type: 'review.move'; delta: number }
   | { type: 'review.close' }
@@ -207,6 +214,7 @@ export type TuiSnapshot = {
     permissionMode: string
     planMode: boolean
   }
+  queuePicker?: PromptQueuePickerState
   helpOpen: boolean
   verbose: boolean
   capabilities: TuiCapabilities
@@ -269,6 +277,7 @@ export type TuiCommandCtx = {
   forkSession?: () => void
   cloneSession?: () => void
   showSessionTree?: () => Promise<void>
+  showQueuePicker?: () => void
 }
 
 export type TuiApp = {
@@ -344,7 +353,7 @@ class TuiAppImpl implements TuiApp {
   private readonly terminalNotify: NonNullable<TuiAppOptions['terminalNotify']>
   private readonly activeSubagents = new Set<string>()
   private lastSubagent: TuiSubagentActivity['last']
-  private readonly queuedPrompts: PromptQueue = createPromptQueue()
+  private readonly promptQueue = new PromptQueueCoordinator()
   private capturingByok = false
   private emitScheduled = false
   private closePromise: Promise<void> | undefined
@@ -514,11 +523,12 @@ class TuiAppImpl implements TuiApp {
           running: this.activeSubagents.size,
           ...(this.lastSubagent === undefined ? {} : { last: this.lastSubagent }),
         },
-        queueCount: this.queuedPrompts.size,
+        queueCount: this.promptQueue.size,
         focusMode: this.focusMode,
         permissionMode: this.permissionMode,
         planMode: this.planMode,
       },
+      queuePicker: this.promptQueue.picker,
       helpOpen: this.helpOpen,
       verbose: this.verbose,
       capabilities: this.capabilities,
@@ -765,6 +775,27 @@ class TuiAppImpl implements TuiApp {
       case 'queuePrompt':
         this.queueCurrentPrompt()
         return
+      case 'queue.open':
+        this.openQueuePicker()
+        return
+      case 'queue.move':
+        this.promptQueue.move(action.delta)
+        this.emit()
+        return
+      case 'queue.setQuery':
+        this.promptQueue.setQuery(action.query)
+        this.emit()
+        return
+      case 'queue.close':
+        this.promptQueue.close()
+        this.emit()
+        return
+      case 'queue.delete':
+        this.deleteSelectedQueuedPrompt()
+        return
+      case 'queue.restore':
+        this.restoreSelectedQueuedPrompt()
+        return
       case 'copyNode':
         this.copyNode(action.nodeKey)
         return
@@ -840,7 +871,8 @@ class TuiAppImpl implements TuiApp {
         this.sessionState.reset()
         this.sessionTitleOverride = undefined
         this.resetSubagentActivity()
-        this.queuedPrompts.clear()
+        this.clearQueuedPrompts()
+        this.agent = 'idle'
         this.attachments = []
         this.notice = {
           tone: 'info',
@@ -992,6 +1024,7 @@ class TuiAppImpl implements TuiApp {
         void this.cloneSession()
       },
       showSessionTree: () => this.showSessionTree(),
+      showQueuePicker: () => this.openQueuePicker(),
     })
   }
 
@@ -1006,6 +1039,7 @@ class TuiAppImpl implements TuiApp {
       this.sessionId = result.sessionId
       this.sessionTitleOverride = undefined
       this.replaceSessionProjection(result.seed)
+      this.clearQueuedPrompts()
       this.notice = { tone: 'info', message: text(this.locale, 'forkCreated') }
     } catch (error) {
       this.notice = {
@@ -1104,7 +1138,7 @@ class TuiAppImpl implements TuiApp {
       }
       this.sessionTitleOverride = item.session.title
       this.resetSubagentActivity()
-      this.queuedPrompts.clear()
+      this.clearQueuedPrompts()
       this.attachments = []
       this.agent = 'idle'
       this.notice = {
@@ -1369,6 +1403,7 @@ class TuiAppImpl implements TuiApp {
 
   private async switchModel(model: string): Promise<void> {
     const previous = this.model
+    this.clearQueuedPrompts()
     this.agent = 'starting'
     this.notice = {
       tone: 'info',
@@ -1387,7 +1422,6 @@ class TuiAppImpl implements TuiApp {
       this.permissionMode = 'manual'
       this.planMode = false
       this.resetSubagentActivity()
-      this.queuedPrompts.clear()
       this.agent = 'idle'
       this.notice = {
         tone: 'info',
@@ -1442,7 +1476,7 @@ class TuiAppImpl implements TuiApp {
       this.sessionState = nextProjection.sessionState
       this.sessionTitleOverride = undefined
       this.resetSubagentActivity()
-      this.queuedPrompts.clear()
+      this.clearQueuedPrompts()
       this.attachments = []
       this.agent = 'idle'
       this.notice = {
@@ -1485,7 +1519,7 @@ class TuiAppImpl implements TuiApp {
       this.sessionId = result.sessionId
       this.replaceSessionProjection(result.seed)
       this.resetSubagentActivity()
-      this.queuedPrompts.clear()
+      this.clearQueuedPrompts()
       this.attachments = []
       this.draft = replaceDraft(this.draft, item.text)
       this.agent = 'idle'
@@ -1575,7 +1609,7 @@ class TuiAppImpl implements TuiApp {
   private queueCurrentPrompt(): void {
     const trimmed = this.draft.text.trim()
     if (trimmed === '' || this.agent !== 'running') return
-    if (!this.queuedPrompts.add({ text: trimmed, attachments: this.attachments.slice() })) {
+    if (!this.promptQueue.add(trimmed, this.attachments.slice())) {
       this.notice = { tone: 'info', message: text(this.locale, 'queueFull') }
       this.emit()
       return
@@ -1586,7 +1620,7 @@ class TuiAppImpl implements TuiApp {
     this.notice = {
       tone: 'info',
       message: text(this.locale, 'queueAdded', {
-        count: String(this.queuedPrompts.size),
+        count: String(this.promptQueue.size),
       }),
     }
     this.emit()
@@ -1594,17 +1628,56 @@ class TuiAppImpl implements TuiApp {
 
   private flushQueuedPrompt(): void {
     if (this.agent !== 'idle') return
-    const next = this.queuedPrompts.take()
-    if (next === undefined) return
+    const ticket = this.promptQueue.take()
+    if (ticket === undefined) return
+    const sessionId = this.sessionId
     this.agent = 'running'
     this.notice = { tone: 'info', message: text(this.locale, 'queueSending') }
     this.emit()
-    void this.promptWithAttachments(next.text, next.attachments).catch((error: unknown) => {
-      this.queuedPrompts.restore(next)
-      this.notice = { tone: 'error', message: errorMessage(error) }
-      this.agent = 'idle'
+    void this.promptWithAttachments(ticket.prompt.text, ticket.prompt.attachments).catch(
+      (error: unknown) => {
+        if (sessionId !== this.sessionId || !this.promptQueue.restore(ticket)) return
+        this.notice = { tone: 'error', message: errorMessage(error) }
+        this.agent = 'idle'
+        this.emit()
+      },
+    )
+  }
+
+  private clearQueuedPrompts(): void {
+    this.promptQueue.clear()
+  }
+
+  private resetPromptQueue(): void {
+    this.clearQueuedPrompts()
+  }
+
+  private openQueuePicker(): void {
+    if (!this.promptQueue.open()) {
+      this.notice = { tone: 'info', message: text(this.locale, 'queueEmpty') }
       this.emit()
-    })
+      return
+    }
+    this.helpOpen = false
+    this.notice = undefined
+    this.emit()
+  }
+
+  private deleteSelectedQueuedPrompt(): void {
+    if (!this.promptQueue.deleteSelected()) return
+    this.notice = { tone: 'info', message: text(this.locale, 'queueDeleted') }
+    this.emit()
+  }
+
+  private restoreSelectedQueuedPrompt(): void {
+    if (!this.promptQueue.prioritizeSelected()) return
+    if (this.agent === 'idle') {
+      this.promptQueue.dismissPicker()
+      this.flushQueuedPrompt()
+      return
+    }
+    this.notice = { tone: 'info', message: text(this.locale, 'queueRestored') }
+    this.emit()
   }
 
   private pruneAttachments(): void {
@@ -1645,7 +1718,7 @@ class TuiAppImpl implements TuiApp {
       setAgent: (agent) => {
         const previous = this.agent
         this.agent = agent
-        if (previous === 'running' && agent === 'idle' && this.queuedPrompts.size === 0) {
+        if (previous === 'running' && agent === 'idle' && this.promptQueue.size === 0) {
           notifyTerminal({
             ...this.terminalNotify,
             title: 'Cocode',
