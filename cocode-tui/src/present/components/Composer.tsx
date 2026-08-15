@@ -16,6 +16,10 @@ export function Composer(props: {
 }) {
   const { composer } = props
   const empty = composer.text === ''
+  const title = composer.mask
+    ? text(props.locale, 'secret')
+    : text(props.locale, props.planMode ? 'modePlan' : 'modeBuild')
+  const titleColor = !composer.mask && props.planMode ? theme.info : theme.brand
   const rows = empty
     ? []
     : visibleComposerRows(
@@ -30,14 +34,8 @@ export function Composer(props: {
       paddingX={1}
     >
       <Box width="100%" justifyContent="space-between">
-        <Text color={composer.disabled ? theme.mute : theme.brand} bold>
-          {composer.mask ? text(props.locale, 'secret') : text(props.locale, 'prompt')}
-          {!composer.mask ? (
-            <Text color={props.planMode ? theme.info : theme.brand}>
-              {' · '}
-              {text(props.locale, props.planMode ? 'modePlan' : 'modeBuild')}
-            </Text>
-          ) : null}
+        <Text color={composer.disabled ? theme.mute : titleColor} bold>
+          {title}
         </Text>
         <Text color={theme.mute}>
           {composer.disabled
