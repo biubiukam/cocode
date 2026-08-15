@@ -4,6 +4,7 @@
 
 const RESULT_PREVIEW_CHARS = 80
 const VERBOSE_RESULT_LINES = 40
+const STREAMING_REASONING_LINES = 24
 
 export function formatReasoning(
   text: string,
@@ -14,8 +15,16 @@ export function formatReasoning(
   // Keep the active reasoning visible so the user can tell the model is making
   // progress. Once the assistant message is sealed, the default view folds it
   // back to a compact summary; verbose mode still keeps it expanded.
-  if (verbose || streaming) return text
+  if (verbose) return text
+  if (streaming) return reasoningTail(text, STREAMING_REASONING_LINES)
   return `thinking · ${text.length} chars`
+}
+
+export function reasoningTail(value: string, maxLines = STREAMING_REASONING_LINES): string {
+  const lines = value.replace(/\r\n?/g, '\n').split('\n')
+  const limit = Math.max(1, Math.trunc(maxLines))
+  if (lines.length <= limit) return value
+  return `… ${lines.length - limit} earlier lines hidden\n${lines.slice(-limit).join('\n')}`
 }
 
 export function formatToolResult(text: string | undefined, verbose: boolean): string | undefined {

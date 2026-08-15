@@ -30,6 +30,7 @@ import { SkillsPicker } from './components/SkillsPicker.tsx'
 import { StatusLine } from './components/StatusLine.tsx'
 import {
   filterSlashItems,
+  isSlashDraft,
   moveSlashSelection,
   SlashMenu,
   type SlashMenuItem,
@@ -91,6 +92,7 @@ import {
   type TuiMouseEvent,
 } from './mouse.ts'
 import { nodeKey } from '../runtime/nodes/types.ts'
+import { filterSearchItems } from './search.ts'
 import { CHECKLIST_WINDOW_SIZE } from '../runtime/checklist.ts'
 import {
   actionMenuItemIndexAtRow,
@@ -114,18 +116,19 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
   const [historyIndex, setHistoryIndex] = useState(0)
   const [messageSelectionActive, setMessageSelectionActive] = useState(false)
   const [messageScrollOffset, setMessageScrollOffset] = useState(0)
+  const [followTranscript, setFollowTranscript] = useState(true)
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null)
   const [expandedMessageIds, setExpandedMessageIds] = useState<ReadonlySet<string>>(() => new Set())
   const [messageActionMenuOpen, setMessageActionMenuOpen] = useState(false)
   const [messageActionIndex, setMessageActionIndex] = useState(0)
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [commandPaletteIndex, setCommandPaletteIndex] = useState(0)
+  const [commandPaletteQuery, setCommandPaletteQuery] = useState('')
   const [editorBusy, setEditorBusy] = useState(false)
   const [editorError, setEditorError] = useState<string | undefined>()
   const [questionMousePointer, setQuestionMousePointer] = useState<TuiMousePointer>()
   const [approvalMousePointer, setApprovalMousePointer] = useState<TuiMousePointer>()
   const mouseClickId = useRef(0)
-  const [mouseMode, setMouseMode] = useState(false)
   const { stdout } = useStdout()
   const { isRawModeSupported, setRawMode } = useStdin()
   const slashItems = useMemo<readonly SlashMenuItem[]>(
@@ -167,7 +170,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     !modelOverlayOpen &&
     !snap.helpOpen &&
     !slashDismissed &&
-    slashItems.length > 0
+    isSlashDraft(snap.composer.text)
   const fileMention = useMemo(
     () => findFileMentionAtCursor(snap.composer.text, snap.composer.cursor),
     [snap.composer.cursor, snap.composer.text],
@@ -226,13 +229,22 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     }
     return items
   }, [expandedMessageIds, selectedNode, snap.capabilities.fork, snap.capabilities.rewind, snap.locale])
-  const commandPaletteItems = useMemo<readonly ActionMenuItem[]>(
+  const allCommandPaletteItems = useMemo<readonly ActionMenuItem[]>(
     () => snap.commands.map((command) => ({
       id: command.name,
       label: `/${command.name}`,
       description: command.summary,
     })),
     [snap.commands],
+  )
+  const commandPaletteItems = useMemo(
+    () =>
+      filterSearchItems(
+        allCommandPaletteItems,
+        commandPaletteQuery,
+        (item) => `${item.label} ${item.description ?? ''}`,
+      ),
+    [allCommandPaletteItems, commandPaletteQuery],
   )
   const actionMenuItems = commandPaletteOpen ? commandPaletteItems : messageActionItems
   const mainChecklistRows = checklistStripRows(
@@ -295,7 +307,8 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
         : questionPanelRows(snap.question),
     approvalRows: approvalOpen ? 12 : undefined,
     reviewRows: reviewOpen ? reviewRowsFor(snap.reviewPicker) : undefined,
-    actionMenuItems: actionMenuItems.length > 0 ? actionMenuItems.length : undefined,
+    actionMenuItems: commandPaletteOpen ? 0 : actionMenuItems.length > 0 ? actionMenuItems.length : undefined,
+    actionMenuQuery: commandPaletteOpen,
     modelSwitchRows: modelPickerOpen ? 14 : modelInputOpen ? 6 : undefined,
   })
   const messageMaxRows = layout.messageRows
@@ -324,8 +337,8 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
   const popupStartRow = popupBounds.startRow
   const mouseTrackingActive = shouldEnableMouseTracking({
     supported: props.mouseSupported !== false,
-    manualMode: mouseMode,
-    overlayOpen: layout.overlayRows > 0,
+    manualMode: false,
+    overlayOpen: false,
   })
   const selectableMessages = useMemo(
     () => selectableMessageKeys(displayNodes),
@@ -350,9 +363,14 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     [app],
   )
 
+  useEffect(() => {
+    if (followTranscript) setMessageScrollOffset(0)
+  }, [followTranscript, messageMaxRows, snap.nodes.length, expandedMessageIds.size])
+
   const openCommandPalette = (): void => {
     setCommandPaletteOpen(true)
     setCommandPaletteIndex(0)
+    setCommandPaletteQuery('')
     setMessageActionMenuOpen(false)
   }
 
@@ -409,6 +427,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
       setMessageScrollOffset((offset) =>
         Math.max(0, Math.min(messageScrollMax, offset + wheelDelta * wheelRows)),
       )
+      setFollowTranscript(wheelDelta < 0 && messageScrollOffset <= wheelRows)
       return
     }
     const insidePopup = popupContains(popupBounds, event.x, event.y)
@@ -455,6 +474,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
         itemCount: commandPaletteItems.length,
         selectedIndex: commandPaletteIndex,
         maxRows: layout.overlayRows,
+        query: true,
       })
       if (index !== undefined) {
         if (isPress) {
@@ -486,7 +506,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     if (slashOpen) {
       const index = listItemIndexAtRow({
         row: hitRow,
-        itemStartRow: popupStartRow + 3,
+        itemStartRow: popupStartRow + 4,
         itemCount: slashItems.length,
         selectedIndex: slashIndex,
         windowSize: overlayWindowSize(layout.overlayRows, slashItems.length, 4),
@@ -832,10 +852,6 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
       dispatchHelpInput(app, input, key)
       return
     }
-    if (key.meta && input.toLowerCase() === 'm') {
-      if (props.mouseSupported !== false) setMouseMode((enabled) => !enabled)
-      return
-    }
     if (approvalOpen) return
     if (questionOpen) return
     if (reviewOpen) {
@@ -845,6 +861,11 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     if (commandPaletteOpen) {
       if (key.escape) {
         setCommandPaletteOpen(false)
+        return
+      }
+      if (key.backspace || key.delete) {
+        setCommandPaletteQuery((query) => query.slice(0, -1))
+        setCommandPaletteIndex(0)
         return
       }
       if (key.upArrow || key.downArrow) {
@@ -857,10 +878,20 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
         setCommandPaletteOpen(false)
         return
       }
+      if (input !== '' && !key.ctrl && !key.meta && !key.shift) {
+        setCommandPaletteQuery((query) => `${query}${input}`)
+        setCommandPaletteIndex(0)
+      }
       return
     }
     const scrollUp = key.pageUp || (key.ctrl && key.upArrow)
     const scrollDown = key.pageDown || (key.ctrl && key.downArrow)
+    const endKey = input === '\u001b[F' || input === '\u001b[4~'
+    if (key.ctrl && endKey && !layout.tooSmall && !snap.composer.disabled) {
+      setMessageScrollOffset(0)
+      setFollowTranscript(true)
+      return
+    }
     if (
       (scrollUp || scrollDown) &&
       !layout.tooSmall &&
@@ -883,6 +914,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
       setMessageScrollOffset((offset) =>
         Math.max(0, Math.min(messageScrollMax, offset + delta)),
       )
+      setFollowTranscript(scrollDown && messageScrollOffset <= Math.abs(delta))
       return
     }
     if (rewindOpen) {
@@ -1206,7 +1238,8 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
         backspace: key.backspace,
         delete: key.delete,
         ctrl: key.ctrl,
-        alt: key.meta,
+        // Ink marks plain Escape as meta, but the keymap must treat it as Esc.
+        alt: key.meta && !key.escape,
         shift: key.shift,
         empty: snap.composer.text === '',
       },
@@ -1304,6 +1337,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
         <SlashMenu
           items={slashItems}
           selectedIndex={slashIndex}
+          query={snap.composer.text.slice(1)}
           locale={snap.locale}
           maxRows={layout.overlayRows}
         />
@@ -1427,6 +1461,8 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
           items={commandPaletteItems}
           selectedIndex={commandPaletteIndex}
           maxRows={layout.overlayRows}
+          query={commandPaletteQuery}
+          queryPlaceholder={text(snap.locale, 'commandsFilter')}
           emptyLabel={snap.locale === 'zh' ? '没有可用命令' : 'No commands'}
         />
       ) : null}
@@ -1456,6 +1492,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
           header={snap.header}
           locale={snap.locale}
           columns={mainColumns}
+          status={snap.status}
         />
         <MessageList
           nodes={displayNodes}
@@ -1477,6 +1514,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
           agent={snap.agent}
           notice={snap.notice}
           locale={snap.locale}
+          maxColumns={mainColumns}
         />
         {editorBusy ? (
           <Text color={theme.info} wrap="truncate-end">
@@ -1521,9 +1559,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
                       <>
                         {' · '}
                         {text(snap.locale, 'footerScroll')} · {text(snap.locale, 'footerMessages')} ·{' '}
-                    {mouseMode
-                      ? text(snap.locale, 'footerMenu')
-                      : snap.locale === 'zh' ? 'Ctrl+P 菜单' : 'ctrl+p menu'}{' '}
+                        {text(snap.locale, 'footerMenu')}{' '}
                         · {text(snap.locale, 'footerDetails')}
                       </>
                     )}
@@ -1533,27 +1569,21 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
                 )}
               </Text>
               <Text
-                color={snap.agent === 'running' ? theme.info : mouseMode ? theme.brand : theme.mute}
+                color={snap.agent === 'running' ? theme.info : theme.mute}
                 wrap="truncate-end"
               >
                 {snap.agent === 'running' && snap.composer.text.trim() !== ''
                   ? text(snap.locale, 'footerQueueDraft')
                   : text(snap.locale, 'footerQuit')}{' '}
                 · {text(snap.locale, 'footerRedraw')}
-                {snap.agent === 'running' ? null : (
-                  <>
-                    {' · '}
-                    {snap.locale === 'zh'
-                      ? '鼠标拖动选择文本 · Alt+M 菜单模式'
-                      : 'drag to select text · alt+m menu mode'}
-                  </>
-                )}
               </Text>
             </>
           )}
         </Box>
       </Box>
-      {wideInspector ? <Inspector snapshot={snap} locale={snap.locale} /> : null}
+      {wideInspector ? (
+        <Inspector snapshot={snap} locale={snap.locale} maxRows={stdout.rows} />
+      ) : null}
     </Box>
   )
 }
@@ -1591,7 +1621,7 @@ function questionPanelRows(state: NonNullable<TuiSnapshot['question']>): number 
     (rows, option) => rows + 1 + Number(option.description !== undefined),
     0,
   )
-  return 7 + Number(state.question.detail !== undefined) + optionRows
+  return 10 + Number(state.question.detail !== undefined) + optionRows
 }
 
 function overlayWindowSize(maxRows: number, itemCount: number, chromeRows: number): number {

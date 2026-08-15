@@ -35,6 +35,45 @@ describe('question coordinator', () => {
     expect(emit).toHaveBeenCalled()
   })
 
+  it('navigates back to replace an earlier answer and keeps answer order', async () => {
+    const coordinator = createQuestionCoordinator({ emit: () => undefined })
+    const result = coordinator.ask(request('s1', 'first', 'second'))
+
+    coordinator.answer(['original'])
+    expect(coordinator.snapshot()).toMatchObject({ position: 2 })
+    coordinator.navigate('previous')
+    expect(coordinator.snapshot()).toMatchObject({
+      position: 1,
+      answer: { id: 'first', selected: ['original'] },
+    })
+    coordinator.answer(['updated'])
+    coordinator.answer(['second-answer'])
+
+    await expect(result).resolves.toEqual({
+      answers: [
+        { id: 'first', selected: ['updated'] },
+        { id: 'second', selected: ['second-answer'] },
+      ],
+    })
+  })
+
+  it('saves a changed custom draft while moving between questions', async () => {
+    const coordinator = createQuestionCoordinator({ emit: () => undefined })
+    const result = coordinator.ask(request('s1', 'first', 'second'))
+
+    coordinator.answer([], 'original')
+    coordinator.navigate('previous')
+    coordinator.navigate('next', [], 'updated', true)
+    coordinator.answer(['second-answer'])
+
+    await expect(result).resolves.toEqual({
+      answers: [
+        { id: 'first', selected: [], custom: 'updated' },
+        { id: 'second', selected: ['second-answer'] },
+      ],
+    })
+  })
+
   it('rejects the active question on cancel and continues with queued work', async () => {
     const coordinator = createQuestionCoordinator({ emit: () => undefined })
     const first = coordinator.ask(request('s1', 'first'))

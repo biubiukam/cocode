@@ -20,6 +20,8 @@ type UiKey =
   | 'filesSearching'
   | 'commands'
   | 'commandsHint'
+  | 'commandsFilter'
+  | 'commandsEmpty'
   | 'help'
   | 'helpHint'
   | 'messageMode'
@@ -82,6 +84,8 @@ type UiKey =
   | 'questionCustom'
   | 'questionMultiHint'
   | 'questionSelectHint'
+  | 'questionStreaming'
+  | 'questionReady'
   | 'rewindTitle'
   | 'rewindHint'
   | 'rewindArm'
@@ -136,6 +140,24 @@ type UiKey =
   | 'inspectorEmpty'
   | 'inspectorGoal'
   | 'inspectorTodos'
+  | 'inspectorRuntime'
+  | 'inspectorSkills'
+  | 'inspectorCapabilities'
+  | 'inspectorRuntimeName'
+  | 'inspectorMcp'
+  | 'inspectorCapabilitySource'
+  | 'inspectorAvailable'
+  | 'inspectorUnavailable'
+  | 'inspectorNotReported'
+  | 'inspectorLoadedSkill'
+  | 'inspectorNone'
+  | 'inspectorEnabled'
+  | 'inspectorDisabled'
+  | 'questionPrevious'
+  | 'questionNext'
+  | 'questionSubmit'
+  | 'questionNewline'
+  | 'questionExit'
   | 'copySuccess'
   | 'copyEmpty'
   | 'copyUnavailable'
@@ -219,7 +241,9 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     filesHint: 'tab / ↑↓ select',
     filesSearching: ' searching workspace…',
     commands: 'commands',
-    commandsHint: 'tab / ↑↓ select',
+    commandsHint: '↑↓ select · enter use · esc close',
+    commandsFilter: 'type to filter',
+    commandsEmpty: 'No matching commands',
     help: 'help',
     helpHint: 'esc close',
     messageMode: 'message mode',
@@ -228,9 +252,9 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     modePlan: 'Plan',
     modeSwitchHint: 'tab switch mode',
     footerHistory: '↑↓ history',
-    footerScroll: 'wheel / pgup / pgdn scroll',
+    footerScroll: 'pgup / pgdn scroll',
     footerMessages: 'shift+↑ messages',
-    footerMenu: 'click model/header/message · ctrl+p menu',
+    footerMenu: 'ctrl+p menu',
     footerDetails: 'ctrl+o details',
     footerHelp: '? help',
     footerQuit: 'esc interrupt / quit',
@@ -278,10 +302,12 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     skillsUnavailable: 'Skills are unavailable in this runtime.',
     skillReady: 'Skill /{name} is ready in the composer.',
     questionTitle: 'Question',
-    questionHint: '↑↓ move · enter answer · esc cancel',
+    questionHint: '↑↓ move · ←→ switch · enter answer · esc cancel',
     questionCustom: 'Type another answer',
     questionMultiHint: 'space toggles options · tab opens custom answer',
     questionSelectHint: 'enter selects · tab opens custom answer',
+    questionStreaming: 'question is streaming…',
+    questionReady: 'question ready for interaction',
     rewindTitle: 'Rewind conversation',
     rewindHint: '↑↓ select · enter review · esc close',
     rewindArm: 'Press Esc again to choose a rewind point.',
@@ -336,6 +362,24 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     inspectorEmpty: 'no active details',
     inspectorGoal: 'goal',
     inspectorTodos: 'todos',
+    inspectorRuntime: 'runtime / MCP',
+    inspectorSkills: 'skills',
+    inspectorCapabilities: 'capabilities',
+    inspectorRuntimeName: 'runtime',
+    inspectorMcp: 'MCP / companion',
+    inspectorCapabilitySource: 'capability source',
+    inspectorAvailable: 'available',
+    inspectorUnavailable: 'unavailable',
+    inspectorNotReported: 'not reported',
+    inspectorLoadedSkill: 'loaded skill',
+    inspectorNone: 'none',
+    inspectorEnabled: 'on',
+    inspectorDisabled: 'off',
+    questionPrevious: '← previous',
+    questionNext: '→ next',
+    questionSubmit: 'enter submit',
+    questionNewline: 'shift+enter newline',
+    questionExit: 'esc exit',
     copySuccess: 'Copied to clipboard.',
     copyEmpty: 'There is no message text to copy.',
     copyUnavailable: 'Clipboard unavailable on this terminal.',
@@ -418,7 +462,9 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     filesHint: 'Tab / ↑↓ 选择',
     filesSearching: ' 正在搜索工作区…',
     commands: '命令',
-    commandsHint: 'Tab / ↑↓ 选择',
+    commandsHint: '↑↓ 选择 · 回车使用 · Esc 关闭',
+    commandsFilter: '输入关键词筛选',
+    commandsEmpty: '没有匹配的命令',
     help: '帮助',
     helpHint: 'Esc 关闭',
     messageMode: '消息模式',
@@ -427,9 +473,9 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     modePlan: 'Plan',
     modeSwitchHint: 'Tab 切换模式',
     footerHistory: '↑↓ 历史',
-    footerScroll: '滚轮 / PageUp / PageDown 滚动',
+    footerScroll: 'PageUp / PageDown 滚动',
     footerMessages: 'Shift+↑ 消息',
-    footerMenu: '点击模型、顶部或消息 · Ctrl+P 菜单',
+    footerMenu: 'Ctrl+P 菜单',
     footerDetails: 'Ctrl+O 详情',
     footerHelp: '? 帮助',
     footerQuit: 'Esc 中断 / 退出',
@@ -477,10 +523,12 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     skillsUnavailable: '当前运行时未配置 Skills。',
     skillReady: '技能 /{name} 已写入输入区。',
     questionTitle: '需要确认',
-    questionHint: '↑↓ 移动 · 回车回答 · Esc 取消',
+    questionHint: '↑↓ 移动 · ←→ 切换问题 · 回车回答 · Esc 取消',
     questionCustom: '输入其他答案',
     questionMultiHint: '空格勾选 · Tab 切换到其他答案',
     questionSelectHint: '回车选择 · Tab 切换到其他答案',
+    questionStreaming: '问题生成中…',
+    questionReady: '问题已生成，等待交互',
     rewindTitle: '回滚会话',
     rewindHint: '↑↓ 选择 · 回车预览 · Esc 关闭',
     rewindArm: '再次按 Esc 选择回滚位置。',
@@ -535,6 +583,24 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     inspectorEmpty: '暂无活动详情',
     inspectorGoal: '目标',
     inspectorTodos: '待办',
+    inspectorRuntime: '运行时 / MCP',
+    inspectorSkills: 'Skills',
+    inspectorCapabilities: '能力',
+    inspectorRuntimeName: '运行时',
+    inspectorMcp: 'MCP / companion',
+    inspectorCapabilitySource: '能力来源',
+    inspectorAvailable: '可用',
+    inspectorUnavailable: '不可用',
+    inspectorNotReported: '未提供',
+    inspectorLoadedSkill: '当前 Skill',
+    inspectorNone: '无',
+    inspectorEnabled: '开启',
+    inspectorDisabled: '关闭',
+    questionPrevious: '← 上一题',
+    questionNext: '→ 下一题',
+    questionSubmit: '回车提交',
+    questionNewline: 'Shift+Enter 换行',
+    questionExit: 'Esc 退出',
     copySuccess: '已复制到剪贴板。',
     copyEmpty: '没有可复制的消息文本。',
     copyUnavailable: '当前终端无法使用剪贴板。',

@@ -3,6 +3,7 @@ import type { TuiSnapshot } from '../../runtime/app.ts'
 import { AgentStatusIndicator } from './AgentStatusIndicator.tsx'
 import { theme } from '../theme.ts'
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
+import { formatNoticeLine } from '../status-format.ts'
 
 const NOTICE_MAX_LINES = 12
 
@@ -23,6 +24,7 @@ export function StatusLine(props: {
   agent: TuiSnapshot['agent']
   notice?: TuiSnapshot['notice']
   locale: UiLocale
+  maxColumns?: number
 }) {
   const notice = props.notice
   const telemetry = props.status.telemetry
@@ -109,7 +111,7 @@ export function StatusLine(props: {
           {telemetryBits.join(' · ')}
         </Text>
       ) : null}
-      {notice ? <Notice notice={notice} /> : null}
+      {notice ? <Notice notice={notice} maxColumns={props.maxColumns} /> : null}
     </Box>
   )
 }
@@ -118,16 +120,15 @@ function formatMetric(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1)
 }
 
-function Notice(props: { notice: NonNullable<TuiSnapshot['notice']> }) {
+function Notice(props: {
+  notice: NonNullable<TuiSnapshot['notice']>
+  maxColumns?: number
+}) {
   const color = props.notice.tone === 'error' ? theme.error : theme.info
+  const compact = formatNoticeLine(props.notice, props.maxColumns ?? 80)
   return (
-    <Box flexDirection="column">
-      {noticeLines(props.notice.message).map((line, index) => (
-        <Text key={`${index}:${line}`} color={color} wrap="truncate-end">
-          {index === 0 ? '! ' : '  '}
-          {line}
-        </Text>
-      ))}
-    </Box>
+    <Text color={color} wrap="truncate-end">
+      {compact}
+    </Text>
   )
 }

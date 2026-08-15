@@ -1,7 +1,12 @@
-import { Box, Text } from 'ink'
+import { Text } from 'ink'
 import { listWindowStart } from '../list-window.ts'
 import { theme } from '../theme.ts'
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
+import { PanelFrame } from './PanelFrame.tsx'
+import { panelCapacity } from '../panel-layout.ts'
+import { filterSearchItems } from '../search.ts'
+import { SearchQueryLine } from './SearchQueryLine.tsx'
+import { SelectionRow } from './SelectionRow.tsx'
 
 export type SlashMenuItem = {
   name: string
@@ -12,9 +17,12 @@ export function filterSlashItems<T extends SlashMenuItem>(
   items: readonly T[],
   draft: string,
 ): readonly T[] {
-  if (!/^\/\S*$/.test(draft)) return []
-  const prefix = draft.slice(1).toLowerCase()
-  return items.filter((item) => item.name.toLowerCase().startsWith(prefix))
+  if (!isSlashDraft(draft)) return []
+  return filterSearchItems(items, draft.slice(1), (item) => `${item.name} ${item.summary}`)
+}
+
+export function isSlashDraft(draft: string): boolean {
+  return /^\/\S*$/.test(draft)
 }
 
 export function moveSlashSelection(
@@ -38,44 +46,36 @@ export function SlashMenu(props: {
   items: readonly SlashMenuItem[]
   selectedIndex: number
   locale: UiLocale
+  query?: string
   maxRows?: number
 }) {
-  if (props.items.length === 0) return null
   const selected = moveSlashSelection(props.selectedIndex, 0, props.items.length)
   const capacity = panelCapacity(props.maxRows, 4, props.items.length)
   const start = listWindowStart(selected, props.items.length, Math.max(1, capacity))
   const visible = capacity === 0 ? [] : props.items.slice(start, start + capacity)
   return (
-    <Box
-      flexDirection="column"
-      marginTop={1}
-      borderStyle="round"
-      borderColor={theme.border}
-      paddingX={1}
+    <PanelFrame
+      title={text(props.locale, 'commands')}
+      hint={text(props.locale, 'commandsHint')}
     >
-      <Text color={theme.dim} bold>
-        {text(props.locale, 'commands')}{' '}
-        <Text color={theme.mute}>· {text(props.locale, 'commandsHint')}</Text>
-      </Text>
+      <SearchQueryLine
+        query={props.query ?? ''}
+        placeholder={text(props.locale, 'commandsFilter')}
+      />
+      {props.items.length === 0 ? (
+        <Text color={theme.mute}>{text(props.locale, 'commandsEmpty')}</Text>
+      ) : null}
       {visible.map((item, offset) => {
         const active = start + offset === selected
         return (
-          <Text
+          <SelectionRow
             key={item.name}
-            color={active ? theme.text : theme.mute}
-            inverse={active}
-            wrap="truncate-end"
-          >
-            {active ? '›' : ' '} /{item.name}{' '}
-            <Text color={active ? theme.text : theme.dim}>· {item.summary}</Text>
-          </Text>
+            active={active}
+            label={`/${item.name}`}
+            description={item.summary}
+          />
         )
       })}
-    </Box>
+    </PanelFrame>
   )
-}
-
-function panelCapacity(maxRows: number | undefined, chromeRows: number, count: number): number {
-  if (maxRows === undefined) return count
-  return Math.max(0, Math.min(count, Math.trunc(maxRows) - chromeRows))
 }

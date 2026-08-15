@@ -8,6 +8,7 @@ import type {
   TuiSessionOpenResult,
   TuiNotification,
   TuiCapabilitySnapshot,
+  TuiRuntimeCapabilityName,
   TuiApprovalAnswer,
   TuiApprovalRequest,
   TuiRuntime,
@@ -179,6 +180,13 @@ export type TuiAction =
   | { type: 'model.input.close' }
   | { type: 'model.input.submit'; model: string }
   | { type: 'question.answer'; selected: string[]; custom?: string }
+  | {
+      type: 'question.navigate'
+      direction: 'previous' | 'next'
+      selected: string[]
+      custom?: string
+      dirty: boolean
+    }
   | { type: 'question.cancel' }
   | { type: 'approval.answer'; outcome: TuiApprovalAnswer['outcome'] }
   | { type: 'approval.cancel' }
@@ -200,6 +208,8 @@ export type TuiAction =
   | { type: 'review.confirm' }
 
 export type { TuiCapabilities }
+
+type TuiDisplayedCapabilityName = Exclude<TuiRuntimeCapabilityName, 'onRequest'>
 
 export type TuiSnapshot = {
   header: {
@@ -242,6 +252,15 @@ export type TuiSnapshot = {
   helpOpen: boolean
   verbose: boolean
   capabilities: TuiCapabilities
+  runtimeInfo: {
+    name: string
+    capabilitySource: TuiCapabilitySnapshot['source'] | 'unknown'
+    mcp: {
+      status: 'connected' | 'unavailable' | 'unknown'
+      name?: string
+    }
+    capabilities: readonly { name: TuiDisplayedCapabilityName; enabled: boolean }[]
+  }
   notice?: { tone: 'info' | 'error'; message: string }
   helpText: string
   commands: readonly { name: string; summary: string }[]
@@ -571,6 +590,20 @@ class TuiAppImpl implements TuiApp {
       helpOpen: this.helpOpen,
       verbose: this.verbose,
       capabilities: this.capabilities,
+      runtimeInfo: {
+        name: this.runtimeName,
+        capabilitySource: this.runtimeCapabilitySnapshot?.source ?? 'unknown',
+        mcp: {
+          // MCP servers are not part of the current TUI wire snapshot. Keep
+          // this explicitly unknown instead of treating the runtime name as
+          // proof that an MCP server is mounted.
+          status: 'unknown',
+        },
+        capabilities: runtimeCapabilityEntries(
+          this.runtimeCapabilitySnapshot,
+          this.capabilities,
+        ),
+      },
       notice: this.notice,
       helpText: helpText(this.capabilities, this.commands, this.locale),
       commands: this.commands.list(this.capabilities).map((command) => ({
@@ -860,6 +893,9 @@ class TuiAppImpl implements TuiApp {
         return
       case 'question.answer':
         this.questions.answer(action.selected, action.custom)
+        return
+      case 'question.navigate':
+        this.questions.navigate(action.direction, action.selected, action.custom, action.dirty)
         return
       case 'question.cancel':
         this.questions.cancel()
@@ -2066,6 +2102,37 @@ class TuiAppImpl implements TuiApp {
       this.emit()
     })
   }
+}
+
+function runtimeCapabilityEntries(
+  snapshot: TuiCapabilitySnapshot | undefined,
+  effective: TuiCapabilities,
+): readonly { name: TuiDisplayedCapabilityName; enabled: boolean }[] {
+  const names: TuiDisplayedCapabilityName[] = [
+    'cancel',
+    'open',
+    'fork',
+    'rewind',
+    'skills',
+    'approval',
+    'permissionMode',
+    'planMode',
+    'sessionList',
+    'modelList',
+    'promptMode',
+    'queueMode',
+  ]
+  return names.map((name) => ({
+    name,
+    enabled:
+      name === 'skills'
+        ? effective.skills
+        : snapshot === undefined
+        ? name === 'sessionList'
+          ? effective.sessionList !== 'none'
+          : effective[name as keyof Omit<TuiCapabilities, 'sessionList'>] === true
+        : snapshot.capabilities[name],
+  }))
 }
 
 function makeSessionTreeItems(

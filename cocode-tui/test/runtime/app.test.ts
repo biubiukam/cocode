@@ -153,6 +153,11 @@ describe('TuiApp', () => {
       locale: 'zh',
     })
     await app.start()
+    expect(app.snapshot().runtimeInfo).toMatchObject({
+      name: 'fake-runtime',
+      capabilitySource: 'unknown',
+      mcp: { status: 'unknown' },
+    })
     runtime.emit({
       method: 'session.event',
       params: {
@@ -197,7 +202,7 @@ describe('TuiApp', () => {
         open: false,
         fork: false,
         rewind: false,
-        skills: false,
+        skills: true,
         onRequest: false,
         approval: false,
         permissionMode: false,
@@ -212,6 +217,7 @@ describe('TuiApp', () => {
       },
     }
     runtime.getCapabilities = () => liveCapabilities
+    runtime.listSkills = async () => []
     const app = createTuiApp({
       runtime,
       cwd: '/tmp',
@@ -226,6 +232,12 @@ describe('TuiApp', () => {
       rewind: false,
       skills: false,
     })
+    expect(app.snapshot().runtimeInfo.capabilities.map((capability) => capability.name)).not.toContain(
+      'onRequest',
+    )
+    expect(
+      app.snapshot().runtimeInfo.capabilities.find((capability) => capability.name === 'skills'),
+    ).toEqual({ name: 'skills', enabled: false })
     app.dispatch({ type: 'command', line: '/doctor' })
     expect(app.snapshot().notice?.message).toContain('caps-configured cancel=true')
     expect(app.snapshot().notice?.message).toContain('caps-runtime cancel=false')
@@ -278,6 +290,28 @@ describe('TuiApp', () => {
       ],
     })
     expect(app.snapshot().question).toBeUndefined()
+  })
+
+  it('keeps dispatch bound when a question panel invokes it as a callback', async () => {
+    const runtime = fakeRuntime()
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+    })
+    await app.start()
+    const answer = runtime.askQuestion({
+      sessionId: 's1',
+      questions: [{ id: 'choice', question: 'Choose?', options: [{ label: 'A' }] }],
+    })
+    const dispatch = app.dispatch
+
+    expect(() => dispatch({ type: 'question.answer', selected: ['A'] })).not.toThrow()
+    await expect(answer).resolves.toEqual({
+      answers: [{ id: 'choice', selected: ['A'] }],
+    })
   })
 
   it('queues question batches FIFO and rejects the active one on cancel', async () => {
