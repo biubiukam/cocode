@@ -55,15 +55,7 @@ async function main(): Promise<void> {
     stdoutColumns: process.stdout.columns,
     stdoutRows: process.stdout.rows,
   })
-  const releaseMouse = terminal.supportsMouse ? enableMouseTracking(process.stdout) : () => undefined
-  let mouseReleased = false
-  const leaveMouse = (): void => {
-    if (mouseReleased) return
-    mouseReleased = true
-    releaseMouse()
-  }
   process.once('exit', () => leaveScreen())
-  process.once('exit', () => leaveMouse())
 
   const auth = await createAuthStore()
   if (auth.snapshot().phase !== 'ready') {
@@ -74,6 +66,17 @@ async function main(): Promise<void> {
       return
     }
   }
+
+  // Keep mouse tracking disabled while AuthGate owns stdin. SGR mouse reports
+  // are otherwise interpreted as pasted key input by Ink's useInput handler.
+  const releaseMouse = terminal.supportsMouse ? enableMouseTracking(process.stdout) : () => undefined
+  let mouseReleased = false
+  const leaveMouse = (): void => {
+    if (mouseReleased) return
+    mouseReleased = true
+    releaseMouse()
+  }
+  process.once('exit', () => leaveMouse())
 
   const resolved = auth.resolved()
   await registerLiveInstance(resolved.home)

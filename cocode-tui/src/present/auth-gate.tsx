@@ -8,6 +8,7 @@ import type { AuthAction, AuthSnapshot } from '../runtime/auth/types.ts'
 import { cycleGateOption, GATE_OPTIONS } from './auth-options.ts'
 import { theme } from './theme.ts'
 import { WhaleLogo } from './components/WhaleLogo.tsx'
+import { isMouseInput } from './mouse.ts'
 
 export function AuthGate(props: {
   snapshot: AuthSnapshot
@@ -22,6 +23,7 @@ export function AuthGate(props: {
   const logoSize = stdout.columns < 56 ? 'small' : stdout.columns < 72 ? 'medium' : 'large'
 
   useInput((input, key) => {
+    if (isMouseInput(input)) return
     if (key.escape || (key.ctrl && input === 'c')) {
       if (snapshot.phase === 'gate') {
         onQuit()

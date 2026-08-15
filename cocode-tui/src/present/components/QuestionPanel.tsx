@@ -3,6 +3,7 @@ import { useState } from 'react'
 import type { TuiQuestionSnapshot, TuiAction } from '../../runtime/app.ts'
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
 import { theme } from '../theme.ts'
+import { isMouseInput } from '../mouse.ts'
 
 export function QuestionPanel(props: {
   state: TuiQuestionSnapshot
@@ -18,6 +19,7 @@ export function QuestionPanel(props: {
   const multiSelect = props.state.question.multiSelect === true
 
   useInput((input, key) => {
+    if (isMouseInput(input)) return
     if (key.escape || (key.ctrl && input === 'c')) {
       props.dispatch({ type: 'question.cancel' })
       return

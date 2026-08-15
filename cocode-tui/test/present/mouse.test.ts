@@ -46,6 +46,7 @@ describe('terminal mouse support', () => {
   it('recognizes Ink input after it strips the leading escape byte', () => {
     expect(isMouseInput('[<64;23;18M[<65;23;18M')).toBe(true)
     expect(isMouseInput('\u001b[<64;23;18M')).toBe(true)
+    expect(isMouseInput('[<64;23;')).toBe(true)
     expect(isMouseInput('hello')).toBe(false)
   })
 })

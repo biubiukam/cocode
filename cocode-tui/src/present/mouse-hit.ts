@@ -49,3 +49,18 @@ export function actionMenuItemIndexAtRow(props: {
   const resolved = start + index
   return index >= 0 && index < capacity && resolved < props.itemCount ? resolved : undefined
 }
+
+export function listItemIndexAtRow(props: {
+  row: number
+  itemStartRow: number
+  itemCount: number
+  selectedIndex: number
+  windowSize: number
+}): number | undefined {
+  if (props.itemCount === 0 || props.windowSize <= 0) return undefined
+  const start = listWindowStart(props.selectedIndex, props.itemCount, props.windowSize)
+  const offset = props.row - props.itemStartRow
+  const visibleCount = Math.min(props.windowSize, props.itemCount - start)
+  if (offset < 0 || offset >= visibleCount) return undefined
+  return start + offset
+}

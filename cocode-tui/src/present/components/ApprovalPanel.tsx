@@ -3,6 +3,7 @@ import type { TuiAction, TuiApprovalSnapshot } from '../../runtime/app.ts'
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
 import { theme } from '../theme.ts'
 import { sanitizeSingleLine } from '../text-format.ts'
+import { isMouseInput } from '../mouse.ts'
 
 export function ApprovalPanel(props: {
   state: TuiApprovalSnapshot
@@ -10,6 +11,7 @@ export function ApprovalPanel(props: {
   dispatch: (action: TuiAction) => void
 }) {
   useInput((input, key) => {
+    if (isMouseInput(input)) return
     if (key.escape || (key.ctrl && input === 'c')) {
       props.dispatch({ type: 'approval.cancel' })
       return

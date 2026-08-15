@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import type { ConversationNode } from '../../src/runtime/nodes/types.ts'
-import { actionMenuItemIndexAtRow, messageKeyAtRow } from '../../src/present/mouse-hit.ts'
+import {
+  actionMenuItemIndexAtRow,
+  listItemIndexAtRow,
+  messageKeyAtRow,
+} from '../../src/present/mouse-hit.ts'
 
 const nodes: ConversationNode[] = [
   { kind: 'user', id: 'u1', seq: 1, time: 1, text: 'hello' },
@@ -43,6 +47,23 @@ describe('mouse hit zones', () => {
       itemCount: 4,
       selectedIndex: 0,
       maxRows: 8,
+    })).toBeUndefined()
+  })
+
+  it('accounts for a scrolled list window and its indicator row', () => {
+    expect(listItemIndexAtRow({
+      row: 18,
+      itemStartRow: 16,
+      itemCount: 12,
+      selectedIndex: 6,
+      windowSize: 4,
+    })).toBe(6)
+    expect(listItemIndexAtRow({
+      row: 15,
+      itemStartRow: 16,
+      itemCount: 12,
+      selectedIndex: 6,
+      windowSize: 4,
     })).toBeUndefined()
   })
 })

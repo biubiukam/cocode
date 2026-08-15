@@ -35,9 +35,22 @@ import { moveMessageSelection, selectableMessageKeys } from './message-selection
 import { maxMessageScrollOffset, visibleMessageWindow } from './message-scroll.ts'
 import { focusConversationNodes } from '../runtime/focus.ts'
 import { text } from '../runtime/ui-locale.ts'
-import { visibleResumeItems } from '../runtime/resume-picker.ts'
-import { visiblePromptQueueItems } from '../runtime/prompt-queue-picker.ts'
+import {
+  RESUME_WINDOW_SIZE,
+  visibleResumeItems,
+} from '../runtime/resume-picker.ts'
+import {
+  PROMPT_QUEUE_WINDOW_SIZE,
+  visiblePromptQueueItems,
+} from '../runtime/prompt-queue-picker.ts'
+import {
+  SESSION_TREE_WINDOW_SIZE,
+  visibleSessionTreeItems,
+} from '../runtime/session-tree-picker.ts'
+import { REWIND_WINDOW_SIZE } from '../runtime/rewind-picker.ts'
+import { SKILLS_WINDOW_SIZE, visibleSkills } from '../runtime/skills-picker.ts'
 import { editDraft } from '../runtime/external-editor.ts'
+import { listWindowStart } from './list-window.ts'
 import { calculateChatLayout } from './chat-layout.ts'
 import { Inspector, INSPECTOR_WIDTH } from './components/Inspector.tsx'
 import { ReviewPicker } from './components/ReviewPicker.tsx'
@@ -51,7 +64,7 @@ import {
   type TuiMouseEvent,
 } from './mouse.ts'
 import { nodeKey } from '../runtime/nodes/types.ts'
-import { actionMenuItemIndexAtRow, messageKeyAtRow } from './mouse-hit.ts'
+import { actionMenuItemIndexAtRow, listItemIndexAtRow, messageKeyAtRow } from './mouse-hit.ts'
 
 export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
   const { app } = props
@@ -311,6 +324,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
       )
       return
     }
+    if (questionOpen || approvalOpen) return
     if (event.action !== 'press' || event.button !== 0 || layout.tooSmall) return
     const headerRows = 3
     const messageStart = headerRows + 1
@@ -344,6 +358,179 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
         runMessageAction(messageActionItems[index])
       } else if (event.y < menuStart || event.y > menuStart + layout.overlayRows) {
         setMessageActionMenuOpen(false)
+      }
+      return
+    }
+    if (slashOpen) {
+      const index = listItemIndexAtRow({
+        row: event.y,
+        itemStartRow: menuStart + 3,
+        itemCount: slashItems.length,
+        selectedIndex: slashIndex,
+        windowSize: overlayWindowSize(layout.overlayRows, slashItems.length, 4),
+      })
+      const item = index === undefined ? undefined : slashItems[index]
+      if (item !== undefined) app.dispatch({ type: 'command', line: `/${item.name}` })
+      return
+    }
+    if (fileOpen && fileMention !== undefined) {
+      const loadingRows = fileLoading ? 1 : 0
+      const index = listItemIndexAtRow({
+        row: event.y,
+        itemStartRow: menuStart + 3 + loadingRows,
+        itemCount: fileItems.length,
+        selectedIndex: fileIndex,
+        windowSize: overlayWindowSize(layout.overlayRows, fileItems.length, 4 + loadingRows),
+      })
+      const item = index === undefined ? undefined : fileItems[index]
+      if (item !== undefined) {
+        app.dispatch({
+          type: 'attachFile',
+          start: fileMention.start,
+          end: fileMention.end,
+          path: item,
+        })
+      }
+      return
+    }
+    if (historySearchOpen) {
+      const index = listItemIndexAtRow({
+        row: event.y,
+        itemStartRow: menuStart + 4,
+        itemCount: historyItems.length,
+        selectedIndex: historyIndex,
+        windowSize: overlayWindowSize(layout.overlayRows, historyItems.length, 5),
+      })
+      const item = index === undefined ? undefined : historyItems[index]
+      if (item !== undefined) {
+        app.dispatch({ type: 'setDraft', text: item })
+        setHistorySearchOpen(false)
+        setHistoryQuery('')
+        setHistoryIndex(0)
+      }
+      return
+    }
+    if (resumeOpen && snap.resumePicker !== undefined) {
+      const items = resumeItems
+      const windowSize = pickerWindowSize(layout.overlayRows, RESUME_WINDOW_SIZE)
+      const start = listWindowStart(snap.resumePicker.selected, items.length, windowSize)
+      const index = listItemIndexAtRow({
+        row: event.y,
+        itemStartRow: menuStart + 4 + Number(start > 0),
+        itemCount: items.length,
+        selectedIndex: snap.resumePicker.selected,
+        windowSize,
+      })
+      if (index !== undefined) {
+        app.dispatch({ type: 'resume.move', delta: index - snap.resumePicker.selected })
+        app.dispatch({ type: 'resume.confirm' })
+      }
+      return
+    }
+    if (sessionTreeOpen && snap.sessionTreePicker !== undefined) {
+      const items = visibleSessionTreeItems(snap.sessionTreePicker)
+      const windowSize = pickerWindowSize(layout.overlayRows, SESSION_TREE_WINDOW_SIZE)
+      const start = listWindowStart(snap.sessionTreePicker.selected, items.length, windowSize)
+      const index = listItemIndexAtRow({
+        row: event.y,
+        itemStartRow: menuStart + 4 + Number(start > 0),
+        itemCount: items.length,
+        selectedIndex: snap.sessionTreePicker.selected,
+        windowSize,
+      })
+      if (index !== undefined) {
+        app.dispatch({ type: 'sessionTree.move', delta: index - snap.sessionTreePicker.selected })
+        app.dispatch({ type: 'sessionTree.confirm' })
+      }
+      return
+    }
+    if (queueOpen && snap.queuePicker !== undefined) {
+      const items = queueItems
+      const windowSize = pickerWindowSize(layout.overlayRows, PROMPT_QUEUE_WINDOW_SIZE)
+      const start = listWindowStart(snap.queuePicker.selected, items.length, windowSize)
+      const index = listItemIndexAtRow({
+        row: event.y,
+        itemStartRow: menuStart + 4 + Number(start > 0),
+        itemCount: items.length,
+        selectedIndex: snap.queuePicker.selected,
+        windowSize,
+      })
+      if (index !== undefined) {
+        app.dispatch({ type: 'queue.move', delta: index - snap.queuePicker.selected })
+        app.dispatch({ type: 'queue.restore' })
+      }
+      return
+    }
+    if (skillsOpen && skillsState !== undefined) {
+      const items = visibleSkills(skillsState)
+      const windowSize = pickerWindowSize(layout.overlayRows, SKILLS_WINDOW_SIZE)
+      const start = listWindowStart(skillsState.selected, items.length, windowSize)
+      const index = listItemIndexAtRow({
+        row: event.y,
+        itemStartRow: menuStart + 4 + Number(start > 0),
+        itemCount: items.length,
+        selectedIndex: skillsState.selected,
+        windowSize,
+      })
+      if (index !== undefined) {
+        app.dispatch({ type: 'skills.move', delta: index - skillsState.selected })
+        app.dispatch({ type: 'skills.confirm' })
+      }
+      return
+    }
+    if (rewindOpen && rewindState !== undefined) {
+      const windowSize = pickerWindowSize(layout.overlayRows, REWIND_WINDOW_SIZE, 6)
+      const start = listWindowStart(rewindState.selected, rewindState.items.length, windowSize)
+      const index = listItemIndexAtRow({
+        row: event.y,
+        itemStartRow: menuStart + 3 + Number(rewindState.confirming) + Number(start > 0),
+        itemCount: rewindState.items.length,
+        selectedIndex: rewindState.selected,
+        windowSize,
+      })
+      if (index !== undefined) {
+        if (index !== rewindState.selected && !rewindState.confirming) {
+          app.dispatch({ type: 'rewind.move', delta: index - rewindState.selected })
+        } else {
+          app.dispatch({ type: 'rewind.confirm' })
+        }
+      }
+      return
+    }
+    if (forkOpen && forkState !== undefined) {
+      const windowSize = pickerWindowSize(layout.overlayRows, REWIND_WINDOW_SIZE, 6)
+      const start = listWindowStart(forkState.selected, forkState.items.length, windowSize)
+      const index = listItemIndexAtRow({
+        row: event.y,
+        itemStartRow: menuStart + 3 + Number(forkState.confirming) + Number(start > 0),
+        itemCount: forkState.items.length,
+        selectedIndex: forkState.selected,
+        windowSize,
+      })
+      if (index !== undefined) {
+        if (index !== forkState.selected && !forkState.confirming) {
+          app.dispatch({ type: 'fork.move', delta: index - forkState.selected })
+        } else {
+          app.dispatch({ type: 'fork.confirm' })
+        }
+      }
+      return
+    }
+    if (reviewOpen && snap.reviewPicker !== undefined) {
+      if (snap.reviewPicker.phase === 'scope') {
+        const index = listItemIndexAtRow({
+          row: event.y,
+          itemStartRow: menuStart + 3,
+          itemCount: snap.reviewPicker.scopes.length,
+          selectedIndex: snap.reviewPicker.selected,
+          windowSize: snap.reviewPicker.scopes.length,
+        })
+        if (index !== undefined) {
+          app.dispatch({ type: 'review.move', delta: index - snap.reviewPicker.selected })
+          app.dispatch({ type: 'review.confirm' })
+        }
+      } else if (snap.reviewPicker.phase === 'preview' && event.y >= menuStart + layout.overlayRows - 2) {
+        app.dispatch({ type: 'review.confirm' })
       }
       return
     }
@@ -1088,4 +1275,12 @@ function reviewRowsFor(state: TuiSnapshot['reviewPicker']): number {
   if (state.phase === 'scope') return state.scopes.length + 5
   if (state.phase === 'loading') return 7
   return Math.min(16, state.review.files.length + 8)
+}
+
+function overlayWindowSize(maxRows: number, itemCount: number, chromeRows: number): number {
+  return Math.max(1, Math.min(itemCount, Math.trunc(maxRows) - chromeRows))
+}
+
+function pickerWindowSize(maxRows: number, windowSize: number, chromeRows = 7): number {
+  return Math.max(1, Math.min(windowSize, Math.trunc(maxRows) - chromeRows))
 }
