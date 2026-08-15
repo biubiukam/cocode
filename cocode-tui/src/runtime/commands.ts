@@ -284,6 +284,11 @@ export function helpText(
         ? `${shortcut('permission.toggle')} 权限`
         : `${shortcut('permission.toggle')} permissions`
       : undefined,
+    shortcut('file.open') === undefined
+      ? undefined
+      : locale === 'zh'
+        ? `${shortcut('file.open')} 文件`
+        : `${shortcut('file.open')} files`,
   ].filter((item): item is string => item !== undefined)
   const detailShortcuts = [
     displayShortcut('transcript.toggleVerbose') === undefined

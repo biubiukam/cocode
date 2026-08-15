@@ -9,6 +9,7 @@ export type CommandId =
   | 'session.interruptOrQuit'
   | 'session.new'
   | 'session.open'
+  | 'file.open'
   | 'app.quit'
   | 'app.redraw'
   | 'model.open'
@@ -86,6 +87,7 @@ export const DEFAULT_BINDINGS: Readonly<Record<CommandId, readonly KeyBinding[]>
   'session.interruptOrQuit': [binding('escape'), binding('c', { ctrl: true })],
   'session.new': [binding('n', { ctrl: true })],
   'session.open': [binding('s', { ctrl: true })],
+  'file.open': [binding('f', { ctrl: true })],
   'app.quit': [binding('d', { ctrl: true, emptyOnly: true })],
   'app.redraw': [],
   'model.open': [binding('l', { ctrl: true })],
@@ -132,6 +134,7 @@ export function matchKey(
     'editor.open',
     'help.toggle',
     'history.search',
+    'file.open',
     'messages.select',
     'command.palette',
     'permission.toggle',

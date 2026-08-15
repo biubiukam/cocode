@@ -159,6 +159,7 @@ export type TuiAction =
   | { type: 'interruptOrQuit' }
   | { type: 'session.new' }
   | { type: 'session.open' }
+  | { type: 'file.open' }
   | { type: 'quit' }
   | { type: 'redraw' }
   | { type: 'resume.setQuery'; query: string }
@@ -764,6 +765,9 @@ class TuiAppImpl implements TuiApp {
         return
       case 'session.open':
         void this.showSessionTree()
+        return
+      case 'file.open':
+        this.openFileMention()
         return
       case 'quit':
         this.beginQuit()
@@ -1372,6 +1376,16 @@ class TuiAppImpl implements TuiApp {
       tone: 'info',
       message: `New session ${this.sessionId}`,
     }
+    this.emit()
+  }
+
+  private openFileMention(): void {
+    const beforeCursor = this.draft.text.slice(0, this.draft.cursor)
+    const previous = beforeCursor.at(-1)
+    const prefix = previous === undefined || /\s/u.test(previous) ? '@' : ' @'
+    this.draft = insertDraft(this.draft, prefix)
+    this.pendingSkillInvocation = undefined
+    this.interruptArmed = false
     this.emit()
   }
 

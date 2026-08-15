@@ -21,6 +21,7 @@ describe('chat input helpers', () => {
     dispatchKeyCommand(app, 'input.newline', '')
     dispatchKeyCommand(app, 'session.new', '')
     dispatchKeyCommand(app, 'session.open', '')
+    dispatchKeyCommand(app, 'file.open', '')
     dispatchKeyCommand(app, 'permission.toggle', '')
     dispatchKeyCommand(app, 'history.next', '')
     expect(dispatch.mock.calls).toEqual([
@@ -28,6 +29,7 @@ describe('chat input helpers', () => {
       [{ type: 'insertDraft', text: '\n' }],
       [{ type: 'session.new' }],
       [{ type: 'session.open' }],
+      [{ type: 'file.open' }],
       [{ type: 'permission.toggle' }],
       [{ type: 'historyNext' }],
     ])

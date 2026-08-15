@@ -11,6 +11,8 @@ const COMMAND_ALIASES: Readonly<Record<string, CommandId>> = {
   sessionNew: 'session.new',
   'session.open': 'session.open',
   sessionOpen: 'session.open',
+  'file.open': 'file.open',
+  fileOpen: 'file.open',
   'app.quit': 'app.quit',
   appQuit: 'app.quit',
   'app.redraw': 'app.redraw',
@@ -91,9 +93,25 @@ export function resolveKeymap(
       continue
     }
     const emptyOnly = DEFAULT_BINDINGS[id][0]?.emptyOnly
-    resolved[id] = [{ ...parsedBinding, emptyOnly }]
+    const resolvedBinding = { ...parsedBinding, emptyOnly }
+    for (const otherId of Object.keys(resolved) as CommandId[]) {
+      if (otherId === id) continue
+      resolved[otherId] = resolved[otherId].filter(
+        (binding) => !sameBinding(binding, resolvedBinding),
+      )
+    }
+    resolved[id] = [resolvedBinding]
   }
   return finish(resolved)
+}
+
+function sameBinding(left: KeyBinding, right: KeyBinding): boolean {
+  return (
+    left.key === right.key &&
+    left.ctrl === right.ctrl &&
+    left.alt === right.alt &&
+    left.shift === right.shift
+  )
 }
 
 function parseBinding(value: string): Omit<KeyBinding, 'emptyOnly'> | undefined {

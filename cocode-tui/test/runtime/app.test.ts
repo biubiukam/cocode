@@ -159,6 +159,23 @@ function fakeRuntime(): TuiRuntime & {
 }
 
 describe('TuiApp', () => {
+  it('opens the file picker mention at the cursor', async () => {
+    const runtime = fakeRuntime()
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+    })
+    await app.start()
+
+    app.dispatch({ type: 'setDraft', text: 'review this' })
+    app.dispatch({ type: 'file.open' })
+
+    expect(app.snapshot().composer.text).toBe('review this @')
+  })
+
   it('notifies when a question needs attention', async () => {
     const runtime = fakeRuntime()
     const values: string[] = []

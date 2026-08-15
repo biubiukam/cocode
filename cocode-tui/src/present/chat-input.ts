@@ -24,6 +24,9 @@ export function dispatchKeyCommand(app: TuiApp, id: string, draft: string): void
     case 'session.open':
       app.dispatch({ type: 'session.open' })
       return
+    case 'file.open':
+      app.dispatch({ type: 'file.open' })
+      return
     case 'app.quit':
       app.dispatch({ type: 'quit' })
       return

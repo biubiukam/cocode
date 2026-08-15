@@ -25,6 +25,7 @@ describe('keymap', () => {
     expect(matchKey({ raw: 'y', ctrl: true, empty: false })).toEqual({
       id: 'permission.toggle',
     })
+    expect(matchKey({ raw: 'f', ctrl: true, empty: false })).toEqual({ id: 'file.open' })
   })
 
   it('allows known commands to override their default bindings', () => {
@@ -37,6 +38,17 @@ describe('keymap', () => {
     })
     expect(matchKey({ raw: 'e', alt: true, empty: false }, keymap)).toEqual({ id: 'editor.open' })
     expect(matchKey({ raw: 'r', ctrl: true, empty: false }, keymap)).toBeUndefined()
+  })
+
+  it('removes conflicting defaults when a custom binding takes the key', () => {
+    const keymap = resolveKeymap({ COCODE_TUI_KEYMAP: '{"fileOpen":"ctrl+r"}' })
+    expect(matchKey({ raw: 'r', ctrl: true, empty: false }, keymap)).toEqual({ id: 'file.open' })
+    expect(matchKey({ raw: 'f', ctrl: true, empty: false }, keymap)).toBeUndefined()
+
+    const emptyConflict = resolveKeymap({ COCODE_TUI_KEYMAP: '{"fileOpen":"ctrl+d"}' })
+    expect(matchKey({ raw: 'd', ctrl: true, empty: true }, emptyConflict)).toEqual({
+      id: 'file.open',
+    })
   })
 
   it('keeps defaults and reports malformed or unknown values', () => {
