@@ -29,6 +29,7 @@ module.exports = {
 		".vite/",
 		"coverage/",
 		"dist/",
+		"dist-electron/",
 		"node_modules/",
 		"out/",
 		"docs/",

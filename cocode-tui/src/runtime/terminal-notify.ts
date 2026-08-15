@@ -52,6 +52,5 @@ export function notifyTerminal(options: {
 
 function sanitize(value: string): string {
   // Control characters and semicolons can corrupt OSC fields.
-  // eslint-disable-next-line no-control-regex
   return value.replace(/[\u0000-\u001f\u007f;]/g, ' ').trim()
 }

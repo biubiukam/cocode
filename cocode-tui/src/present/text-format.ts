@@ -42,9 +42,7 @@ export function sanitizeSingleLine(text: string): string {
   return (
     text
       // ANSI and control characters must not reach the terminal renderer.
-      // eslint-disable-next-line no-control-regex
       .replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, '')
-      // eslint-disable-next-line no-control-regex
       .replace(/[\u0000-\u001f\u007f-\u009f]/g, ' ')
       .replace(/\s+/g, ' ')
       .trim()

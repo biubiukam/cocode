@@ -222,7 +222,9 @@ export class AgencyClient {
 		) {
 			const detail = problemDetail(response.value)
 			throw new AgencyHttpError(
-				`could not create a desktop API key (HTTP ${String(response.status)})${detail === undefined ? "" : `: ${detail}`}`,
+				`could not create a desktop API key (HTTP ${String(response.status)})${
+					detail === undefined ? "" : `: ${detail}`
+				}`,
 				response.status,
 			)
 		}

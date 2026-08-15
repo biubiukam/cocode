@@ -136,16 +136,22 @@ test("Agency client trims a desktop key and preserves a safe API problem detail"
 			headers: { "content-type": "application/json" },
 		})) as typeof fetch
 	try {
-		assert.equal(await new AgencyClient("https://cocode.agency").createDesktopKey("identity-token"), "ck_live_secret")
+		assert.equal(
+			await new AgencyClient("https://cocode.agency").createDesktopKey("identity-token"),
+			"ck_live_secret",
+		)
 
 		globalThis.fetch = (async () =>
-			new Response(JSON.stringify({
-				code: "reauthentication_required",
-				detail: "Reauthenticate this browser session within ten minutes before creating a personal API key.",
-			}), {
-				status: 403,
-				headers: { "content-type": "application/json" },
-			})) as typeof fetch
+			new Response(
+				JSON.stringify({
+					code: "reauthentication_required",
+					detail: "Reauthenticate this browser session within ten minutes before creating a personal API key.",
+				}),
+				{
+					status: 403,
+					headers: { "content-type": "application/json" },
+				},
+			)) as typeof fetch
 		await assert.rejects(
 			new AgencyClient("https://cocode.agency").createDesktopKey("identity-token"),
 			/Reauthenticate this browser session within ten minutes/,

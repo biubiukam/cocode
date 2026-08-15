@@ -58,7 +58,7 @@ jobs:
         run: pnpm exec tsc --noEmit --project packages/connection/tsconfig.json
 
       - name: Lint TUI source
-        run: pnpm exec eslint src packages
+        run: pnpm run lint
 
       - name: Check formatting
-        run: pnpm exec prettier --check src packages test docs .dev/rfc/pending .dev/rfc/implemented package.json
+        run: pnpm run format:check

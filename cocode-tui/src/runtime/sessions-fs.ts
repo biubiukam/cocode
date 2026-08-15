@@ -183,9 +183,7 @@ function userMessageText(data: unknown): string {
 
 function previewText(value: string): string | undefined {
   const normalized = value
-    // eslint-disable-next-line no-control-regex
     .replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, '')
-    // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u001f\u007f-\u009f]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()

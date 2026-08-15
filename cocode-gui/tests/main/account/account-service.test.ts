@@ -492,29 +492,42 @@ test("desktop-key reauthentication opens a browser reauth gate before retry", as
 			return "ck_fresh"
 		},
 	})
-	const settings = (): SettingsNamespace[] => [{
-		ns: "llm-pi-ai",
-		revision: route === undefined ? 1 : 2,
-		value: route === undefined ? { providers: {} } : { providers: { "cocode-cloud": route } },
-	}]
+	const settings = (): SettingsNamespace[] => [
+		{
+			ns: "llm-pi-ai",
+			revision: route === undefined ? 1 : 2,
+			value:
+				route === undefined ? { providers: {} } : { providers: { "cocode-cloud": route } },
+		},
+	]
 	const dsh = {
 		currentDefault: async () => ({ provider: "deepseek-official", model: "deepseek-v4-flash" }),
 		describeSettings: async () => ({ writable: true, namespaces: settings() }),
 		describeCredentials: async () => ({
 			COCODE_CLOUD_API_KEY: { configured: credentialConfigured, writable: true },
 		}),
-		providers: async (): Promise<ProviderView[]> => route === undefined ? [] : [{
-			provider: "cocode-cloud",
-			displayName: "Cocode Cloud",
-			settingsNs: "llm-pi-ai",
-			settingsPath: ["providers", "cocode-cloud"],
-			active: credentialConfigured,
-		}],
-		models: async (): Promise<ModelGroup[]> => route === undefined ? [] : [{
-			id: "cocode-cloud",
-			name: "Cocode Cloud",
-			models: [{ id: "cloud-model", name: "Cloud Model" }],
-		}],
+		providers: async (): Promise<ProviderView[]> =>
+			route === undefined
+				? []
+				: [
+						{
+							provider: "cocode-cloud",
+							displayName: "Cocode Cloud",
+							settingsNs: "llm-pi-ai",
+							settingsPath: ["providers", "cocode-cloud"],
+							active: credentialConfigured,
+						},
+				  ],
+		models: async (): Promise<ModelGroup[]> =>
+			route === undefined
+				? []
+				: [
+						{
+							id: "cocode-cloud",
+							name: "Cocode Cloud",
+							models: [{ id: "cloud-model", name: "Cloud Model" }],
+						},
+				  ],
 		setCredential: async () => {
 			credentialConfigured = true
 		},
@@ -523,7 +536,7 @@ test("desktop-key reauthentication opens a browser reauth gate before retry", as
 		},
 		mutateSettings: async (request: { ops: { op: "set" | "unset"; value?: unknown }[] }) => {
 			const op = request.ops[0]
-			route = op?.op === "set" ? op.value as Record<string, unknown> : undefined
+			route = op?.op === "set" ? (op.value as Record<string, unknown>) : undefined
 		},
 	} as never
 	const { deps } = dependencies(identity)
@@ -537,9 +550,10 @@ test("desktop-key reauthentication opens a browser reauth gate before retry", as
 			callbackCount += 1
 			return {
 				redirectUri: "http://127.0.0.1:43123/auth/callback",
-				wait: async () => new URL(
-					`http://127.0.0.1:43123/auth/callback?code=fresh-code&state=${authorizationState}`,
-				),
+				wait: async () =>
+					new URL(
+						`http://127.0.0.1:43123/auth/callback?code=fresh-code&state=${authorizationState}`,
+					),
 				close: () => undefined,
 			}
 		},

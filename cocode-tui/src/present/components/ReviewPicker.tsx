@@ -253,7 +253,6 @@ function safeFallbackLines(value: string, maxLines: number): string[] {
     .split('\n')
     .map((line) =>
       stripControl(
-        // eslint-disable-next-line no-control-regex
         line.replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, ''),
       ),
     )
