@@ -6,6 +6,7 @@ import type { SessionEvent } from '@cocode/tui-connection'
 import { asNumber, asString, blocksToText, isRecord, reasoningToText } from '../text.ts'
 import type { AssistantNode, NodeDefinition, NoticeNode, ToolNode, UserNode } from './types.ts'
 import { NodeRegistry } from './registry.ts'
+import { inferToolView } from './tool-view.ts'
 
 export function createBuiltinRegistry(): NodeRegistry {
   const registry = new NodeRegistry()
@@ -145,6 +146,7 @@ const toolDefinition: NodeDefinition<ToolNode> = {
       name: asString(data.name, 'tool'),
       args: asString(data.arguments),
       status: 'running',
+      view: inferToolView(asString(data.name, 'tool'), asString(data.arguments)),
     }
   },
   update(state, event) {

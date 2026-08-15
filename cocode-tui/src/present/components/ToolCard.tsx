@@ -3,6 +3,7 @@ import type { ToolNode } from '../../runtime/nodes/types.ts'
 import { formatToolResult } from '../text-format.ts'
 import { theme } from '../theme.ts'
 import type { UiLocale } from '../../runtime/ui-locale.ts'
+import { toolViewDetail } from '../../runtime/nodes/tool-view.ts'
 
 export function ToolCard(props: { node: ToolNode; verbose: boolean; locale: UiLocale }) {
   const { node, verbose } = props
@@ -23,12 +24,14 @@ export function ToolCard(props: { node: ToolNode; verbose: boolean; locale: UiLo
       : 'done'
   const result = formatToolResult(node.result, verbose)
   const summary = !verbose ? result ?? node.error?.code : undefined
+  const detail = toolViewDetail(node.view)
   return (
     <Box flexDirection="column" marginTop={1} paddingLeft={1}>
       <Text color={color}>
         {mark} <Text bold>{node.name}</Text> · {state}
         {summary ? ` · ${summary}` : ''}
       </Text>
+      {detail !== undefined ? <Text color={theme.mute}> {detail}</Text> : null}
       {verbose && node.args !== '' ? <Text color={theme.mute}> args {node.args}</Text> : null}
       {verbose && result !== undefined ? <Text color={theme.tool}> {result}</Text> : null}
       {verbose && node.error ? <Text color={theme.error}> {node.error.code}</Text> : null}
