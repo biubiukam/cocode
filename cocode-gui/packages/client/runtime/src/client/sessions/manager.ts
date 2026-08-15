@@ -317,6 +317,18 @@ export class SessionManager {
       onEngaged: (engaged) => {
         this.recordMutation({ kind: 'engaged', sessionId: engaged.sessionId })
       },
+      onMissing: (missingId) => {
+        this.recordMutation({ kind: 'remove', sessionId: missingId })
+        this.pendingBuffers.delete(missingId)
+        this.pendingInteractions.delete(missingId)
+        this.completedNotifications.delete(missingId)
+        this.prevRunning.delete(missingId)
+        this.projectionStores.delete(missingId)
+        this.addresses.delete(missingId)
+        if (this.selected === missingId) this.selected = undefined
+        this.sessions.delete(missingId)
+        this.notifier.notifyNow()
+      },
       projections: this.projectionStore(sessionId),
       ...this.conversation === undefined ? {} : { conversation: this.conversation },
     })

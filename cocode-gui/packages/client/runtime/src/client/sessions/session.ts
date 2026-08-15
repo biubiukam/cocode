@@ -46,6 +46,8 @@ export interface SessionOptions {
    * (hidden, still reusable by connectWorkspace).
    */
   onEngaged?(session: Session): void
+  /** Remove a stale sidebar row when the host confirms its durable log is gone. */
+  onMissing?(sessionId: SessionId): void
   /**
    * Manager-owned projection value store to adopt (frames route through the
    * manager and values outlive instantiation); omitted, the Session owns a
@@ -619,6 +621,12 @@ export class Session implements SessionFace {
       let { result } = await this.history({ maxMessages: PAGE_MESSAGES })
       if (generation !== this.openGeneration) return
       if (!result.ok) {
+        if (result.error.code === 'session-not-found') {
+          this.options.onMissing?.(this.sessionId)
+          this.openState = 'cold'
+          this.openError = null
+          return
+        }
         this.openState = 'error'
         this.openError = result.error
         return
