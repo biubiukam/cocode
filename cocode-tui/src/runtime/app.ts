@@ -898,7 +898,7 @@ class TuiAppImpl implements TuiApp {
         this.questions.navigate(action.direction, action.selected, action.custom, action.dirty)
         return
       case 'question.cancel':
-        this.questions.cancel()
+        this.cancelQuestion()
         return
       case 'approval.answer':
         this.answerApproval(action.outcome)
@@ -1018,6 +1018,36 @@ class TuiAppImpl implements TuiApp {
       rewindUnavailable: text(this.locale, 'rewindUnavailable'),
       emit: () => this.emit(),
     })
+  }
+
+  private cancelQuestion(): void {
+    // Start cancelling the agent turn before rejecting the question promise.
+    // Otherwise the model can receive a normal tool error and immediately
+    // issue the same question again.
+    const cancelRequest = this.capabilities.cancel
+      ? this.runtime.cancel(this.sessionId, false)
+      : undefined
+    this.questions.cancel()
+    if (cancelRequest === undefined) return
+    void cancelRequest.then(
+      (wasRunning) => {
+        this.notice = {
+          tone: 'info',
+          message: wasRunning
+            ? text(this.locale, 'cancelRequested')
+            : text(this.locale, 'cancelNotRunning'),
+        }
+        if (!wasRunning) this.interruptArmed = false
+        this.emit()
+      },
+      (error: unknown) => {
+        this.notice = {
+          tone: 'error',
+          message: `${text(this.locale, 'cancelFailed')}: ${errorMessage(error)}`,
+        }
+        this.emit()
+      },
+    )
   }
 
   private commandCtx(): TuiCommandCtx {
