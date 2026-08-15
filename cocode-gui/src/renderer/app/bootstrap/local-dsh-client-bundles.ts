@@ -37,6 +37,7 @@ const LOCAL_CLIENT_BUNDLES = new Map<string, string>([
 		"ui-workspace",
 	].map((directory) => [`${CLIENT_PACKAGE_PREFIX}${directory}`, directory] as const),
 	["cocode-sidebar", "cocode/cocode-sidebar"],
+	["cocode-account", "cocode/cocode-account"],
 ])
 
 export function resolveLocalDshClientBundleUrl(packageId: string): string | undefined {

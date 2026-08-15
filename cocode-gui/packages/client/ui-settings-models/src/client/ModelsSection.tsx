@@ -95,8 +95,9 @@ function renderProviderEditor({ target, ...props }: ProviderEditorRenderProps): 
 export async function removeProviderProfile(
   api: Pick<IApiClient, 'settings' | 'credentials'>,
   controller: ModelsSettingsStore,
-  target: { settingsNs: string; settingsPath: readonly string[]; credentialRef?: string },
+  target: { provider?: string; settingsNs: string; settingsPath: readonly string[]; credentialRef?: string },
 ): Promise<string | undefined> {
+  if (target.provider === 'cocode-cloud') return 'Cocode Cloud is managed by the Cocode account.'
   try {
     if (target.credentialRef !== undefined) {
       const credential = await api.credentials.unset({ ref: target.credentialRef })
@@ -321,6 +322,9 @@ function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
                   {row.entry.declared === true
                     ? <span className={styles['rowTag']}>{t('customTag')}</span>
                     : null}
+                  {row.entry.provider === 'cocode-cloud'
+                    ? <span className={styles['rowTag']}>{t('managedTag')}</span>
+                    : null}
                   {credentialConfigured
                     ? (
                       <span
@@ -342,22 +346,24 @@ function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
                       : null}
                 </span>
                 <span className={styles['rowActions']}>
-                  <button
-                    type="button"
-                    className={styles['secondaryButton']}
-                    aria-label={providerCopy(t('editProvider'), target)}
-                    onClick={() => {
-                      setSavedTarget(undefined)
-                      // One card at a time: leaving `declaring` set would show
-                      // the create card beside this editor, and closing either
-                      // one discards the other's draft.
-                      setDeclaring(false)
-                      setAdding(false)
-                      setEditing(open ? undefined : target)
-                    }}
-                  >
-                    {t('edit')}
-                  </button>
+                  {row.entry.provider === 'cocode-cloud'
+                    ? null
+                    : <button
+                      type="button"
+                      className={styles['secondaryButton']}
+                      aria-label={providerCopy(t('editProvider'), target)}
+                      onClick={() => {
+                        setSavedTarget(undefined)
+                        // One card at a time: leaving `declaring` set would show
+                        // the create card beside this editor, and closing either
+                        // one discards the other's draft.
+                        setDeclaring(false)
+                        setAdding(false)
+                        setEditing(open ? undefined : target)
+                      }}
+                    >
+                      {t('edit')}
+                    </button>}
                   {row.removable
                     ? (
                       <button

@@ -56,8 +56,8 @@ window.__ModuleLoader__.load({
 			if (!LEGAL_API_KEY.test(value)) return "keyIllegalCharacters";
 		}
 		//#endregion
-		//#region \0dsh-css:/Users/kambiu/worker/open/electron-template/packages/client/ui-settings-models/src/client/ModelsSection.module.css.mjs
-		const css$3 = ".KAP1zq_section{max-width:720px;color:var(--dsw-alias-label-primary);flex-direction:column;gap:12px;display:flex}.KAP1zq_title{color:var(--dsw-alias-label-primary);margin:0;font-size:16px;font-weight:500;line-height:24px}.KAP1zq_intro{color:var(--dsw-alias-label-tertiary);margin:0;font-size:14px;line-height:22px}.KAP1zq_notice{color:var(--dsw-alias-state-warn-label);margin:0;font-size:12px;line-height:18px}.KAP1zq_savedNotice{color:var(--dsw-alias-state-success-primary);margin:0;font-size:12px;line-height:18px}.KAP1zq_rows{flex-direction:column;gap:8px;margin:12px 0 0;padding:0;list-style:none;display:flex}.KAP1zq_rowCard{border:1px solid var(--dsw-alias-border-l2);border-radius:12px;flex-direction:column;gap:12px;padding:12px 14px;display:flex}.KAP1zq_rowHead{align-items:center;gap:10px;display:flex}.KAP1zq_rowIdentity{align-items:center;gap:6px;min-width:0;display:inline-flex}.KAP1zq_rowName{color:var(--dsw-alias-label-primary);font-size:14px;font-weight:500;line-height:22px}.KAP1zq_rowTag{border:1px solid var(--dsw-alias-border-l3);color:var(--dsw-alias-label-secondary);border-radius:4px;flex:none;padding:1px 6px;font-size:11px;line-height:16px}.KAP1zq_credentialDot{box-sizing:border-box;border-radius:50%;flex:none;width:8px;height:8px;display:inline-block}.KAP1zq_credentialDotConfigured{background:var(--dsw-alias-state-success-primary)}.KAP1zq_credentialDotMissing{background:var(--dsw-alias-state-error-primary)}.KAP1zq_rowActions{align-items:center;gap:4px;margin-left:auto;display:inline-flex}.KAP1zq_primaryButton,.KAP1zq_secondaryButton,.KAP1zq_addButton{box-sizing:border-box;height:36px;font:inherit;cursor:pointer;border:none;border-radius:18px;justify-content:center;align-items:center;gap:4px;padding:0 14px;font-size:14px;line-height:22px;display:inline-flex}.KAP1zq_primaryButton{background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary-foreground)}.KAP1zq_primaryButton:hover:not(:disabled){background:var(--dsw-alias-button-primary-hover)}.KAP1zq_secondaryButton,.KAP1zq_addButton{border:1px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-primary);background:0 0}.KAP1zq_secondaryButton:hover:not(:disabled),.KAP1zq_addButton:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover)}.KAP1zq_secondaryButton:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover-solid)}.KAP1zq_dangerButton{box-sizing:border-box;height:36px;color:var(--dsw-alias-state-error-primary);font:inherit;cursor:pointer;background:0 0;border:none;border-radius:18px;justify-content:center;align-items:center;padding:0 14px;font-size:14px;line-height:22px;display:inline-flex}.KAP1zq_dangerButton:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover-danger)}.KAP1zq_rowActions .KAP1zq_secondaryButton,.KAP1zq_rowActions .KAP1zq_dangerButton{border-radius:14px;height:28px;padding:0 10px;font-size:12px;line-height:18px}.KAP1zq_primaryButton:disabled,.KAP1zq_secondaryButton:disabled,.KAP1zq_dangerButton:disabled,.KAP1zq_addButton:disabled,.KAP1zq_linkButton:disabled,.KAP1zq_addModelButton:disabled{opacity:.4;cursor:default}.KAP1zq_primaryButton:focus-visible,.KAP1zq_secondaryButton:focus-visible,.KAP1zq_dangerButton:focus-visible,.KAP1zq_addButton:focus-visible,.KAP1zq_linkButton:focus-visible,.KAP1zq_addModelButton:focus-visible,.KAP1zq_iconButton:focus-visible,.KAP1zq_customizedSummary:focus-visible{box-shadow:0 0 0 2px var(--dsw-alias-state-business-primary);outline:none}.KAP1zq_editor{background:var(--dsw-alias-bg-module-platform);border-radius:12px;flex-direction:column;gap:14px;padding:14px 16px;display:flex}.KAP1zq_editorHeader{align-items:baseline;gap:8px;display:flex}.KAP1zq_editorTitle{color:var(--dsw-alias-label-primary);font-size:14px;font-weight:500;line-height:22px}.KAP1zq_editorRoute{color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px}.KAP1zq_field{flex-direction:column;gap:6px;display:flex}.KAP1zq_fieldLabel{color:var(--dsw-alias-label-secondary);align-items:center;gap:10px;font-size:12px;font-weight:500;line-height:18px;display:inline-flex}.KAP1zq_linkButton{box-sizing:border-box;height:28px;color:var(--dsw-alias-label-tertiary);font:inherit;cursor:pointer;background:0 0;border:none;border-radius:14px;align-items:center;padding:0 10px;font-size:12px;line-height:18px;display:inline-flex}.KAP1zq_linkButton:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-secondary)}.KAP1zq_advancedHint{color:var(--dsw-alias-label-tertiary);margin:0;font-size:12px;line-height:18px}.KAP1zq_editorActions{justify-content:flex-end;gap:8px;display:flex}.KAP1zq_addBlock{flex-direction:column;gap:12px;display:flex}.KAP1zq_addActions{flex-wrap:wrap;gap:10px;display:flex}.KAP1zq_addButton{border:1px dashed var(--dsw-alias-border-l3);border-radius:12px;flex:1 1 0;gap:6px;min-width:180px;height:44px}.KAP1zq_addCard,.KAP1zq_setupCard{background:var(--dsw-alias-bg-module-platform);border-radius:12px;flex-direction:column;gap:14px;padding:14px 16px;list-style:none;display:flex}.KAP1zq_addCard .KAP1zq_editor,.KAP1zq_setupCard .KAP1zq_editor{background:0 0;padding:0}.KAP1zq_customized{border-top:1px solid var(--dsw-alias-border-l2);padding-top:10px}.KAP1zq_customizedSummary{cursor:pointer;width:fit-content;color:var(--dsw-alias-label-secondary);border-radius:6px;align-items:center;gap:6px;margin-left:-4px;padding:2px 4px;font-size:12px;font-weight:500;line-height:18px;list-style:none;display:flex}.KAP1zq_customizedSummary::-webkit-details-marker{display:none}.KAP1zq_customizedSummary:before{content:\"\";border-bottom:1.5px solid;border-right:1.5px solid;width:5px;height:5px;transition:transform .12s;transform:rotate(-45deg)translate(-1px,-1px)}.KAP1zq_customized[open]>.KAP1zq_customizedSummary:before{transform:rotate(45deg)translate(-1px,-1px)}.KAP1zq_customizedSummary:hover{color:var(--dsw-alias-label-primary)}.KAP1zq_customizedBody{flex-direction:column;gap:12px;padding-top:12px;display:flex}.KAP1zq_modelCatalog{border-top:1px solid var(--dsw-alias-border-l2);flex-direction:column;gap:10px;padding-top:12px;display:flex}.KAP1zq_modelCatalogHeading{flex-direction:column;gap:2px;display:flex}.KAP1zq_modelCatalogTitle{color:var(--dsw-alias-label-secondary);font-size:12px;font-weight:500;line-height:18px}.KAP1zq_modelCatalogMeta,.KAP1zq_modelEmpty{color:var(--dsw-alias-label-tertiary);margin:0;font-size:12px;line-height:18px}.KAP1zq_modelList{flex-direction:column;gap:8px;display:flex}.KAP1zq_modelListHead{justify-content:space-between;align-items:flex-start;gap:12px;display:flex}.KAP1zq_modelEntry{border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:6px}.KAP1zq_modelRow{grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) auto auto;align-items:center;gap:6px;display:grid}.KAP1zq_iconButton{box-sizing:border-box;width:28px;height:28px;color:var(--dsw-alias-label-tertiary);cursor:pointer;background:0 0;border:none;border-radius:6px;justify-content:center;align-items:center;display:inline-flex}.KAP1zq_iconButton:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.KAP1zq_iconButton:disabled{cursor:default;opacity:.4}.KAP1zq_iconButtonDanger:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover-danger);color:var(--dsw-alias-state-error-primary)}.KAP1zq_modelAdvanced{grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;padding:8px 4px 2px;display:grid}.KAP1zq_modelField{flex-direction:column;gap:4px;display:flex}.KAP1zq_modelFieldLabel{color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px}.KAP1zq_modelEmpty{border:1px dashed var(--dsw-alias-border-l3);text-align:center;border-radius:8px;padding:12px}.KAP1zq_addModelButton{box-sizing:border-box;border:1px solid var(--dsw-alias-border-l2);height:28px;color:var(--dsw-alias-label-primary);font:inherit;cursor:pointer;background:0 0;border-radius:14px;align-self:flex-start;align-items:center;gap:4px;padding:0 10px;font-size:12px;line-height:18px;display:inline-flex}.KAP1zq_addModelButton:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover)}.KAP1zq_input{box-sizing:border-box;border:1px solid var(--dsw-alias-border-l2);width:100%;height:32px;font:inherit;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);border-radius:8px;padding:0 10px;font-size:14px;line-height:22px}select.KAP1zq_input{cursor:pointer;max-width:240px}.KAP1zq_input:focus{border-color:var(--dsw-alias-state-business-primary);outline:none}.KAP1zq_input::placeholder{color:var(--dsw-alias-label-dimmed)}.KAP1zq_input:disabled{opacity:.6;cursor:default}.KAP1zq_selectInput{appearance:none;background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%2381858C' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\");background-position:right 12px center;background-repeat:no-repeat;background-size:12px 12px;padding-right:32px}.KAP1zq_error{color:var(--dsw-alias-state-error-primary);margin:0;font-size:12px;line-height:18px}.KAP1zq_deleteDialog{width:min(480px,100%)}.KAP1zq_deleteConfirm:not(:disabled){border-color:var(--dsw-alias-state-error-primary);color:var(--dsw-alias-state-error-primary)}.KAP1zq_deleteConfirm:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover-danger)}.KAP1zq_hiddenLabel{clip:rect(0 0 0 0);white-space:nowrap;width:1px;height:1px;position:absolute;overflow:hidden}@media (prefers-reduced-motion:reduce){.KAP1zq_customizedSummary:before{transition:none}}.KAP1zq_fetchDialog{--dsh-scrollbar-thumb:var(--dsw-alias-scrollbar-bg-l2);--dsh-scrollbar-thumb-hover:var(--dsw-alias-scrollbar-hover-l2);max-width:520px}.KAP1zq_candidateList{flex-direction:column;gap:2px;max-height:320px;margin:0;padding:0;list-style:none;display:flex;overflow-y:auto}.KAP1zq_candidate{border-radius:6px}.KAP1zq_candidateLabel{cursor:pointer;align-items:center;gap:8px;padding:6px 8px;display:flex}.KAP1zq_candidateId{font-family:var(--ds-font-family-code);overflow-wrap:anywhere;flex:auto;font-size:13px}";
+		//#region \0dsh-css:/Users/kambiu/worker/open/cocode/cocode-gui/packages/client/ui-settings-models/src/client/ModelsSection.module.css.mjs
+		const css$3 = ".GizMjG_section{max-width:720px;color:var(--dsw-alias-label-primary);flex-direction:column;gap:12px;display:flex}.GizMjG_title{color:var(--dsw-alias-label-primary);margin:0;font-size:16px;font-weight:500;line-height:24px}.GizMjG_intro{color:var(--dsw-alias-label-tertiary);margin:0;font-size:14px;line-height:22px}.GizMjG_notice{color:var(--dsw-alias-state-warn-label);margin:0;font-size:12px;line-height:18px}.GizMjG_savedNotice{color:var(--dsw-alias-state-success-primary);margin:0;font-size:12px;line-height:18px}.GizMjG_rows{flex-direction:column;gap:8px;margin:12px 0 0;padding:0;list-style:none;display:flex}.GizMjG_rowCard{border:1px solid var(--dsw-alias-border-l2);border-radius:12px;flex-direction:column;gap:12px;padding:12px 14px;display:flex}.GizMjG_rowHead{align-items:center;gap:10px;display:flex}.GizMjG_rowIdentity{align-items:center;gap:6px;min-width:0;display:inline-flex}.GizMjG_rowName{color:var(--dsw-alias-label-primary);font-size:14px;font-weight:500;line-height:22px}.GizMjG_rowTag{border:1px solid var(--dsw-alias-border-l3);color:var(--dsw-alias-label-secondary);border-radius:4px;flex:none;padding:1px 6px;font-size:11px;line-height:16px}.GizMjG_credentialDot{box-sizing:border-box;border-radius:50%;flex:none;width:8px;height:8px;display:inline-block}.GizMjG_credentialDotConfigured{background:var(--dsw-alias-state-success-primary)}.GizMjG_credentialDotMissing{background:var(--dsw-alias-state-error-primary)}.GizMjG_rowActions{align-items:center;gap:4px;margin-left:auto;display:inline-flex}.GizMjG_primaryButton,.GizMjG_secondaryButton,.GizMjG_addButton{box-sizing:border-box;height:36px;font:inherit;cursor:pointer;border:none;border-radius:18px;justify-content:center;align-items:center;gap:4px;padding:0 14px;font-size:14px;line-height:22px;display:inline-flex}.GizMjG_primaryButton{background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary-foreground)}.GizMjG_primaryButton:hover:not(:disabled){background:var(--dsw-alias-button-primary-hover)}.GizMjG_secondaryButton,.GizMjG_addButton{border:1px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-primary);background:0 0}.GizMjG_secondaryButton:hover:not(:disabled),.GizMjG_addButton:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover)}.GizMjG_secondaryButton:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover-solid)}.GizMjG_dangerButton{box-sizing:border-box;height:36px;color:var(--dsw-alias-state-error-primary);font:inherit;cursor:pointer;background:0 0;border:none;border-radius:18px;justify-content:center;align-items:center;padding:0 14px;font-size:14px;line-height:22px;display:inline-flex}.GizMjG_dangerButton:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover-danger)}.GizMjG_rowActions .GizMjG_secondaryButton,.GizMjG_rowActions .GizMjG_dangerButton{border-radius:14px;height:28px;padding:0 10px;font-size:12px;line-height:18px}.GizMjG_primaryButton:disabled,.GizMjG_secondaryButton:disabled,.GizMjG_dangerButton:disabled,.GizMjG_addButton:disabled,.GizMjG_linkButton:disabled,.GizMjG_addModelButton:disabled{opacity:.4;cursor:default}.GizMjG_primaryButton:focus-visible,.GizMjG_secondaryButton:focus-visible,.GizMjG_dangerButton:focus-visible,.GizMjG_addButton:focus-visible,.GizMjG_linkButton:focus-visible,.GizMjG_addModelButton:focus-visible,.GizMjG_iconButton:focus-visible,.GizMjG_customizedSummary:focus-visible{box-shadow:0 0 0 2px var(--dsw-alias-state-business-primary);outline:none}.GizMjG_editor{background:var(--dsw-alias-bg-module-platform);border-radius:12px;flex-direction:column;gap:14px;padding:14px 16px;display:flex}.GizMjG_editorHeader{align-items:baseline;gap:8px;display:flex}.GizMjG_editorTitle{color:var(--dsw-alias-label-primary);font-size:14px;font-weight:500;line-height:22px}.GizMjG_editorRoute{color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px}.GizMjG_field{flex-direction:column;gap:6px;display:flex}.GizMjG_fieldLabel{color:var(--dsw-alias-label-secondary);align-items:center;gap:10px;font-size:12px;font-weight:500;line-height:18px;display:inline-flex}.GizMjG_linkButton{box-sizing:border-box;height:28px;color:var(--dsw-alias-label-tertiary);font:inherit;cursor:pointer;background:0 0;border:none;border-radius:14px;align-items:center;padding:0 10px;font-size:12px;line-height:18px;display:inline-flex}.GizMjG_linkButton:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-secondary)}.GizMjG_advancedHint{color:var(--dsw-alias-label-tertiary);margin:0;font-size:12px;line-height:18px}.GizMjG_editorActions{justify-content:flex-end;gap:8px;display:flex}.GizMjG_addBlock{flex-direction:column;gap:12px;display:flex}.GizMjG_addActions{flex-wrap:wrap;gap:10px;display:flex}.GizMjG_addButton{border:1px dashed var(--dsw-alias-border-l3);border-radius:12px;flex:1 1 0;gap:6px;min-width:180px;height:44px}.GizMjG_addCard,.GizMjG_setupCard{background:var(--dsw-alias-bg-module-platform);border-radius:12px;flex-direction:column;gap:14px;padding:14px 16px;list-style:none;display:flex}.GizMjG_addCard .GizMjG_editor,.GizMjG_setupCard .GizMjG_editor{background:0 0;padding:0}.GizMjG_customized{border-top:1px solid var(--dsw-alias-border-l2);padding-top:10px}.GizMjG_customizedSummary{cursor:pointer;width:fit-content;color:var(--dsw-alias-label-secondary);border-radius:6px;align-items:center;gap:6px;margin-left:-4px;padding:2px 4px;font-size:12px;font-weight:500;line-height:18px;list-style:none;display:flex}.GizMjG_customizedSummary::-webkit-details-marker{display:none}.GizMjG_customizedSummary:before{content:\"\";border-bottom:1.5px solid;border-right:1.5px solid;width:5px;height:5px;transition:transform .12s;transform:rotate(-45deg)translate(-1px,-1px)}.GizMjG_customized[open]>.GizMjG_customizedSummary:before{transform:rotate(45deg)translate(-1px,-1px)}.GizMjG_customizedSummary:hover{color:var(--dsw-alias-label-primary)}.GizMjG_customizedBody{flex-direction:column;gap:12px;padding-top:12px;display:flex}.GizMjG_modelCatalog{border-top:1px solid var(--dsw-alias-border-l2);flex-direction:column;gap:10px;padding-top:12px;display:flex}.GizMjG_modelCatalogHeading{flex-direction:column;gap:2px;display:flex}.GizMjG_modelCatalogTitle{color:var(--dsw-alias-label-secondary);font-size:12px;font-weight:500;line-height:18px}.GizMjG_modelCatalogMeta,.GizMjG_modelEmpty{color:var(--dsw-alias-label-tertiary);margin:0;font-size:12px;line-height:18px}.GizMjG_modelList{flex-direction:column;gap:8px;display:flex}.GizMjG_modelListHead{justify-content:space-between;align-items:flex-start;gap:12px;display:flex}.GizMjG_modelEntry{border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:6px}.GizMjG_modelRow{grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) auto auto;align-items:center;gap:6px;display:grid}.GizMjG_iconButton{box-sizing:border-box;width:28px;height:28px;color:var(--dsw-alias-label-tertiary);cursor:pointer;background:0 0;border:none;border-radius:6px;justify-content:center;align-items:center;display:inline-flex}.GizMjG_iconButton:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.GizMjG_iconButton:disabled{cursor:default;opacity:.4}.GizMjG_iconButtonDanger:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover-danger);color:var(--dsw-alias-state-error-primary)}.GizMjG_modelAdvanced{grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;padding:8px 4px 2px;display:grid}.GizMjG_modelField{flex-direction:column;gap:4px;display:flex}.GizMjG_modelFieldLabel{color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px}.GizMjG_modelEmpty{border:1px dashed var(--dsw-alias-border-l3);text-align:center;border-radius:8px;padding:12px}.GizMjG_addModelButton{box-sizing:border-box;border:1px solid var(--dsw-alias-border-l2);height:28px;color:var(--dsw-alias-label-primary);font:inherit;cursor:pointer;background:0 0;border-radius:14px;align-self:flex-start;align-items:center;gap:4px;padding:0 10px;font-size:12px;line-height:18px;display:inline-flex}.GizMjG_addModelButton:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover)}.GizMjG_input{box-sizing:border-box;border:1px solid var(--dsw-alias-border-l2);width:100%;height:32px;font:inherit;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);border-radius:8px;padding:0 10px;font-size:14px;line-height:22px}select.GizMjG_input{cursor:pointer;max-width:240px}.GizMjG_input:focus{border-color:var(--dsw-alias-state-business-primary);outline:none}.GizMjG_input::placeholder{color:var(--dsw-alias-label-dimmed)}.GizMjG_input:disabled{opacity:.6;cursor:default}.GizMjG_selectInput{appearance:none;background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%2381858C' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\");background-position:right 12px center;background-repeat:no-repeat;background-size:12px 12px;padding-right:32px}.GizMjG_error{color:var(--dsw-alias-state-error-primary);margin:0;font-size:12px;line-height:18px}.GizMjG_deleteDialog{width:min(480px,100%)}.GizMjG_deleteConfirm:not(:disabled){border-color:var(--dsw-alias-state-error-primary);color:var(--dsw-alias-state-error-primary)}.GizMjG_deleteConfirm:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover-danger)}.GizMjG_hiddenLabel{clip:rect(0 0 0 0);white-space:nowrap;width:1px;height:1px;position:absolute;overflow:hidden}@media (prefers-reduced-motion:reduce){.GizMjG_customizedSummary:before{transition:none}}.GizMjG_fetchDialog{--dsh-scrollbar-thumb:var(--dsw-alias-scrollbar-bg-l2);--dsh-scrollbar-thumb-hover:var(--dsw-alias-scrollbar-hover-l2);max-width:520px}.GizMjG_candidateList{flex-direction:column;gap:2px;max-height:320px;margin:0;padding:0;list-style:none;display:flex;overflow-y:auto}.GizMjG_candidate{border-radius:6px}.GizMjG_candidateLabel{cursor:pointer;align-items:center;gap:8px;padding:6px 8px;display:flex}.GizMjG_candidateId{font-family:var(--ds-font-family-code);overflow-wrap:anywhere;flex:auto;font-size:13px}";
 		const tagId$3 = "@deepseek-ai/dsh-client-ui-settings-models/ModelsSection.module.css";
 		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId$3) + "]") === null) {
 			const tag = document.createElement("style");
@@ -67,67 +67,67 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var ModelsSection_module_css_default = {
-			"setupCard": "KAP1zq_setupCard",
-			"customized": "KAP1zq_customized",
-			"rowTag": "KAP1zq_rowTag",
-			"addCard": "KAP1zq_addCard",
-			"customizedBody": "KAP1zq_customizedBody",
-			"secondaryButton": "KAP1zq_secondaryButton",
-			"editorActions": "KAP1zq_editorActions",
-			"addBlock": "KAP1zq_addBlock",
-			"section": "KAP1zq_section",
-			"intro": "KAP1zq_intro",
-			"addActions": "KAP1zq_addActions",
-			"modelCatalogMeta": "KAP1zq_modelCatalogMeta",
-			"input": "KAP1zq_input",
-			"hiddenLabel": "KAP1zq_hiddenLabel",
-			"rows": "KAP1zq_rows",
-			"modelList": "KAP1zq_modelList",
-			"editorHeader": "KAP1zq_editorHeader",
-			"notice": "KAP1zq_notice",
-			"editorRoute": "KAP1zq_editorRoute",
-			"advancedHint": "KAP1zq_advancedHint",
-			"modelCatalogHeading": "KAP1zq_modelCatalogHeading",
-			"editorTitle": "KAP1zq_editorTitle",
-			"rowHead": "KAP1zq_rowHead",
-			"addButton": "KAP1zq_addButton",
-			"credentialDotConfigured": "KAP1zq_credentialDotConfigured",
-			"selectInput": "KAP1zq_selectInput",
-			"linkButton": "KAP1zq_linkButton",
-			"editor": "KAP1zq_editor",
-			"fieldLabel": "KAP1zq_fieldLabel",
-			"candidateLabel": "KAP1zq_candidateLabel",
-			"credentialDotMissing": "KAP1zq_credentialDotMissing",
-			"candidateId": "KAP1zq_candidateId",
-			"primaryButton": "KAP1zq_primaryButton",
-			"deleteConfirm": "KAP1zq_deleteConfirm",
-			"fetchDialog": "KAP1zq_fetchDialog",
-			"modelAdvanced": "KAP1zq_modelAdvanced",
-			"rowName": "KAP1zq_rowName",
-			"modelCatalog": "KAP1zq_modelCatalog",
-			"modelRow": "KAP1zq_modelRow",
-			"dangerButton": "KAP1zq_dangerButton",
-			"candidateList": "KAP1zq_candidateList",
-			"modelListHead": "KAP1zq_modelListHead",
-			"candidate": "KAP1zq_candidate",
-			"error": "KAP1zq_error",
-			"rowIdentity": "KAP1zq_rowIdentity",
-			"rowActions": "KAP1zq_rowActions",
-			"iconButtonDanger": "KAP1zq_iconButtonDanger",
-			"deleteDialog": "KAP1zq_deleteDialog",
-			"field": "KAP1zq_field",
-			"modelCatalogTitle": "KAP1zq_modelCatalogTitle",
-			"modelFieldLabel": "KAP1zq_modelFieldLabel",
-			"credentialDot": "KAP1zq_credentialDot",
-			"title": "KAP1zq_title",
-			"iconButton": "KAP1zq_iconButton",
-			"modelField": "KAP1zq_modelField",
-			"addModelButton": "KAP1zq_addModelButton",
-			"customizedSummary": "KAP1zq_customizedSummary",
-			"rowCard": "KAP1zq_rowCard",
-			"modelEntry": "KAP1zq_modelEntry",
-			"savedNotice": "KAP1zq_savedNotice",
-			"modelEmpty": "KAP1zq_modelEmpty"
+			"credentialDot": "GizMjG_credentialDot",
+			"modelRow": "GizMjG_modelRow",
+			"modelCatalogHeading": "GizMjG_modelCatalogHeading",
+			"fetchDialog": "GizMjG_fetchDialog",
+			"modelListHead": "GizMjG_modelListHead",
+			"editor": "GizMjG_editor",
+			"modelEmpty": "GizMjG_modelEmpty",
+			"field": "GizMjG_field",
+			"secondaryButton": "GizMjG_secondaryButton",
+			"modelCatalogTitle": "GizMjG_modelCatalogTitle",
+			"addBlock": "GizMjG_addBlock",
+			"modelAdvanced": "GizMjG_modelAdvanced",
+			"addButton": "GizMjG_addButton",
+			"rowIdentity": "GizMjG_rowIdentity",
+			"rowName": "GizMjG_rowName",
+			"modelCatalog": "GizMjG_modelCatalog",
+			"addCard": "GizMjG_addCard",
+			"editorHeader": "GizMjG_editorHeader",
+			"dangerButton": "GizMjG_dangerButton",
+			"candidateId": "GizMjG_candidateId",
+			"editorRoute": "GizMjG_editorRoute",
+			"credentialDotConfigured": "GizMjG_credentialDotConfigured",
+			"fieldLabel": "GizMjG_fieldLabel",
+			"addModelButton": "GizMjG_addModelButton",
+			"notice": "GizMjG_notice",
+			"savedNotice": "GizMjG_savedNotice",
+			"selectInput": "GizMjG_selectInput",
+			"modelFieldLabel": "GizMjG_modelFieldLabel",
+			"credentialDotMissing": "GizMjG_credentialDotMissing",
+			"deleteDialog": "GizMjG_deleteDialog",
+			"deleteConfirm": "GizMjG_deleteConfirm",
+			"modelField": "GizMjG_modelField",
+			"candidateList": "GizMjG_candidateList",
+			"candidateLabel": "GizMjG_candidateLabel",
+			"customized": "GizMjG_customized",
+			"editorTitle": "GizMjG_editorTitle",
+			"addActions": "GizMjG_addActions",
+			"intro": "GizMjG_intro",
+			"hiddenLabel": "GizMjG_hiddenLabel",
+			"customizedSummary": "GizMjG_customizedSummary",
+			"section": "GizMjG_section",
+			"rowHead": "GizMjG_rowHead",
+			"iconButtonDanger": "GizMjG_iconButtonDanger",
+			"primaryButton": "GizMjG_primaryButton",
+			"iconButton": "GizMjG_iconButton",
+			"rowActions": "GizMjG_rowActions",
+			"rowTag": "GizMjG_rowTag",
+			"candidate": "GizMjG_candidate",
+			"setupCard": "GizMjG_setupCard",
+			"editorActions": "GizMjG_editorActions",
+			"modelEntry": "GizMjG_modelEntry",
+			"advancedHint": "GizMjG_advancedHint",
+			"modelList": "GizMjG_modelList",
+			"input": "GizMjG_input",
+			"customizedBody": "GizMjG_customizedBody",
+			"rowCard": "GizMjG_rowCard",
+			"error": "GizMjG_error",
+			"title": "GizMjG_title",
+			"linkButton": "GizMjG_linkButton",
+			"modelCatalogMeta": "GizMjG_modelCatalogMeta",
+			"rows": "GizMjG_rows"
 		};
 		//#endregion
 		//#region packages/client/ui-settings-models/src/client/EditorFooter.tsx
@@ -550,7 +550,7 @@ window.__ModuleLoader__.load({
 					return {
 						entry,
 						configured: namespace !== void 0 && (entry.settingsPath.length === 0 || (0, _deepseek_ai_dsh_client_schema_form.getPath)(namespace.value, entry.settingsPath) !== void 0),
-						removable: namespace !== void 0 && entry.settingsPath.length > 0 && (0, _deepseek_ai_dsh_client_schema_form.hasPath)(namespace.user, entry.settingsPath) && !(0, _deepseek_ai_dsh_client_schema_form.hasPath)(namespace.base, entry.settingsPath),
+						removable: namespace !== void 0 && entry.settingsPath.length > 0 && (0, _deepseek_ai_dsh_client_schema_form.hasPath)(namespace.user, entry.settingsPath) && !(0, _deepseek_ai_dsh_client_schema_form.hasPath)(namespace.base, entry.settingsPath) && entry.provider !== "cocode-cloud",
 						apiKeyEnv: apiKeyEnvOf(namespace, entry.settingsPath),
 						credential: void 0
 					};
@@ -1079,7 +1079,7 @@ window.__ModuleLoader__.load({
 			/** Everything but the key stops being editable once the provider exists. */
 			const profileDisabled = disabled || committed;
 			const routeInvalid = route.length > 0 && !ROUTE_PATTERN.test(route);
-			const routeTaken = taken.includes(route);
+			const routeTaken = route === "cocode-cloud" || taken.includes(route);
 			const modelFailure = validateDeepSeekModels(models);
 			const keyFailure = apiKeyFailure(keyDraft);
 			const keyValue = keyDraft.trim();
@@ -1693,6 +1693,7 @@ window.__ModuleLoader__.load({
 		* @returns the failure message, or undefined once the write and reload landed.
 		*/
 		async function removeProviderProfile(api, controller, target) {
+			if (target.provider === "cocode-cloud") return "Cocode Cloud is managed by the Cocode account.";
 			try {
 				if (target.credentialRef !== void 0) {
 					const credential = await api.credentials.unset({ ref: target.credentialRef });
@@ -1902,6 +1903,10 @@ window.__ModuleLoader__.load({
 												className: ModelsSection_module_css_default["rowTag"],
 												children: t("customTag")
 											}) : null,
+											row.entry.provider === "cocode-cloud" ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+												className: ModelsSection_module_css_default["rowTag"],
+												children: t("managedTag")
+											}) : null,
 											credentialConfigured ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 												className: `${ModelsSection_module_css_default["credentialDot"]} ${ModelsSection_module_css_default["credentialDotConfigured"]}`,
 												role: "img",
@@ -1916,7 +1921,7 @@ window.__ModuleLoader__.load({
 										]
 									}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
 										className: ModelsSection_module_css_default["rowActions"],
-										children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+										children: [row.entry.provider === "cocode-cloud" ? null : /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
 											type: "button",
 											className: ModelsSection_module_css_default["secondaryButton"],
 											"aria-label": providerCopy(t("editProvider"), target),
@@ -2064,8 +2069,8 @@ window.__ModuleLoader__.load({
 			});
 		}
 		//#endregion
-		//#region \0dsh-css:/Users/kambiu/worker/open/electron-template/packages/client/ui-settings-models/src/client/OnboardingModal.module.css.mjs
-		const css$2 = ".vR36oG_dialog{width:min(600px,100%);padding:0}.vR36oG_content{box-sizing:border-box;flex-direction:column;max-height:calc(100vh - 48px);padding:28px;display:flex;overflow-y:auto}.vR36oG_title{color:var(--dsw-alias-label-primary);outline:none;margin:0;font-size:20px;font-weight:500;line-height:28px}.vR36oG_body{margin-top:20px}@media (width<=560px){.vR36oG_content{padding:24px}}";
+		//#region \0dsh-css:/Users/kambiu/worker/open/cocode/cocode-gui/packages/client/ui-settings-models/src/client/OnboardingModal.module.css.mjs
+		const css$2 = ".abevUq_dialog{width:min(600px,100%);padding:0}.abevUq_content{box-sizing:border-box;flex-direction:column;max-height:calc(100vh - 48px);padding:28px;display:flex;overflow-y:auto}.abevUq_title{color:var(--dsw-alias-label-primary);outline:none;margin:0;font-size:20px;font-weight:500;line-height:28px}.abevUq_body{margin-top:20px}@media (width<=560px){.abevUq_content{padding:24px}}";
 		const tagId$2 = "@deepseek-ai/dsh-client-ui-settings-models/OnboardingModal.module.css";
 		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId$2) + "]") === null) {
 			const tag = document.createElement("style");
@@ -2075,10 +2080,10 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var OnboardingModal_module_css_default = {
-			"dialog": "vR36oG_dialog",
-			"title": "vR36oG_title",
-			"content": "vR36oG_content",
-			"body": "vR36oG_body"
+			"title": "abevUq_title",
+			"content": "abevUq_content",
+			"body": "abevUq_body",
+			"dialog": "abevUq_dialog"
 		};
 		//#endregion
 		//#region packages/client/ui-settings-models/src/client/OnboardingModal.tsx
@@ -2126,8 +2131,8 @@ window.__ModuleLoader__.load({
 			});
 		}
 		//#endregion
-		//#region \0dsh-css:/Users/kambiu/worker/open/electron-template/packages/client/ui-settings-models/src/client/DeepSeekOnboardingDialog.module.css.mjs
-		const css$1 = "._DCi9a_description{color:var(--dsw-alias-label-secondary);margin:0;font-size:14px;line-height:24px}._DCi9a_editor{margin-top:24px}@media (width<=560px){._DCi9a_editor{margin-top:20px}}";
+		//#region \0dsh-css:/Users/kambiu/worker/open/cocode/cocode-gui/packages/client/ui-settings-models/src/client/DeepSeekOnboardingDialog.module.css.mjs
+		const css$1 = ".n3rOEq_description{color:var(--dsw-alias-label-secondary);margin:0;font-size:14px;line-height:24px}.n3rOEq_editor{margin-top:24px}@media (width<=560px){.n3rOEq_editor{margin-top:20px}}";
 		const tagId$1 = "@deepseek-ai/dsh-client-ui-settings-models/DeepSeekOnboardingDialog.module.css";
 		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId$1) + "]") === null) {
 			const tag = document.createElement("style");
@@ -2137,8 +2142,8 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var DeepSeekOnboardingDialog_module_css_default = {
-			"editor": "_DCi9a_editor",
-			"description": "_DCi9a_description"
+			"description": "n3rOEq_description",
+			"editor": "n3rOEq_editor"
 		};
 		//#endregion
 		//#region packages/client/ui-settings-models/src/client/DeepSeekOnboardingDialog.tsx
@@ -2217,8 +2222,8 @@ window.__ModuleLoader__.load({
 			});
 		}
 		//#endregion
-		//#region \0dsh-css:/Users/kambiu/worker/open/electron-template/packages/client/ui-settings-models/src/client/WelcomeNotice.module.css.mjs
-		const css = "._3PJXfG_copy{color:var(--dsw-alias-label-secondary);font-size:14px;line-height:24px}._3PJXfG_copy p{margin:0}._3PJXfG_copy p+p{margin-top:12px}._3PJXfG_error{color:var(--dsw-alias-state-error-primary);margin:16px 0 0;font-size:14px;line-height:22px}._3PJXfG_actions{justify-content:flex-end;margin-top:24px;display:flex}._3PJXfG_primary{min-width:120px}@media (width<=560px){._3PJXfG_primary{width:100%}}";
+		//#region \0dsh-css:/Users/kambiu/worker/open/cocode/cocode-gui/packages/client/ui-settings-models/src/client/WelcomeNotice.module.css.mjs
+		const css = ".YRBQ5q_copy{color:var(--dsw-alias-label-secondary);font-size:14px;line-height:24px}.YRBQ5q_copy p{margin:0}.YRBQ5q_copy p+p{margin-top:12px}.YRBQ5q_error{color:var(--dsw-alias-state-error-primary);margin:16px 0 0;font-size:14px;line-height:22px}.YRBQ5q_actions{justify-content:flex-end;margin-top:24px;display:flex}.YRBQ5q_primary{min-width:120px}@media (width<=560px){.YRBQ5q_primary{width:100%}}";
 		const tagId = "@deepseek-ai/dsh-client-ui-settings-models/WelcomeNotice.module.css";
 		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId) + "]") === null) {
 			const tag = document.createElement("style");
@@ -2228,10 +2233,10 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var WelcomeNotice_module_css_default = {
-			"error": "_3PJXfG_error",
-			"primary": "_3PJXfG_primary",
-			"actions": "_3PJXfG_actions",
-			"copy": "_3PJXfG_copy"
+			"copy": "YRBQ5q_copy",
+			"error": "YRBQ5q_error",
+			"actions": "YRBQ5q_actions",
+			"primary": "YRBQ5q_primary"
 		};
 		//#endregion
 		//#region packages/client/ui-settings-models/src/client/WelcomeNotice.tsx
@@ -2504,6 +2509,7 @@ window.__ModuleLoader__.load({
 			customAdd: "Add a custom provider",
 			customTitle: "Custom provider",
 			customTag: "Custom",
+			managedTag: "Managed by Cocode account",
 			customRoute: "Provider ID",
 			customRouteHint: "Lowercase identifier, starting with a letter, that uniquely names this provider in requests and as its credential name.",
 			customRouteInvalid: "Start with a lowercase letter; then lowercase letters, digits, and dashes.",
@@ -2600,6 +2606,7 @@ window.__ModuleLoader__.load({
 			customAdd: "添加自定义提供方",
 			customTitle: "自定义提供方",
 			customTag: "自定义",
+			managedTag: "由 Cocode 账号管理",
 			customRoute: "Provider ID",
 			customRouteHint: "以小写字母开头的标识，在请求中唯一标识该提供方，并用于派生凭据名。",
 			customRouteInvalid: "需以小写字母开头，之后可用小写字母、数字和短横线。",

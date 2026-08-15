@@ -1,6 +1,13 @@
 import { app } from "electron"
 import started from "electron-squirrel-startup"
 import { DshRuntimeProcess } from "../contexts/dsh-runtime/infrastructure/dsh-runtime-process"
+import { DshCloudConfigPort } from "../contexts/account/infrastructure/dsh-cloud-config-port"
+import { AgencyClient } from "../contexts/account/infrastructure/agency-client"
+import { AccountService } from "../contexts/account/application/account-service"
+import {
+	registerAccountIpc,
+	unregisterAccountIpc,
+} from "../contexts/account/presentation/ipc/register-account-ipc"
 import {
 	registerDshRuntimeIpc,
 	unregisterDshRuntimeIpc,
@@ -17,6 +24,7 @@ export const startApplication = (): void => {
 
 	let databaseModule: DatabaseModule | null = null
 	let dshRuntime: DshRuntimeProcess | null = null
+	let account: AccountService | null = null
 	let dshUrl: string | null = null
 
 	registerApplicationLifecycle({
@@ -30,8 +38,20 @@ export const startApplication = (): void => {
 			dshRuntime = new DshRuntimeProcess()
 			registerDshRuntimeIpc(dshRuntime)
 			dshUrl = await dshRuntime.start()
+			account = new AccountService(
+				new DshCloudConfigPort(dshRuntime),
+				new AgencyClient(undefined, {
+					allowOriginOverride: !app.isPackaged,
+					allowLocalHttp: !app.isPackaged,
+				}),
+			)
+			registerAccountIpc(account)
+			void account.hydrate()
 		},
 		onBeforeQuit: async () => {
+			unregisterAccountIpc()
+			account?.dispose()
+			account = null
 			unregisterDshRuntimeIpc()
 			databaseModule?.dispose()
 			databaseModule = null

@@ -1,4 +1,5 @@
 export const COCODE_SIDEBAR_PACKAGE = "cocode-sidebar"
+export const COCODE_ACCOUNT_PACKAGE = "cocode-account"
 
 /** Build the Electron-only overlay in a file owned by the Electron app. */
 export function createDshDesktopPatch(noopHmrUrl: string): string {
@@ -8,6 +9,8 @@ export function createDshDesktopPatch(noopHmrUrl: string): string {
 		`      name: ${JSON.stringify(noopHmrUrl)}`,
 		"    - id: cocode-sidebar",
 		`      name: ${JSON.stringify(COCODE_SIDEBAR_PACKAGE)}`,
+		"    - id: cocode-account",
+		`      name: ${JSON.stringify(COCODE_ACCOUNT_PACKAGE)}`,
 		"",
 	].join("\n")
 }

@@ -1,0 +1,269 @@
+type AgencyResponse<T> = { readonly status: number; readonly value: T }
+
+export class AgencyHttpError extends Error {
+	readonly status: number
+
+	constructor(message: string, status: number) {
+		super(message)
+		this.name = "AgencyHttpError"
+		this.status = status
+	}
+}
+
+export type TokenPair = {
+	readonly access_token: string
+	readonly refresh_token: string
+	readonly expires_in: number
+}
+
+type AgencyProfile = {
+	readonly user?: {
+		readonly display_name?: string
+		readonly email?: string
+		readonly avatar_url?: string
+	}
+}
+
+export type AgencyModel = { readonly id: string; readonly name: string }
+
+const DEFAULT_ORIGIN = "https://cocode.agency"
+
+export type AgencyClientOptions = {
+	/** Permit COCODE_AGENCY_ORIGIN and local HTTP for development/test clients. */
+	readonly allowOriginOverride?: boolean
+	readonly allowLocalHttp?: boolean
+}
+
+function isAllowedAgencyProtocol(url: URL): boolean {
+	if (url.protocol === "https:") return true
+	return (
+		url.protocol === "http:" &&
+		(url.hostname === "127.0.0.1" || url.hostname === "localhost" || url.hostname === "[::1]")
+	)
+}
+
+export function agencyOrigin(options: AgencyClientOptions = {}): string {
+	const configured = process.env.COCODE_AGENCY_ORIGIN
+	if (options.allowOriginOverride !== false && configured !== undefined && configured !== "")
+		return normalizeOrigin(configured, options.allowLocalHttp !== false)
+	return DEFAULT_ORIGIN
+}
+
+function normalizeOrigin(value: string, allowLocalHttp = true): string {
+	let parsed: URL
+	try {
+		parsed = new URL(value)
+	} catch {
+		throw new Error("COCODE_AGENCY_ORIGIN must be a valid URL")
+	}
+	if (
+		parsed.username !== "" ||
+		parsed.password !== "" ||
+		parsed.search !== "" ||
+		parsed.hash !== ""
+	) {
+		throw new Error(
+			"COCODE_AGENCY_ORIGIN must be an origin without credentials or query parameters",
+		)
+	}
+	if (!isAllowedAgencyProtocol(parsed) || (!allowLocalHttp && parsed.protocol !== "https:")) {
+		throw new Error("COCODE_AGENCY_ORIGIN must use HTTPS outside local development")
+	}
+	return parsed.origin
+}
+
+export class AgencyClient {
+	private readonly origin: string
+
+	constructor(origin?: string, options: AgencyClientOptions = {}) {
+		this.origin = normalizeOrigin(
+			origin ?? agencyOrigin(options),
+			options.allowLocalHttp !== false,
+		)
+	}
+
+	getOrigin(): string {
+		return this.origin
+	}
+
+	async startAuthorization(input: {
+		readonly redirectUri: string
+		readonly state: string
+		readonly codeChallenge: string
+	}): Promise<string> {
+		const response = await this.request<{ authorization_url?: string }>(
+			"/v1/auth/native/authorizations",
+			{
+				method: "POST",
+				body: {
+					client_id: "cocode-desktop",
+					device_label: "Cocode Desktop",
+					redirect_uri: input.redirectUri,
+					state: input.state,
+					code_challenge: input.codeChallenge,
+					code_challenge_method: "S256",
+					scopes: [
+						"profile:read",
+						"organizations:read",
+						"account:read",
+						"models:read",
+						"inference:write",
+					],
+				},
+			},
+		)
+		if (response.status !== 201 || typeof response.value.authorization_url !== "string") {
+			throw new Error("could not start Cocode login")
+		}
+		let authorizationUrl: URL
+		try {
+			authorizationUrl = new URL(response.value.authorization_url)
+		} catch {
+			throw new Error("Cocode returned an invalid authorization URL")
+		}
+		if (!isAllowedAgencyProtocol(authorizationUrl)) {
+			throw new Error("Cocode returned an unsafe authorization URL")
+		}
+		if (authorizationUrl.origin !== this.origin)
+			throw new Error("Cocode returned an unexpected authorization origin")
+		return authorizationUrl.href
+	}
+
+	async exchangeCode(input: {
+		readonly code: string
+		readonly redirectUri: string
+		readonly verifier: string
+	}): Promise<TokenPair> {
+		const response = await this.request<TokenPair>("/v1/auth/native/token", {
+			method: "POST",
+			body: {
+				grant_type: "authorization_code",
+				client_id: "cocode-desktop",
+				code: input.code,
+				redirect_uri: input.redirectUri,
+				code_verifier: input.verifier,
+			},
+		})
+		if (
+			response.status !== 200 ||
+			typeof response.value.access_token !== "string" ||
+			typeof response.value.refresh_token !== "string" ||
+			typeof response.value.expires_in !== "number" ||
+			!Number.isFinite(response.value.expires_in)
+		) {
+			throw new Error("could not exchange login code")
+		}
+		return response.value
+	}
+
+	async refresh(refreshToken: string): Promise<TokenPair> {
+		const response = await this.request<TokenPair>("/v1/auth/token/refresh", {
+			method: "POST",
+			body: { refresh_token: refreshToken },
+		})
+		if (response.status === 401 || response.status === 403)
+			throw new AgencyHttpError("session expired", response.status)
+		if (
+			response.status !== 200 ||
+			typeof response.value.access_token !== "string" ||
+			typeof response.value.expires_in !== "number" ||
+			!Number.isFinite(response.value.expires_in)
+		)
+			throw new AgencyHttpError("could not refresh Cocode session", response.status)
+		return response.value
+	}
+
+	async profile(
+		accessToken: string,
+	): Promise<{ displayName: string; email?: string; avatarUrl?: string }> {
+		const response = await this.request<AgencyProfile>("/v1/me", {
+			method: "GET",
+			token: accessToken,
+		})
+		if (response.status !== 200)
+			throw new AgencyHttpError("could not load account", response.status)
+		const displayName = response.value.user?.display_name?.trim() ?? ""
+		const email = response.value.user?.email
+		return {
+			displayName: displayName === "" ? email ?? "Cocode" : displayName,
+			...(email === undefined ? {} : { email }),
+			...(response.value.user?.avatar_url === undefined
+				? {}
+				: { avatarUrl: response.value.user.avatar_url }),
+		}
+	}
+
+	async createDesktopKey(accessToken: string): Promise<string> {
+		const response = await this.request<{ secret?: string }>("/v1/me/api-keys", {
+			method: "POST",
+			token: accessToken,
+			body: { name: "Cocode Desktop", scopes: ["models:read", "inference:write"] },
+		})
+		if (
+			(response.status !== 201 && response.status !== 200) ||
+			typeof response.value.secret !== "string" ||
+			!/^ck_[A-Za-z0-9_-]+$/.test(response.value.secret)
+		) {
+			throw new AgencyHttpError("could not create a desktop API key", response.status)
+		}
+		return response.value.secret
+	}
+
+	async models(apiKey: string): Promise<AgencyModel[]> {
+		if (!/^ck_[A-Za-z0-9_-]+$/.test(apiKey)) throw new Error("invalid Cocode Cloud API key")
+		const response = await this.request<{ data?: { id?: string; name?: string }[] }>(
+			"/v1/me/models",
+			{ method: "GET", token: apiKey },
+		)
+		if (response.status !== 200)
+			throw new AgencyHttpError("could not list hosted models", response.status)
+		const models = (response.value.data ?? [])
+			.filter(
+				(row): row is { id: string; name?: string } =>
+					typeof row.id === "string" && row.id !== "",
+			)
+			.map((row) => ({ id: row.id, name: row.name?.trim() || row.id }))
+		return [...new Map(models.map((model) => [model.id, model])).values()]
+	}
+
+	async revoke(refreshToken: string): Promise<void> {
+		try {
+			await this.request("/v1/auth/token/revoke", {
+				method: "POST",
+				body: { refresh_token: refreshToken },
+			})
+		} catch {
+			// Local logout remains authoritative.
+		}
+	}
+
+	private async request<T>(
+		path: string,
+		init: { method: string; body?: unknown; token?: string },
+	): Promise<AgencyResponse<T>> {
+		const headers: Record<string, string> = { accept: "application/json" }
+		if (init.body !== undefined) headers["content-type"] = "application/json"
+		if (init.token !== undefined) headers.authorization = `Bearer ${init.token}`
+		let response: Response
+		try {
+			response = await fetch(`${this.origin}${path}`, {
+				method: init.method,
+				headers,
+				body: init.body === undefined ? undefined : JSON.stringify(init.body),
+			})
+		} catch {
+			throw new Error("Cocode Agency is unavailable")
+		}
+		const text = await response.text()
+		let value: T
+		try {
+			value = text === "" ? ({} as T) : (JSON.parse(text) as T)
+		} catch {
+			throw new AgencyHttpError(
+				`agency answered HTTP ${String(response.status)}`,
+				response.status,
+			)
+		}
+		return { status: response.status, value }
+	}
+}

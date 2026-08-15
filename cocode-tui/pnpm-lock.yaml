@@ -595,10 +595,6 @@ packages:
       }
 
   '@dtyq/eslint-config@0.0.11':
-    resolution:
-      {
-        integrity: sha512-QFsMh5KAmLpfhL16i1ul9HyGPPW/eNEfzPRiPJK8WiLzX9uuScO6EadmRFH9wP8V3zOjuhWHJm7wq2JBS+b0PQ==,
-      }
     hasBin: true
     peerDependencies:
       eslint: '>=8.0.0'
