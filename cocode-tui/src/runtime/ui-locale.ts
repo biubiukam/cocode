@@ -33,6 +33,7 @@ type UiKey =
   | 'footerRedraw'
   | 'agentIdle'
   | 'agentRunning'
+  | 'agentThinking'
   | 'agentStarting'
   | 'agentDead'
   | 'emptyTitle'
@@ -136,6 +137,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     footerRedraw: 'ctrl+l redraw',
     agentIdle: 'idle',
     agentRunning: 'running',
+    agentThinking: 'thinking…',
     agentStarting: 'starting',
     agentDead: 'dead',
     emptyTitle: 'cocode is ready',
@@ -238,6 +240,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     footerRedraw: 'Ctrl+L 重绘',
     agentIdle: '空闲',
     agentRunning: '运行中',
+    agentThinking: '思考中…',
     agentStarting: '连接中',
     agentDead: '已停止',
     emptyTitle: 'cocode 已准备好',

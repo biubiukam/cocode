@@ -370,6 +370,30 @@ describe('TuiApp', () => {
     expect(app.snapshot().notice?.message).toMatch(/Turn in progress/)
   })
 
+  it('shows thinking while a turn is running before the first response chunk', async () => {
+    const runtime = fakeRuntime()
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+      locale: 'zh',
+    })
+    await app.start()
+    runtime.emit({
+      method: 'session.status',
+      params: { sessionId: 's1', status: 'running' },
+    })
+
+    expect(app.snapshot().status.line).toBe('fake-runtime · 思考中…')
+    runtime.emit({
+      method: 'session.status',
+      params: { sessionId: 's1', status: 'idle' },
+    })
+    expect(app.snapshot().status.line).toBe('fake-runtime · 空闲')
+  })
+
   it('sends /compact through the prompt path', async () => {
     const runtime = fakeRuntime()
     const app = createTuiApp({

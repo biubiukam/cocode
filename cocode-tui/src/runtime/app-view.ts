@@ -29,7 +29,7 @@ export function statusLine(
     agent === 'idle'
       ? text(locale, 'agentIdle')
       : agent === 'running'
-      ? text(locale, 'agentRunning')
+      ? text(locale, 'agentThinking')
       : agent === 'starting'
       ? text(locale, 'agentStarting')
       : text(locale, 'agentDead')
