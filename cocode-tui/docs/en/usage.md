@@ -8,9 +8,13 @@ Prepare a sibling `cocode-harness` clone, then set `cocode-tui/.env`:
 
 ```dotenv
 COCODE_HARNESS_CMD=node
-COCODE_HARNESS_ARGS=--import,tsx/esm,../../cocode-harness/packages/examples/jsonrpc-demo/src/bin.ts
-DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
+COCODE_HARNESS_ARGS=--import,tsx/esm,scripts/companion-runner.mjs
+DSH_CORDIS_CONFIG=companion/cordis.yml
 ```
+
+Both `scripts/companion-runner.mjs` and `companion/cordis.yml` belong to `cocode-tui`. The runner only calls the sibling Harness generic boot entry and uses the sibling Harness as the bare-module resolution base. The companion is the sole stdio JSON-RPC owner, so the official `sdk-jsonrpc-server` is not loaded. The plugin source does not need to be copied into `cocode-harness`, and no Harness source is modified.
+
+The local sibling-Harness composition is currently verified on macOS. Windows, Linux, and real terminal key combinations still require separate acceptance as described in [platform notes](./platforms.md); automated tests are not a substitute for a real TTY check.
 
 Configure a key on the first-run gate, or set `DEEPSEEK_API_KEY` for this process. For development, point `COCODE_HOME` at a separate config directory. Sessions default to `$DSH_HOME/sessions`, or `~/.dsh/sessions` when `DSH_HOME` is unset; `DSH_SESSION_ROOT` can override it.
 

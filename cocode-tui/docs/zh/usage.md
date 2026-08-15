@@ -8,9 +8,13 @@
 
 ```dotenv
 COCODE_HARNESS_CMD=node
-COCODE_HARNESS_ARGS=--import,tsx/esm,../../cocode-harness/packages/examples/jsonrpc-demo/src/bin.ts
-DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
+COCODE_HARNESS_ARGS=--import,tsx/esm,scripts/companion-runner.mjs
+DSH_CORDIS_CONFIG=companion/cordis.yml
 ```
+
+`scripts/companion-runner.mjs` 和 `companion/cordis.yml` 都属于 `cocode-tui`。Runner 只调用 sibling Harness 已有的通用启动器，并把 sibling Harness 作为裸包解析基准；Companion 是当前进程唯一的 stdio JSON-RPC owner，不加载官方 `sdk-jsonrpc-server`。因此不需要把插件文件复制到 `cocode-harness`，也不会修改 Harness 源码。
+
+当前已验证的是 macOS 上的本地 sibling Harness 组合。Windows、Linux 和真实终端组合键仍需按 [平台说明](./platforms.md) 单独验收；自动化测试不会替代真实 TTY 验收。
 
 密钥可以通过首屏登录配置，也可以临时设置 `DEEPSEEK_API_KEY`。开发环境可用 `COCODE_HOME` 指向单独的配置目录。会话目录默认使用 `$DSH_HOME/sessions`；未设置 `DSH_HOME` 时使用 `~/.dsh/sessions`，也可以用 `DSH_SESSION_ROOT` 覆盖。
 
