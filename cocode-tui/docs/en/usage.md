@@ -2,6 +2,45 @@
 
 [中文](../zh/usage.md) · [English](./usage.md)
 
+## Install a release package
+
+Requires Node.js 22.19.x or Node.js 24 and later.
+
+The release package contains the terminal client and Cocode companion plugin.
+The Harness model, tool, and session runtime is built separately:
+
+```sh
+cd /path/to/cocode-harness
+pnpm install --frozen-lockfile
+pnpm run build
+
+cd /path/to/cocode-tui
+pnpm run build
+npm pack
+npm install --global ./cocode-tui-0.1.0.tgz
+```
+
+After publication, install it directly with `npm install --global @cocode/tui`.
+
+Point the CLI at the built runtime and verify the installation:
+
+```sh
+export COCODE_HARNESS_ROOT=/path/to/cocode-harness
+cocode --doctor
+cocode
+```
+
+`COCODE_HARNESS_ROOT` must point to a built Harness checkout containing
+`packages/examples/jsonrpc-demo/src/runner.ts` (or its built runner) and
+`examples/package.json`.
+The CLI uses the current directory as the Agent workspace. Set `COCODE_HOME` to
+isolate credentials, or `DSH_SESSION_ROOT` to move session files.
+
+The first launch opens the authentication gate. Choose a DeepSeek API key or
+sign in to Cocode. Later launches reuse the local configuration. The `cocode`
+command's `--help`, `--version`, and `--doctor` options do not require a TTY and
+are suitable for installation scripts and troubleshooting.
+
 ## Before launch
 
 Prepare a sibling `cocode-harness` clone, then set `cocode-tui/.env`:

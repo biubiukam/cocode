@@ -69,7 +69,7 @@ function createHarnessContext(
         }
       },
       async resume(createOptions: Record<string, unknown>): Promise<AgentHandle> {
-        return this.agents.create({ sessionId: createOptions.resumeSessionId, seed: [] })
+        return context.agents.create({ sessionId: createOptions.resumeSessionId, seed: [] })
       },
     },
     sessions: {
@@ -143,6 +143,111 @@ describe('TuiCompanionGateway', () => {
     await expect(gateway.listSkills({ sessionId: 'session-a' })).rejects.toThrow(
       'skills registry is not configured',
     )
+  })
+
+  it('enables plan mode before the first prompt without creating a session on read', async () => {
+    const activeSessions = new Set<string>()
+    const { gateway, agents } = createGateway({
+      services: {
+        planMode: {
+          get(agent: Agent) {
+            return { active: activeSessions.has(String(agent.session.id)) }
+          },
+          set(agent: Agent, active: boolean) {
+            const sessionId = String(agent.session.id)
+            if (active) activeSessions.add(sessionId)
+            else activeSessions.delete(sessionId)
+          },
+        },
+      },
+    })
+    await gateway.initialize({ cwd: '/tmp/project', provider: 'provider', model: 'model' })
+
+    await expect(gateway.planMode({ sessionId: 'session-a' })).resolves.toEqual({ active: false })
+    expect(agents.has('session-a')).toBe(false)
+    await expect(
+      gateway.planMode({ sessionId: 'session-a', active: true }),
+    ).resolves.toEqual({ active: true })
+    expect(agents.has('session-a')).toBe(true)
+
+    const enabling = gateway.planMode({ sessionId: 'session-b', active: true })
+    const reading = gateway.planMode({ sessionId: 'session-b' })
+    await expect(Promise.all([enabling, reading])).resolves.toEqual([
+      { active: true },
+      { active: true },
+    ])
+  })
+
+  it('supports permission mode before the first prompt', async () => {
+    let currentMode = 'manual'
+    const { gateway, agents } = createGateway({
+      services: {
+        permissionPresets: {
+          names: ['manual', 'allow-all'],
+          current: () => currentMode,
+          set: (_session, mode: string) => {
+            currentMode = mode
+          },
+        },
+      },
+    })
+    await gateway.initialize({ cwd: '/tmp/project', provider: 'provider', model: 'model' })
+
+    await expect(gateway.permissionMode({ sessionId: 'session-a' })).resolves.toEqual({
+      mode: 'manual',
+      supportedModes: ['manual', 'allow-all'],
+    })
+    expect(agents.has('session-a')).toBe(false)
+    await expect(
+      gateway.permissionMode({ sessionId: 'session-a', mode: 'allow-all' }),
+    ).resolves.toEqual({ mode: 'allow-all', supportedModes: ['manual', 'allow-all'] })
+    expect(agents.has('session-a')).toBe(true)
+
+    const changing = gateway.permissionMode({ sessionId: 'session-b', mode: 'allow-all' })
+    const reading = gateway.permissionMode({ sessionId: 'session-b' })
+    await expect(Promise.all([changing, reading])).resolves.toEqual([
+      { mode: 'allow-all', supportedModes: ['manual', 'allow-all'] },
+      { mode: 'allow-all', supportedModes: ['manual', 'allow-all'] },
+    ])
+  })
+
+  it('waits for an opening session before changing plan mode', async () => {
+    let releaseInspection!: () => void
+    const inspection = new Promise<void>((resolve) => {
+      releaseInspection = resolve
+    })
+    const activeAgents = new Set<Agent>()
+    const { gateway } = createGateway({
+      services: {
+        sessionPersistence: {
+          async list() {
+            return []
+          },
+          async inspect() {
+            await inspection
+            return { meta: { id: 'session-a', cwd: '/tmp/project' }, events: [] }
+          },
+        },
+        planMode: {
+          get(agent: Agent) {
+            return { active: activeAgents.has(agent) }
+          },
+          set(agent: Agent, active: boolean) {
+            if (active) activeAgents.add(agent)
+            else activeAgents.delete(agent)
+          },
+        },
+      },
+    })
+    await gateway.initialize({ cwd: '/tmp/project', provider: 'provider', model: 'model' })
+
+    const opening = gateway.open({ sessionId: 'session-a' })
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    const changing = gateway.planMode({ sessionId: 'session-a', active: true })
+    releaseInspection()
+    await Promise.all([opening, changing])
+
+    await expect(gateway.planMode({ sessionId: 'session-a' })).resolves.toEqual({ active: true })
   })
 
   it('round-trips an approval response through notification and request', async () => {

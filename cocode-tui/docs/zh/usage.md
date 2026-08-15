@@ -2,6 +2,44 @@
 
 [中文](./usage.md) · [English](../en/usage.md)
 
+## 发布版安装
+
+要求 Node.js 22.19.x 或 24 及以上版本。
+
+发布包不包含 Harness 的模型、工具和会话运行时。先准备一个已经构建好的
+`cocode-harness`，再安装 TUI 包：
+
+```sh
+cd /path/to/cocode-harness
+pnpm install --frozen-lockfile
+pnpm run build
+
+cd /path/to/cocode-tui
+pnpm run build
+npm pack
+npm install --global ./cocode-tui-0.1.0.tgz
+```
+
+正式发布后可直接执行 `npm install --global @cocode/tui`。
+
+设置运行时路径并检查安装：
+
+```sh
+export COCODE_HARNESS_ROOT=/path/to/cocode-harness
+cocode --doctor
+cocode
+```
+
+`COCODE_HARNESS_ROOT` 必须指向已经构建完成的 Harness 根目录，目录中应存在
+`packages/examples/jsonrpc-demo/src/runner.ts`（或对应的构建入口）和
+`examples/package.json`。
+CLI 会把当前目录作为 Agent 工作区。需要隔离凭据时设置 `COCODE_HOME`，需要
+修改会话目录时设置 `DSH_SESSION_ROOT`。
+
+首次启动会进入登录引导，可选择粘贴 DeepSeek API Key 或登录 Cocode 账号。
+后续启动会复用本机配置。`cocode --help`、`--version` 和 `--doctor` 不要求
+TTY，可以用于安装脚本和故障排查。
+
 ## 启动前
 
 先准备 sibling `cocode-harness`，然后在 `cocode-tui/.env` 中设置：

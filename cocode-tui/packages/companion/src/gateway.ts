@@ -126,6 +126,8 @@ export class TuiCompanionGateway {
   private readonly sessions = new Map<string, SessionRecord>()
   private readonly sessionCreations = new Map<string, Promise<SessionRecord>>()
   private readonly sessionOpenings = new Map<string, Promise<SessionRecord>>()
+  private readonly pendingPermissionModes = new Map<string, Promise<SessionRecord>>()
+  private readonly pendingPlanModes = new Map<string, Promise<SessionRecord>>()
   private readonly turnAllowances = new Map<string, { turn: number; tools: Set<string> }>()
   private readonly pendingQuestions = new Map<string, PendingQuestion>()
   private readonly pendingApprovals = new Map<string, PendingApproval>()
@@ -292,33 +294,112 @@ export class TuiCompanionGateway {
     return { sessions }
   }
 
-  permissionMode(params: { sessionId: string; mode?: string }): {
+  async permissionMode(params: { sessionId: string; mode?: string }): Promise<{
     mode: string
     supportedModes: string[]
-  } {
-    const record = this.requireSession(params.sessionId)
+  }> {
+    this.assertInitialized()
     const service = this.ctx.get('permissionPresets') as PermissionService | undefined
     if (service === undefined)
       throw new Error(
         'permission/mode capability is unavailable: permission presets are not configured',
       )
-    if (params.mode !== undefined) service.set(record.handle.agent.session, params.mode)
-    return {
-      mode: service.current(record.handle.agent.session.events),
-      supportedModes: [...service.names],
+
+    const existing = this.sessions.get(params.sessionId)
+    const pending = this.sessionCreations.get(params.sessionId)
+    const opening = this.sessionOpenings.get(params.sessionId)
+    if (
+      existing === undefined &&
+      pending === undefined &&
+      opening === undefined &&
+      params.mode === undefined
+    ) {
+      return { mode: service.current([]), supportedModes: [...service.names] }
+    }
+
+    if (params.mode === undefined) {
+      await this.pendingPermissionModes.get(params.sessionId)
+      const record =
+        existing === undefined
+          ? await this.getOrCreateSession(params.sessionId)
+          : this.assertLive(params.sessionId, existing)
+      return {
+        mode: service.current(record.handle.agent.session.events),
+        supportedModes: [...service.names],
+      }
+    }
+
+    const change = (async () => {
+      const record =
+        existing === undefined
+          ? await this.getOrCreateSession(params.sessionId)
+          : this.assertLive(params.sessionId, existing)
+      service.set(record.handle.agent.session, params.mode as string)
+      return record
+    })()
+    {
+      this.pendingPermissionModes.set(params.sessionId, change)
+      try {
+        const record = await change
+        return {
+          mode: service.current(record.handle.agent.session.events),
+          supportedModes: [...service.names],
+        }
+      } finally {
+        if (this.pendingPermissionModes.get(params.sessionId) === change)
+          this.pendingPermissionModes.delete(params.sessionId)
+      }
     }
   }
 
-  planMode(params: { sessionId: string; active?: boolean }): {
+  async planMode(params: { sessionId: string; active?: boolean }): Promise<{
     active: boolean
     pending?: boolean
-  } {
-    const record = this.requireSession(params.sessionId)
+  }> {
+    this.assertInitialized()
     const service = this.ctx.get('planMode') as PlanService | undefined
     if (service === undefined)
       throw new Error('plan/mode capability is unavailable: plan mode is not configured')
-    if (params.active !== undefined) service.set(record.handle.agent, params.active)
-    return service.get(record.handle.agent)
+
+    const existing = this.sessions.get(params.sessionId)
+    const pending = this.sessionCreations.get(params.sessionId)
+    const opening = this.sessionOpenings.get(params.sessionId)
+    if (
+      existing === undefined &&
+      pending === undefined &&
+      opening === undefined &&
+      params.active !== true
+    ) {
+      return { active: false }
+    }
+
+    if (params.active === undefined) {
+      await this.pendingPlanModes.get(params.sessionId)
+      const record =
+        existing === undefined
+          ? await this.getOrCreateSession(params.sessionId)
+          : this.assertLive(params.sessionId, existing)
+      return service.get(record.handle.agent)
+    }
+
+    const change = (async () => {
+      const record =
+        existing === undefined
+          ? await this.getOrCreateSession(params.sessionId)
+          : this.assertLive(params.sessionId, existing)
+      service.set(record.handle.agent, params.active as boolean)
+      return record
+    })()
+    {
+      this.pendingPlanModes.set(params.sessionId, change)
+      try {
+        const record = await change
+        return service.get(record.handle.agent)
+      } finally {
+        if (this.pendingPlanModes.get(params.sessionId) === change)
+          this.pendingPlanModes.delete(params.sessionId)
+      }
+    }
   }
 
   cancel(params: { sessionId: string; keepInbox?: boolean }): { cancelled: boolean } {
@@ -345,14 +426,15 @@ export class TuiCompanionGateway {
       throw new Error(`session is already live outside the companion: ${params.sessionId}`)
     const opening = this.resumeSession(params.sessionId)
     this.sessionOpenings.set(params.sessionId, opening)
-    void opening.then(
-      () => this.sessionOpenings.delete(params.sessionId),
-      () => this.sessionOpenings.delete(params.sessionId),
-    )
-    const record = await opening
-    this.sessions.set(params.sessionId, record)
-    await this.replaceSession(params.replaceSessionId, params.sessionId)
-    return { opened: true, seed: record.seed ?? [], seedLength: record.seed?.length ?? 0 }
+    try {
+      const record = await opening
+      this.sessions.set(params.sessionId, record)
+      await this.replaceSession(params.replaceSessionId, params.sessionId)
+      return { opened: true, seed: record.seed ?? [], seedLength: record.seed?.length ?? 0 }
+    } finally {
+      if (this.sessionOpenings.get(params.sessionId) === opening)
+        this.sessionOpenings.delete(params.sessionId)
+    }
   }
 
   async fork(params: {
@@ -547,6 +629,8 @@ export class TuiCompanionGateway {
     if (this.shuttingDown) throw new Error('companion is shutting down')
     const existing = this.sessions.get(sessionId)
     if (existing !== undefined) return existing
+    const opening = this.sessionOpenings.get(sessionId)
+    if (opening !== undefined) return opening
     const pending = this.sessionCreations.get(sessionId)
     if (pending !== undefined) return pending
     const creation = this.createSession(sessionId)

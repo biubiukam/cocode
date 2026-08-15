@@ -45,6 +45,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
 
+      - name: Build and validate release package
+        run: pnpm run release:check
+
       - name: Run tests
         run: pnpm test
 
