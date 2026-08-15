@@ -67,6 +67,7 @@ type SkillService = {
       name: string
       description: string
       whenToUse?: string
+      source?: string
       invocation?: { userInvocable?: boolean }
     }[]
   >
@@ -547,6 +548,7 @@ export class TuiCompanionGateway {
           name: skill.name,
           description: skill.description,
           ...(skill.whenToUse === undefined ? {} : { whenToUse: skill.whenToUse }),
+          ...(skill.source === undefined ? {} : { source: skill.source }),
         })),
     }
   }

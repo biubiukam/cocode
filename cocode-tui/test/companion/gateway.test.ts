@@ -123,6 +123,36 @@ describe('TuiCompanionGateway', () => {
     })
   })
 
+  it('preserves skill discovery sources for command namespacing', async () => {
+    const { gateway } = createGateway({
+      services: {
+        skills: {
+          async list() {
+            return [
+              {
+                name: 'review',
+                description: 'Review changes',
+                source: 'project-agents',
+                invocation: { userInvocable: true },
+              },
+            ]
+          },
+        },
+      },
+    })
+    await gateway.initialize({ cwd: PROJECT_CWD, provider: 'provider', model: 'model' })
+
+    await expect(gateway.listSkills({ sessionId: 'session-a' })).resolves.toEqual({
+      skills: [
+        {
+          name: 'review',
+          description: 'Review changes',
+          source: 'project-agents',
+        },
+      ],
+    })
+  })
+
   it('lists every available model group while preserving provider failures', async () => {
     const { gateway } = createGateway({
       services: {

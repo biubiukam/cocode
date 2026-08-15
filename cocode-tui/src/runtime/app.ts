@@ -19,6 +19,7 @@ import type { AuthSnapshot, ResolvedAuth } from './auth/types.ts'
 import type { Assembler } from './assembler.ts'
 import { P0_CAPABILITIES, type TuiCapabilities } from './capabilities.ts'
 import {
+  type Command,
   CommandRegistry,
   commandSummary,
   createBuiltinCommands,
@@ -427,6 +428,7 @@ class TuiAppImpl implements TuiApp {
   private modelPicker: ModelPickerState | undefined
   private modelInputOpen = false
   private skills: SkillEntry[] = []
+  private pendingSkillInvocation: string | undefined
   private readonly questions: QuestionCoordinator
   private readonly approvalQueue: PendingApproval[] = []
   private activeApproval: PendingApproval | undefined
@@ -624,8 +626,13 @@ class TuiAppImpl implements TuiApp {
         ),
       },
       notice: this.notice,
-      helpText: helpText(this.capabilities, this.commands, this.locale),
-      commands: this.commands.list(this.capabilities).map((command) => ({
+      helpText: helpText(
+        this.capabilities,
+        this.commands,
+        this.locale,
+        this.skillCommands(),
+      ),
+      commands: this.visibleCommands().map((command) => ({
         name: command.name,
         summary: commandSummary(command, this.locale),
       })),
@@ -658,6 +665,7 @@ class TuiAppImpl implements TuiApp {
     switch (action.type) {
       case 'setDraft':
         this.draft = replaceDraft(this.draft, action.text)
+        this.pendingSkillInvocation = undefined
         this.interruptArmed = false
         this.pruneAttachments()
         this.pruneImages()
@@ -665,6 +673,7 @@ class TuiAppImpl implements TuiApp {
         return
       case 'insertDraft':
         this.draft = insertDraft(this.draft, action.text)
+        this.pendingSkillInvocation = undefined
         this.interruptArmed = false
         this.pruneAttachments()
         this.pruneImages()
@@ -672,6 +681,7 @@ class TuiAppImpl implements TuiApp {
         return
       case 'deleteBackward':
         this.draft = backspaceDraft(this.draft)
+        this.pendingSkillInvocation = undefined
         this.interruptArmed = false
         this.pruneAttachments()
         this.pruneImages()
@@ -684,6 +694,7 @@ class TuiAppImpl implements TuiApp {
       case 'attachFile': {
         const token = formatFileMention(action.path)
         this.draft = replaceDraftRange(this.draft, action.start, action.end, `${token} `)
+        this.pendingSkillInvocation = undefined
         this.attachments = [
           ...this.attachments.filter((attachment) => attachment.path !== action.path),
           { path: action.path, token },
@@ -866,6 +877,7 @@ class TuiAppImpl implements TuiApp {
         const skill = selectedSkill(this.skillsPicker)
         this.skillsPicker = closeSkillsPicker(this.skillsPicker)
         if (skill !== undefined) {
+          this.pendingSkillInvocation = skill.name
           this.draft = replaceDraft(this.draft, `/${skill.name} `)
           this.attachments = []
           this.images = []
@@ -1764,6 +1776,7 @@ class TuiAppImpl implements TuiApp {
       this.telemetry.reset()
       this.sessionState.reset()
       await this.refreshSessionControls()
+      await this.loadSkills()
       this.resetSubagentActivity()
       this.agent = 'idle'
       this.notice = {
@@ -1784,6 +1797,7 @@ class TuiAppImpl implements TuiApp {
         this.runtimeName = info.name
         this.refreshRuntimeCapabilities()
         await this.refreshSessionControls()
+        await this.loadSkills()
         this.agent = 'idle'
         this.notice = {
           tone: 'error',
@@ -1886,6 +1900,16 @@ class TuiAppImpl implements TuiApp {
     if (this.capturingByok) {
       void submitCapturedByok(this.switchHost(), trimmed)
       return
+    }
+    const pendingSkill = this.pendingSkillInvocation
+    this.pendingSkillInvocation = undefined
+    if (pendingSkill !== undefined) {
+      const parsed = parseSlash(trimmed)
+      const skill = this.skills.find((entry) => entry.name === pendingSkill)
+      if (parsed?.name === pendingSkill && skill !== undefined) {
+        this.sendSkill(trimmed)
+        return
+      }
     }
     if (trimmed.startsWith('/')) {
       this.runCommand(trimmed)
@@ -2132,15 +2156,74 @@ class TuiAppImpl implements TuiApp {
       return
     }
     const command = this.commands.find(parsed.name, this.capabilities)
-    if (command === undefined) {
+    if (command !== undefined) {
+      this.draft = createDraft()
+      this.attachments = []
+      this.images = []
+      this.history.push(line)
+      command.run(this.commandCtx(), parsed.args)
+      return
+    }
+    const skill = this.skills.find((entry) => entry.name === parsed.name)
+    const namespacedSkill = this.skills.find(
+      (entry) => skillCommandName(entry) === parsed.name,
+    )
+    const selectedSkill = skill ?? namespacedSkill
+    if (this.capabilities.skills && selectedSkill !== undefined) {
+      const invocation =
+        selectedSkill === skill ? line : formatSkillInvocation(selectedSkill, parsed.args)
+      this.sendSkill(invocation)
+      return
+    }
+    {
       this.notice = errorNotice('COMMAND_UNKNOWN', { name: parsed.name })
       this.emit()
       return
     }
+  }
+
+  private sendSkill(line: string): void {
+    if (this.agent !== 'idle') {
+      this.notice = { tone: 'info', message: text(this.locale, 'turnBusy') }
+      this.emit()
+      return
+    }
+    const attachments = this.attachments.slice()
+    const images = this.images.slice()
+    this.history.push(line)
     this.draft = createDraft()
     this.attachments = []
-    this.history.push(line)
-    command.run(this.commandCtx(), parsed.args)
+    this.images = []
+    this.notice = undefined
+    void this.promptWithAttachments(line, attachments, 'normal', images).catch((error: unknown) => {
+      if (this.draft.text.trim() === '' && this.attachments.length === 0 && this.images.length === 0) {
+        this.draft = insertDraft(createDraft(), line)
+        this.attachments = [...attachments]
+        this.images = [...images]
+        if (this.history.at(-1) === line) this.history.pop()
+      }
+      this.notice = { tone: 'error', message: errorMessage(error) }
+      this.emit()
+    })
+    this.emit()
+  }
+
+  private visibleCommands(): Command[] {
+    return [...this.commands.list(this.capabilities), ...this.skillCommands()]
+  }
+
+  private skillCommands(): Command[] {
+    if (!this.capabilities.skills || this.skills.length === 0) return []
+    const localNames = new Set(this.commands.list(this.capabilities).map((command) => command.name))
+    return this.skills
+      .filter((skill) => !localNames.has(skillCommandName(skill)))
+      .map((skill) => ({
+        name: skillCommandName(skill),
+        summary: skill.description,
+        kind: 'prompt-text' as const,
+        available: () => true,
+        run: () => undefined,
+      }))
   }
 
   private onNotification(notification: TuiNotification): void {
@@ -2332,6 +2415,23 @@ function safeSubagentId(value: string): string {
     })
     .join('')
     .slice(0, 32)
+}
+
+function skillCommandName(skill: SkillEntry): string {
+  const source = skill.source
+  if (source === undefined || source === '') return skill.name
+  const prefix =
+    source.startsWith('project-')
+      ? 'project'
+      : source.startsWith('user-')
+      ? 'user'
+      : source
+  return `${prefix}:${skill.name}`
+}
+
+function formatSkillInvocation(skill: SkillEntry, args: string): string {
+  const suffix = args.trim()
+  return suffix === '' ? `/${skill.name}` : `/${skill.name} ${suffix}`
 }
 
 function imageExtension(mediaType: TuiImageInput['mediaType']): string {
