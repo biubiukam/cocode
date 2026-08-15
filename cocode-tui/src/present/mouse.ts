@@ -10,6 +10,20 @@ export type TuiMouseEvent = {
   ctrl: boolean
 }
 
+export type TuiMousePointer = {
+  id: number
+  row: number
+  action: 'press' | 'move'
+}
+
+export function shouldEnableMouseTracking(props: {
+  supported: boolean
+  manualMode: boolean
+  overlayOpen: boolean
+}): boolean {
+  return props.supported && (props.manualMode || props.overlayOpen)
+}
+
 /** Convert a pressed mouse wheel event into transcript movement. */
 export function mouseWheelDelta(
   event: Pick<TuiMouseEvent, 'action' | 'button'>,
@@ -67,9 +81,9 @@ export function createMouseDecoder(onEvent: (event: TuiMouseEvent) => void): {
 }
 
 export function enableMouseTracking(stream: { write(value: string): unknown }): () => void {
-  stream.write('\u001b[?1000h\u001b[?1006h')
+  stream.write('\u001b[?1003h\u001b[?1006h')
   return () => {
-    stream.write('\u001b[?1000l\u001b[?1006l')
+    stream.write('\u001b[?1003l\u001b[?1006l')
   }
 }
 

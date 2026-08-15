@@ -69,7 +69,7 @@ Inside `tmux` or `screen`, the TUI automatically uses inline rendering and suppr
 - The transcript projects `you`, `cocode`, reasoning, and tool results as separate node groups.
 - The status bar shows runtime state, notices, and input/output token usage when supplied by the runtime.
 - The composer is a bordered `prompt` panel; a dead runtime is shown as `locked` instead of looking editable.
-- The `/` command menu and `?` help panel appear between status and composer. The transcript shrinks first, then overlay height is bounded by the remaining rows.
+- The `/` command menu, pickers, and confirmation panels appear between the status area and composer; the transcript shrinks first, then overlay height is bounded by the remaining rows.
 - A multiline draft shows at most six logical lines around the cursor without deleting the full draft. If the fixed chrome cannot fit, the TUI asks for a taller terminal and pauses ordinary input.
 
 ## Editing
@@ -80,6 +80,7 @@ Inside `tmux` or `screen`, the TUI automatically uses inline rendering and suppr
 - `Ctrl+R` opens history search; type to filter recent messages, use `↑` `↓` to select, Enter to restore the draft, and `Esc` to close.
 - `Ctrl+G` opens the draft in `$VISUAL` or `$EDITOR`; the edited Markdown is restored to the composer when the editor exits. Non-zero exits, invalid UTF-8, and drafts over 256 KiB are reported as errors.
 - `Shift+↑` enters message selection; use `↑` `↓` to move, Enter to expand or collapse the current message, and `Esc` to exit.
+- Mouse tracking is off by default so native terminal drag-selection keeps working. Press `Alt+M` to toggle mouse mode; clicking the underlined model name opens a model input popup, while clicking elsewhere in the header opens the command menu. The current runtime wire does not expose a model catalog, so the popup accepts a model id and keeps `/model`'s runtime-restart and new-session semantics. Moving across other popup choices shows hover feedback, and clicking runs the choice. Popups opened from the keyboard enable mouse tracking only while they are visible, then restore text selection when they close. Message bodies do not open menus on left click; enter message selection with `Shift+↑` and press `m` for message actions.
 - Press `c` in message selection to copy the current node, or use `/copy` to copy the latest assistant reply. The TUI tries macOS `pbcopy`, Windows `clip.exe`, then Linux `wl-copy`, `xclip`, and `xsel`; an unavailable command produces a notice without interrupting the session.
 - `/focus` toggles a local latest-turn view. When enabled, the transcript shows the most recent user message and every node after it, and the status line shows `focus: latest turn`. It only changes the projection, so `/clear`, `/resume`, `/rewind`, export, and the persisted session log keep their existing semantics. Toggle it again to return to the normal full-transcript view.
 - `/lang zh` or `/lang en` switches the interface immediately; startup language follows `COCODE_LANG`, `LANG`, and related locale variables.

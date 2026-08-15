@@ -3,7 +3,7 @@
  */
 
 import { Box, Text, useInput, useStdout, useStdin } from 'ink'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { TuiApp, TuiSnapshot } from '../runtime/app.ts'
 import { matchKey, type Keymap } from '../runtime/keymap.ts'
 import { resolveKeymap } from '../runtime/keymap-config.ts'
@@ -59,14 +59,21 @@ import { QueuePicker } from './components/QueuePicker.tsx'
 import { dispatchKeyCommand, dispatchPickerInput, moveSelection } from './chat-input.ts'
 import {
   createMouseDecoder,
+  enableMouseTracking,
   isMouseInput,
   mouseWheelDelta,
+  shouldEnableMouseTracking,
+  type TuiMousePointer,
   type TuiMouseEvent,
 } from './mouse.ts'
 import { nodeKey } from '../runtime/nodes/types.ts'
-import { actionMenuItemIndexAtRow, listItemIndexAtRow, messageKeyAtRow } from './mouse-hit.ts'
+import {
+  actionMenuItemIndexAtRow,
+  listItemIndexAtRow,
+  popupContains,
+} from './mouse-hit.ts'
 
-export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
+export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boolean }) {
   const { app } = props
   const [snap, setSnap] = useState<TuiSnapshot>(() => app.snapshot())
   const keymap = useMemo(() => props.keymap ?? resolveKeymap(), [props.keymap])
@@ -89,6 +96,10 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
   const [commandPaletteIndex, setCommandPaletteIndex] = useState(0)
   const [editorBusy, setEditorBusy] = useState(false)
   const [editorError, setEditorError] = useState<string | undefined>()
+  const [questionMousePointer, setQuestionMousePointer] = useState<TuiMousePointer>()
+  const [approvalMousePointer, setApprovalMousePointer] = useState<TuiMousePointer>()
+  const mouseClickId = useRef(0)
+  const [mouseMode, setMouseMode] = useState(false)
   const { stdout } = useStdout()
   const { isRawModeSupported, setRawMode } = useStdin()
   const slashItems = useMemo<readonly SlashMenuItem[]>(
@@ -234,18 +245,31 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
     questionRows:
       snap.question === undefined
         ? undefined
-        : 6 +
-          (snap.question.question.options?.length ?? 0) +
-          Number(snap.question.question.detail !== undefined),
-    approvalRows: approvalOpen ? 6 : undefined,
+        : questionPanelRows(snap.question),
+    approvalRows: approvalOpen ? 12 : undefined,
     reviewRows: reviewOpen ? reviewRowsFor(snap.reviewPicker) : undefined,
     actionMenuItems: actionMenuItems.length > 0 ? actionMenuItems.length : undefined,
   })
   const messageMaxRows = layout.messageRows
+  const statusRows = 2 + Number(snap.notice !== undefined) + Number(hasStatusDetails(snap.status))
+  const editorRows = Number(editorBusy) + Number(editorError !== undefined)
+  const contentOverlayStartRow = 4 + messageMaxRows + statusRows + editorRows
   const wideInspector = stdout.columns >= 120
   const mainColumns = wideInspector
     ? Math.max(1, stdout.columns - INSPECTOR_WIDTH - 1)
     : stdout.columns
+  const popupBounds = {
+    startRow: contentOverlayStartRow,
+    startColumn: 1,
+    rows: layout.overlayRows,
+    columns: mainColumns,
+  }
+  const popupStartRow = popupBounds.startRow
+  const mouseTrackingActive = shouldEnableMouseTracking({
+    supported: props.mouseSupported !== false,
+    manualMode: mouseMode,
+    overlayOpen: layout.overlayRows > 0,
+  })
   const selectableMessages = useMemo(
     () =>
       selectableMessageKeys(
@@ -324,90 +348,110 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
       )
       return
     }
-    if (questionOpen || approvalOpen) return
-    if (event.action !== 'press' || event.button !== 0 || layout.tooSmall) return
+    const insidePopup = popupContains(popupBounds, event.x, event.y)
+    const hitRow = insidePopup ? event.y : -1
+    if (questionOpen || approvalOpen) {
+      if ((event.action === 'press' || event.action === 'move') && event.button === 0) {
+        const pointer = { id: mouseClickId.current++, row: hitRow, action: event.action }
+        if (questionOpen) setQuestionMousePointer(pointer)
+        else setApprovalMousePointer(pointer)
+      }
+      return
+    }
+    if (
+      (event.action !== 'press' && event.action !== 'move') ||
+      event.button !== 0 ||
+      layout.tooSmall
+    ) return
+    const isPress = event.action === 'press'
     const headerRows = 3
     const messageStart = headerRows + 1
-    const statusRows = 2 + Number(snap.notice !== undefined) + Number(hasStatusDetails(snap.status))
-    const editorRows = Number(editorBusy) + Number(editorError !== undefined)
-    const menuStart = messageStart + messageMaxRows + statusRows + editorRows
     if (commandPaletteOpen) {
       const index = actionMenuItemIndexAtRow({
-        row: event.y,
-        menuStartRow: menuStart,
+        row: hitRow,
+        menuStartRow: popupStartRow,
         itemCount: commandPaletteItems.length,
         selectedIndex: commandPaletteIndex,
         maxRows: layout.overlayRows,
       })
       if (index !== undefined) {
-        const item = commandPaletteItems[index]
-        if (item !== undefined) app.dispatch({ type: 'command', line: `/${item.id}` })
-        setCommandPaletteOpen(false)
+        if (isPress) {
+          const item = commandPaletteItems[index]
+          if (item !== undefined) app.dispatch({ type: 'command', line: `/${item.id}` })
+          setCommandPaletteOpen(false)
+        } else {
+          setCommandPaletteIndex(index)
+        }
       }
       return
     }
     if (messageActionMenuOpen) {
       const index = actionMenuItemIndexAtRow({
-        row: event.y,
-        menuStartRow: menuStart,
+        row: hitRow,
+        menuStartRow: popupStartRow,
         itemCount: messageActionItems.length,
         selectedIndex: messageActionIndex,
         maxRows: layout.overlayRows,
       })
       if (index !== undefined) {
-        runMessageAction(messageActionItems[index])
-      } else if (event.y < menuStart || event.y > menuStart + layout.overlayRows) {
+        if (isPress) runMessageAction(messageActionItems[index])
+        else setMessageActionIndex(index)
+      } else if (isPress && (event.y < popupStartRow || event.y > popupStartRow + layout.overlayRows)) {
         setMessageActionMenuOpen(false)
       }
       return
     }
     if (slashOpen) {
       const index = listItemIndexAtRow({
-        row: event.y,
-        itemStartRow: menuStart + 3,
+        row: hitRow,
+        itemStartRow: popupStartRow + 3,
         itemCount: slashItems.length,
         selectedIndex: slashIndex,
         windowSize: overlayWindowSize(layout.overlayRows, slashItems.length, 4),
       })
       const item = index === undefined ? undefined : slashItems[index]
-      if (item !== undefined) app.dispatch({ type: 'command', line: `/${item.name}` })
+      if (index !== undefined && isPress && item !== undefined) {
+        app.dispatch({ type: 'command', line: `/${item.name}` })
+      } else if (index !== undefined) {
+        setSlashIndex(index)
+      }
       return
     }
     if (fileOpen && fileMention !== undefined) {
       const loadingRows = fileLoading ? 1 : 0
       const index = listItemIndexAtRow({
-        row: event.y,
-        itemStartRow: menuStart + 3 + loadingRows,
+        row: hitRow,
+        itemStartRow: popupStartRow + 3 + loadingRows,
         itemCount: fileItems.length,
         selectedIndex: fileIndex,
         windowSize: overlayWindowSize(layout.overlayRows, fileItems.length, 4 + loadingRows),
       })
       const item = index === undefined ? undefined : fileItems[index]
-      if (item !== undefined) {
+      if (item !== undefined && isPress) {
         app.dispatch({
           type: 'attachFile',
           start: fileMention.start,
           end: fileMention.end,
           path: item,
         })
-      }
+      } else if (index !== undefined) setFileIndex(index)
       return
     }
     if (historySearchOpen) {
       const index = listItemIndexAtRow({
-        row: event.y,
-        itemStartRow: menuStart + 4,
+        row: hitRow,
+        itemStartRow: popupStartRow + 4,
         itemCount: historyItems.length,
         selectedIndex: historyIndex,
         windowSize: overlayWindowSize(layout.overlayRows, historyItems.length, 5),
       })
       const item = index === undefined ? undefined : historyItems[index]
-      if (item !== undefined) {
+      if (item !== undefined && isPress) {
         app.dispatch({ type: 'setDraft', text: item })
         setHistorySearchOpen(false)
         setHistoryQuery('')
         setHistoryIndex(0)
-      }
+      } else if (index !== undefined) setHistoryIndex(index)
       return
     }
     if (resumeOpen && snap.resumePicker !== undefined) {
@@ -415,15 +459,15 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
       const windowSize = pickerWindowSize(layout.overlayRows, RESUME_WINDOW_SIZE)
       const start = listWindowStart(snap.resumePicker.selected, items.length, windowSize)
       const index = listItemIndexAtRow({
-        row: event.y,
-        itemStartRow: menuStart + 4 + Number(start > 0),
+        row: hitRow,
+        itemStartRow: popupStartRow + 4 + Number(start > 0),
         itemCount: items.length,
         selectedIndex: snap.resumePicker.selected,
         windowSize,
       })
       if (index !== undefined) {
         app.dispatch({ type: 'resume.move', delta: index - snap.resumePicker.selected })
-        app.dispatch({ type: 'resume.confirm' })
+        if (isPress) app.dispatch({ type: 'resume.confirm' })
       }
       return
     }
@@ -432,15 +476,15 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
       const windowSize = pickerWindowSize(layout.overlayRows, SESSION_TREE_WINDOW_SIZE)
       const start = listWindowStart(snap.sessionTreePicker.selected, items.length, windowSize)
       const index = listItemIndexAtRow({
-        row: event.y,
-        itemStartRow: menuStart + 4 + Number(start > 0),
+        row: hitRow,
+        itemStartRow: popupStartRow + 4 + Number(start > 0),
         itemCount: items.length,
         selectedIndex: snap.sessionTreePicker.selected,
         windowSize,
       })
       if (index !== undefined) {
         app.dispatch({ type: 'sessionTree.move', delta: index - snap.sessionTreePicker.selected })
-        app.dispatch({ type: 'sessionTree.confirm' })
+        if (isPress) app.dispatch({ type: 'sessionTree.confirm' })
       }
       return
     }
@@ -449,15 +493,15 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
       const windowSize = pickerWindowSize(layout.overlayRows, PROMPT_QUEUE_WINDOW_SIZE)
       const start = listWindowStart(snap.queuePicker.selected, items.length, windowSize)
       const index = listItemIndexAtRow({
-        row: event.y,
-        itemStartRow: menuStart + 4 + Number(start > 0),
+        row: hitRow,
+        itemStartRow: popupStartRow + 4 + Number(start > 0),
         itemCount: items.length,
         selectedIndex: snap.queuePicker.selected,
         windowSize,
       })
       if (index !== undefined) {
         app.dispatch({ type: 'queue.move', delta: index - snap.queuePicker.selected })
-        app.dispatch({ type: 'queue.restore' })
+        if (isPress) app.dispatch({ type: 'queue.restore' })
       }
       return
     }
@@ -466,15 +510,15 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
       const windowSize = pickerWindowSize(layout.overlayRows, SKILLS_WINDOW_SIZE)
       const start = listWindowStart(skillsState.selected, items.length, windowSize)
       const index = listItemIndexAtRow({
-        row: event.y,
-        itemStartRow: menuStart + 4 + Number(start > 0),
+        row: hitRow,
+        itemStartRow: popupStartRow + 4 + Number(start > 0),
         itemCount: items.length,
         selectedIndex: skillsState.selected,
         windowSize,
       })
       if (index !== undefined) {
         app.dispatch({ type: 'skills.move', delta: index - skillsState.selected })
-        app.dispatch({ type: 'skills.confirm' })
+        if (isPress) app.dispatch({ type: 'skills.confirm' })
       }
       return
     }
@@ -482,8 +526,8 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
       const windowSize = pickerWindowSize(layout.overlayRows, REWIND_WINDOW_SIZE, 6)
       const start = listWindowStart(rewindState.selected, rewindState.items.length, windowSize)
       const index = listItemIndexAtRow({
-        row: event.y,
-        itemStartRow: menuStart + 3 + Number(rewindState.confirming) + Number(start > 0),
+        row: hitRow,
+        itemStartRow: popupStartRow + 3 + Number(rewindState.confirming) + Number(start > 0),
         itemCount: rewindState.items.length,
         selectedIndex: rewindState.selected,
         windowSize,
@@ -491,7 +535,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
       if (index !== undefined) {
         if (index !== rewindState.selected && !rewindState.confirming) {
           app.dispatch({ type: 'rewind.move', delta: index - rewindState.selected })
-        } else {
+        } else if (isPress) {
           app.dispatch({ type: 'rewind.confirm' })
         }
       }
@@ -501,8 +545,8 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
       const windowSize = pickerWindowSize(layout.overlayRows, REWIND_WINDOW_SIZE, 6)
       const start = listWindowStart(forkState.selected, forkState.items.length, windowSize)
       const index = listItemIndexAtRow({
-        row: event.y,
-        itemStartRow: menuStart + 3 + Number(forkState.confirming) + Number(start > 0),
+        row: hitRow,
+        itemStartRow: popupStartRow + 3 + Number(forkState.confirming) + Number(start > 0),
         itemCount: forkState.items.length,
         selectedIndex: forkState.selected,
         windowSize,
@@ -510,7 +554,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
       if (index !== undefined) {
         if (index !== forkState.selected && !forkState.confirming) {
           app.dispatch({ type: 'fork.move', delta: index - forkState.selected })
-        } else {
+        } else if (isPress) {
           app.dispatch({ type: 'fork.confirm' })
         }
       }
@@ -519,47 +563,38 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
     if (reviewOpen && snap.reviewPicker !== undefined) {
       if (snap.reviewPicker.phase === 'scope') {
         const index = listItemIndexAtRow({
-          row: event.y,
-          itemStartRow: menuStart + 3,
+          row: hitRow,
+          itemStartRow: popupStartRow + 3,
           itemCount: snap.reviewPicker.scopes.length,
           selectedIndex: snap.reviewPicker.selected,
           windowSize: snap.reviewPicker.scopes.length,
         })
         if (index !== undefined) {
           app.dispatch({ type: 'review.move', delta: index - snap.reviewPicker.selected })
-          app.dispatch({ type: 'review.confirm' })
+          if (isPress) app.dispatch({ type: 'review.confirm' })
         }
-      } else if (snap.reviewPicker.phase === 'preview' && event.y >= menuStart + layout.overlayRows - 2) {
+      } else if (isPress && insidePopup && snap.reviewPicker.phase === 'preview' && event.y >= popupStartRow + layout.overlayRows - 2) {
         app.dispatch({ type: 'review.confirm' })
       }
       return
     }
+    if (!isPress) return
     if (
       event.y <= headerRows ||
-      (event.y >= messageStart + messageMaxRows && event.y < menuStart)
+      (event.y >= messageStart + messageMaxRows && event.y < contentOverlayStartRow)
     ) {
       openCommandPalette()
       return
     }
-    if (event.y < messageStart || event.y >= messageStart + messageMaxRows) return
-    const key = messageKeyAtRow({
-      nodes: displayNodes,
-      maxRows: messageMaxRows,
-      verbose: snap.verbose,
-      expandedNodeIds: expandedMessageIds,
-      scrollOffset: messageScrollOffset,
-      row: event.y,
-      startRow: messageStart,
-    })
-    if (key !== undefined) {
-      setMessageSelectionActive(true)
-      setSelectedMessageId(key)
-      setMessageActionIndex(0)
-      setMessageActionMenuOpen(true)
-    }
   }
 
   useEffect(() => {
+    if (!mouseTrackingActive) return
+    return enableMouseTracking(process.stdout)
+  }, [mouseTrackingActive])
+
+  useEffect(() => {
+    if (!mouseTrackingActive) return
     const decoder = createMouseDecoder(handleMouseEvent)
     const onData = (chunk: Buffer | string): void => decoder.feed(String(chunk))
     process.stdin.on('data', onData)
@@ -567,7 +602,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
       process.stdin.off('data', onData)
       decoder.reset()
     }
-  })
+  }, [mouseTrackingActive, handleMouseEvent])
 
   useEffect(() => {
     setMessageScrollOffset((offset) => Math.min(offset, messageScrollMax))
@@ -653,6 +688,10 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
   useInput((input, key) => {
     if (editorBusy) return
     if (isMouseInput(input)) return
+    if (key.meta && input.toLowerCase() === 'm') {
+      if (props.mouseSupported !== false) setMouseMode((enabled) => !enabled)
+      return
+    }
     if (approvalOpen) return
     if (questionOpen) return
     if (reviewOpen) {
@@ -1139,11 +1178,19 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
           key={snap.question.key}
           state={snap.question}
           locale={snap.locale}
+          panelStartRow={popupStartRow}
+          mousePointer={questionMousePointer}
           dispatch={app.dispatch}
         />
       ) : null}
       {approvalOpen && snap.approval !== undefined ? (
-        <ApprovalPanel state={snap.approval} locale={snap.locale} dispatch={app.dispatch} />
+        <ApprovalPanel
+          state={snap.approval}
+          locale={snap.locale}
+          panelStartRow={popupStartRow}
+          mousePointer={approvalMousePointer}
+          dispatch={app.dispatch}
+        />
       ) : null}
       {reviewOpen && snap.reviewPicker !== undefined ? (
         <ReviewPicker state={snap.reviewPicker} locale={snap.locale} maxRows={layout.overlayRows} />
@@ -1235,11 +1282,14 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
             <>
               <Text color={theme.mute} wrap="truncate-end">
                 {text(snap.locale, 'footerHistory')} · {text(snap.locale, 'footerScroll')} ·{' '}
-                {text(snap.locale, 'footerMessages')} · {text(snap.locale, 'footerMenu')} ·{' '}
+                {text(snap.locale, 'footerMessages')} · {mouseMode ? text(snap.locale, 'footerMenu') : snap.locale === 'zh' ? 'Ctrl+P 菜单' : 'ctrl+p menu'} ·{' '}
                 {text(snap.locale, 'footerDetails')} · {text(snap.locale, 'footerHelp')}
               </Text>
-              <Text color={theme.mute} wrap="truncate-end">
-                {text(snap.locale, 'footerQuit')} · {text(snap.locale, 'footerRedraw')}
+              <Text color={mouseMode ? theme.brand : theme.mute} wrap="truncate-end">
+                {text(snap.locale, 'footerQuit')} · {text(snap.locale, 'footerRedraw')} ·{' '}
+                {mouseMode
+                  ? snap.locale === 'zh' ? '鼠标模式 · Alt+M 选择文本' : 'mouse mode · alt+m select text'
+                  : snap.locale === 'zh' ? '文本选择 · Alt+M 鼠标模式' : 'text select · alt+m mouse mode'}
               </Text>
             </>
           )}
@@ -1275,6 +1325,15 @@ function reviewRowsFor(state: TuiSnapshot['reviewPicker']): number {
   if (state.phase === 'scope') return state.scopes.length + 5
   if (state.phase === 'loading') return 7
   return Math.min(16, state.review.files.length + 8)
+}
+
+function questionPanelRows(state: NonNullable<TuiSnapshot['question']>): number {
+  const options = state.question.options ?? []
+  const optionRows = options.reduce(
+    (rows, option) => rows + 1 + Number(option.description !== undefined),
+    0,
+  )
+  return 7 + Number(state.question.detail !== undefined) + optionRows
 }
 
 function overlayWindowSize(maxRows: number, itemCount: number, chromeRows: number): number {

@@ -26,7 +26,6 @@ import { Chat } from './present/chat.tsx'
 import { clearViewport, enterScreen, parseScreenMode } from './present/clear-screen.ts'
 import { resolveUiLocale } from './runtime/ui-locale.ts'
 import { detectTerminalEnvironment } from './runtime/platform.ts'
-import { enableMouseTracking } from './present/mouse.ts'
 
 loadDotenv(resolve(process.cwd(), '.env'))
 
@@ -66,17 +65,6 @@ async function main(): Promise<void> {
       return
     }
   }
-
-  // Keep mouse tracking disabled while AuthGate owns stdin. SGR mouse reports
-  // are otherwise interpreted as pasted key input by Ink's useInput handler.
-  const releaseMouse = terminal.supportsMouse ? enableMouseTracking(process.stdout) : () => undefined
-  let mouseReleased = false
-  const leaveMouse = (): void => {
-    if (mouseReleased) return
-    mouseReleased = true
-    releaseMouse()
-  }
-  process.once('exit', () => leaveMouse())
 
   const resolved = auth.resolved()
   await registerLiveInstance(resolved.home)
@@ -132,7 +120,7 @@ async function main(): Promise<void> {
   })
 
   clearViewport()
-  const screen = render(<Chat app={app} />)
+  const screen = render(<Chat app={app} mouseSupported={terminal.supportsMouse} />)
   let exitStarted = false
   const finish = async (): Promise<void> => {
     if (exitStarted) return
@@ -144,7 +132,6 @@ async function main(): Promise<void> {
     process.off('SIGTERM', onTerminate)
     process.off('SIGHUP', onTerminate)
     await screen.unmount()
-    leaveMouse()
     leaveScreen()
     try {
       await releaseLiveInstance(resolved.home)

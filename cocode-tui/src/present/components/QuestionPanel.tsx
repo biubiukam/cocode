@@ -1,13 +1,16 @@
 import { Box, Text, useInput } from 'ink'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { TuiQuestionSnapshot, TuiAction } from '../../runtime/app.ts'
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
 import { theme } from '../theme.ts'
-import { isMouseInput } from '../mouse.ts'
+import { isMouseInput, type TuiMousePointer } from '../mouse.ts'
+import { questionCustomRow, questionOptionIndexAtRow } from '../mouse-hit.ts'
 
 export function QuestionPanel(props: {
   state: TuiQuestionSnapshot
   locale: UiLocale
+  panelStartRow: number
+  mousePointer?: TuiMousePointer
   dispatch: (action: TuiAction) => void
 }) {
   const options = props.state.question.options ?? []
@@ -17,6 +20,41 @@ export function QuestionPanel(props: {
   const inputIndex = options.length
   const inputFocused = focus === inputIndex
   const multiSelect = props.state.question.multiSelect === true
+  const lastPointerId = useRef<number>()
+
+  useEffect(() => {
+    const pointer = props.mousePointer
+    if (pointer === undefined || pointer.id === lastPointerId.current) return
+    lastPointerId.current = pointer.id
+    const optionHasDescription = options.map((option) => option.description !== undefined)
+    const firstOptionRow =
+      props.panelStartRow + 4 + Number(props.state.question.detail !== undefined)
+    const optionIndex = questionOptionIndexAtRow({
+      row: pointer.row,
+      firstOptionRow,
+      optionHasDescription,
+    })
+    if (optionIndex !== undefined) {
+      setFocus(optionIndex)
+      if (pointer.action === 'move') return
+      const option = options[optionIndex]
+      if (option === undefined) return
+      if (multiSelect) {
+        setSelected((current) => {
+          const next = new Set(current)
+          if (next.has(optionIndex)) next.delete(optionIndex)
+          else next.add(optionIndex)
+          return next
+        })
+      } else {
+        props.dispatch({ type: 'question.answer', selected: [option.label] })
+      }
+      return
+    }
+    if (pointer.row === questionCustomRow({ firstOptionRow, optionHasDescription })) {
+      setFocus(inputIndex)
+    }
+  }, [inputIndex, multiSelect, options, props])
 
   useInput((input, key) => {
     if (isMouseInput(input)) return
@@ -79,14 +117,15 @@ export function QuestionPanel(props: {
       <Text color={theme.brand} bold wrap="truncate-end">
         {props.state.question.header ?? text(props.locale, 'questionTitle')}{' '}
         <Text color={theme.mute}>
-          · {props.state.position}/{props.state.total} · {text(props.locale, 'questionHint')}
+          · {props.state.position}/{props.state.total} · {text(props.locale, 'questionHint')} ·{' '}
+          {props.locale === 'zh' ? '点击选项' : 'click an option'}
         </Text>
       </Text>
-      <Text color={theme.text} wrap="wrap">
+      <Text color={theme.text} wrap="truncate-end">
         {props.state.question.question}
       </Text>
       {props.state.question.detail !== undefined ? (
-        <Text color={theme.dim} wrap="wrap">
+        <Text color={theme.dim} wrap="truncate-end">
           {props.state.question.detail}
         </Text>
       ) : null}
@@ -94,7 +133,7 @@ export function QuestionPanel(props: {
         const active = focus === index
         const checked = multiSelect ? selected.has(index) : active
         return (
-          <Box key={option.label} flexDirection="column" marginTop={active ? 1 : 0}>
+          <Box key={option.label} flexDirection="column">
             <Text color={active ? theme.text : theme.mute} inverse={active} wrap="truncate-end">
               {active ? '›' : ' '} {checked ? (multiSelect ? '◉' : '●') : '○'} {option.label}
             </Text>

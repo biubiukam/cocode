@@ -4,6 +4,7 @@ import {
   enableMouseTracking,
   isMouseInput,
   mouseWheelDelta,
+  shouldEnableMouseTracking,
 } from '../../src/present/mouse.ts'
 
 describe('terminal mouse support', () => {
@@ -31,9 +32,32 @@ describe('terminal mouse support', () => {
     const leave = enableMouseTracking({ write })
     leave()
     expect(write.mock.calls).toEqual([
-      ['\u001b[?1000h\u001b[?1006h'],
-      ['\u001b[?1000l\u001b[?1006l'],
+      ['\u001b[?1003h\u001b[?1006h'],
+      ['\u001b[?1003l\u001b[?1006l'],
     ])
+  })
+
+  it('keeps native text selection until mouse mode or a popup needs tracking', () => {
+    expect(shouldEnableMouseTracking({
+      supported: true,
+      manualMode: false,
+      overlayOpen: false,
+    })).toBe(false)
+    expect(shouldEnableMouseTracking({
+      supported: true,
+      manualMode: true,
+      overlayOpen: false,
+    })).toBe(true)
+    expect(shouldEnableMouseTracking({
+      supported: true,
+      manualMode: false,
+      overlayOpen: true,
+    })).toBe(true)
+    expect(shouldEnableMouseTracking({
+      supported: false,
+      manualMode: true,
+      overlayOpen: true,
+    })).toBe(false)
   })
 
   it('maps pressed wheel events to transcript movement', () => {

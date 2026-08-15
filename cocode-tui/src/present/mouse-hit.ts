@@ -1,37 +1,19 @@
-import type { ConversationNode } from '../runtime/nodes/types.ts'
-import { nodeKey } from '../runtime/nodes/types.ts'
 import { listWindowStart } from './list-window.ts'
-import { estimateNodeRows } from './visible-tail.ts'
-import { visibleMessageWindow } from './message-scroll.ts'
 
-export function messageKeyAtRow(props: {
-  nodes: readonly ConversationNode[]
-  maxRows: number
-  verbose: boolean
-  expandedNodeIds: ReadonlySet<string>
-  scrollOffset: number
-  row: number
+export type PopupBounds = {
   startRow: number
-}): string | undefined {
-  if (props.row < props.startRow || props.row >= props.startRow + props.maxRows) return undefined
-  const visible = visibleMessageWindow(
-    props.nodes,
-    props.maxRows,
-    props.verbose,
-    props.expandedNodeIds,
-    props.scrollOffset,
+  startColumn: number
+  rows: number
+  columns: number
+}
+
+export function popupContains(bounds: PopupBounds, x: number, y: number): boolean {
+  return (
+    x >= bounds.startColumn &&
+    x < bounds.startColumn + bounds.columns &&
+    y >= bounds.startRow &&
+    y < bounds.startRow + bounds.rows
   )
-  let cursor = props.startRow
-  for (const node of visible) {
-    const rows = estimateNodeRows(
-      node,
-      props.verbose,
-      props.expandedNodeIds.has(nodeKey(node.kind, node.id)),
-    )
-    if (props.row < cursor + rows) return nodeKey(node.kind, node.id)
-    cursor += rows
-  }
-  return undefined
 }
 
 export function actionMenuItemIndexAtRow(props: {
@@ -63,4 +45,39 @@ export function listItemIndexAtRow(props: {
   const visibleCount = Math.min(props.windowSize, props.itemCount - start)
   if (offset < 0 || offset >= visibleCount) return undefined
   return start + offset
+}
+
+export function questionOptionIndexAtRow(props: {
+  row: number
+  firstOptionRow: number
+  optionHasDescription: readonly boolean[]
+}): number | undefined {
+  let cursor = props.firstOptionRow
+  for (const [index, hasDescription] of props.optionHasDescription.entries()) {
+    const rows = 1 + Number(hasDescription)
+    if (props.row >= cursor && props.row < cursor + rows) return index
+    cursor += rows
+  }
+  return undefined
+}
+
+export function questionCustomRow(props: {
+  firstOptionRow: number
+  optionHasDescription: readonly boolean[]
+}): number {
+  return props.firstOptionRow + props.optionHasDescription.reduce(
+    (rows, hasDescription) => rows + 1 + Number(hasDescription),
+    0,
+  )
+}
+
+export function approvalActionAtRow(row: number, panelStartRow: number):
+  | 'allowed-once'
+  | 'allowed-for-turn'
+  | 'rejected'
+  | undefined {
+  if (row === panelStartRow + 8) return 'allowed-once'
+  if (row === panelStartRow + 9) return 'allowed-for-turn'
+  if (row === panelStartRow + 10) return 'rejected'
+  return undefined
 }

@@ -1,38 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import type { ConversationNode } from '../../src/runtime/nodes/types.ts'
 import {
+  approvalActionAtRow,
   actionMenuItemIndexAtRow,
   listItemIndexAtRow,
-  messageKeyAtRow,
+  popupContains,
+  questionCustomRow,
+  questionOptionIndexAtRow,
 } from '../../src/present/mouse-hit.ts'
 
-const nodes: ConversationNode[] = [
-  { kind: 'user', id: 'u1', seq: 1, time: 1, text: 'hello' },
-  { kind: 'tool', id: 't1', seq: 2, time: 2, callId: 'c1', name: 'read', args: '', status: 'running' },
-]
-
 describe('mouse hit zones', () => {
-  it('maps terminal rows to the visible conversation node', () => {
-    expect(messageKeyAtRow({
-      nodes,
-      maxRows: 8,
-      verbose: false,
-      expandedNodeIds: new Set(),
-      scrollOffset: 0,
-      row: 5,
-      startRow: 4,
-    })).toBe('user:u1')
-    expect(messageKeyAtRow({
-      nodes,
-      maxRows: 8,
-      verbose: false,
-      expandedNodeIds: new Set(),
-      scrollOffset: 0,
-      row: 7,
-      startRow: 4,
-    })).toBe('tool:t1')
-  })
-
   it('maps clicks to the currently visible menu window', () => {
     expect(actionMenuItemIndexAtRow({
       row: 14,
@@ -50,6 +26,14 @@ describe('mouse hit zones', () => {
     })).toBeUndefined()
   })
 
+  it('keeps pointer hits inside the inline popup region', () => {
+    const bounds = { startRow: 10, startColumn: 1, rows: 8, columns: 80 }
+    expect(popupContains(bounds, 1, 10)).toBe(true)
+    expect(popupContains(bounds, 80, 17)).toBe(true)
+    expect(popupContains(bounds, 81, 17)).toBe(false)
+    expect(popupContains(bounds, 20, 18)).toBe(false)
+  })
+
   it('accounts for a scrolled list window and its indicator row', () => {
     expect(listItemIndexAtRow({
       row: 18,
@@ -65,5 +49,32 @@ describe('mouse hit zones', () => {
       selectedIndex: 6,
       windowSize: 4,
     })).toBeUndefined()
+  })
+
+  it('maps question option labels and descriptions to the same option', () => {
+    const optionHasDescription = [false, true, false]
+    expect(questionOptionIndexAtRow({
+      row: 12,
+      firstOptionRow: 12,
+      optionHasDescription,
+    })).toBe(0)
+    expect(questionOptionIndexAtRow({
+      row: 14,
+      firstOptionRow: 12,
+      optionHasDescription,
+    })).toBe(1)
+    expect(questionOptionIndexAtRow({
+      row: 15,
+      firstOptionRow: 12,
+      optionHasDescription,
+    })).toBe(2)
+    expect(questionCustomRow({ firstOptionRow: 12, optionHasDescription })).toBe(16)
+  })
+
+  it('maps approval action rows without making the details clickable', () => {
+    expect(approvalActionAtRow(18, 10)).toBe('allowed-once')
+    expect(approvalActionAtRow(19, 10)).toBe('allowed-for-turn')
+    expect(approvalActionAtRow(20, 10)).toBe('rejected')
+    expect(approvalActionAtRow(17, 10)).toBeUndefined()
   })
 })
