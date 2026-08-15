@@ -5,7 +5,8 @@
 import { Box, Text, useInput, useStdout, useStdin } from 'ink'
 import { useEffect, useMemo, useState } from 'react'
 import type { TuiApp, TuiSnapshot } from '../runtime/app.ts'
-import { matchKey } from '../runtime/keymap.ts'
+import { matchKey, type Keymap } from '../runtime/keymap.ts'
+import { resolveKeymap } from '../runtime/keymap-config.ts'
 import { Composer } from './components/Composer.tsx'
 import { FileMenu } from './components/FileMenu.tsx'
 import { Header } from './components/Header.tsx'
@@ -35,9 +36,10 @@ import { editDraft } from '../runtime/external-editor.ts'
 import { calculateChatLayout } from './chat-layout.ts'
 import { Inspector, INSPECTOR_WIDTH } from './components/Inspector.tsx'
 
-export function Chat(props: { app: TuiApp }) {
+export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
   const { app } = props
   const [snap, setSnap] = useState<TuiSnapshot>(() => app.snapshot())
+  const keymap = useMemo(() => props.keymap ?? resolveKeymap(), [props.keymap])
   const [slashDismissed, setSlashDismissed] = useState(false)
   const [slashIndex, setSlashIndex] = useState(0)
   const [fileDismissed, setFileDismissed] = useState(false)
@@ -357,20 +359,10 @@ export function Chat(props: { app: TuiApp }) {
         })
         return
       }
-      return
-    }
-
-    if (key.ctrl && input === 'r') {
-      setHistorySearchOpen(true)
-      setHistoryQuery('')
-      setHistoryIndex(0)
-      return
-    }
-
-    if (key.shift && key.upArrow) {
-      if (selectableMessages.length === 0) return
-      setMessageSelectionActive(true)
-      setSelectedMessageId(selectableMessages[selectableMessages.length - 1] ?? null)
+      if (input === 'c' && !key.ctrl && !key.meta && !key.shift && selectedMessageId !== null) {
+        app.dispatch({ type: 'copyNode', nodeKey: selectedMessageId })
+        return
+      }
       return
     }
 
@@ -428,16 +420,25 @@ export function Chat(props: { app: TuiApp }) {
       return
     }
 
-    const matched = matchKey({
-      raw: input,
-      return: key.return,
-      escape: key.escape,
-      upArrow: key.upArrow,
-      downArrow: key.downArrow,
-      ctrl: key.ctrl,
-      shift: key.shift,
-      empty: snap.composer.text === '',
-    })
+    const matched = matchKey(
+      {
+        raw: input,
+        return: key.return,
+        escape: key.escape,
+        upArrow: key.upArrow,
+        downArrow: key.downArrow,
+        leftArrow: key.leftArrow,
+        rightArrow: key.rightArrow,
+        tab: key.tab,
+        backspace: key.backspace,
+        delete: key.delete,
+        ctrl: key.ctrl,
+        alt: key.meta,
+        shift: key.shift,
+        empty: snap.composer.text === '',
+      },
+      keymap,
+    )
 
     if (matched !== undefined) {
       if (matched.emptyOnly === true && snap.composer.text !== '') return
@@ -445,12 +446,19 @@ export function Chat(props: { app: TuiApp }) {
         openExternalEditor()
         return
       }
+      if (matched.id === 'history.search') {
+        setHistorySearchOpen(true)
+        setHistoryQuery('')
+        setHistoryIndex(0)
+        return
+      }
+      if (matched.id === 'messages.select') {
+        if (selectableMessages.length === 0) return
+        setMessageSelectionActive(true)
+        setSelectedMessageId(selectableMessages[selectableMessages.length - 1] ?? null)
+        return
+      }
       runCommand(app, matched.id, snap.composer.text)
-      return
-    }
-
-    if (key.ctrl && input === 'l') {
-      app.dispatch({ type: 'redraw' })
       return
     }
     if (key.leftArrow) {
@@ -664,6 +672,9 @@ function runCommand(app: TuiApp, id: string, draft: string): void {
       return
     case 'app.quit':
       app.dispatch({ type: 'quit' })
+      return
+    case 'app.redraw':
+      app.dispatch({ type: 'redraw' })
       return
     case 'transcript.toggleVerbose':
       app.dispatch({ type: 'toggleVerbose' })

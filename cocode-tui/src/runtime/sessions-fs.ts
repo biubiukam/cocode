@@ -6,11 +6,15 @@ import { createInterface } from 'node:readline'
 import { createZstdDecompress } from 'node:zlib'
 import { join, posix, resolve, win32 } from 'node:path'
 import type { SessionEvent } from '@cocode/tui-connection'
+import { blocksToText, isRecord } from './text.ts'
+
+export const SESSION_PREVIEW_MAX_LENGTH = 72
 
 export type SessionSummary = {
   id: string
   createdAt: number
   cwd?: string
+  preview?: string
   path: string
 }
 
@@ -110,7 +114,17 @@ export async function listSessionSummaries(options: {
           skipped += 1
           continue
         }
-        sessions.push({ ...header, path: existing[0] })
+        let preview: string | undefined
+        try {
+          preview = await readFirstUserPreview(existing[0], existing[0] === compressed)
+        } catch {
+          // A broken or partially-written event stream must not hide a valid session header.
+        }
+        sessions.push({
+          ...header,
+          ...(preview === undefined ? {} : { preview }),
+          path: existing[0],
+        })
       } catch {
         skipped += 1
       }
@@ -122,6 +136,48 @@ export async function listSessionSummaries(options: {
   )
   const limit = options.limit === undefined ? sessions.length : Math.max(0, options.limit)
   return { sessions: sessions.slice(0, limit), skipped }
+}
+
+async function readFirstUserPreview(
+  path: string,
+  compressed: boolean,
+): Promise<string | undefined> {
+  const source = createReadStream(path)
+  const output = compressed ? source.pipe(createZstdDecompress()) : source
+  const lines = createInterface({ input: output })
+  try {
+    for await (const line of lines) {
+      const event = parseEvent(line)
+      if (event?.type !== 'user/message') continue
+      return previewText(userMessageText(event.data))
+    }
+    return undefined
+  } finally {
+    lines.close()
+    source.destroy()
+    if (compressed) output.destroy()
+  }
+}
+
+function userMessageText(data: unknown): string {
+  if (!isRecord(data)) return ''
+  if ('content' in data) return blocksToText(data.content)
+  const message = isRecord(data.message) ? data.message : undefined
+  return message === undefined ? '' : blocksToText(message.content)
+}
+
+function previewText(value: string): string | undefined {
+  const normalized = value
+    // eslint-disable-next-line no-control-regex
+    .replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, '')
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u001f\u007f-\u009f]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (normalized === '') return undefined
+  const characters = Array.from(normalized)
+  if (characters.length <= SESSION_PREVIEW_MAX_LENGTH) return normalized
+  return `${characters.slice(0, SESSION_PREVIEW_MAX_LENGTH - 1).join('')}…`
 }
 
 async function existingFiles(paths: string[]): Promise<string[]> {

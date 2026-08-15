@@ -24,6 +24,7 @@ describe('commands', () => {
       'lang',
       'model',
       'export',
+      'copy',
       'init',
       'new',
       'compact',
@@ -96,6 +97,13 @@ describe('commands', () => {
     command?.run(commandCtx({ dispatch: (action) => actions.push(action) }), '')
     expect(actions).toEqual([{ type: 'compact' }])
   })
+
+  it('/copy delegates to the latest assistant callback', () => {
+    let called = false
+    const command = createBuiltinCommands().find('copy', P0_CAPABILITIES)
+    command?.run(commandCtx({ copyLatestAssistant: () => (called = true) }), '')
+    expect(called).toBe(true)
+  })
 })
 
 function commandCtx(
@@ -105,6 +113,7 @@ function commandCtx(
     useAuth: (target: 'byok' | 'cocode' | 'login') => void
     setLocale: (value: string) => void
     setModel: (value: string) => void
+    copyLatestAssistant: () => void
   }> = {},
 ) {
   return {
@@ -117,5 +126,6 @@ function commandCtx(
     useAuth: overrides.useAuth,
     setLocale: overrides.setLocale,
     setModel: overrides.setModel,
+    copyLatestAssistant: overrides.copyLatestAssistant,
   }
 }

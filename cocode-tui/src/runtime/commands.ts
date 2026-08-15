@@ -86,6 +86,9 @@ export function createBuiltinCommands(): CommandRegistry {
   local('export', 'Export the projected session as Markdown', (ctx) => {
     void ctx.exportTranscript?.()
   })
+  local('copy', 'Copy the latest assistant reply to the clipboard', (ctx) => {
+    ctx.copyLatestAssistant?.()
+  })
   local('init', 'Create AGENTS.md when the workspace has none', (ctx) => {
     void ctx.initWorkspace?.()
   })

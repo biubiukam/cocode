@@ -33,6 +33,7 @@ DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 - `Ctrl+R` 打开历史搜索；输入文字过滤最近消息，使用 `↑` `↓` 选择，回车回填到输入区，`Esc` 关闭。
 - `Ctrl+G` 使用 `$VISUAL` 或 `$EDITOR` 打开临时 Markdown 草稿；退出编辑器后内容回填到输入区。编辑器退出码非 0、草稿不是 UTF-8 或超过 256 KiB 时会显示错误。
 - `Shift+↑` 进入消息选择模式；使用 `↑` `↓` 移动，回车展开或收起当前消息，`Esc` 退出。
+- 在消息选择模式按 `c` 可复制当前消息；也可以使用 `/copy` 复制最近一条 assistant 回复。复制依次尝试 macOS `pbcopy`、Windows `clip.exe`，以及 Linux 的 `wl-copy`、`xclip`、`xsel`；命令不可用时只显示提示，不影响会话。
 - `/lang zh` 或 `/lang en` 立即切换界面语言；未指定时启动语言由 `COCODE_LANG`、`LANG` 等环境变量决定。
 - `/model <model-id>` 通过 runtime restart 切换当前模型，并创建新 session；切换失败会尝试恢复原模型。
 - `Ctrl+O` 切换详细模式，查看完整思考内容和工具输入输出。
@@ -40,6 +41,9 @@ DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 - 当前任务运行时按 `Tab` 可将输入加入队列，最多 8 条；收到 `session.status=idle` 后按顺序自动发送。这是本地排队，不会打断当前任务，也不是 steer。
 - `Esc` 在帮助、命令菜单等弹层中先关闭弹层；任务运行时第一次请求取消，第二次退出；空闲时连续按两次退出 TUI。
 - `Ctrl+L` 重绘界面，不清除会话内容。
+- 可用 `COCODE_TUI_KEYMAP` 以 JSON 对象覆盖快捷键，例如
+  `COCODE_TUI_KEYMAP='{"historySearch":"ctrl+f","editorOpen":"alt+e"}'`。键名支持帮助中的 command id（如
+  `history.search`）和对应的驼峰别名。只有已存在的 command id 会生效；JSON、键名或按键格式非法时保留默认键位，并向 stderr 输出诊断。配置使用 `ctrl`、`alt`、`shift` 与 `enter`、`escape`、`up`、`down` 等跨平台写法，Windows、macOS、Linux 均按同一规则解析。
 - 在消息任意位置输入 `@` 可搜索工作区文件和目录；使用 `Tab`、`↑`、`↓` 选择，回车插入引用。
 - 发送时会在消息末尾附加选中文件内容，目录则附加受限的目录列表；文件必须位于当前工作区内。
 - 当 runtime 挂载 Skills registry 时，`/skills` 会打开可搜索的工作区技能目录。选择技能后会向输入区插入 `/技能名 `，可以继续编辑 prompt 再发送；未挂载 registry 时不会显示该命令。
@@ -66,6 +70,7 @@ DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 | `/new`                         | 创建新的 session id，不复制旧会话                         |
 | `/compact`                     | 通过 prompt 路径请求 host 压缩当前会话                    |
 | `/export`                      | 将当前投影导出为 Markdown 文件                            |
+| `/copy`                        | 复制最近一条 assistant 回复到系统剪贴板                   |
 | `/init`                        | 仅在缺少 `AGENTS.md` 时创建最小工作区模板                 |
 | `/theme dark` / `/theme light` | 切换显示主题                                              |
 | `/lang zh` / `/lang en`        | 切换中英文界面                                            |
@@ -78,7 +83,11 @@ DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 
 `/resume` 会读取本地 session header，支持关键词过滤和 `↑` `↓` 选择，以流式方式将选中 JSONL 的事件回放到临时投影，并要求 runtime 重新打开同一个持久化 session 后再替换当前 TUI。后续输入会继续写入选中的 session id。TUI 不负责跨进程写入锁；如果其它客户端正在写同一 session，请不要同时恢复。
 
+选择器每一行会显示该会话首条用户消息的短摘要。系统会移除控制字符和终端转义序列、合并空白，并限制为最多 72 个可见字符，避免长 prompt 撑开选择器。如果事件读取失败，会回退显示会话工作目录；两者都没有时显示「无摘要」。摘要只用于界面展示，不会修改持久化 JSONL。
+
 `/compact` 会向当前 session 发送字面量 `/compact` prompt。只有 host 的 compaction 插件识别该 prompt 时才会执行压缩；TUI 不会在缺少对应事件时宣称压缩成功。
+
+回合从运行变为空闲时，TUI 默认发送 OSC 9 终端通知。设置 `COCODE_TUI_NOTIFY=off` 可关闭；需要 OSC 777 的终端可以设置为 `osc777`。通知是尽力而为的终端控制序列，写入失败不会影响会话。
 
 ## 错误
 

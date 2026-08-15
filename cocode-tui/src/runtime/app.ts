@@ -76,6 +76,8 @@ import {
   type ChannelSwitchHost,
 } from './channel-switch.ts'
 import { createTelemetryProjector, type TelemetrySnapshot } from './telemetry.ts'
+import { copyToClipboard, readableNodeText } from './clipboard.ts'
+import { notifyTerminal, type TerminalNotifyMode } from './terminal-notify.ts'
 
 export type TuiAction =
   | { type: 'submit'; text: string }
@@ -108,6 +110,7 @@ export type TuiAction =
   | { type: 'question.answer'; selected: string[]; custom?: string }
   | { type: 'question.cancel' }
   | { type: 'queuePrompt' }
+  | { type: 'copyNode'; nodeKey: string }
 
 export type { TuiCapabilities }
 
@@ -216,6 +219,7 @@ export type TuiCommandCtx = {
   setModel?: (value: string) => void
   resumeSessions?: () => Promise<void>
   showSkillsPicker?: () => void
+  copyLatestAssistant?: () => void
 }
 
 export type TuiApp = {
@@ -243,6 +247,10 @@ export type TuiAppOptions = {
   }
   setTheme?: (name: 'dark' | 'light') => void
   locale?: UiLocale
+  terminalNotify?: {
+    mode?: TerminalNotifyMode
+    write?: (value: string) => void
+  }
 }
 
 export function createTuiApp(options: TuiAppOptions): TuiApp {
@@ -280,6 +288,7 @@ class TuiAppImpl implements TuiApp {
   private readonly themeSetter: TuiAppOptions['setTheme']
   private locale: UiLocale
   private readonly auth: TuiAuthInfo | undefined
+  private readonly terminalNotify: NonNullable<TuiAppOptions['terminalNotify']>
   private readonly activeSubagents = new Set<string>()
   private lastSubagent: TuiSubagentActivity['last']
   private readonly queuedPrompts: QueuedPrompt[] = []
@@ -311,6 +320,8 @@ class TuiAppImpl implements TuiApp {
     }
     this.themeSetter = options.setTheme
     this.locale = options.locale ?? 'en'
+    this.terminalNotify =
+      options.terminalNotify ?? (process.stdout.isTTY === true ? {} : { mode: 'off' })
   }
 
   async start(): Promise<void> {
@@ -634,6 +645,9 @@ class TuiAppImpl implements TuiApp {
       case 'queuePrompt':
         this.queueCurrentPrompt()
         return
+      case 'copyNode':
+        this.copyNode(action.nodeKey)
+        return
     }
   }
 
@@ -791,7 +805,7 @@ class TuiAppImpl implements TuiApp {
           sessions.map((session) => ({
             id: session.id,
             createdAt: session.createdAt,
-            preview: session.cwd,
+            preview: session.preview ?? session.cwd,
             path: session.path,
           })),
         )
@@ -808,6 +822,39 @@ class TuiAppImpl implements TuiApp {
         this.skillsPicker = createSkillsPicker(this.skills)
         this.emit()
       },
+      copyLatestAssistant: () => {
+        const node = [...this.assembler.snapshot()]
+          .reverse()
+          .find((candidate) => candidate.kind === 'assistant' && candidate.text !== '')
+        if (node === undefined) {
+          this.notice = { tone: 'info', message: text(this.locale, 'copyEmpty') }
+          this.emit()
+          return
+        }
+        this.copyText(readableNodeText(node))
+      },
+    })
+  }
+
+  private copyNode(key: string): void {
+    const node = this.assembler
+      .snapshot()
+      .find((candidate) => `${candidate.kind}:${candidate.id}` === key)
+    const value = node === undefined ? '' : readableNodeText(node)
+    if (value === '') {
+      this.notice = { tone: 'info', message: text(this.locale, 'copyEmpty') }
+      this.emit()
+      return
+    }
+    this.copyText(value)
+  }
+
+  private copyText(value: string): void {
+    void copyToClipboard(value).then((result) => {
+      this.notice = result.ok
+        ? { tone: 'info', message: text(this.locale, 'copySuccess') }
+        : { tone: 'error', message: text(this.locale, 'copyUnavailable') }
+      this.emit()
     })
   }
 
@@ -1163,7 +1210,15 @@ class TuiAppImpl implements TuiApp {
       },
       isDeadOrExiting: () => this.agent === 'dead' || this.exiting,
       setAgent: (agent) => {
+        const previous = this.agent
         this.agent = agent
+        if (previous === 'running' && agent === 'idle' && this.queuedPrompts.length === 0) {
+          notifyTerminal({
+            ...this.terminalNotify,
+            title: 'Cocode',
+            body: text(this.locale, 'turnComplete'),
+          })
+        }
         if (agent === 'idle') this.flushQueuedPrompt()
       },
       clearInterrupt: () => {

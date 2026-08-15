@@ -33,6 +33,7 @@ Set `COCODE_TUI_SCREEN=inline` (the default) to keep the main screen and scrollb
 - `Ctrl+R` opens history search; type to filter recent messages, use `↑` `↓` to select, Enter to restore the draft, and `Esc` to close.
 - `Ctrl+G` opens the draft in `$VISUAL` or `$EDITOR`; the edited Markdown is restored to the composer when the editor exits. Non-zero exits, invalid UTF-8, and drafts over 256 KiB are reported as errors.
 - `Shift+↑` enters message selection; use `↑` `↓` to move, Enter to expand or collapse the current message, and `Esc` to exit.
+- Press `c` in message selection to copy the current node, or use `/copy` to copy the latest assistant reply. The TUI tries macOS `pbcopy`, Windows `clip.exe`, then Linux `wl-copy`, `xclip`, and `xsel`; an unavailable command produces a notice without interrupting the session.
 - `/lang zh` or `/lang en` switches the interface immediately; startup language follows `COCODE_LANG`, `LANG`, and related locale variables.
 - `/model <model-id>` restarts the runtime with a new model and starts a new session; a failed switch attempts to restore the previous model.
 - `Ctrl+O` toggles verbose mode for full reasoning and tool I/O.
@@ -40,6 +41,9 @@ Set `COCODE_TUI_SCREEN=inline` (the default) to keep the main screen and scrollb
 - While a turn is running, press `Tab` to queue the current draft. Up to eight queued prompts are sent in order after `session.status=idle`; this is local queuing, not steer or cancellation.
 - `Esc` closes overlays (help, command menu) first; while a turn is running, the first press requests cancellation and the second exits. When idle, press twice to quit.
 - `Ctrl+L` redraws the screen without clearing the session.
+- Set `COCODE_TUI_KEYMAP` to a JSON object to override shortcuts, for example
+  `COCODE_TUI_KEYMAP='{"historySearch":"ctrl+f","editorOpen":"alt+e"}'`. Keys may use the command id shown by help (such as
+  `history.search`) or its camel-case alias. Only existing command ids are accepted; invalid JSON, command names, or key values keep the defaults and write a diagnostic to stderr. Use the platform-neutral `ctrl`, `alt`, `shift`, and names such as `enter`, `escape`, `up`, and `down`; the same parser is used on Windows, macOS, and Linux.
 - Type `@` at any position in the message to search workspace files and directories; use `Tab`, `↑`, or `↓` to select, then Enter to insert the reference.
 - On send, selected files are appended with their contents and selected directories with a bounded listing; references must stay inside the workspace.
 - When the runtime exposes a Skills registry, `/skills` opens a searchable workspace catalog. Select a skill to insert `/skill-name ` into the composer, then edit the prompt before sending. The command stays hidden when the runtime does not mount a Skills registry.
@@ -66,6 +70,7 @@ Type `/` to open the command menu. Keep typing to filter by prefix. `Tab` or arr
 | `/new`                         | Start a new session id (not a fork)                                         |
 | `/compact`                     | Request host conversation compaction through the prompt path                |
 | `/export`                      | Export the current projection as Markdown                                   |
+| `/copy`                        | Copy the latest assistant reply to the system clipboard                     |
 | `/init`                        | Create a minimal `AGENTS.md` only when the workspace has none               |
 | `/theme dark` / `/theme light` | Switch the display theme                                                    |
 | `/lang zh` / `/lang en`        | Switch between Chinese and English UI                                       |
@@ -78,7 +83,11 @@ Type `/` to open the command menu. Keep typing to filter by prefix. `Tab` or arr
 
 `/resume` reads local session headers, supports text filtering plus `↑` `↓` selection, streams the selected JSONL into a temporary projection, and asks the runtime to reopen the same persisted session before swapping it into the current TUI. Follow-up prompts use the selected session id and continue writing to that session. The TUI does not claim cross-process locking; avoid resuming a session that another client is currently writing.
 
+Each picker row includes a short preview generated from the first user message in the session. Control characters and terminal escape sequences are removed, whitespace is collapsed, and the preview is capped at 72 visible characters so a long prompt cannot expand the picker. If the event cannot be read, the picker falls back to the session working directory; when neither value is available it shows `No summary`. The preview is display-only and does not modify the persisted JSONL.
+
 `/compact` sends the literal `/compact` prompt to the current session. A host compaction plugin must recognize that prompt; the TUI does not claim compaction succeeded without a corresponding event.
+
+When a turn changes from running to idle, the TUI sends an OSC 9 terminal notification by default. Set `COCODE_TUI_NOTIFY=off` to disable it, or `osc777` for terminals that support OSC 777. Notifications are best-effort terminal control sequences; a write failure does not affect the session.
 
 ## Errors
 

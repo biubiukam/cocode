@@ -29,6 +29,7 @@ export type CommandContextOptions = {
   locale?: UiLocale
   showResumePicker?: (sessions: readonly SessionSummary[]) => void
   showSkillsPicker?: TuiCommandCtx['showSkillsPicker']
+  copyLatestAssistant?: TuiCommandCtx['copyLatestAssistant']
 }
 
 export type AppCommandContextOptions = {
@@ -55,6 +56,7 @@ export type AppCommandContextOptions = {
   locale: UiLocale
   showResumePicker: (sessions: readonly SessionSummary[]) => void
   showSkillsPicker: TuiCommandCtx['showSkillsPicker']
+  copyLatestAssistant?: TuiCommandCtx['copyLatestAssistant']
 }
 
 export function createCommandContext(options: CommandContextOptions): TuiCommandCtx {
@@ -104,6 +106,7 @@ export function createCommandContext(options: CommandContextOptions): TuiCommand
       }
     },
     showSkillsPicker: options.showSkillsPicker,
+    copyLatestAssistant: options.copyLatestAssistant,
   }
 }
 
@@ -141,5 +144,6 @@ export function createAppCommandContext(options: AppCommandContextOptions): TuiC
     locale: options.locale,
     showResumePicker: options.showResumePicker,
     showSkillsPicker: options.showSkillsPicker,
+    copyLatestAssistant: options.copyLatestAssistant,
   })
 }

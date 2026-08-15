@@ -49,6 +49,7 @@ type UiKey =
   | 'resumeHint'
   | 'resumeQuery'
   | 'resumeEmpty'
+  | 'resumeNoSummary'
   | 'resumeLoading'
   | 'resumeLoaded'
   | 'resumeUnavailable'
@@ -78,6 +79,7 @@ type UiKey =
   | 'queueAdded'
   | 'queueFull'
   | 'queueSending'
+  | 'turnComplete'
   | 'turnBusy'
   | 'cancelRequested'
   | 'cancelNotRunning'
@@ -104,6 +106,9 @@ type UiKey =
   | 'inspectorEmpty'
   | 'inspectorGoal'
   | 'inspectorTodos'
+  | 'copySuccess'
+  | 'copyEmpty'
+  | 'copyUnavailable'
 
 const TEXT: Record<UiLocale, Record<UiKey, string>> = {
   en: {
@@ -128,7 +133,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     help: 'help',
     helpHint: 'esc close',
     messageMode: 'message mode',
-    messageModeHint: '↑↓ move · enter expand · esc close',
+    messageModeHint: '↑↓ move · enter expand · c copy · esc close',
     footerHistory: '↑↓ history',
     footerMessages: 'shift+↑ messages',
     footerDetails: 'ctrl+o details',
@@ -153,6 +158,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     resumeHint: 'type to filter · ↑↓ select · enter choose · esc close',
     resumeQuery: 'filter: {query}',
     resumeEmpty: 'No sessions found for this workspace.',
+    resumeNoSummary: 'No summary',
     resumeLoading: 'Loading session history…',
     resumeLoaded: 'Resumed session {session}.',
     resumeUnavailable: 'Cannot resume session {session}: the session file is unavailable.',
@@ -182,6 +188,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     queueAdded: 'Queued prompt ({count}); it will send when the current turn finishes.',
     queueFull: 'Prompt queue is full (8).',
     queueSending: 'Sending queued prompt…',
+    turnComplete: 'Turn complete',
     turnBusy: 'Turn in progress. Press Tab to queue this prompt.',
     cancelRequested: 'Cancel requested; waiting for the runtime to become idle.',
     cancelNotRunning: 'No active turn to cancel.',
@@ -208,6 +215,9 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     inspectorEmpty: 'no active details',
     inspectorGoal: 'goal',
     inspectorTodos: 'todos',
+    copySuccess: 'Copied to clipboard.',
+    copyEmpty: 'There is no message text to copy.',
+    copyUnavailable: 'Clipboard unavailable on this terminal.',
   },
   zh: {
     session: '会话',
@@ -231,7 +241,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     help: '帮助',
     helpHint: 'Esc 关闭',
     messageMode: '消息模式',
-    messageModeHint: '↑↓ 移动 · 回车展开 · Esc 关闭',
+    messageModeHint: '↑↓ 移动 · 回车展开 · c 复制 · Esc 关闭',
     footerHistory: '↑↓ 历史',
     footerMessages: 'Shift+↑ 消息',
     footerDetails: 'Ctrl+O 详情',
@@ -256,6 +266,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     resumeHint: '输入关键词过滤 · ↑↓ 选择 · 回车确认 · Esc 关闭',
     resumeQuery: '筛选：{query}',
     resumeEmpty: '当前工作区没有可用的历史会话。',
+    resumeNoSummary: '无摘要',
     resumeLoading: '正在加载会话历史…',
     resumeLoaded: '已恢复会话 {session}。',
     resumeUnavailable: '无法恢复会话 {session}：会话文件不可用。',
@@ -285,6 +296,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     queueAdded: '已加入队列（{count} 条），当前任务结束后自动发送。',
     queueFull: '输入队列已满（最多 8 条）。',
     queueSending: '正在发送队列中的输入…',
+    turnComplete: '本轮任务已完成',
     turnBusy: '当前任务仍在运行，按 Tab 可将输入加入队列。',
     cancelRequested: '已请求取消，等待运行时进入空闲状态。',
     cancelNotRunning: '当前没有可取消的任务。',
@@ -311,6 +323,9 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     inspectorEmpty: '暂无活动详情',
     inspectorGoal: '目标',
     inspectorTodos: '待办',
+    copySuccess: '已复制到剪贴板。',
+    copyEmpty: '没有可复制的消息文本。',
+    copyUnavailable: '当前终端无法使用剪贴板。',
   },
 }
 
