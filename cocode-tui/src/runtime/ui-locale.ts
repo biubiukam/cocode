@@ -154,8 +154,6 @@ type UiKey =
   | 'inspectorNone'
   | 'inspectorEnabled'
   | 'inspectorDisabled'
-  | 'questionPrevious'
-  | 'questionNext'
   | 'questionSubmit'
   | 'questionNewline'
   | 'questionExit'
@@ -303,10 +301,10 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     skillsUnavailable: 'Skills are unavailable in this runtime.',
     skillReady: 'Skill /{name} is ready in the composer.',
     questionTitle: 'Question',
-    questionHint: '↑↓ move · ←→ switch · enter answer · esc cancel',
+    questionHint: '↑↓ move · ←→ switch',
     questionCustom: 'Type another answer',
-    questionMultiHint: 'space toggles options · tab opens custom answer',
-    questionSelectHint: 'enter selects · tab opens custom answer',
+    questionMultiHint: 'space toggles · tab custom',
+    questionSelectHint: 'tab custom',
     questionStreaming: 'question is streaming…',
     questionReady: 'question ready for interaction',
     questionUnavailable: 'Question text unavailable',
@@ -377,8 +375,6 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     inspectorNone: 'none',
     inspectorEnabled: 'on',
     inspectorDisabled: 'off',
-    questionPrevious: '← previous',
-    questionNext: '→ next',
     questionSubmit: 'enter submit',
     questionNewline: 'shift+enter newline',
     questionExit: 'esc exit',
@@ -525,10 +521,10 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     skillsUnavailable: '当前运行时未配置 Skills。',
     skillReady: '技能 /{name} 已写入输入区。',
     questionTitle: '需要确认',
-    questionHint: '↑↓ 移动 · ←→ 切换问题 · 回车回答 · Esc 取消',
+    questionHint: '↑↓ 移动 · ←→ 切换问题',
     questionCustom: '输入其他答案',
-    questionMultiHint: '空格勾选 · Tab 切换到其他答案',
-    questionSelectHint: '回车选择 · Tab 切换到其他答案',
+    questionMultiHint: '空格勾选 · Tab 输入其他答案',
+    questionSelectHint: 'Tab 输入其他答案',
     questionStreaming: '问题生成中…',
     questionReady: '问题已生成，等待交互',
     questionUnavailable: '问题内容暂不可用',
@@ -599,8 +595,6 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     inspectorNone: '无',
     inspectorEnabled: '开启',
     inspectorDisabled: '关闭',
-    questionPrevious: '← 上一题',
-    questionNext: '→ 下一题',
     questionSubmit: '回车提交',
     questionNewline: 'Shift+Enter 换行',
     questionExit: 'Esc 退出',

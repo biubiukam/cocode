@@ -166,8 +166,6 @@ export function QuestionPanel(props: {
       borderColor={theme.brand}
       footer={
         [
-          text(props.locale, 'questionPrevious'),
-          text(props.locale, 'questionNext'),
           text(props.locale, 'questionSubmit'),
           text(props.locale, 'questionNewline'),
           text(props.locale, 'questionExit'),
