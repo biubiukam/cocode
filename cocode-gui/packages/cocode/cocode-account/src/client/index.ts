@@ -1,1 +1,1 @@
-export { apply, mountStandalone } from "./index.tsx"
+export { apply, inject, mountStandalone } from "./index.tsx"

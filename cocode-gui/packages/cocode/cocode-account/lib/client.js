@@ -18,17 +18,17 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var account_module_css_default = {
-			"accountAvatar": "Jlr38G_accountAvatar",
-			"copy": "Jlr38G_copy",
-			"chevron": "Jlr38G_chevron",
-			"primary": "Jlr38G_primary",
-			"rail": "Jlr38G_rail",
-			"avatar": "Jlr38G_avatar",
-			"trigger": "Jlr38G_trigger",
-			"menuRoot": "Jlr38G_menuRoot",
 			"guestAvatar": "Jlr38G_guestAvatar",
-			"providerAvatar": "Jlr38G_providerAvatar",
-			"secondary": "Jlr38G_secondary"
+			"trigger": "Jlr38G_trigger",
+			"avatar": "Jlr38G_avatar",
+			"chevron": "Jlr38G_chevron",
+			"accountAvatar": "Jlr38G_accountAvatar",
+			"rail": "Jlr38G_rail",
+			"copy": "Jlr38G_copy",
+			"menuRoot": "Jlr38G_menuRoot",
+			"secondary": "Jlr38G_secondary",
+			"primary": "Jlr38G_primary",
+			"providerAvatar": "Jlr38G_providerAvatar"
 		};
 		//#endregion
 		//#region src/client/index.tsx
@@ -454,6 +454,11 @@ window.__ModuleLoader__.load({
 				}))
 			});
 		}
+		const inject = [
+			"slots",
+			"connection",
+			"remote"
+		];
 		function apply(ctx) {
 			const store = new AccountStore();
 			const connection = ctx.get("connection");
@@ -520,6 +525,7 @@ window.__ModuleLoader__.load({
 		}
 		//#endregion
 		exports.apply = apply;
+		exports.inject = inject;
 		exports.mountStandalone = mountStandalone;
 		return module.exports;
 	}
