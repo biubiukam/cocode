@@ -1,11 +1,27 @@
-# Electron Template Agent Engineering Rules
+# Cocode Agent Engineering Rules
 
 This file is the repository-level development contract. Every agent working in this
 repository MUST read and follow it before changing code. User instructions for a
 specific task take precedence when they explicitly conflict with this file; otherwise
 these rules are mandatory.
 
-## 1. Project baseline
+## 1. Agent instruction portability
+
+When adding or revising agent constraints, prompts or examples in this file:
+
+- MUST NOT include personal names, usernames, email addresses, machine names,
+  user-home paths or other person/device-specific identifiers.
+- MUST use repository-relative paths, environment variables, standard tool
+  discovery or neutral placeholders so the instructions can be reused directly
+  on another device.
+- MUST NOT assume a particular operating system, shell, checkout location or
+  locally installed absolute binary path. If a platform-specific step is
+  unavoidable, state the condition and provide a discoverable alternative.
+- MUST keep the resulting instructions independent of local environment state;
+  do not encode secrets, local credentials, or assumptions about another
+  developer's filesystem.
+
+## 2. Project baseline
 
 This repository is an Electron Forge + Vite + TypeScript desktop application.
 
@@ -17,20 +33,18 @@ This repository is an Electron Forge + Vite + TypeScript desktop application.
 - UI primitives: shadcn/ui source components backed by Radix UI.
 - Class composition: `clsx` + `tailwind-merge` through `cn()`.
 
-Before running project commands, use the repository runtime. The canonical commands
-are:
+Before running project commands, use the repository runtime. If `.nvmrc` exists,
+select the version declared there; otherwise use a compatible Node.js version
+from the `engines` field. Run pnpm through Corepack at the pinned version:
 
 ```bash
-export NVM_DIR="/Users/kam/.nvm"
-. "$NVM_DIR/nvm.sh"
-nvm use 22.12.0
 corepack pnpm@10.34.5 <command>
 ```
 
 Do not weaken `engines` constraints or upgrade React to 19 / Tailwind to 4 as a
 shortcut for a local environment mismatch.
 
-## 2. Source tree and ownership
+## 3. Source tree and ownership
 
 The source tree is organized by Electron runtime boundary first, then by business
 boundary:
@@ -156,7 +170,7 @@ The database context is the only current owner of `better-sqlite3`:
 - New business tables belong to their owning bounded context, not automatically in the
   example database table.
 
-## 3. Bounded contexts and DDD rules
+## 4. Bounded contexts and DDD rules
 
 `contexts/_template` is a template only. Do not implement business features inside
 `_template`. When a real business capability appears, copy the template and rename it
@@ -270,7 +284,7 @@ Contexts communicate through public facades, application ports, explicit integra
 services, domain events or `contracts`—never by reaching into another context's
 private `domain`, `infrastructure` or `presentation` directory.
 
-## 4. IPC and process-boundary rules
+## 5. IPC and process-boundary rules
 
 All cross-process communication follows:
 
@@ -303,7 +317,7 @@ For the database capability, the only allowed Renderer-facing surface is the typ
 for a key-value record. Do not expose SQL, paths, native handles or generic IPC
 forwarders.
 
-## 5. TypeScript type design
+## 6. TypeScript type design
 
 ### General rules
 
@@ -369,7 +383,7 @@ The exposed Preload API is declared once under `src/preload/types`, using global
 augmentation. The declaration must match the actual `contextBridge.exposeInMainWorld`
 object exactly. Renderer code consumes `window.desktopApi`; it does not redeclare it.
 
-## 6. Export and import conventions
+## 7. Export and import conventions
 
 ### Default rule: named exports
 
@@ -418,7 +432,7 @@ surface is needed.
   clearer.
 - Main, Preload, contracts and root shared must not import from Renderer.
 
-## 7. React, Tailwind and shadcn/ui rules
+## 8. React, Tailwind and shadcn/ui rules
 
 ### React
 
@@ -453,7 +467,7 @@ surface is needed.
 - Do not put business workflows into generic UI primitives.
 - Keep `cn()` in `src/renderer/lib/utils.ts` and do not duplicate class-merging helpers.
 
-## 8. Naming and file conventions
+## 9. Naming and file conventions
 
 - Folders and files: kebab-case (`workspace-gateway.ts`, `use-toast.ts`).
 - React component files: kebab-case; exported component names: PascalCase.
@@ -467,7 +481,7 @@ surface is needed.
 - Use `index.ts`/`index.tsx` as an entry only when the directory itself is the module
   boundary; do not make every file an `index` file.
 
-## 9. Testing and verification
+## 10. Testing and verification
 
 ### Code quality toolchain
 
@@ -510,7 +524,7 @@ corepack pnpm@10.34.5 package
 If a check cannot run because the environment violates the repository engines, report
 the exact versions and failure; do not claim success or silently change constraints.
 
-## 10. Change discipline for agents
+## 11. Change discipline for agents
 
 Before editing:
 
@@ -536,7 +550,7 @@ After editing:
 - Run typecheck, lint and package checks appropriate to the change.
 - Summarize any intentionally deferred test or migration work.
 
-## 11. Anti-pattern checklist
+## 12. Anti-pattern checklist
 
 The following are prohibited unless the task explicitly documents an exception:
 
