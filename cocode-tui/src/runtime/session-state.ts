@@ -43,6 +43,10 @@ class SessionStateProjectorImpl implements SessionStateProjector {
 
   ingest(event: SessionEvent): void {
     const data = isRecord(event.data) ? event.data : {}
+    if (event.type === 'turn/start') {
+      this.todos = []
+      return
+    }
     if (event.type === 'todo/write') {
       this.todos = parseTodos(data.todos)
       return

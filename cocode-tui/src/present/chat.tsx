@@ -56,6 +56,12 @@ import { Inspector, INSPECTOR_WIDTH } from './components/Inspector.tsx'
 import { ReviewPicker } from './components/ReviewPicker.tsx'
 import { ApprovalPanel } from './components/ApprovalPanel.tsx'
 import { QueuePicker } from './components/QueuePicker.tsx'
+import { ChecklistPanel } from './components/ChecklistPanel.tsx'
+import {
+  ChecklistStrip,
+  CHECKLIST_STRIP_MAX_ITEMS,
+  checklistStripRows,
+} from './components/ChecklistStrip.tsx'
 import { dispatchKeyCommand, dispatchPickerInput, moveSelection } from './chat-input.ts'
 import {
   createMouseDecoder,
@@ -67,6 +73,7 @@ import {
   type TuiMouseEvent,
 } from './mouse.ts'
 import { nodeKey } from '../runtime/nodes/types.ts'
+import { CHECKLIST_WINDOW_SIZE } from '../runtime/checklist.ts'
 import {
   actionMenuItemIndexAtRow,
   listItemIndexAtRow,
@@ -109,6 +116,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
   const resumeOpen = snap.resumePicker?.open === true
   const sessionTreeOpen = snap.sessionTreePicker?.open === true
   const queueOpen = snap.queuePicker?.open === true
+  const checklistOpen = snap.checklist?.open === true
   const queueItems = snap.queuePicker === undefined ? [] : visiblePromptQueueItems(snap.queuePicker)
   const resumeItems = snap.resumePicker === undefined ? [] : visibleResumeItems(snap.resumePicker)
   const rewindState = snap.rewindPicker
@@ -130,6 +138,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     !resumeOpen &&
     !sessionTreeOpen &&
     !queueOpen &&
+    !checklistOpen &&
     !historySearchOpen &&
     !commandPaletteOpen &&
     !messageActionMenuOpen &&
@@ -150,6 +159,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     !resumeOpen &&
     !sessionTreeOpen &&
     !queueOpen &&
+    !checklistOpen &&
     !historySearchOpen &&
     !commandPaletteOpen &&
     !messageActionMenuOpen &&
@@ -207,6 +217,10 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     hasAttachments: snap.composer.attachments.length > 0,
     hasNotice: snap.notice !== undefined,
     hasStatusDetails: hasStatusDetails(snap.status),
+    checklistStripRows: checklistStripRows(
+      snap.status.todos.length,
+      stdout.columns >= 120 ? CHECKLIST_STRIP_MAX_ITEMS : 2,
+    ),
     editorFeedbackRows: Number(editorBusy) + Number(editorError !== undefined),
     helpLines: snap.helpOpen ? snap.helpText.split('\n').length : undefined,
     slashItems: slashOpen ? slashItems.length : undefined,
@@ -229,6 +243,8 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
       : resumeOpen
       ? snap.resumePicker?.selected
       : undefined,
+    checklistItems: checklistOpen ? snap.status.todos.length : undefined,
+    checklistSelected: checklistOpen ? snap.checklist?.selected : undefined,
     rewindItems: rewindOpen
       ? rewindState.items.length
       : forkOpen
@@ -336,6 +352,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
         resumeOpen ||
         sessionTreeOpen ||
         queueOpen ||
+        checklistOpen ||
         historySearchOpen ||
         messageSelectionActive ||
         snap.composer.disabled
@@ -502,6 +519,29 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
       if (index !== undefined) {
         app.dispatch({ type: 'queue.move', delta: index - snap.queuePicker.selected })
         if (isPress) app.dispatch({ type: 'queue.restore' })
+      }
+      return
+    }
+    if (checklistOpen && snap.checklist !== undefined) {
+      const windowSize = pickerWindowSize(
+        layout.overlayRows,
+        CHECKLIST_WINDOW_SIZE,
+        4,
+      )
+      const start = listWindowStart(
+        snap.checklist.selected,
+        snap.status.todos.length,
+        windowSize,
+      )
+      const index = listItemIndexAtRow({
+        row: hitRow,
+        itemStartRow: popupStartRow + 3 + Number(start > 0),
+        itemCount: snap.status.todos.length,
+        selectedIndex: snap.checklist.selected,
+        windowSize,
+      })
+      if (index !== undefined) {
+        app.dispatch({ type: 'checklist.move', delta: index - snap.checklist.selected })
       }
       return
     }
@@ -727,6 +767,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
       !resumeOpen &&
       !sessionTreeOpen &&
       !queueOpen &&
+      !checklistOpen &&
       !historySearchOpen &&
       !messageSelectionActive &&
       !slashOpen &&
@@ -773,6 +814,17 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
           type: 'skills.setQuery',
           query: (skillsState?.query ?? '') + input,
         })
+      }
+      return
+    }
+    if (checklistOpen) {
+      if (key.escape) {
+        app.dispatch({ type: 'checklist.close' })
+        return
+      }
+      if (key.upArrow || key.downArrow) {
+        app.dispatch({ type: 'checklist.move', delta: key.upArrow ? -1 : 1 })
+        return
       }
       return
     }
@@ -1164,6 +1216,14 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
       {queueOpen && snap.queuePicker !== undefined ? (
         <QueuePicker state={snap.queuePicker} locale={snap.locale} maxRows={layout.overlayRows} />
       ) : null}
+      {checklistOpen && snap.checklist !== undefined ? (
+        <ChecklistPanel
+          state={snap.checklist}
+          todos={snap.status.todos}
+          locale={snap.locale}
+          maxRows={layout.overlayRows}
+        />
+      ) : null}
       {rewindOpen ? (
         <RewindPicker state={rewindState} locale={snap.locale} maxRows={layout.overlayRows} />
       ) : null}
@@ -1245,6 +1305,11 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
           expandedNodeIds={expandedMessageIds}
           locale={snap.locale}
           maxColumns={mainColumns}
+        />
+        <ChecklistStrip
+          todos={snap.status.todos}
+          locale={snap.locale}
+          maxItems={wideInspector ? CHECKLIST_STRIP_MAX_ITEMS : 2}
         />
         <StatusLine
           status={snap.status}

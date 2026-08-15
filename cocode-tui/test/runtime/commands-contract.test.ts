@@ -16,6 +16,7 @@ describe('builtin command contract', () => {
       'model',
       'export',
       'copy',
+      'todos',
       'review',
       'focus',
       'init',
@@ -87,6 +88,7 @@ describe('builtin command contract', () => {
       showForkPicker: () => calls.add('showForkPicker'),
       cloneSession: async () => calls.add('cloneSession'),
       showQueuePicker: () => calls.add('showQueuePicker'),
+      showChecklist: () => calls.add('showChecklist'),
       notice: vi.fn(),
     }
 
@@ -114,6 +116,7 @@ describe('builtin command contract', () => {
         'showForkPicker',
         'cloneSession',
         'showQueuePicker',
+        'showChecklist',
       ]),
     )
   })

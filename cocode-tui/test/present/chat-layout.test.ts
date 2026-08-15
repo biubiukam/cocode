@@ -40,6 +40,24 @@ describe('chat layout rows', () => {
     })
   })
 
+  it('reserves the main-area checklist without pushing the composer away', () => {
+    expect(
+      calculateChatLayout({
+        viewportRows: 30,
+        composerLines: 1,
+        checklistStripRows: 6,
+      }),
+    ).toEqual({
+      baseRows: 18,
+      composerRows: 1,
+      overlayRows: 0,
+      reservedRows: 18,
+      messageRows: 12,
+      minimumRows: 18,
+      tooSmall: false,
+    })
+  })
+
   it.each([
     ['help', { helpLines: 5 }, 21],
     ['slash', { slashItems: 3 }, 19],
@@ -50,6 +68,8 @@ describe('chat layout rows', () => {
     ['empty resume', { resumeItems: 0 }, 18],
     ['resume results', { resumeItems: 4 }, 21],
     ['windowed resume', { resumeItems: 12 }, 26],
+    ['checklist', { checklistItems: 3 }, 19],
+    ['windowed checklist', { checklistItems: 12, checklistSelected: 6 }, 26],
     ['rewind results', { rewindItems: 4 }, 22],
     ['windowed rewind', { rewindItems: 12, rewindSelected: 6 }, 26],
   ] as const)('covers the %s overlay height', (_name, overlay, reservedRows) => {

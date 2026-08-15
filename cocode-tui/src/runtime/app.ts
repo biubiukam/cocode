@@ -119,6 +119,13 @@ import {
 } from './session-tree-picker.ts'
 import { buildSessionTree, flattenSessionTree } from './session-tree.ts'
 import { listSessionSummaries } from './sessions-fs.ts'
+import {
+  clampChecklistSelection,
+  closeChecklist,
+  createChecklist,
+  moveChecklistSelection,
+  type ChecklistState,
+} from './checklist.ts'
 
 export type TuiAction =
   | { type: 'submit'; text: string }
@@ -169,6 +176,9 @@ export type TuiAction =
   | { type: 'queue.close' }
   | { type: 'queue.delete' }
   | { type: 'queue.restore' }
+  | { type: 'checklist.open' }
+  | { type: 'checklist.move'; delta: number }
+  | { type: 'checklist.close' }
   | { type: 'copyNode'; nodeKey: string }
   | { type: 'review.move'; delta: number }
   | { type: 'review.close' }
@@ -213,6 +223,7 @@ export type TuiSnapshot = {
     planMode: boolean
   }
   queuePicker?: PromptQueuePickerState
+  checklist?: ChecklistState
   helpOpen: boolean
   verbose: boolean
   capabilities: TuiCapabilities
@@ -278,6 +289,7 @@ export type TuiCommandCtx = {
   showSessionTree?: () => Promise<void>
   showForkPicker?: () => void
   showQueuePicker?: () => void
+  showChecklist?: () => void
 }
 
 export type TuiApp = {
@@ -371,6 +383,7 @@ class TuiAppImpl implements TuiApp {
   private supportedPermissionModes: string[] = ['manual']
   private planMode = false
   private reviewPicker: ReviewPickerState | undefined
+  private checklist: ChecklistState | undefined
   private reviewRequest = 0
 
   constructor(options: TuiAppOptions) {
@@ -531,6 +544,10 @@ class TuiAppImpl implements TuiApp {
         planMode: this.planMode,
       },
       queuePicker: this.promptQueue.picker,
+      checklist:
+        this.checklist === undefined
+          ? undefined
+          : clampChecklistSelection(this.checklist, sessionState.todos.length),
       helpOpen: this.helpOpen,
       verbose: this.verbose,
       capabilities: this.capabilities,
@@ -824,6 +841,25 @@ class TuiAppImpl implements TuiApp {
       case 'queue.restore':
         this.restoreSelectedQueuedPrompt()
         return
+      case 'checklist.open':
+        this.openChecklist()
+        return
+      case 'checklist.move':
+        if (this.checklist !== undefined) {
+          this.checklist = moveChecklistSelection(
+            this.checklist,
+            action.delta,
+            this.sessionState.snapshot().todos.length,
+          )
+          this.emit()
+        }
+        return
+      case 'checklist.close':
+        if (this.checklist !== undefined) {
+          this.checklist = closeChecklist(this.checklist)
+          this.emit()
+        }
+        return
       case 'copyNode':
         this.copyNode(action.nodeKey)
         return
@@ -914,6 +950,7 @@ class TuiAppImpl implements TuiApp {
         this.assembler.reset()
         this.telemetry.reset()
         this.sessionState.reset()
+        this.checklist = undefined
         this.sessionTitleOverride = undefined
         this.attachments = []
         this.notice = { tone: 'info', message: 'Transcript cleared' }
@@ -1056,6 +1093,7 @@ class TuiAppImpl implements TuiApp {
       showSessionTree: () => this.showSessionTree(),
       showForkPicker: () => this.openForkPicker(),
       showQueuePicker: () => this.openQueuePicker(),
+      showChecklist: () => this.openChecklist(),
     })
   }
 
@@ -1772,6 +1810,13 @@ class TuiAppImpl implements TuiApp {
     this.emit()
   }
 
+  private openChecklist(): void {
+    this.helpOpen = false
+    this.notice = undefined
+    this.checklist = createChecklist(this.sessionState.snapshot().todos)
+    this.emit()
+  }
+
   private deleteSelectedQueuedPrompt(): void {
     if (!this.promptQueue.deleteSelected()) return
     this.notice = { tone: 'info', message: text(this.locale, 'queueDeleted') }
@@ -1820,6 +1865,7 @@ class TuiAppImpl implements TuiApp {
       ingest: (event) => {
         this.telemetry.ingest(event)
         this.sessionState.ingest(event)
+        if (event.type === 'turn/start') this.checklist = undefined
         if (event.type === 'session/title') this.sessionTitleOverride = undefined
         this.assembler.ingest(event)
       },
@@ -1879,6 +1925,7 @@ class TuiAppImpl implements TuiApp {
     this.permissionMode = 'manual'
     this.supportedPermissionModes = ['manual']
     this.planMode = false
+    this.checklist = undefined
   }
 
   private switchHost(): ChannelSwitchHost {

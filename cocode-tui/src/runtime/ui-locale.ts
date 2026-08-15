@@ -89,6 +89,10 @@ type UiKey =
   | 'queueAttachments'
   | 'queueDeleted'
   | 'queueRestored'
+  | 'checklistTitle'
+  | 'checklistHint'
+  | 'checklistEmpty'
+  | 'checklistMore'
   | 'turnComplete'
   | 'turnBusy'
   | 'sessionChanging'
@@ -261,6 +265,10 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     queueAttachments: '{count} attachments',
     queueDeleted: 'Queued prompt deleted.',
     queueRestored: 'Queued prompt restored to the front of the queue.',
+    checklistTitle: 'Checklist',
+    checklistHint: '↑↓ select · esc close',
+    checklistEmpty: 'No tasks in the current turn.',
+    checklistMore: '… {count} more',
     turnComplete: 'Turn complete',
     turnBusy: 'Turn in progress. Press Tab to queue this prompt.',
     sessionChanging: 'Session is changing. Wait for it to finish.',
@@ -432,6 +440,10 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     queueAttachments: '{count} 个附件',
     queueDeleted: '已删除队列中的输入。',
     queueRestored: '已将队列输入恢复到队首。',
+    checklistTitle: '任务清单',
+    checklistHint: '↑↓ 选择 · Esc 关闭',
+    checklistEmpty: '当前回合没有任务。',
+    checklistMore: '… 还有 {count} 项',
     turnComplete: '本轮任务已完成',
     turnBusy: '当前任务仍在运行，按 Tab 可将输入加入队列。',
     sessionChanging: '正在切换会话，请等待当前操作完成。',

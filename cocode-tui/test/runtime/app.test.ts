@@ -1464,6 +1464,60 @@ describe('TuiApp', () => {
     expect(app.snapshot().status.goal?.phase).toBe('active')
   })
 
+  it('opens and navigates the current checklist without mutating todos', async () => {
+    const runtime = fakeRuntime()
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+    })
+    await app.start()
+    runtime.emit({
+      method: 'session.event',
+      params: {
+        sessionId: 's1',
+        event: {
+          type: 'todo/write',
+          seq: 1,
+          time: 1,
+          data: {
+            todos: [
+              { content: 'done', status: 'completed' },
+              { content: 'active', status: 'in_progress' },
+              { content: 'next', status: 'pending' },
+            ],
+          },
+        },
+      },
+    })
+
+    app.dispatch({ type: 'command', line: '/todos' })
+    expect(app.snapshot().checklist).toEqual({ open: true, selected: 1 })
+
+    app.dispatch({ type: 'checklist.move', delta: 1 })
+    expect(app.snapshot().checklist?.selected).toBe(2)
+    expect(app.snapshot().status.todos.map((todo) => todo.content)).toEqual([
+      'done',
+      'active',
+      'next',
+    ])
+
+    runtime.emit({
+      method: 'session.event',
+      params: {
+        sessionId: 's1',
+        event: { type: 'turn/start', seq: 2, time: 2, data: {} },
+      },
+    })
+    expect(app.snapshot().status.todos).toEqual([])
+    expect(app.snapshot().checklist).toBeUndefined()
+
+    app.dispatch({ type: 'checklist.close' })
+    expect(app.snapshot().checklist).toBeUndefined()
+  })
+
   it('projects subagent lifecycle into status without leaking other sessions', async () => {
     const runtime = fakeRuntime()
     const app = createTuiApp({

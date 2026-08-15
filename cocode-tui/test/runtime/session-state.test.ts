@@ -83,4 +83,19 @@ describe('SessionStateProjector', () => {
     projector.ingest(event('goal/change', 3, { operation: 'clear' }))
     expect(projector.snapshot()).toEqual({ todos: [] })
   })
+
+  it('clears the standing checklist when the next turn starts', () => {
+    const projector = createSessionStateProjector()
+    projector.ingest(
+      event('todo/write', 1, {
+        todos: [{ content: 'finish the current turn', status: 'in_progress' }],
+      }),
+    )
+
+    projector.ingest(event('turn/end', 2, {}))
+    expect(projector.snapshot().todos).toHaveLength(1)
+
+    projector.ingest(event('turn/start', 3, {}))
+    expect(projector.snapshot().todos).toEqual([])
+  })
 })

@@ -3,6 +3,7 @@
 import { RESUME_WINDOW_SIZE } from '../runtime/resume-picker.ts'
 import { REWIND_WINDOW_SIZE } from '../runtime/rewind-picker.ts'
 import { SKILLS_WINDOW_SIZE } from '../runtime/skills-picker.ts'
+import { CHECKLIST_WINDOW_SIZE } from '../runtime/checklist.ts'
 import { listWindowStart } from './list-window.ts'
 
 const HEADER_ROWS = 3
@@ -22,6 +23,7 @@ export type ChatLayoutInput = {
   hasAttachments?: boolean
   hasNotice?: boolean
   hasStatusDetails?: boolean
+  checklistStripRows?: number
   editorFeedbackRows?: number
   helpLines?: number
   slashItems?: number
@@ -30,6 +32,8 @@ export type ChatLayoutInput = {
   historyMatches?: number
   resumeItems?: number
   resumeSelected?: number
+  checklistItems?: number
+  checklistSelected?: number
   rewindItems?: number
   rewindSelected?: number
   rewindConfirming?: boolean
@@ -64,6 +68,7 @@ export function calculateChatLayout(input: ChatLayoutInput): ChatLayout {
     optionalRow(input.hasAttachments) +
     optionalRow(input.hasNotice) +
     optionalRow(input.hasStatusDetails) +
+    nonNegativeInteger(input.checklistStripRows) +
     nonNegativeInteger(input.editorFeedbackRows)
   const requestedOverlayRows =
     helpRows(input.helpLines) +
@@ -71,6 +76,7 @@ export function calculateChatLayout(input: ChatLayoutInput): ChatLayout {
     fileRows(input.fileItems, input.fileLoading) +
     historyRows(input.historyMatches) +
     resumeRows(input.resumeItems, input.resumeSelected) +
+    checklistRows(input.checklistItems, input.checklistSelected) +
     rewindRows(input.rewindItems, input.rewindSelected, input.rewindConfirming) +
     skillsRows(input.skillsItems, input.skillsSelected) +
     questionRows(input.questionRows) +
@@ -136,6 +142,7 @@ function resumeRows(items: number | undefined, selected = 0): number {
 
 function minimumOverlayHeight(input: ChatLayoutInput): number {
   if (input.resumeItems !== undefined) return MIN_RESUME_OVERLAY_ROWS
+  if (input.checklistItems !== undefined) return MIN_OVERLAY_ROWS
   if (input.rewindItems !== undefined) return MIN_REWIND_OVERLAY_ROWS
   if (input.skillsItems !== undefined) return MIN_OVERLAY_ROWS
   if (input.questionRows !== undefined) return MIN_OVERLAY_ROWS
@@ -150,6 +157,15 @@ function minimumOverlayHeight(input: ChatLayoutInput): number {
     return MIN_OVERLAY_ROWS
   }
   return MIN_OVERLAY_ROWS
+}
+
+function checklistRows(items: number | undefined, selected = 0): number {
+  if (items === undefined) return 0
+  const count = nonNegativeInteger(items)
+  const visible = Math.max(1, Math.min(count, CHECKLIST_WINDOW_SIZE))
+  const start = listWindowStart(selected, count, CHECKLIST_WINDOW_SIZE)
+  const indicators = optionalRow(start > 0) + optionalRow(count - start - visible > 0)
+  return visible + indicators + 4
 }
 
 function actionMenuRows(items: number | undefined, query = false): number {

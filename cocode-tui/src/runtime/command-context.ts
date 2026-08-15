@@ -39,6 +39,7 @@ export type CommandContextOptions = {
   showSessionTree?: TuiCommandCtx['showSessionTree']
   showForkPicker?: TuiCommandCtx['showForkPicker']
   showQueuePicker?: TuiCommandCtx['showQueuePicker']
+  showChecklist?: TuiCommandCtx['showChecklist']
 }
 
 export type AppCommandContextOptions = {
@@ -76,6 +77,7 @@ export type AppCommandContextOptions = {
   showSessionTree?: TuiCommandCtx['showSessionTree']
   showForkPicker?: TuiCommandCtx['showForkPicker']
   showQueuePicker?: TuiCommandCtx['showQueuePicker']
+  showChecklist?: TuiCommandCtx['showChecklist']
 }
 
 export function createCommandContext(options: CommandContextOptions): TuiCommandCtx {
@@ -135,6 +137,7 @@ export function createCommandContext(options: CommandContextOptions): TuiCommand
     showSessionTree: options.showSessionTree,
     showForkPicker: options.showForkPicker,
     showQueuePicker: options.showQueuePicker,
+    showChecklist: options.showChecklist,
   }
 }
 
@@ -183,5 +186,6 @@ export function createAppCommandContext(options: AppCommandContextOptions): TuiC
     showSessionTree: options.showSessionTree,
     showForkPicker: options.showForkPicker,
     showQueuePicker: options.showQueuePicker,
+    showChecklist: options.showChecklist,
   })
 }

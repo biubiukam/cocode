@@ -25,6 +25,7 @@ describe('commands', () => {
       'model',
       'export',
       'copy',
+      'todos',
       'review',
       'focus',
       'init',
@@ -135,6 +136,13 @@ describe('commands', () => {
     command?.run(commandCtx({ toggleFocus: () => (called = true) }), '')
     expect(called).toBe(true)
   })
+
+  it('/todos opens the checklist panel', () => {
+    let called = false
+    const command = createBuiltinCommands().find('todos', P0_CAPABILITIES)
+    command?.run(commandCtx({ showChecklist: () => (called = true) }), '')
+    expect(called).toBe(true)
+  })
 })
 
 function commandCtx(
@@ -146,6 +154,7 @@ function commandCtx(
     setModel: (value: string) => void
     copyLatestAssistant: () => void
     toggleFocus: () => void
+    showChecklist: () => void
   }> = {},
 ) {
   return {
@@ -160,5 +169,6 @@ function commandCtx(
     setModel: overrides.setModel,
     copyLatestAssistant: overrides.copyLatestAssistant,
     toggleFocus: overrides.toggleFocus,
+    showChecklist: overrides.showChecklist,
   }
 }

@@ -91,6 +91,14 @@ export function createBuiltinCommands(): CommandRegistry {
     ctx.copyLatestAssistant?.()
   })
   registry.register({
+    name: 'todos',
+    summary: 'Show the current task checklist',
+    summaryZh: '查看当前任务清单',
+    kind: 'local',
+    available: () => true,
+    run: (ctx) => ctx.showChecklist?.(),
+  })
+  registry.register({
     name: 'review',
     summary: 'Review Git changes in the current workspace',
     summaryZh: 'Review 当前工作区的 Git 改动',
