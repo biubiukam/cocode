@@ -65,6 +65,32 @@ export type TuiLaunch = {
   env?: NodeJS.ProcessEnv
 }
 
+/**
+ * Runtime operations whose availability is negotiated after initialize.
+ *
+ * These names describe wire/client facts, not local UI configuration. A
+ * consumer should use the snapshot returned by `TuiRuntime.getCapabilities`
+ * when it needs to decide whether to send one of these requests.
+ */
+export type TuiRuntimeCapabilityName =
+  | 'cancel'
+  | 'open'
+  | 'fork'
+  | 'rewind'
+  | 'skills'
+  | 'onRequest'
+
+export type TuiRuntimeCapabilities = Record<TuiRuntimeCapabilityName, boolean>
+
+/** Result of probing the live SDK runtime after its initialize handshake. */
+export type TuiCapabilitySnapshot = {
+  /** `runtime` means probes ran; `fallback` means no probe API was available. */
+  source: 'runtime' | 'fallback'
+  capabilities: TuiRuntimeCapabilities
+  /** Human-readable probe failures, keyed by the capability they describe. */
+  errors: Partial<Record<TuiRuntimeCapabilityName, string>>
+}
+
 export type TuiInitialize = {
   cwd: string
   provider: string
@@ -113,6 +139,8 @@ export type TuiRuntime = {
   ): Promise<{ sessionId: string; seedLength: number; seed: SessionEvent[] }>
   listSkills?(sessionId: string): Promise<SkillEntry[]>
   onQuestion?(handler: (request: TuiQuestionRequest) => Promise<TuiQuestionAnswer>): () => void
+  /** Live capability snapshot; absent on legacy/fake runtimes. */
+  getCapabilities?(): TuiCapabilitySnapshot
   subscribe(handler: (n: TuiNotification) => void): () => void
   onClose?: (handler: (error?: string) => void) => () => void
   close(): Promise<void>

@@ -4,6 +4,8 @@
 
 export type TuiCapabilities = {
   cancel: boolean
+  open: boolean
+  fork: boolean
   approval: boolean
   promptMode: boolean
   rewind: boolean
@@ -13,6 +15,8 @@ export type TuiCapabilities = {
 
 export const P0_CAPABILITIES: TuiCapabilities = {
   cancel: true,
+  open: true,
+  fork: true,
   approval: false,
   promptMode: false,
   rewind: true,

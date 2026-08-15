@@ -9,6 +9,7 @@ import type { UiLocale } from './ui-locale.ts'
 export type Command = {
   name: string
   summary: string
+  summaryZh?: string
   kind: 'local' | 'prompt-text'
   available: (caps: TuiCapabilities) => boolean
   run: (app: TuiCommandCtx, args: string) => void
@@ -89,6 +90,16 @@ export function createBuiltinCommands(): CommandRegistry {
   local('copy', 'Copy the latest assistant reply to the clipboard', (ctx) => {
     ctx.copyLatestAssistant?.()
   })
+  registry.register({
+    name: 'focus',
+    summary: 'Toggle the latest-turn focus view',
+    summaryZh: '切换最近一轮聚焦视图',
+    kind: 'local',
+    available: () => true,
+    run: (ctx) => {
+      ctx.toggleFocus?.()
+    },
+  })
   local('init', 'Create AGENTS.md when the workspace has none', (ctx) => {
     void ctx.initWorkspace?.()
   })
@@ -96,7 +107,7 @@ export function createBuiltinCommands(): CommandRegistry {
     name: 'resume',
     summary: 'List local session history for this workspace',
     kind: 'local',
-    available: (caps) => caps.sessionList === 'jsonl',
+    available: (caps) => caps.sessionList === 'jsonl' && caps.open,
     run: (ctx) => {
       void ctx.resumeSessions?.()
     },
@@ -149,7 +160,7 @@ export function helpText(
 ): string {
   const commands = registry
     .list(caps)
-    .map((command) => `/${command.name}  ${command.summary}`)
+    .map((command) => `/${command.name}  ${commandSummary(command, locale)}`)
     .join('\n')
   return [
     locale === 'zh' ? 'Cocode TUI（终端界面）' : 'Cocode TUI',
@@ -165,4 +176,8 @@ export function helpText(
       : 'Local commands (not the GUI command registry):',
     commands,
   ].join('\n')
+}
+
+export function commandSummary(command: Command, locale: UiLocale): string {
+  return locale === 'zh' ? command.summaryZh ?? command.summary : command.summary
 }

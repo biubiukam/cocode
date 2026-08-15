@@ -69,8 +69,14 @@ export function StatusLine(props: {
           {agentMark(props.agent)} {props.status.line}
         </Text>
         <Box flexShrink={0}>
+          {props.status.focusMode ? (
+            <Text color={theme.info} wrap="truncate-end">
+              {text(props.locale, 'focusStatusOn')}
+            </Text>
+          ) : null}
           {props.status.tokens !== undefined ? (
             <Text color={theme.mute} wrap="truncate-end">
+              {props.status.focusMode ? ' · ' : null}
               {text(props.locale, 'tokensIn')} {props.status.tokens.input} ·{' '}
               {text(props.locale, 'tokensOut')} {props.status.tokens.output}
             </Text>

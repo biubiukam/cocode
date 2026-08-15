@@ -2,6 +2,7 @@
 
 import type { TuiAuthInfo, TuiCommandCtx } from './app.ts'
 import type { TuiCapabilities } from './capabilities.ts'
+import type { TuiCapabilitySnapshot } from '@cocode/tui-connection'
 import { formatDoctor } from './diagnostics.ts'
 import { formatError } from './errors/index.ts'
 import { writeSessionExport } from './export-file.ts'
@@ -30,6 +31,7 @@ export type CommandContextOptions = {
   showResumePicker?: (sessions: readonly SessionSummary[]) => void
   showSkillsPicker?: TuiCommandCtx['showSkillsPicker']
   copyLatestAssistant?: TuiCommandCtx['copyLatestAssistant']
+  toggleFocus?: TuiCommandCtx['toggleFocus']
 }
 
 export type AppCommandContextOptions = {
@@ -43,6 +45,8 @@ export type AppCommandContextOptions = {
   showStatus: () => void
   initError?: string
   capabilities: TuiCapabilities
+  configuredCapabilities: TuiCapabilities
+  runtimeCapabilities?: TuiCapabilitySnapshot
   cwd: string
   provider: string
   model: string
@@ -57,6 +61,7 @@ export type AppCommandContextOptions = {
   showResumePicker: (sessions: readonly SessionSummary[]) => void
   showSkillsPicker: TuiCommandCtx['showSkillsPicker']
   copyLatestAssistant?: TuiCommandCtx['copyLatestAssistant']
+  toggleFocus?: TuiCommandCtx['toggleFocus']
 }
 
 export function createCommandContext(options: CommandContextOptions): TuiCommandCtx {
@@ -107,6 +112,7 @@ export function createCommandContext(options: CommandContextOptions): TuiCommand
     },
     showSkillsPicker: options.showSkillsPicker,
     copyLatestAssistant: options.copyLatestAssistant,
+    toggleFocus: options.toggleFocus,
   }
 }
 
@@ -131,6 +137,8 @@ export function createAppCommandContext(options: AppCommandContextOptions): TuiC
           model: options.model,
           sessionId: options.sessionId(),
           capabilities: options.capabilities,
+          configuredCapabilities: options.configuredCapabilities,
+          runtimeCapabilities: options.runtimeCapabilities,
         }),
       )
     },
@@ -145,5 +153,6 @@ export function createAppCommandContext(options: AppCommandContextOptions): TuiC
     showResumePicker: options.showResumePicker,
     showSkillsPicker: options.showSkillsPicker,
     copyLatestAssistant: options.copyLatestAssistant,
+    toggleFocus: options.toggleFocus,
   })
 }

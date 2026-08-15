@@ -34,6 +34,7 @@ Set `COCODE_TUI_SCREEN=inline` (the default) to keep the main screen and scrollb
 - `Ctrl+G` opens the draft in `$VISUAL` or `$EDITOR`; the edited Markdown is restored to the composer when the editor exits. Non-zero exits, invalid UTF-8, and drafts over 256 KiB are reported as errors.
 - `Shift+↑` enters message selection; use `↑` `↓` to move, Enter to expand or collapse the current message, and `Esc` to exit.
 - Press `c` in message selection to copy the current node, or use `/copy` to copy the latest assistant reply. The TUI tries macOS `pbcopy`, Windows `clip.exe`, then Linux `wl-copy`, `xclip`, and `xsel`; an unavailable command produces a notice without interrupting the session.
+- `/focus` toggles a local latest-turn view. When enabled, the transcript shows the most recent user message and every node after it, and the status line shows `focus: latest turn`. It only changes the projection, so `/clear`, `/resume`, `/rewind`, export, and the persisted session log keep their existing semantics. Toggle it again to return to the normal full-transcript view.
 - `/lang zh` or `/lang en` switches the interface immediately; startup language follows `COCODE_LANG`, `LANG`, and related locale variables.
 - `/model <model-id>` restarts the runtime with a new model and starts a new session; a failed switch attempts to restore the previous model.
 - `Ctrl+O` toggles verbose mode for full reasoning and tool I/O.
@@ -61,25 +62,26 @@ Assistant messages render common Markdown including headings, lists, quotes, inl
 
 Type `/` to open the command menu. Keep typing to filter by prefix. `Tab` or arrows select; Enter runs the command. A space returns you to ordinary text editing.
 
-| Command                        | What it does                                                                |
-| ------------------------------ | --------------------------------------------------------------------------- |
-| `/help`                        | Keyboard shortcuts and currently available commands                         |
-| `/status`                      | Session, model, runtime, and auth mode                                      |
-| `/doctor`                      | TTY, launch flags, initialize result, session root, and closed capabilities |
-| `/clear`                       | Clear the on-screen projection; does not delete the session log             |
-| `/new`                         | Start a new session id (not a fork)                                         |
-| `/compact`                     | Request host conversation compaction through the prompt path                |
-| `/export`                      | Export the current projection as Markdown                                   |
-| `/copy`                        | Copy the latest assistant reply to the system clipboard                     |
-| `/init`                        | Create a minimal `AGENTS.md` only when the workspace has none               |
-| `/theme dark` / `/theme light` | Switch the display theme                                                    |
-| `/lang zh` / `/lang en`        | Switch between Chinese and English UI                                       |
-| `/model <model-id>`            | Switch models and start a new session                                       |
-| `/resume`                      | Open the local session picker and replay a selected session                 |
-| `/skills`                      | Browse user-invocable skills from the current workspace                     |
-| `/use byok` / `/use cocode`    | Switch between your key and Cocode; switching starts a new session          |
-| `/login` / `/logout`           | Sign in or out of Cocode Cloud; logout keeps your key and stays in chat     |
-| `/exit`                        | Shut down TUI and restore the terminal                                      |
+| Command                        | What it does                                                                                      |
+| ------------------------------ | ------------------------------------------------------------------------------------------------- |
+| `/help`                        | Keyboard shortcuts and currently available commands                                               |
+| `/status`                      | Session, model, runtime, and auth mode                                                            |
+| `/doctor`                      | TTY, launch flags, initialize result, session root, and configured/runtime capability differences |
+| `/clear`                       | Clear the on-screen projection; does not delete the session log                                   |
+| `/new`                         | Start a new session id (not a fork)                                                               |
+| `/compact`                     | Request host conversation compaction through the prompt path                                      |
+| `/export`                      | Export the current projection as Markdown                                                         |
+| `/copy`                        | Copy the latest assistant reply to the system clipboard                                           |
+| `/focus`                       | Show or hide the latest user turn in the transcript                                               |
+| `/init`                        | Create a minimal `AGENTS.md` only when the workspace has none                                     |
+| `/theme dark` / `/theme light` | Switch the display theme                                                                          |
+| `/lang zh` / `/lang en`        | Switch between Chinese and English UI                                                             |
+| `/model <model-id>`            | Switch models and start a new session                                                             |
+| `/resume`                      | Open the local session picker and replay a selected session                                       |
+| `/skills`                      | Browse user-invocable skills from the current workspace                                           |
+| `/use byok` / `/use cocode`    | Switch between your key and Cocode; switching starts a new session                                |
+| `/login` / `/logout`           | Sign in or out of Cocode Cloud; logout keeps your key and stays in chat                           |
+| `/exit`                        | Shut down TUI and restore the terminal                                                            |
 
 `/resume` reads local session headers, supports text filtering plus `↑` `↓` selection, streams the selected JSONL into a temporary projection, and asks the runtime to reopen the same persisted session before swapping it into the current TUI. Follow-up prompts use the selected session id and continue writing to that session. The TUI does not claim cross-process locking; avoid resuming a session that another client is currently writing.
 
@@ -102,5 +104,7 @@ If another TUI window is still open, `/use`, `/login`, and `/logout` refuse so t
 ## Runtime capability boundaries
 
 The `/skills` command is enabled only after `skills/list` returns a real catalog from the harness. A composition without `@deepseek-ai/dsh-skill` (and a provider such as `@deepseek-ai/dsh-skill-filesystem`) keeps the command hidden; an empty or failed probe is not presented as a usable feature.
+
+In `/doctor`, `caps-configured` is what the TUI expects from local configuration and implementation, while `caps-runtime` is the result of probing the live JSON-RPC runtime after initialization. When they differ, the runtime result wins; `caps-errors` explains disabled capabilities. Probes use a random, non-existent session id and do not create or mutate a user session.
 
 Interactive questions require the harness composition to mount the user-questions service and an ask-user consumer. The SDK server then forwards `question/ask` to the TUI and waits for the complete answer batch. A composition without that service does not register the terminal as a question provider.

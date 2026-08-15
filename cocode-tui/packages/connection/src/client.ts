@@ -3,6 +3,7 @@
  */
 
 import type {
+  TuiCapabilitySnapshot,
   SessionEvent,
   SkillEntry,
   TuiQuestionAnswer,
@@ -12,35 +13,21 @@ import type {
   TuiNotification,
   TuiRuntime,
 } from './types.ts'
+import {
+  fallbackCapabilitySnapshot,
+  probeRuntimeCapabilities,
+  unavailableCapabilitySnapshot,
+} from './capability.ts'
 
 type SdkClient = typeof import('@deepseek-ai/dsh-sdk-client')
 type HarnessClient = InstanceType<SdkClient['HarnessClient']>
-type RequestAwareHarnessClient = HarnessClient & {
-  onRequest?: (
-    handler: (method: string, params: Record<string, unknown>) => Promise<unknown>,
-  ) => () => void
-}
-type CancelableHarnessClient = HarnessClient & {
-  cancel(sessionId: string, keepInbox?: boolean): Promise<boolean>
-  open(sessionId: string, replaceSessionId?: string): Promise<boolean>
-  fork(
-    sourceSessionId: string,
-    boundary?: number,
-    replaceSessionId?: string,
-  ): Promise<{ sessionId: string; seedLength: number; seed: SessionEvent[] }>
-  rewind(
-    sourceSessionId: string,
-    messageSeq: number,
-    replaceSessionId?: string,
-  ): Promise<{ sessionId: string; seedLength: number; seed: SessionEvent[] }>
-}
 
 export function createTuiRuntime(launch: TuiLaunch): TuiRuntime {
   return new SdkTuiRuntime(launch)
 }
 
 class SdkTuiRuntime implements TuiRuntime {
-  private client: RequestAwareHarnessClient | undefined
+  private client: HarnessClient | undefined
   private launch: TuiLaunch
   private readonly handlers = new Set<(n: TuiNotification) => void>()
   private readonly closeHandlers = new Set<(error?: string) => void>()
@@ -49,6 +36,7 @@ class SdkTuiRuntime implements TuiRuntime {
   private closing = false
   private questionHandler: ((request: TuiQuestionRequest) => Promise<TuiQuestionAnswer>) | undefined
   private clientRequestDisposer: (() => void) | undefined
+  private capabilitySnapshot: TuiCapabilitySnapshot = fallbackCapabilitySnapshot()
 
   constructor(launch: TuiLaunch) {
     this.launch = launch
@@ -62,21 +50,41 @@ class SdkTuiRuntime implements TuiRuntime {
       cwd: this.launch.cwd,
       env: this.launch.env,
     })
-    const requestAwareClient = client as RequestAwareHarnessClient
-    this.client = requestAwareClient
+    this.client = client
     this.closing = false
+    this.capabilitySnapshot = fallbackCapabilitySnapshot()
     try {
       client.start()
-      this.clientRequestDisposer = requestAwareClient.onRequest?.(async (method, params) => {
-        if (method !== 'question/ask') throw new Error(`unknown server request: ${method}`)
-        const handler = this.questionHandler
-        if (handler === undefined) throw new Error('TUI has no question handler')
-        return handler(parseQuestionRequest(params))
-      })
+      const onRequest = Reflect.get(client, 'onRequest')
+      let onRequestAvailable = false
+      if (typeof onRequest === 'function') {
+        onRequestAvailable = true
+        const disposer = onRequest.call(
+          client,
+          async (method: string, params: Record<string, unknown>) => {
+            if (method !== 'question/ask') throw new Error(`unknown server request: ${method}`)
+            const handler = this.questionHandler
+            if (handler === undefined) throw new Error('TUI has no question handler')
+            return handler(parseQuestionRequest(params))
+          },
+        )
+        if (typeof disposer === 'function') this.clientRequestDisposer = disposer
+      }
       const sub = client.subscribe()
       this.subscription = sub
       this.pump = this.readLoop(sub)
       const result = await client.initialize(init)
+      const request = Reflect.get(client, 'request')
+      this.capabilitySnapshot =
+        typeof request === 'function'
+          ? await probeRuntimeCapabilities(
+              {
+                request: (method, params, timeoutMs) =>
+                  request.call(client, method, params, timeoutMs),
+              },
+              { onRequest: onRequestAvailable },
+            )
+          : unavailableCapabilitySnapshot('SDK client does not expose request')
       return result.serverInfo
     } catch (error) {
       this.closing = true
@@ -119,12 +127,25 @@ class SdkTuiRuntime implements TuiRuntime {
 
   async cancel(sessionId: string, keepInbox = false): Promise<boolean> {
     const client = this.requireClient()
-    return (client as CancelableHarnessClient).cancel(sessionId, keepInbox)
+    this.requireCapability('cancel')
+    const result = await client.request('session/cancel', { sessionId, keepInbox })
+    if (!isRecord(result) || typeof result.cancelled !== 'boolean') {
+      throw new Error(`session/cancel returned no cancellation result: ${JSON.stringify(result)}`)
+    }
+    return result.cancelled
   }
 
   async open(sessionId: string, replaceSessionId?: string): Promise<boolean> {
     const client = this.requireClient()
-    return (client as CancelableHarnessClient).open(sessionId, replaceSessionId)
+    this.requireCapability('open')
+    const result = await client.request('session/open', {
+      sessionId,
+      ...(replaceSessionId === undefined ? {} : { replaceSessionId }),
+    })
+    if (!isRecord(result) || typeof result.opened !== 'boolean') {
+      throw new Error(`session/open returned no open result: ${JSON.stringify(result)}`)
+    }
+    return result.opened
   }
 
   async fork(
@@ -133,7 +154,13 @@ class SdkTuiRuntime implements TuiRuntime {
     replaceSessionId?: string,
   ): Promise<{ sessionId: string; seedLength: number; seed: SessionEvent[] }> {
     const client = this.requireClient()
-    return (client as CancelableHarnessClient).fork(sourceSessionId, boundary, replaceSessionId)
+    this.requireCapability('fork')
+    const result = await client.request('session/fork', {
+      sourceSessionId,
+      ...(boundary === undefined ? {} : { boundary }),
+      ...(replaceSessionId === undefined ? {} : { replaceSessionId }),
+    })
+    return parseSessionForkResult(result, 'fork')
   }
 
   async rewind(
@@ -142,14 +169,23 @@ class SdkTuiRuntime implements TuiRuntime {
     replaceSessionId?: string,
   ): Promise<{ sessionId: string; seedLength: number; seed: SessionEvent[] }> {
     const client = this.requireClient()
-    return (client as CancelableHarnessClient).rewind(sourceSessionId, messageSeq, replaceSessionId)
+    this.requireCapability('rewind')
+    const result = await client.request('session/fork', {
+      sourceSessionId,
+      rewindToMessageSeq: messageSeq,
+      ...(replaceSessionId === undefined ? {} : { replaceSessionId }),
+    })
+    return parseSessionForkResult(result, 'rewind')
   }
 
   async listSkills(sessionId: string): Promise<SkillEntry[]> {
-    const client = this.requireClient() as HarnessClient & {
-      listSkills(sessionId: string): Promise<SkillEntry[]>
+    const client = this.requireClient()
+    this.requireCapability('skills')
+    const result = await client.request('skills/list', { sessionId })
+    if (!isRecord(result) || !Array.isArray(result.skills)) {
+      throw new Error(`skills/list returned no skill catalog: ${JSON.stringify(result)}`)
     }
-    return client.listSkills(sessionId)
+    return parseSkillEntries(result.skills)
   }
 
   onQuestion(handler: (request: TuiQuestionRequest) => Promise<TuiQuestionAnswer>): () => void {
@@ -157,6 +193,10 @@ class SdkTuiRuntime implements TuiRuntime {
     return () => {
       if (this.questionHandler === handler) this.questionHandler = undefined
     }
+  }
+
+  getCapabilities(): TuiCapabilitySnapshot {
+    return this.capabilitySnapshot
   }
 
   subscribe(handler: (n: TuiNotification) => void): () => void {
@@ -190,6 +230,16 @@ class SdkTuiRuntime implements TuiRuntime {
     return this.client
   }
 
+  private requireCapability(name: keyof TuiCapabilitySnapshot['capabilities']): void {
+    if (this.capabilitySnapshot.capabilities[name]) return
+    const detail = this.capabilitySnapshot.errors[name]
+    throw new Error(
+      detail === undefined
+        ? `runtime capability "${name}" is unavailable`
+        : `runtime capability "${name}" is unavailable: ${detail}`,
+    )
+  }
+
   private async readLoop(
     sub: AsyncIterable<{ method: string; params: Record<string, unknown> }>,
   ): Promise<void> {
@@ -208,6 +258,57 @@ class SdkTuiRuntime implements TuiRuntime {
       }
     }
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function isForkResult(
+  value: unknown,
+): value is { sessionId: string; seedLength: number; seed: SessionEvent[] } {
+  return (
+    isRecord(value) &&
+    typeof value.sessionId === 'string' &&
+    typeof value.seedLength === 'number' &&
+    Number.isSafeInteger(value.seedLength) &&
+    value.seedLength >= 0 &&
+    Array.isArray(value.seed) &&
+    value.seed.every(isSessionEvent)
+  )
+}
+
+function parseSessionForkResult(
+  value: unknown,
+  operation: 'fork' | 'rewind',
+): { sessionId: string; seedLength: number; seed: SessionEvent[] } {
+  if (!isForkResult(value)) {
+    throw new Error(`session/fork returned no ${operation} result: ${JSON.stringify(value)}`)
+  }
+  return {
+    sessionId: value.sessionId,
+    seedLength: value.seedLength,
+    seed: value.seed,
+  }
+}
+
+function parseSkillEntries(value: unknown[]): SkillEntry[] {
+  const skills: SkillEntry[] = []
+  for (const entry of value) {
+    if (
+      !isRecord(entry) ||
+      typeof entry.name !== 'string' ||
+      typeof entry.description !== 'string'
+    ) {
+      throw new Error(`skills/list returned an invalid skill entry: ${JSON.stringify(entry)}`)
+    }
+    skills.push({
+      name: entry.name,
+      description: entry.description,
+      ...(typeof entry.whenToUse === 'string' ? { whenToUse: entry.whenToUse } : {}),
+    })
+  }
+  return skills
 }
 
 function mapNotification(notification: {

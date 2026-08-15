@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type {
+  TuiCapabilitySnapshot,
   SessionEvent,
   TuiNotification,
   TuiQuestionAnswer,
@@ -132,6 +133,91 @@ function fakeRuntime(): TuiRuntime & {
 }
 
 describe('TuiApp', () => {
+  it('toggles latest-turn focus without changing the assembled transcript', async () => {
+    const runtime = fakeRuntime()
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+      locale: 'zh',
+    })
+    await app.start()
+    runtime.emit({
+      method: 'session.event',
+      params: {
+        sessionId: 's1',
+        event: {
+          type: 'user/message',
+          seq: 1,
+          time: 1,
+          data: { id: 'u1', content: [{ type: 'text', text: 'first' }] },
+        },
+      },
+    })
+    runtime.emit({
+      method: 'session.event',
+      params: {
+        sessionId: 's1',
+        event: {
+          type: 'user/message',
+          seq: 2,
+          time: 2,
+          data: { id: 'u2', content: [{ type: 'text', text: 'latest' }] },
+        },
+      },
+    })
+
+    app.dispatch({ type: 'command', line: '/focus' })
+    expect(app.snapshot().status.focusMode).toBe(true)
+    expect(app.snapshot().notice?.message).toBe('已开启聚焦模式：仅显示最近一轮。')
+    expect(app.snapshot().nodes).toHaveLength(2)
+
+    app.dispatch({ type: 'command', line: '/focus' })
+    expect(app.snapshot().status.focusMode).toBe(false)
+    expect(app.snapshot().notice?.message).toBe('已关闭聚焦模式：显示完整会话。')
+  })
+
+  it('uses live runtime capabilities and reports configured differences in /doctor', async () => {
+    const runtime = fakeRuntime()
+    const liveCapabilities: TuiCapabilitySnapshot = {
+      source: 'runtime',
+      capabilities: {
+        cancel: false,
+        open: false,
+        fork: false,
+        rewind: false,
+        skills: false,
+        onRequest: false,
+      },
+      errors: {
+        cancel: 'protocol method is not supported by the runtime',
+      },
+    }
+    runtime.getCapabilities = () => liveCapabilities
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+    })
+    await app.start()
+
+    expect(app.snapshot().capabilities).toMatchObject({
+      cancel: false,
+      rewind: false,
+      skills: false,
+    })
+    app.dispatch({ type: 'command', line: '/doctor' })
+    expect(app.snapshot().notice?.message).toContain('caps-configured cancel=true')
+    expect(app.snapshot().notice?.message).toContain('caps-runtime cancel=false')
+    expect(app.snapshot().notice?.message).toContain(
+      'caps-errors cancel=protocol method is not supported',
+    )
+  })
+
   it('presents a question batch and resolves answers in order', async () => {
     const runtime = fakeRuntime()
     const app = createTuiApp({

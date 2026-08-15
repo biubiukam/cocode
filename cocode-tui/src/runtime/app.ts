@@ -8,13 +8,20 @@ import type {
   TuiQuestionAnswer,
   TuiQuestionItem,
   TuiQuestionRequest,
+  TuiCapabilitySnapshot,
   TuiRuntime,
 } from '@cocode/tui-connection'
 import type { SelectModeResult } from './auth/store.ts'
 import type { AuthSnapshot, ResolvedAuth } from './auth/types.ts'
 import { createAssembler, type Assembler } from './assembler.ts'
 import { P0_CAPABILITIES, type TuiCapabilities } from './capabilities.ts'
-import { CommandRegistry, createBuiltinCommands, helpText, parseSlash } from './commands.ts'
+import {
+  CommandRegistry,
+  commandSummary,
+  createBuiltinCommands,
+  helpText,
+  parseSlash,
+} from './commands.ts'
 import { InputHistory } from './history.ts'
 import type { ConversationNode } from './nodes/types.ts'
 import {
@@ -146,6 +153,7 @@ export type TuiSnapshot = {
     transcript?: { evicted: number }
     subagents?: TuiSubagentActivity
     queueCount: number
+    focusMode: boolean
   }
   helpOpen: boolean
   verbose: boolean
@@ -220,6 +228,7 @@ export type TuiCommandCtx = {
   resumeSessions?: () => Promise<void>
   showSkillsPicker?: () => void
   copyLatestAssistant?: () => void
+  toggleFocus?: () => void
 }
 
 export type TuiApp = {
@@ -262,7 +271,9 @@ class TuiAppImpl implements TuiApp {
   private readonly cwd: string
   private provider: string
   private model: string
+  private readonly configuredCapabilities: TuiCapabilities
   private capabilities: TuiCapabilities
+  private runtimeCapabilitySnapshot: TuiCapabilitySnapshot | undefined
   private readonly commands: CommandRegistry
   private assembler: Assembler
   private telemetry = createTelemetryProjector()
@@ -278,6 +289,7 @@ class TuiAppImpl implements TuiApp {
   private attachments: Array<{ path: string; token: string }> = []
   private helpOpen = false
   private verbose = false
+  private focusMode = false
   private notice: TuiSnapshot['notice']
   private interruptArmed = false
   private exiting = false
@@ -309,7 +321,8 @@ class TuiAppImpl implements TuiApp {
     this.provider = options.provider
     this.model = options.model
     this.sessionId = options.sessionId ?? crypto.randomUUID()
-    this.capabilities = options.capabilities ?? P0_CAPABILITIES
+    this.configuredCapabilities = options.capabilities ?? P0_CAPABILITIES
+    this.capabilities = this.configuredCapabilities
     this.commands = options.commands ?? createBuiltinCommands()
     this.assembler = createAssembler()
     this.auth = options.auth
@@ -346,6 +359,7 @@ class TuiAppImpl implements TuiApp {
       })
       if (this.exiting) return
       this.runtimeName = info.name
+      this.refreshRuntimeCapabilities()
       this.agent = 'idle'
       this.initError = undefined
       this.notice = undefined
@@ -442,15 +456,16 @@ class TuiAppImpl implements TuiApp {
           ...(this.lastSubagent === undefined ? {} : { last: this.lastSubagent }),
         },
         queueCount: this.queuedPrompts.length,
+        focusMode: this.focusMode,
       },
       helpOpen: this.helpOpen,
       verbose: this.verbose,
       capabilities: this.capabilities,
       notice: this.notice,
       helpText: helpText(this.capabilities, this.commands, this.locale),
-      commands: this.commands.list(this.capabilities).map(({ name, summary }) => ({
-        name,
-        summary,
+      commands: this.commands.list(this.capabilities).map((command) => ({
+        name: command.name,
+        summary: commandSummary(command, this.locale),
       })),
       resumePicker: this.resumePicker,
       rewindPicker: this.rewindPicker,
@@ -752,6 +767,8 @@ class TuiAppImpl implements TuiApp {
       useAuth: (target) => requestChannelSwitch(this.switchHost(), target),
       initError: this.initError,
       capabilities: this.capabilities,
+      configuredCapabilities: this.configuredCapabilities,
+      runtimeCapabilities: this.runtimeCapabilitySnapshot,
       cwd: this.cwd,
       provider: this.provider,
       model: this.model,
@@ -833,6 +850,14 @@ class TuiAppImpl implements TuiApp {
         }
         this.copyText(readableNodeText(node))
       },
+      toggleFocus: () => {
+        this.focusMode = !this.focusMode
+        this.notice = {
+          tone: 'info',
+          message: text(this.locale, this.focusMode ? 'focusEnabled' : 'focusDisabled'),
+        }
+        this.emit()
+      },
     })
   }
 
@@ -859,6 +884,14 @@ class TuiAppImpl implements TuiApp {
   }
 
   private async loadSkills(): Promise<void> {
+    if (
+      this.runtimeCapabilitySnapshot?.source === 'runtime' &&
+      !this.runtimeCapabilitySnapshot.capabilities.skills
+    ) {
+      this.capabilities = { ...this.capabilities, skills: false }
+      this.skills = []
+      return
+    }
     const listSkills = this.runtime.listSkills
     if (listSkills === undefined) {
       this.capabilities = { ...this.capabilities, skills: false }
@@ -871,6 +904,16 @@ class TuiAppImpl implements TuiApp {
     } catch {
       this.skills = []
       this.capabilities = { ...this.capabilities, skills: false }
+    }
+  }
+
+  private refreshRuntimeCapabilities(): void {
+    this.runtimeCapabilitySnapshot = this.runtime.getCapabilities?.()
+    if (this.runtimeCapabilitySnapshot?.source === 'runtime') {
+      this.capabilities = applyRuntimeCapabilities(
+        this.configuredCapabilities,
+        this.runtimeCapabilitySnapshot,
+      )
     }
   }
 
@@ -956,6 +999,7 @@ class TuiAppImpl implements TuiApp {
       const info = await this.runtime.restart({ cwd: this.cwd, provider: this.provider, model })
       this.model = model
       this.runtimeName = info.name
+      this.refreshRuntimeCapabilities()
       this.sessionId = crypto.randomUUID()
       this.assembler.reset()
       this.telemetry.reset()
@@ -978,6 +1022,7 @@ class TuiAppImpl implements TuiApp {
         })
         this.model = previous
         this.runtimeName = info.name
+        this.refreshRuntimeCapabilities()
         this.agent = 'idle'
         this.notice = {
           tone: 'error',
@@ -1282,6 +1327,20 @@ class TuiAppImpl implements TuiApp {
       this.emitScheduled = false
       this.emit()
     })
+  }
+}
+
+function applyRuntimeCapabilities(
+  configured: TuiCapabilities,
+  runtime: TuiCapabilitySnapshot,
+): TuiCapabilities {
+  return {
+    ...configured,
+    cancel: runtime.capabilities.cancel,
+    open: runtime.capabilities.open,
+    fork: runtime.capabilities.fork,
+    rewind: runtime.capabilities.rewind,
+    skills: runtime.capabilities.skills,
   }
 }
 

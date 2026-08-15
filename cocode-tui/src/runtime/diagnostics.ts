@@ -1,6 +1,7 @@
 /** Format safe runtime diagnostics without exposing credentials. */
 
 import type { TuiCapabilities } from './capabilities.ts'
+import type { TuiCapabilitySnapshot } from '@cocode/tui-connection'
 
 export function formatDoctor(options: {
   tty: boolean
@@ -13,6 +14,8 @@ export function formatDoctor(options: {
   model: string
   sessionId: string
   capabilities: TuiCapabilities
+  configuredCapabilities: TuiCapabilities
+  runtimeCapabilities?: TuiCapabilitySnapshot
   sessionRoot?: string
 }): string {
   const init =
@@ -22,6 +25,17 @@ export function formatDoctor(options: {
   const caps = Object.entries(options.capabilities)
     .map(([key, value]) => `${key}=${String(value)}`)
     .join(',')
+  const configuredCaps = formatCapabilityMap(options.configuredCapabilities)
+  const runtimeCaps =
+    options.runtimeCapabilities === undefined
+      ? 'unavailable'
+      : formatCapabilityMap(options.runtimeCapabilities.capabilities)
+  const runtimeErrors =
+    options.runtimeCapabilities === undefined
+      ? undefined
+      : Object.entries(options.runtimeCapabilities.errors)
+          .map(([key, value]) => `${key}=${value}`)
+          .join(',')
   return [
     `tty ${options.tty ? 'yes' : 'no'}`,
     `launch ${options.launchConfigured ? 'set' : 'unset'}`,
@@ -32,11 +46,24 @@ export function formatDoctor(options: {
     `model ${options.model}`,
     `session ${options.sessionId}`,
     `caps ${caps}`,
+    `caps-configured ${configuredCaps}`,
+    `caps-runtime ${runtimeCaps}`,
+    runtimeErrors === undefined || runtimeErrors === ''
+      ? undefined
+      : `caps-errors ${runtimeErrors}`,
     options.sessionRoot === undefined
       ? 'session-root unset'
       : `session-root ${options.sessionRoot}`,
     'secrets omitted; do not edit credentials concurrently with GUI',
-  ].join(' · ')
+  ]
+    .filter((value): value is string => value !== undefined)
+    .join(' · ')
+}
+
+function formatCapabilityMap(capabilities: Record<string, unknown>): string {
+  return Object.entries(capabilities)
+    .map(([key, value]) => `${key}=${String(value)}`)
+    .join(',')
 }
 
 export function redactSecrets(value: string): string {

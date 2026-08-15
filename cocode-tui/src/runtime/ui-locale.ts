@@ -109,6 +109,9 @@ type UiKey =
   | 'copySuccess'
   | 'copyEmpty'
   | 'copyUnavailable'
+  | 'focusStatusOn'
+  | 'focusEnabled'
+  | 'focusDisabled'
 
 const TEXT: Record<UiLocale, Record<UiKey, string>> = {
   en: {
@@ -218,6 +221,9 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     copySuccess: 'Copied to clipboard.',
     copyEmpty: 'There is no message text to copy.',
     copyUnavailable: 'Clipboard unavailable on this terminal.',
+    focusStatusOn: 'focus: latest turn',
+    focusEnabled: 'Focus mode enabled: showing the latest turn.',
+    focusDisabled: 'Focus mode disabled: showing the full transcript.',
   },
   zh: {
     session: '会话',
@@ -326,6 +332,9 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     copySuccess: '已复制到剪贴板。',
     copyEmpty: '没有可复制的消息文本。',
     copyUnavailable: '当前终端无法使用剪贴板。',
+    focusStatusOn: '聚焦：最近一轮',
+    focusEnabled: '已开启聚焦模式：仅显示最近一轮。',
+    focusDisabled: '已关闭聚焦模式：显示完整会话。',
   },
 }
 

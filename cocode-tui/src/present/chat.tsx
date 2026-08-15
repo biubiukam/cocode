@@ -30,6 +30,7 @@ import { searchHistory } from '../runtime/history-search.ts'
 import { listWorkspaceEntries, rankFileMatches } from '../runtime/workspace-files.ts'
 import { moveMessageSelection, selectableMessageKeys } from './message-selection.ts'
 import { visibleTail } from './visible-tail.ts'
+import { focusConversationNodes } from '../runtime/focus.ts'
 import { text } from '../runtime/ui-locale.ts'
 import { visibleResumeItems } from '../runtime/resume-picker.ts'
 import { editDraft } from '../runtime/external-editor.ts'
@@ -126,12 +127,16 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
   const mainColumns = wideInspector
     ? Math.max(1, stdout.columns - INSPECTOR_WIDTH - 1)
     : stdout.columns
+  const displayNodes = useMemo(
+    () => focusConversationNodes(snap.nodes, snap.status.focusMode),
+    [snap.nodes, snap.status.focusMode],
+  )
   const selectableMessages = useMemo(
     () =>
       selectableMessageKeys(
-        visibleTail(snap.nodes, messageMaxRows, snap.verbose, expandedMessageIds),
+        visibleTail(displayNodes, messageMaxRows, snap.verbose, expandedMessageIds),
       ),
-    [expandedMessageIds, messageMaxRows, snap.nodes, snap.verbose],
+    [displayNodes, expandedMessageIds, messageMaxRows, snap.verbose],
   )
 
   useEffect(
@@ -575,7 +580,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
           columns={mainColumns}
         />
         <MessageList
-          nodes={snap.nodes}
+          nodes={displayNodes}
           verbose={snap.verbose}
           maxRows={messageMaxRows}
           selectedNodeId={messageSelectionActive ? selectedMessageId : undefined}

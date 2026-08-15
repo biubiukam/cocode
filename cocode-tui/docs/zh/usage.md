@@ -34,6 +34,7 @@ DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 - `Ctrl+G` 使用 `$VISUAL` 或 `$EDITOR` 打开临时 Markdown 草稿；退出编辑器后内容回填到输入区。编辑器退出码非 0、草稿不是 UTF-8 或超过 256 KiB 时会显示错误。
 - `Shift+↑` 进入消息选择模式；使用 `↑` `↓` 移动，回车展开或收起当前消息，`Esc` 退出。
 - 在消息选择模式按 `c` 可复制当前消息；也可以使用 `/copy` 复制最近一条 assistant 回复。复制依次尝试 macOS `pbcopy`、Windows `clip.exe`，以及 Linux 的 `wl-copy`、`xclip`、`xsel`；命令不可用时只显示提示，不影响会话。
+- `/focus` 切换本地「最近一轮」视图。开启后，对话区只显示最近一条用户消息及其后续节点，状态栏显示「聚焦：最近一轮」。它只改变界面投影，不修改 `/clear`、`/resume`、`/rewind`、导出或持久化 session log 的语义；再次执行可恢复完整会话视图。
 - `/lang zh` 或 `/lang en` 立即切换界面语言；未指定时启动语言由 `COCODE_LANG`、`LANG` 等环境变量决定。
 - `/model <model-id>` 通过 runtime restart 切换当前模型，并创建新 session；切换失败会尝试恢复原模型。
 - `Ctrl+O` 切换详细模式，查看完整思考内容和工具输入输出。
@@ -61,25 +62,26 @@ DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 
 输入 `/` 会打开命令菜单。继续输入可按前缀过滤，使用 `Tab` 或方向键选择，回车执行；输入空格后回到普通文本编辑。
 
-| 命令                           | 作用                                                      |
-| ------------------------------ | --------------------------------------------------------- |
-| `/help`                        | 查看快捷键和当前可用命令                                  |
-| `/status`                      | 查看会话、模型、运行时和授权模式                          |
-| `/doctor`                      | 查看 TTY、启动参数、初始化结果、会话根和关闭的 capability |
-| `/clear`                       | 清除当前屏幕投影，不删除 session log                      |
-| `/new`                         | 创建新的 session id，不复制旧会话                         |
-| `/compact`                     | 通过 prompt 路径请求 host 压缩当前会话                    |
-| `/export`                      | 将当前投影导出为 Markdown 文件                            |
-| `/copy`                        | 复制最近一条 assistant 回复到系统剪贴板                   |
-| `/init`                        | 仅在缺少 `AGENTS.md` 时创建最小工作区模板                 |
-| `/theme dark` / `/theme light` | 切换显示主题                                              |
-| `/lang zh` / `/lang en`        | 切换中英文界面                                            |
-| `/model <model-id>`            | 切换模型并创建新 session                                  |
-| `/resume`                      | 打开当前工作区的 session 选择器并回放选中会话             |
-| `/skills`                      | 浏览当前工作区中可由用户调用的技能                        |
-| `/use byok` / `/use cocode`    | 在自己的 Key 和 Cocode 之间切换；切换即新会话             |
-| `/login` / `/logout`           | 登录或退出 Cocode Cloud；退出时若还有 Key 则留在对话里    |
-| `/exit`                        | 关闭 TUI 并恢复终端                                       |
+| 命令                           | 作用                                                                 |
+| ------------------------------ | -------------------------------------------------------------------- |
+| `/help`                        | 查看快捷键和当前可用命令                                             |
+| `/status`                      | 查看会话、模型、运行时和授权模式                                     |
+| `/doctor`                      | 查看 TTY、启动参数、初始化结果、会话根，以及配置能力与运行时能力差异 |
+| `/clear`                       | 清除当前屏幕投影，不删除 session log                                 |
+| `/new`                         | 创建新的 session id，不复制旧会话                                    |
+| `/compact`                     | 通过 prompt 路径请求 host 压缩当前会话                               |
+| `/export`                      | 将当前投影导出为 Markdown 文件                                       |
+| `/copy`                        | 复制最近一条 assistant 回复到系统剪贴板                              |
+| `/focus`                       | 显示或隐藏最近一轮用户消息及其后续节点                               |
+| `/init`                        | 仅在缺少 `AGENTS.md` 时创建最小工作区模板                            |
+| `/theme dark` / `/theme light` | 切换显示主题                                                         |
+| `/lang zh` / `/lang en`        | 切换中英文界面                                                       |
+| `/model <model-id>`            | 切换模型并创建新 session                                             |
+| `/resume`                      | 打开当前工作区的 session 选择器并回放选中会话                        |
+| `/skills`                      | 浏览当前工作区中可由用户调用的技能                                   |
+| `/use byok` / `/use cocode`    | 在自己的 Key 和 Cocode 之间切换；切换即新会话                        |
+| `/login` / `/logout`           | 登录或退出 Cocode Cloud；退出时若还有 Key 则留在对话里               |
+| `/exit`                        | 关闭 TUI 并恢复终端                                                  |
 
 `/resume` 会读取本地 session header，支持关键词过滤和 `↑` `↓` 选择，以流式方式将选中 JSONL 的事件回放到临时投影，并要求 runtime 重新打开同一个持久化 session 后再替换当前 TUI。后续输入会继续写入选中的 session id。TUI 不负责跨进程写入锁；如果其它客户端正在写同一 session，请不要同时恢复。
 
@@ -102,5 +104,7 @@ DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 ## Runtime capability 边界
 
 只有 harness 的 `skills/list` 返回真实目录后，TUI 才会启用 `/skills`。如果 composition 没有挂载 `@deepseek-ai/dsh-skill` 及其 provider（例如 `@deepseek-ai/dsh-skill-filesystem`），命令会保持隐藏；探测失败或目录为空不会被展示成可用能力。
+
+`/doctor` 中的 `caps-configured` 表示 TUI 根据配置和本地实现预期的能力，`caps-runtime` 表示初始化后对真实 JSON-RPC runtime 的探测结果。两者不一致时，以运行时结果为准；`caps-errors` 会列出被禁用能力的原因。探测使用随机、不存在的 session id，不会创建或修改用户会话。
 
 交互式问卷要求 harness composition 挂载 user-questions service 和对应的 ask-user consumer。SDK server 会把 `question/ask` 转发给 TUI，并等待完整答案批次；未挂载该 service 时不会把终端注册为问卷 provider。
