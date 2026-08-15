@@ -544,6 +544,10 @@ export class TuiCompanionGateway {
     if (requestId === undefined || pending === undefined)
       throw new Error(`unknown question request: ${String(params.requestId)}`)
     this.pendingQuestions.delete(requestId)
+    if (params.cancelled === true) {
+      pending.reject(new Error('ask_user_question was interrupted before the user answered'))
+      return {}
+    }
     try {
       const answer = parseQuestionAnswer(params.answer)
       validateQuestionAnswer(pending.questions, answer)

@@ -424,17 +424,19 @@ class SdkTuiRuntime implements TuiRuntime {
   private async respondToQuestion(params: Record<string, unknown>): Promise<void> {
     const requestId = params.requestId
     if (typeof requestId !== 'string') return
-    let answer: TuiQuestionAnswer = { answers: [] }
+    let response: { answer: TuiQuestionAnswer } | { cancelled: true }
     try {
       const handler = this.questionHandler
       if (handler === undefined) throw new Error('TUI has no question handler')
-      answer = await handler(parseQuestionRequest(params))
+      response = { answer: await handler(parseQuestionRequest(params)) }
     } catch {
-      // The companion validates the answer and rejects the waiting operation;
-      // an empty answer is intentionally sent to settle the request.
+      // A rejected UI handler means that the user cancelled the interaction.
+      // Send that outcome explicitly instead of fabricating an empty answer,
+      // which would fail normal question-batch validation.
+      response = { cancelled: true }
     }
     await this.requireClient()
-      .request('cocode/question/respond', { requestId, answer })
+      .request('cocode/question/respond', { requestId, ...response })
       .catch(() => undefined)
   }
 

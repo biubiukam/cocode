@@ -251,4 +251,21 @@ describe('TuiCompanionGateway RPC contract', () => {
     })
     await expect(pending).resolves.toEqual({ answers: [{ id: 'mode', selected: ['fast'] }] })
   })
+
+  it('propagates an explicit question cancellation without validating an empty answer batch', async () => {
+    const { gateway, output, askQuestion } = createFixture()
+    await gateway.initialize({ cwd: '/workspace', provider: 'p', model: 'm' })
+    const pending = askQuestion?.({
+      questions: [{ id: 'mode', question: 'Mode?', options: [{ label: 'fast' }] }],
+    })
+    const request = await readFrame(output)
+    const params = request.params as { requestId: string }
+
+    await gateway.handleRequest('question/respond', {
+      requestId: params.requestId,
+      cancelled: true,
+    })
+
+    await expect(pending).rejects.toThrow('ask_user_question was interrupted before the user answered')
+  })
 })
