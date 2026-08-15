@@ -47,6 +47,7 @@ type UiKey =
   | 'footerRunning'
   | 'footerQueueDraft'
   | 'footerRedraw'
+  | 'footerModel'
   | 'agentIdle'
   | 'agentRunning'
   | 'agentThinking'
@@ -278,7 +279,8 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     footerQuit: 'esc interrupt / quit',
     footerRunning: 'esc interrupt',
     footerQueueDraft: 'tab queue draft',
-    footerRedraw: 'ctrl+l redraw',
+    footerRedraw: 'redraw: /redraw',
+    footerModel: 'ctrl+l model',
     agentIdle: 'ready',
     agentRunning: 'running',
     agentThinking: 'thinking…',
@@ -509,7 +511,8 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     footerQuit: 'Esc 中断 / 退出',
     footerRunning: '按 Esc 终止',
     footerQueueDraft: '按 Tab 加入队列',
-    footerRedraw: 'Ctrl+L 重绘',
+    footerRedraw: '重绘：/redraw',
+    footerModel: 'Ctrl+L 模型',
     agentIdle: '就绪',
     agentRunning: '运行中',
     agentThinking: '思考中…',

@@ -59,6 +59,9 @@ export function createBuiltinCommands(): CommandRegistry {
   local('clear', 'Clear the projected transcript', (ctx) => {
     ctx.clearTranscript()
   })
+  local('redraw', 'Redraw the terminal without clearing the session', (ctx) => {
+    ctx.dispatch({ type: 'redraw' })
+  })
   local('status', 'Show session, model, and agent state', (ctx) => {
     ctx.showStatus()
   })
@@ -252,9 +255,9 @@ export function helpText(
   caps: TuiCapabilities,
   registry: CommandRegistry,
   locale: UiLocale = 'en',
+  additional: readonly Command[] = [],
 ): string {
-  const commands = registry
-    .list(caps)
+  const commands = [...registry.list(caps), ...additional]
     .map((command) => `/${command.name}  ${commandSummary(command, locale)}`)
     .join('\n')
   return [

@@ -18,6 +18,7 @@ describe('commands', () => {
       'help',
       'exit',
       'clear',
+      'redraw',
       'status',
       'doctor',
       'theme',

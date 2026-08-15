@@ -1599,7 +1599,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
                 {snap.agent === 'running' && snap.composer.text.trim() !== ''
                   ? text(snap.locale, 'footerQueueDraft')
                   : text(snap.locale, 'footerQuit')}{' '}
-                · {text(snap.locale, 'footerRedraw')}
+                · {text(snap.locale, 'footerModel')} · {text(snap.locale, 'footerRedraw')}
               </Text>
             </>
           )}
