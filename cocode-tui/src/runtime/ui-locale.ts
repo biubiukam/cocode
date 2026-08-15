@@ -57,6 +57,11 @@ type UiKey =
   | 'skillsEmpty'
   | 'skillsUnavailable'
   | 'skillReady'
+  | 'questionTitle'
+  | 'questionHint'
+  | 'questionCustom'
+  | 'questionMultiHint'
+  | 'questionSelectHint'
   | 'rewindTitle'
   | 'rewindHint'
   | 'rewindArm'
@@ -147,6 +152,11 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     skillsEmpty: 'No user-invocable skills found.',
     skillsUnavailable: 'Skills are unavailable in this runtime.',
     skillReady: 'Skill /{name} is ready in the composer.',
+    questionTitle: 'Question',
+    questionHint: '↑↓ move · enter answer · esc cancel',
+    questionCustom: 'Type another answer',
+    questionMultiHint: 'space toggles options · tab opens custom answer',
+    questionSelectHint: 'enter selects · tab opens custom answer',
     rewindTitle: 'Rewind conversation',
     rewindHint: '↑↓ select · enter review · esc close',
     rewindArm: 'Press Esc again to choose a rewind point.',
@@ -236,6 +246,11 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     skillsEmpty: '当前运行时没有可调用的技能。',
     skillsUnavailable: '当前运行时未配置 Skills。',
     skillReady: '技能 /{name} 已写入输入区。',
+    questionTitle: '需要确认',
+    questionHint: '↑↓ 移动 · 回车回答 · Esc 取消',
+    questionCustom: '输入其他答案',
+    questionMultiHint: '空格勾选 · Tab 切换到其他答案',
+    questionSelectHint: '回车选择 · Tab 切换到其他答案',
     rewindTitle: '回滚会话',
     rewindHint: '↑↓ 选择 · 回车预览 · Esc 关闭',
     rewindArm: '再次按 Esc 选择回滚位置。',

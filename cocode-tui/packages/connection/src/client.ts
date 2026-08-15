@@ -5,6 +5,8 @@
 import type {
   SessionEvent,
   SkillEntry,
+  TuiQuestionAnswer,
+  TuiQuestionRequest,
   TuiInitialize,
   TuiLaunch,
   TuiNotification,
@@ -13,6 +15,11 @@ import type {
 
 type SdkClient = typeof import('@deepseek-ai/dsh-sdk-client')
 type HarnessClient = InstanceType<SdkClient['HarnessClient']>
+type RequestAwareHarnessClient = HarnessClient & {
+  onRequest?: (
+    handler: (method: string, params: Record<string, unknown>) => Promise<unknown>,
+  ) => () => void
+}
 type CancelableHarnessClient = HarnessClient & {
   cancel(sessionId: string, keepInbox?: boolean): Promise<boolean>
   open(sessionId: string, replaceSessionId?: string): Promise<boolean>
@@ -33,13 +40,15 @@ export function createTuiRuntime(launch: TuiLaunch): TuiRuntime {
 }
 
 class SdkTuiRuntime implements TuiRuntime {
-  private client: HarnessClient | undefined
+  private client: RequestAwareHarnessClient | undefined
   private launch: TuiLaunch
   private readonly handlers = new Set<(n: TuiNotification) => void>()
   private readonly closeHandlers = new Set<(error?: string) => void>()
   private pump: Promise<void> | undefined
   private subscription: { close(): void } | undefined
   private closing = false
+  private questionHandler: ((request: TuiQuestionRequest) => Promise<TuiQuestionAnswer>) | undefined
+  private clientRequestDisposer: (() => void) | undefined
 
   constructor(launch: TuiLaunch) {
     this.launch = launch
@@ -53,10 +62,17 @@ class SdkTuiRuntime implements TuiRuntime {
       cwd: this.launch.cwd,
       env: this.launch.env,
     })
-    this.client = client
+    const requestAwareClient = client as RequestAwareHarnessClient
+    this.client = requestAwareClient
     this.closing = false
     try {
       client.start()
+      this.clientRequestDisposer = requestAwareClient.onRequest?.(async (method, params) => {
+        if (method !== 'question/ask') throw new Error(`unknown server request: ${method}`)
+        const handler = this.questionHandler
+        if (handler === undefined) throw new Error('TUI has no question handler')
+        return handler(parseQuestionRequest(params))
+      })
       const sub = client.subscribe()
       this.subscription = sub
       this.pump = this.readLoop(sub)
@@ -136,6 +152,13 @@ class SdkTuiRuntime implements TuiRuntime {
     return client.listSkills(sessionId)
   }
 
+  onQuestion(handler: (request: TuiQuestionRequest) => Promise<TuiQuestionAnswer>): () => void {
+    this.questionHandler = handler
+    return () => {
+      if (this.questionHandler === handler) this.questionHandler = undefined
+    }
+  }
+
   subscribe(handler: (n: TuiNotification) => void): () => void {
     this.handlers.add(handler)
     return () => {
@@ -154,6 +177,8 @@ class SdkTuiRuntime implements TuiRuntime {
     this.closing = true
     this.subscription?.close()
     this.subscription = undefined
+    this.clientRequestDisposer?.()
+    this.clientRequestDisposer = undefined
     await this.client?.close()
     await this.pump?.catch(() => undefined)
   }
@@ -245,4 +270,58 @@ function isSessionEvent(value: unknown): value is SessionEvent {
     typeof event.seq === 'number' &&
     typeof event.time === 'number'
   )
+}
+
+function parseQuestionRequest(params: Record<string, unknown>): TuiQuestionRequest {
+  if (typeof params.sessionId !== 'string' || !Array.isArray(params.questions)) {
+    throw new Error('invalid question/ask request')
+  }
+  const questions = params.questions.map((value) => {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      throw new Error('invalid question item')
+    }
+    const item = value as Record<string, unknown>
+    if (typeof item.id !== 'string' || typeof item.question !== 'string') {
+      throw new Error('invalid question item')
+    }
+    const options = item.options === undefined ? undefined : parseQuestionOptions(item.options)
+    const intent = item.intent === undefined ? undefined : parseQuestionIntent(item.intent)
+    return {
+      id: item.id,
+      question: item.question,
+      ...(typeof item.detail === 'string' ? { detail: item.detail } : {}),
+      ...(typeof item.header === 'string' ? { header: item.header } : {}),
+      ...(options === undefined ? {} : { options }),
+      ...(typeof item.multiSelect === 'boolean' ? { multiSelect: item.multiSelect } : {}),
+      ...(intent === undefined ? {} : { intent }),
+    }
+  })
+  if (questions.length === 0) throw new Error('question/ask requires at least one question')
+  return { sessionId: params.sessionId, questions }
+}
+
+function parseQuestionIntent(value: unknown): { kind: 'plan-review'; approve: string } {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new Error('invalid question intent')
+  }
+  const intent = value as Record<string, unknown>
+  if (intent.kind !== 'plan-review' || typeof intent.approve !== 'string') {
+    throw new Error('invalid question intent')
+  }
+  return { kind: intent.kind, approve: intent.approve }
+}
+
+function parseQuestionOptions(value: unknown): { label: string; description?: string }[] {
+  if (!Array.isArray(value)) throw new Error('invalid question options')
+  return value.map((entry) => {
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+      throw new Error('invalid question option')
+    }
+    const option = entry as Record<string, unknown>
+    if (typeof option.label !== 'string') throw new Error('invalid question option')
+    return {
+      label: option.label,
+      ...(typeof option.description === 'string' ? { description: option.description } : {}),
+    }
+  })
 }

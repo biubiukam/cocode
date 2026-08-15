@@ -43,6 +43,7 @@ Set `COCODE_TUI_SCREEN=inline` (the default) to keep the main screen and scrollb
 - Type `@` at any position in the message to search workspace files and directories; use `Tab`, `↑`, or `↓` to select, then Enter to insert the reference.
 - On send, selected files are appended with their contents and selected directories with a bounded listing; references must stay inside the workspace.
 - When the runtime exposes a Skills registry, `/skills` opens a searchable workspace catalog. Select a skill to insert `/skill-name ` into the composer, then edit the prompt before sending. The command stays hidden when the runtime does not mount a Skills registry.
+- When an agent calls `ask_user_question`, the composer is replaced by a question panel. Use `↑` `↓` to move, `Space` to toggle multiple choices, `Tab` to reach the custom answer, `Enter` to answer, and `Esc` to cancel. Batched and concurrent requests are presented in FIFO order.
 
 Tool output is truncated by display mode; while a node remains in the projection cache, its raw payload is retained in node state, and the complete event stays in the session log. When the transcript is tight, the composer stays visible.
 
@@ -90,3 +91,5 @@ If another TUI window is still open, `/use`, `/login`, and `/logout` refuse so t
 ## Runtime capability boundaries
 
 The `/skills` command is enabled only after `skills/list` returns a real catalog from the harness. A composition without `@deepseek-ai/dsh-skill` (and a provider such as `@deepseek-ai/dsh-skill-filesystem`) keeps the command hidden; an empty or failed probe is not presented as a usable feature.
+
+Interactive questions require the harness composition to mount the user-questions service and an ask-user consumer. The SDK server then forwards `question/ask` to the TUI and waits for the complete answer batch. A composition without that service does not register the terminal as a question provider.

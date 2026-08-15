@@ -2,7 +2,14 @@
  * TuiApp owns session lifecycle, projection, and local queues.
  */
 
-import type { SkillEntry, TuiNotification, TuiRuntime } from '@cocode/tui-connection'
+import type {
+  SkillEntry,
+  TuiNotification,
+  TuiQuestionAnswer,
+  TuiQuestionItem,
+  TuiQuestionRequest,
+  TuiRuntime,
+} from '@cocode/tui-connection'
 import type { SelectModeResult } from './auth/store.ts'
 import type { AuthSnapshot, ResolvedAuth } from './auth/types.ts'
 import { createAssembler, type Assembler } from './assembler.ts'
@@ -98,6 +105,8 @@ export type TuiAction =
   | { type: 'skills.move'; delta: number }
   | { type: 'skills.close' }
   | { type: 'skills.confirm' }
+  | { type: 'question.answer'; selected: string[]; custom?: string }
+  | { type: 'question.cancel' }
   | { type: 'queuePrompt' }
 
 export type { TuiCapabilities }
@@ -145,7 +154,17 @@ export type TuiSnapshot = {
   rewindPicker?: RewindPickerState
   skillsPicker?: SkillsPickerState
   skills: readonly SkillEntry[]
+  question?: TuiQuestionSnapshot
   exiting: boolean
+}
+
+export type TuiQuestionSnapshot = {
+  key: string
+  sessionId: string
+  question: TuiQuestionItem
+  position: number
+  total: number
+  answered: number
 }
 
 export type TuiSubagentActivity = {
@@ -156,6 +175,15 @@ export type TuiSubagentActivity = {
 type QueuedPrompt = {
   text: string
   attachments: readonly { path: string; token: string }[]
+}
+
+type PendingQuestion = {
+  id: number
+  request: TuiQuestionRequest
+  index: number
+  answers: TuiQuestionAnswer['answers']
+  resolve: (answer: TuiQuestionAnswer) => void
+  reject: (error: Error) => void
 }
 
 export type TuiAuthInfo = {
@@ -235,6 +263,7 @@ class TuiAppImpl implements TuiApp {
   private readonly listeners = new Set<() => void>()
   private unsubscribeRuntime: (() => void) | undefined
   private unsubscribeRuntimeClose: (() => void) | undefined
+  private unsubscribeQuestion: (() => void) | undefined
   private sessionId: string
   private agent: TuiSnapshot['agent'] = 'starting'
   private draft: DraftState = createDraft()
@@ -261,6 +290,9 @@ class TuiAppImpl implements TuiApp {
   private rewindPicker: RewindPickerState | undefined
   private skillsPicker: SkillsPickerState | undefined
   private skills: SkillEntry[] = []
+  private readonly questionQueue: PendingQuestion[] = []
+  private activeQuestion: PendingQuestion | undefined
+  private questionSerial = 0
 
   constructor(options: TuiAppOptions) {
     this.runtime = options.runtime
@@ -285,6 +317,7 @@ class TuiAppImpl implements TuiApp {
     this.agent = 'starting'
     this.emit()
     this.unsubscribeRuntime = this.runtime.subscribe((n) => this.onNotification(n))
+    this.unsubscribeQuestion = this.runtime.onQuestion?.((request) => this.askQuestion(request))
     this.unsubscribeRuntimeClose = this.runtime.onClose?.((error) => {
       if (this.exiting) return
       this.agent = 'dead'
@@ -330,6 +363,9 @@ class TuiAppImpl implements TuiApp {
       unsubscribe: () => {
         this.unsubscribeRuntime?.()
         this.unsubscribeRuntime = undefined
+        this.unsubscribeQuestion?.()
+        this.unsubscribeQuestion = undefined
+        this.rejectQuestions(new Error('TUI closed before the question was answered'))
       },
       unsubscribeClose: () => {
         this.unsubscribeRuntimeClose?.()
@@ -409,6 +445,7 @@ class TuiAppImpl implements TuiApp {
       rewindPicker: this.rewindPicker,
       skillsPicker: this.skillsPicker,
       skills: this.skills,
+      question: this.questionSnapshot(),
       exiting: this.exiting,
     }
   }
@@ -588,6 +625,12 @@ class TuiAppImpl implements TuiApp {
         this.emit()
         return
       }
+      case 'question.answer':
+        this.answerQuestion(action.selected, action.custom)
+        return
+      case 'question.cancel':
+        this.cancelQuestion()
+        return
       case 'queuePrompt':
         this.queueCurrentPrompt()
         return
@@ -782,6 +825,76 @@ class TuiAppImpl implements TuiApp {
       this.skills = []
       this.capabilities = { ...this.capabilities, skills: false }
     }
+  }
+
+  private askQuestion(request: TuiQuestionRequest): Promise<TuiQuestionAnswer> {
+    return new Promise<TuiQuestionAnswer>((resolve, reject) => {
+      this.questionQueue.push({
+        id: ++this.questionSerial,
+        request,
+        index: 0,
+        answers: [],
+        resolve,
+        reject,
+      })
+      this.startNextQuestion()
+    })
+  }
+
+  private startNextQuestion(): void {
+    if (this.activeQuestion !== undefined || this.questionQueue.length === 0) return
+    this.activeQuestion = this.questionQueue.shift()
+    this.emit()
+  }
+
+  private questionSnapshot(): TuiQuestionSnapshot | undefined {
+    const active = this.activeQuestion
+    if (active === undefined) return undefined
+    const question = active.request.questions[active.index]
+    if (question === undefined) return undefined
+    return {
+      key: `${active.id}-${active.index}`,
+      sessionId: active.request.sessionId,
+      question,
+      position: active.index + 1,
+      total: active.request.questions.length,
+      answered: active.answers.length,
+    }
+  }
+
+  private answerQuestion(selected: string[], custom?: string): void {
+    const active = this.activeQuestion
+    const question = active?.request.questions[active.index]
+    if (active === undefined || question === undefined) return
+    active.answers.push({
+      id: question.id,
+      selected: [...selected],
+      ...(custom === undefined || custom.trim() === '' ? {} : { custom: custom.trim() }),
+    })
+    active.index += 1
+    if (active.index >= active.request.questions.length) {
+      this.activeQuestion = undefined
+      active.resolve({ answers: [...active.answers] })
+      this.startNextQuestion()
+    }
+    this.emit()
+  }
+
+  private cancelQuestion(): void {
+    const active = this.activeQuestion
+    if (active === undefined) return
+    this.activeQuestion = undefined
+    active.reject(new Error('ask_user_question was interrupted before the user answered'))
+    this.startNextQuestion()
+    this.emit()
+  }
+
+  private rejectQuestions(error: Error): void {
+    const active = this.activeQuestion
+    this.activeQuestion = undefined
+    if (active !== undefined) active.reject(error)
+    for (const pending of this.questionQueue.splice(0)) pending.reject(error)
+    this.emit()
   }
 
   private async switchModel(model: string): Promise<void> {

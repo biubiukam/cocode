@@ -2,7 +2,12 @@ import { describe, expect, it, vi } from 'vitest'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { TuiNotification, TuiRuntime } from '@cocode/tui-connection'
+import type {
+  TuiNotification,
+  TuiQuestionAnswer,
+  TuiQuestionRequest,
+  TuiRuntime,
+} from '@cocode/tui-connection'
 import { createTuiApp } from '../../src/runtime/app.ts'
 import { P0_CAPABILITIES } from '../../src/runtime/capabilities.ts'
 
@@ -15,12 +20,14 @@ function fakeRuntime(): TuiRuntime & {
   cancels: { sessionId: string; keepInbox: boolean }[]
   opens: { sessionId: string; replaceSessionId?: string }[]
   rewinds: { sourceSessionId: string; messageSeq: number; replaceSessionId?: string }[]
+  askQuestion: (request: TuiQuestionRequest) => Promise<TuiQuestionAnswer>
   failStart?: Error
   cancelError?: Error
   failRestartModels: Set<string>
 } {
   const handlers = new Set<(n: TuiNotification) => void>()
   const closeHandlers = new Set<(error?: string) => void>()
+  let questionHandler: ((request: TuiQuestionRequest) => Promise<TuiQuestionAnswer>) | undefined
   const runtime: TuiRuntime & {
     prompts: { sessionId: string; text: string }[]
     emit: (n: TuiNotification) => void
@@ -93,6 +100,16 @@ function fakeRuntime(): TuiRuntime & {
         ],
       }
     },
+    async askQuestion(request) {
+      if (questionHandler === undefined) throw new Error('question handler is unavailable')
+      return questionHandler(request)
+    },
+    onQuestion(handler) {
+      questionHandler = handler
+      return () => {
+        if (questionHandler === handler) questionHandler = undefined
+      }
+    },
     subscribe(handler) {
       handlers.add(handler)
       return () => {
@@ -111,6 +128,80 @@ function fakeRuntime(): TuiRuntime & {
 }
 
 describe('TuiApp', () => {
+  it('presents a question batch and resolves answers in order', async () => {
+    const runtime = fakeRuntime()
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+    })
+    await app.start()
+    const answer = runtime.askQuestion({
+      sessionId: 's1',
+      questions: [
+        {
+          id: 'mode',
+          header: 'Setup',
+          question: 'How should cocode work?',
+          options: [{ label: 'fast' }, { label: 'careful' }],
+        },
+        {
+          id: 'note',
+          question: 'Any extra note?',
+        },
+      ],
+    })
+    expect(app.snapshot().question).toMatchObject({
+      position: 1,
+      total: 2,
+      question: { id: 'mode' },
+    })
+    app.dispatch({ type: 'question.answer', selected: ['careful'] })
+    expect(app.snapshot().question).toMatchObject({
+      position: 2,
+      answered: 1,
+      question: { id: 'note' },
+    })
+    app.dispatch({ type: 'question.answer', selected: [], custom: 'keep it short' })
+    await expect(answer).resolves.toEqual({
+      answers: [
+        { id: 'mode', selected: ['careful'] },
+        { id: 'note', selected: [], custom: 'keep it short' },
+      ],
+    })
+    expect(app.snapshot().question).toBeUndefined()
+  })
+
+  it('queues question batches FIFO and rejects the active one on cancel', async () => {
+    const runtime = fakeRuntime()
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+    })
+    await app.start()
+    const first = runtime.askQuestion({
+      sessionId: 's1',
+      questions: [{ id: 'first', question: 'First?' }],
+    })
+    const second = runtime.askQuestion({
+      sessionId: 's1',
+      questions: [{ id: 'second', question: 'Second?' }],
+    })
+    expect(app.snapshot().question?.question.id).toBe('first')
+    app.dispatch({ type: 'question.cancel' })
+    await expect(first).rejects.toThrow('interrupted')
+    expect(app.snapshot().question?.question.id).toBe('second')
+    app.dispatch({ type: 'question.answer', selected: [], custom: 'done' })
+    await expect(second).resolves.toEqual({
+      answers: [{ id: 'second', selected: [], custom: 'done' }],
+    })
+  })
+
   it('loads a real skill catalog and inserts the selected invocation', async () => {
     const runtime = fakeRuntime() as TuiRuntime & {
       listSkills(sessionId: string): Promise<{ name: string; description: string }[]>

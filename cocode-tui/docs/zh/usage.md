@@ -43,6 +43,7 @@ DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 - 在消息任意位置输入 `@` 可搜索工作区文件和目录；使用 `Tab`、`↑`、`↓` 选择，回车插入引用。
 - 发送时会在消息末尾附加选中文件内容，目录则附加受限的目录列表；文件必须位于当前工作区内。
 - 当 runtime 挂载 Skills registry 时，`/skills` 会打开可搜索的工作区技能目录。选择技能后会向输入区插入 `/技能名 `，可以继续编辑 prompt 再发送；未挂载 registry 时不会显示该命令。
+- Agent 调用 `ask_user_question` 时，输入区会切换为问卷面板。使用 `↑` `↓` 移动，空格勾选多个选项，`Tab` 切换到自定义答案，回车回答，`Esc` 取消。批量问题和并发请求按 FIFO 顺序显示。
 
 工具输出会按显示模式截断；未被投影缓存淘汰时，原始内容仍保留在节点状态，完整事件始终保存在 session log 中。对话区空间不足时，输入区保持可见。
 
@@ -90,3 +91,5 @@ DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 ## Runtime capability 边界
 
 只有 harness 的 `skills/list` 返回真实目录后，TUI 才会启用 `/skills`。如果 composition 没有挂载 `@deepseek-ai/dsh-skill` 及其 provider（例如 `@deepseek-ai/dsh-skill-filesystem`），命令会保持隐藏；探测失败或目录为空不会被展示成可用能力。
+
+交互式问卷要求 harness composition 挂载 user-questions service 和对应的 ask-user consumer。SDK server 会把 `question/ask` 转发给 TUI，并等待完整答案批次；未挂载该 service 时不会把终端注册为问卷 provider。

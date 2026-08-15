@@ -23,6 +23,41 @@ export type SkillEntry = {
   whenToUse?: string
 }
 
+export type TuiQuestionOption = {
+  label: string
+  description?: string
+}
+
+export type TuiQuestionIntent = {
+  kind: 'plan-review'
+  approve: string
+}
+
+export type TuiQuestionItem = {
+  id: string
+  question: string
+  detail?: string
+  header?: string
+  options?: TuiQuestionOption[]
+  multiSelect?: boolean
+  intent?: TuiQuestionIntent
+}
+
+export type TuiQuestionAnswerItem = {
+  id: string
+  selected: string[]
+  custom?: string
+}
+
+export type TuiQuestionRequest = {
+  sessionId: string
+  questions: TuiQuestionItem[]
+}
+
+export type TuiQuestionAnswer = {
+  answers: TuiQuestionAnswerItem[]
+}
+
 export type TuiLaunch = {
   command: string
   args: string[]
@@ -77,6 +112,7 @@ export type TuiRuntime = {
     replaceSessionId?: string,
   ): Promise<{ sessionId: string; seedLength: number; seed: SessionEvent[] }>
   listSkills?(sessionId: string): Promise<SkillEntry[]>
+  onQuestion?(handler: (request: TuiQuestionRequest) => Promise<TuiQuestionAnswer>): () => void
   subscribe(handler: (n: TuiNotification) => void): () => void
   onClose?: (handler: (error?: string) => void) => () => void
   close(): Promise<void>

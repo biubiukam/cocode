@@ -35,6 +35,7 @@ export type ChatLayoutInput = {
   rewindConfirming?: boolean
   skillsItems?: number
   skillsSelected?: number
+  questionRows?: number
 }
 
 export type ChatLayout = {
@@ -67,7 +68,8 @@ export function calculateChatLayout(input: ChatLayoutInput): ChatLayout {
     historyRows(input.historyMatches) +
     resumeRows(input.resumeItems, input.resumeSelected) +
     rewindRows(input.rewindItems, input.rewindSelected, input.rewindConfirming) +
-    skillsRows(input.skillsItems, input.skillsSelected)
+    skillsRows(input.skillsItems, input.skillsSelected) +
+    questionRows(input.questionRows)
   const availableRows = Math.max(0, viewportRows - baseRows)
   const minimumOverlayRows = minimumOverlayHeight(input)
   const minimumRows =
@@ -129,6 +131,7 @@ function minimumOverlayHeight(input: ChatLayoutInput): number {
   if (input.resumeItems !== undefined) return MIN_RESUME_OVERLAY_ROWS
   if (input.rewindItems !== undefined) return MIN_REWIND_OVERLAY_ROWS
   if (input.skillsItems !== undefined) return MIN_OVERLAY_ROWS
+  if (input.questionRows !== undefined) return MIN_OVERLAY_ROWS
   if (input.historyMatches !== undefined) return MIN_OVERLAY_ROWS
   if (input.fileItems !== undefined || input.fileLoading === true) {
     return MIN_OVERLAY_ROWS + optionalRow(input.fileLoading)
@@ -155,6 +158,10 @@ function skillsRows(items: number | undefined, selected = 0): number {
   const start = listWindowStart(selected, count, SKILLS_WINDOW_SIZE)
   const indicators = optionalRow(start > 0) + optionalRow(count - start - visible > 0)
   return visible + indicators + 6
+}
+
+function questionRows(rows: number | undefined): number {
+  return rows === undefined ? 0 : Math.max(MIN_OVERLAY_ROWS, nonNegativeInteger(rows))
 }
 
 function optionalRow(enabled = false): number {

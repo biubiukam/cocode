@@ -14,6 +14,7 @@ import { HistorySearch } from './components/HistorySearch.tsx'
 import { MessageList } from './components/MessageList.tsx'
 import { ResumePicker } from './components/ResumePicker.tsx'
 import { RewindPicker } from './components/RewindPicker.tsx'
+import { QuestionPanel } from './components/QuestionPanel.tsx'
 import { SkillsPicker } from './components/SkillsPicker.tsx'
 import { StatusLine } from './components/StatusLine.tsx'
 import {
@@ -62,7 +63,9 @@ export function Chat(props: { app: TuiApp }) {
   const rewindOpen = rewindState?.open === true
   const skillsState = snap.skillsPicker
   const skillsOpen = skillsState?.open === true
+  const questionOpen = snap.question !== undefined
   const slashOpen =
+    !questionOpen &&
     !rewindOpen &&
     !skillsOpen &&
     !resumeOpen &&
@@ -75,6 +78,7 @@ export function Chat(props: { app: TuiApp }) {
     [snap.composer.cursor, snap.composer.text],
   )
   const fileVisible =
+    !questionOpen &&
     !rewindOpen &&
     !skillsOpen &&
     !resumeOpen &&
@@ -107,6 +111,12 @@ export function Chat(props: { app: TuiApp }) {
     rewindConfirming: rewindOpen ? rewindState.confirming : undefined,
     skillsItems: skillsOpen ? skillsState.skills.length : undefined,
     skillsSelected: skillsOpen ? skillsState.selected : undefined,
+    questionRows:
+      snap.question === undefined
+        ? undefined
+        : 6 +
+          (snap.question.question.options?.length ?? 0) +
+          Number(snap.question.question.detail !== undefined),
   })
   const messageMaxRows = layout.messageRows
   const selectableMessages = useMemo(
@@ -200,6 +210,7 @@ export function Chat(props: { app: TuiApp }) {
 
   useInput((input, key) => {
     if (editorBusy) return
+    if (questionOpen) return
     if (rewindOpen) {
       if (key.escape) {
         app.dispatch({ type: 'rewind.close' })
@@ -520,6 +531,14 @@ export function Chat(props: { app: TuiApp }) {
       ) : null}
       {skillsOpen && skillsState !== undefined ? (
         <SkillsPicker state={skillsState} locale={snap.locale} maxRows={layout.overlayRows} />
+      ) : null}
+      {snap.question !== undefined ? (
+        <QuestionPanel
+          key={snap.question.key}
+          state={snap.question}
+          locale={snap.locale}
+          dispatch={app.dispatch}
+        />
       ) : null}
       {snap.helpOpen ? (
         <Help text={snap.helpText} locale={snap.locale} maxRows={layout.overlayRows} />
