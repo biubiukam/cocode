@@ -308,6 +308,28 @@ describe('TuiApp', () => {
     })
   })
 
+  it('keeps dispatch bound when passed to a question panel', async () => {
+    const runtime = fakeRuntime()
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+    })
+    await app.start()
+    const answer = runtime.askQuestion({
+      sessionId: 's1',
+      questions: [{ id: 'plan', question: 'Accept this plan?' }],
+    })
+    const panel = { dispatch: app.dispatch }
+
+    panel.dispatch({ type: 'question.cancel' })
+
+    await expect(answer).rejects.toThrow('interrupted')
+    expect(app.snapshot().question).toBeUndefined()
+  })
+
   it('loads a real skill catalog and inserts the selected invocation', async () => {
     const runtime = fakeRuntime() as TuiRuntime & {
       listSkills(sessionId: string): Promise<{ name: string; description: string }[]>

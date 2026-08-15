@@ -603,7 +603,7 @@ class TuiAppImpl implements TuiApp {
     }
   }
 
-  dispatch(action: TuiAction): void {
+  dispatch = (action: TuiAction): void => {
     switch (action.type) {
       case 'setDraft':
         this.draft = replaceDraft(this.draft, action.text)
