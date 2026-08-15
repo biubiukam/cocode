@@ -901,6 +901,8 @@ class TuiAppImpl implements TuiApp {
         this.resetSubagentActivity()
         this.clearQueuedPrompts()
         this.agent = 'idle'
+        this.interruptArmed = false
+        this.resetSessionControls()
         this.attachments = []
         this.notice = {
           tone: 'info',
@@ -1060,6 +1062,11 @@ class TuiAppImpl implements TuiApp {
   private async forkSession(rewindToMessageSeq?: number): Promise<void> {
     if (!this.capabilities.fork || this.agent !== 'idle') {
       this.notice = { tone: 'info', message: text(this.locale, 'forkUnavailable') }
+      this.emit()
+      return
+    }
+    if (!this.assembler.snapshot().some((node) => node.kind === 'user')) {
+      this.notice = { tone: 'info', message: text(this.locale, 'forkEmpty') }
       this.emit()
       return
     }
@@ -1411,6 +1418,11 @@ class TuiAppImpl implements TuiApp {
       this.emit()
       return
     }
+    if (this.agent === 'starting') {
+      this.notice = { tone: 'info', message: text(this.locale, 'sessionChanging') }
+      this.emit()
+      return
+    }
     try {
       const current = await this.runtime.permissionMode(this.sessionId)
       this.permissionMode = current.mode
@@ -1464,15 +1476,18 @@ class TuiAppImpl implements TuiApp {
   }
 
   private async refreshSessionControls(): Promise<void> {
-    this.permissionMode = 'manual'
-    this.supportedPermissionModes = ['manual']
-    this.planMode = false
+    this.resetSessionControls()
     await Promise.all([this.refreshPermissionMode(), this.refreshPlanMode()])
   }
 
   private async togglePlanMode(): Promise<void> {
     if (!this.capabilities.planMode || this.runtime.planMode === undefined) {
       this.notice = { tone: 'info', message: text(this.locale, 'planUnavailable') }
+      this.emit()
+      return
+    }
+    if (this.agent === 'starting') {
+      this.notice = { tone: 'info', message: text(this.locale, 'sessionChanging') }
       this.emit()
       return
     }
@@ -1858,6 +1873,12 @@ class TuiAppImpl implements TuiApp {
 
   private resetSessionState(): void {
     this.sessionState.reset()
+  }
+
+  private resetSessionControls(): void {
+    this.permissionMode = 'manual'
+    this.supportedPermissionModes = ['manual']
+    this.planMode = false
   }
 
   private switchHost(): ChannelSwitchHost {

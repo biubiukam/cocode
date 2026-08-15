@@ -466,6 +466,18 @@ describe('TuiApp', () => {
       capabilities: { ...P0_CAPABILITIES, fork: true },
     })
     await app.start()
+    runtime.emit({
+      method: 'session.event',
+      params: {
+        sessionId: 'source-session',
+        event: {
+          type: 'user/message',
+          seq: 1,
+          time: 1,
+          data: { id: 'source-user', content: [{ type: 'text', text: 'existing prompt' }] },
+        },
+      },
+    })
 
     app.dispatch({ type: 'command', line: '/clone' })
     await expect.poll(() => app.snapshot().header.sessionId).toBe('forked-session')
@@ -475,6 +487,28 @@ describe('TuiApp', () => {
         .snapshot()
         .nodes.some((node) => node.kind === 'user' && node.text.includes('Forked prompt')),
     ).toBe(true)
+  })
+
+  it('does not clone an empty session before the first prompt', async () => {
+    const runtime = fakeRuntime()
+    const fork = vi.fn(runtime.fork)
+    runtime.fork = fork
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 'empty-session',
+      capabilities: { ...P0_CAPABILITIES, fork: true },
+      locale: 'zh',
+    })
+    await app.start()
+
+    app.dispatch({ type: 'command', line: '/clone' })
+    await vi.waitFor(() => expect(app.snapshot().notice?.message).toBe('没有可用于创建分支边界的历史用户消息。'))
+
+    expect(fork).not.toHaveBeenCalled()
+    expect(app.snapshot().header.sessionId).toBe('empty-session')
   })
 
   it('forks from a selected user message and replaces the live session', async () => {
@@ -1140,6 +1174,81 @@ describe('TuiApp', () => {
     expect(snap.nodes).toEqual([])
   })
 
+  it('/new resets session control state before the first prompt', async () => {
+    const runtime = fakeRuntime() as TuiRuntime & {
+      permissionMode(
+        sessionId: string,
+        mode?: string,
+      ): Promise<{ mode: string; supportedModes: string[] }>
+      planMode(sessionId: string, active?: boolean): Promise<{ active: boolean }>
+    }
+    const planStates = new Map([['s1', true]])
+    const permissionModes = new Map([['s1', 'allow-all']])
+    runtime.planMode = async (sessionId, active) => {
+      if (active !== undefined) planStates.set(sessionId, active)
+      return { active: planStates.get(sessionId) ?? false }
+    }
+    runtime.permissionMode = async (sessionId, mode) => {
+      if (mode !== undefined) permissionModes.set(sessionId, mode)
+      return {
+        mode: permissionModes.get(sessionId) ?? 'manual',
+        supportedModes: ['manual', 'allow-all'],
+      }
+    }
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+      capabilities: { ...P0_CAPABILITIES, permissionMode: true, planMode: true },
+    })
+    await app.start()
+    expect(app.snapshot().status).toMatchObject({ permissionMode: 'allow-all', planMode: true })
+
+    app.dispatch({ type: 'command', line: '/new' })
+
+    expect(app.snapshot().status).toMatchObject({ permissionMode: 'manual', planMode: false })
+  })
+
+  it('does not change session controls while switching sessions', async () => {
+    const runtime = fakeRuntime() as TuiRuntime & {
+      planMode(sessionId: string, active?: boolean): Promise<{ active: boolean }>
+    }
+    let releaseRestart!: () => void
+    const restartReady = new Promise<void>((resolve) => {
+      releaseRestart = resolve
+    })
+    const planCalls: string[] = []
+    runtime.planMode = async (sessionId) => {
+      planCalls.push(sessionId)
+      return { active: false }
+    }
+    runtime.restart = async () => {
+      await restartReady
+      return { name: 'fake-runtime', version: '0' }
+    }
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm1',
+      sessionId: 's1',
+      capabilities: { ...P0_CAPABILITIES, planMode: true },
+      locale: 'zh',
+    })
+    await app.start()
+    planCalls.length = 0
+
+    app.dispatch({ type: 'command', line: '/model m2' })
+    app.dispatch({ type: 'command', line: '/plan' })
+
+    expect(planCalls).toEqual([])
+    expect(app.snapshot().notice?.message).toBe('正在切换会话，请等待当前操作完成。')
+    releaseRestart()
+    await expect.poll(() => app.snapshot().agent).toBe('idle')
+  })
+
   it('edits the draft around a cursor', async () => {
     const runtime = fakeRuntime()
     const app = createTuiApp({
@@ -1444,13 +1553,22 @@ describe('TuiApp', () => {
   })
 
   it('/use byok restarts the runtime as a new session', async () => {
-    const runtime = fakeRuntime()
+    const runtime = fakeRuntime() as TuiRuntime & {
+      permissionMode(): Promise<{ mode: string; supportedModes: string[] }>
+      planMode(): Promise<{ active: boolean }>
+    }
+    runtime.permissionMode = async () => ({
+      mode: 'allow-all',
+      supportedModes: ['manual', 'allow-all'],
+    })
+    runtime.planMode = async () => ({ active: true })
     const app = createTuiApp({
       runtime,
       cwd: '/tmp',
       provider: 'cocode-cloud',
       model: 'cloud-1',
       sessionId: 's1',
+      capabilities: { ...P0_CAPABILITIES, permissionMode: true, planMode: true },
       auth: {
         mode: 'cocode',
         envLocked: false,
@@ -1468,6 +1586,7 @@ describe('TuiApp', () => {
       },
     })
     await app.start()
+    expect(app.snapshot().status).toMatchObject({ permissionMode: 'allow-all', planMode: true })
     runtime.emit({
       method: 'session.event',
       params: {
@@ -1492,6 +1611,7 @@ describe('TuiApp', () => {
     ])
     expect(app.snapshot().header.sessionId).not.toBe('s1')
     expect(app.snapshot().nodes).toEqual([])
+    expect(app.snapshot().status).toMatchObject({ permissionMode: 'manual', planMode: false })
     expect(app.snapshot().notice?.message).toMatch(/API Key/)
     expect(app.snapshot().notice?.message).toMatch(/新会话/)
     expect(app.snapshot().notice?.message).not.toMatch(/sk-|ck_/)

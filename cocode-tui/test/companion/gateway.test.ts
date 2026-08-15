@@ -250,6 +250,33 @@ describe('TuiCompanionGateway', () => {
     await expect(gateway.planMode({ sessionId: 'session-a' })).resolves.toEqual({ active: true })
   })
 
+  it('clears a failed session opening so a later open can retry', async () => {
+    let inspections = 0
+    const { gateway, agents } = createGateway({
+      services: {
+        sessionPersistence: {
+          async list() {
+            return []
+          },
+          async inspect() {
+            inspections += 1
+            if (inspections === 1) throw new Error('temporary persistence failure')
+            return { meta: { id: 'session-a', cwd: '/tmp/project' }, events: [] }
+          },
+        },
+      },
+    })
+    await gateway.initialize({ cwd: '/tmp/project', provider: 'provider', model: 'model' })
+
+    await expect(gateway.open({ sessionId: 'session-a' })).rejects.toThrow(
+      'temporary persistence failure',
+    )
+    await expect(gateway.open({ sessionId: 'session-a' })).resolves.toMatchObject({
+      opened: true,
+    })
+    expect(agents.has('session-a')).toBe(true)
+  })
+
   it('round-trips an approval response through notification and request', async () => {
     const { gateway, events, output } = createGateway({ services: { approval: {} } })
     await gateway.initialize({ cwd: '/tmp/project', provider: 'provider', model: 'model' })

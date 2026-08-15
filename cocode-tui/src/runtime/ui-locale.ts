@@ -89,6 +89,7 @@ type UiKey =
   | 'queueRestored'
   | 'turnComplete'
   | 'turnBusy'
+  | 'sessionChanging'
   | 'cancelRequested'
   | 'cancelNotRunning'
   | 'cancelFailed'
@@ -260,6 +261,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     queueRestored: 'Queued prompt restored to the front of the queue.',
     turnComplete: 'Turn complete',
     turnBusy: 'Turn in progress. Press Tab to queue this prompt.',
+    sessionChanging: 'Session is changing. Wait for it to finish.',
     cancelRequested: 'Cancel requested; waiting for the runtime to become idle.',
     cancelNotRunning: 'No active turn to cancel.',
     cancelFailed: 'Cancel request failed',
@@ -430,6 +432,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     queueRestored: '已将队列输入恢复到队首。',
     turnComplete: '本轮任务已完成',
     turnBusy: '当前任务仍在运行，按 Tab 可将输入加入队列。',
+    sessionChanging: '正在切换会话，请等待当前操作完成。',
     cancelRequested: '已请求取消，等待运行时进入空闲状态。',
     cancelNotRunning: '当前没有可取消的任务。',
     cancelFailed: '取消请求失败',
