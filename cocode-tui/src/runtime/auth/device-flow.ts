@@ -111,10 +111,13 @@ export async function pollDeviceToken(
       return polled.value
     }
     const code = problemCode(polled.value)
-    if (code === 'authorization_pending') continue
+    if (isPendingDeviceCode(code)) continue
     if (code === 'slow_down') {
       waitSec += 5
       continue
+    }
+    if (isExpiredDeviceCode(code)) {
+      throw new TuiError('AUTH_DEVICE_EXPIRED')
     }
     throw new TuiError('AUTH_DEVICE_DENIED')
   }
@@ -263,6 +266,18 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isPositiveFinite(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0
+}
+
+function isPendingDeviceCode(code: string | undefined): boolean {
+  return code === 'authorization_pending' || code === 'device_authorization_pending'
+}
+
+function isExpiredDeviceCode(code: string | undefined): boolean {
+  return (
+    code === 'expired_token' ||
+    code === 'token_expired' ||
+    code === 'device_authorization_unavailable'
+  )
 }
 
 function isTokenPair(value: unknown): value is TokenPair {

@@ -55,6 +55,49 @@ describe('device-flow', () => {
     expect(calls).toBe(2)
   })
 
+  it('treats the agency pending code as still waiting', async () => {
+    let calls = 0
+    const fetchImpl: typeof fetch = async () => {
+      calls += 1
+      if (calls === 1) {
+        return json(428, { code: 'device_authorization_pending' })
+      }
+      return json(200, {
+        access_token: 'at',
+        refresh_token: 'rt',
+        expires_in: 900,
+      })
+    }
+    const token = await pollDeviceToken(
+      'https://cocode.agency',
+      'dc',
+      1,
+      600,
+      new AbortController().signal,
+      { fetch: fetchImpl, delay: async () => undefined },
+    )
+    expect(token.access_token).toBe('at')
+    expect(calls).toBe(2)
+  })
+
+  it('stops when the agency denies the device', async () => {
+    await expect(
+      pollDeviceToken('https://cocode.agency', 'dc', 1, 600, new AbortController().signal, {
+        delay: async () => undefined,
+        fetch: async () => json(403, { code: 'device_authorization_denied' }),
+      }),
+    ).rejects.toThrow(/AUTH_DEVICE_DENIED/)
+  })
+
+  it('stops when the agency reports the device code expired', async () => {
+    await expect(
+      pollDeviceToken('https://cocode.agency', 'dc', 1, 600, new AbortController().signal, {
+        delay: async () => undefined,
+        fetch: async () => json(401, { code: 'token_expired' }),
+      }),
+    ).rejects.toThrow(/AUTH_DEVICE_EXPIRED/)
+  })
+
   it('slows down when asked', async () => {
     let calls = 0
     let lastWait = 0
