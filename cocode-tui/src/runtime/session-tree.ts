@@ -35,7 +35,9 @@ export function buildSessionTree(sessions: readonly SessionSummary[]): SessionTr
 
   const sort = (items: SessionSummary[]): SessionSummary[] =>
     [...items].sort(
-      (left, right) => left.createdAt - right.createdAt || left.id.localeCompare(right.id),
+      (left, right) =>
+        (right.updatedAt ?? right.createdAt) - (left.updatedAt ?? left.createdAt) ||
+        left.id.localeCompare(right.id),
     )
   const visit = (
     session: SessionSummary,

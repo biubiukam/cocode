@@ -59,7 +59,7 @@ export function SessionTreePicker(props: {
               {active ? '›' : ' '} {marker} {indent}
               {title} · {item.session.id.slice(0, 8)}{' '}
               <Text color={active ? theme.text : theme.dim}>
-                {formatTimestamp(item.session.createdAt, props.locale)}
+                {formatTimestamp(item.updatedAt ?? item.session.createdAt, props.locale)}
               </Text>
             </Text>
           )
