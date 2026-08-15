@@ -1,5 +1,5 @@
 if git diff --cached --name-only -- cocode-gui | grep -q .; then
-  pnpm --dir cocode-gui exec lint-staged --cwd . --config lint-staged.config.mjs
+  pnpm --dir cocode-gui exec lint-staged --cwd . --config lint-staged.config.cjs
 fi
 if git diff --cached --name-only -- cocode-tui | grep -q .; then
   pnpm --dir cocode-tui exec lint-staged --cwd . --config lint-staged.config.mjs
