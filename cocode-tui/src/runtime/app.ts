@@ -1519,10 +1519,11 @@ class TuiAppImpl implements TuiApp {
   }
 
   private async loadSkills(): Promise<void> {
-    if (
-      this.runtimeCapabilitySnapshot?.source === 'runtime' &&
-      !this.runtimeCapabilitySnapshot.capabilities.skills
-    ) {
+    const advertisedSkills =
+      this.runtimeCapabilitySnapshot?.source === 'runtime'
+        ? this.runtimeCapabilitySnapshot.capabilities.skills
+        : undefined
+    if (advertisedSkills === false) {
       this.capabilities = { ...this.capabilities, skills: false }
       this.skills = []
       return
@@ -1535,7 +1536,10 @@ class TuiAppImpl implements TuiApp {
     }
     try {
       this.skills = await listSkills.call(this.runtime, this.sessionId)
-      this.capabilities = { ...this.capabilities, skills: this.skills.length > 0 }
+      this.capabilities = {
+        ...this.capabilities,
+        skills: advertisedSkills ?? this.skills.length > 0,
+      }
     } catch {
       this.skills = []
       this.capabilities = { ...this.capabilities, skills: false }

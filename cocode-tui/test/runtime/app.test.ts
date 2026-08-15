@@ -247,14 +247,14 @@ describe('TuiApp', () => {
     expect(app.snapshot().capabilities).toMatchObject({
       cancel: false,
       rewind: false,
-      skills: false,
+      skills: true,
     })
     expect(app.snapshot().runtimeInfo.capabilities.map((capability) => capability.name)).not.toContain(
       'onRequest',
     )
     expect(
       app.snapshot().runtimeInfo.capabilities.find((capability) => capability.name === 'skills'),
-    ).toEqual({ name: 'skills', enabled: false })
+    ).toEqual({ name: 'skills', enabled: true })
     app.dispatch({ type: 'command', line: '/doctor' })
     expect(app.snapshot().notice?.message).toContain('caps-configured cancel=true')
     expect(app.snapshot().notice?.message).toContain('caps-runtime cancel=false')
