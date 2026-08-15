@@ -11,8 +11,11 @@ export function formatReasoning(
   streaming: boolean,
 ): string | undefined {
   if (text === '') return undefined
-  if (verbose) return text
-  return `thinking · ${text.length} chars${streaming ? ' …' : ''}`
+  // Keep the active reasoning visible so the user can tell the model is making
+  // progress. Once the assistant message is sealed, the default view folds it
+  // back to a compact summary; verbose mode still keeps it expanded.
+  if (verbose || streaming) return text
+  return `thinking · ${text.length} chars`
 }
 
 export function formatToolResult(text: string | undefined, verbose: boolean): string | undefined {
