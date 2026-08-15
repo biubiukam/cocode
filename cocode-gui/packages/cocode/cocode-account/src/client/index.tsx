@@ -376,7 +376,10 @@ function MenuGlyph({ kind }: { readonly kind: MenuGlyphKind }): ReturnType<typeo
   const paths: Record<MenuGlyphKind, ReturnType<typeof createElement>> = {
     account: createElement("path", { d: "M3 13.5c.7-1.9 2.5-3 5-3s4.3 1.1 5 3M8 8.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" }),
     usage: createElement("path", { d: "M3 13V9.5M6.5 13V6.5M10 13V3M13.5 13V8M2 13.5h12" }),
-    settings: createElement("path", { d: "M8 1.75v2M8 12.25v2M1.75 8h2M12.25 8h2M3.58 3.58 5 5M11 11l1.42 1.42M12.42 3.58 11 5M5 11l-1.42 1.42" }),
+    settings: createElement("g", null,
+      createElement("path", { d: "m6.55 2.05.35 1.42a4.9 4.9 0 0 0-1.26.73l-1.36-.56-1.28 2.22 1.01.99a4.8 4.8 0 0 0 0 1.46L3 9.3l1.28 2.22 1.36-.56a4.9 4.9 0 0 0 1.26.73l-.35 1.42h2.56l-.35-1.42a4.9 4.9 0 0 0 1.26-.73l1.36.56 1.28-2.22-1.01-.99a4.8 4.8 0 0 0 0-1.46l1.01-.99-1.28-2.22-1.36.56a4.9 4.9 0 0 0-1.26-.73l.35-1.42Z" }),
+      createElement("circle", { cx: 8, cy: 7.58, r: 1.65 }),
+    ),
     help: createElement("path", { d: "M5.9 5.8a2.15 2.15 0 1 1 3.65 1.54c-.9.78-1.55 1.15-1.55 2.16M8 12.25v.1" }),
     logout: createElement("path", { d: "M8.5 3H4.25A1.25 1.25 0 0 0 3 4.25v7.5A1.25 1.25 0 0 0 4.25 13H8.5M9 8h5M11.5 5.5 14 8l-2.5 2.5" }),
   }
@@ -435,7 +438,7 @@ function AccountPanel({ kind, snapshot, provider, onClose }: {
   return createElement("div", { className: css.panelOverlay, role: "presentation", onMouseDown: (event: ReactMouseEvent<HTMLDivElement>) => { if (event.target === event.currentTarget) onClose() } },
     createElement("section", { className: css.panel, role: "dialog", "aria-modal": "true", "aria-label": title },
       createElement("header", { className: css.panelHeader },
-        createElement("div", null, createElement("h2", { className: css.panelTitle }, title), createElement("span", { className: css.panelSubtitle }, "Cocode")),
+        createElement("h2", { className: css.panelTitle }, title),
         createElement("button", { type: "button", className: css.panelClose, onClick: onClose, "aria-label": "关闭" }, "×"),
       ),
       body,
