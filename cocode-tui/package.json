@@ -7,8 +7,9 @@
   },
   "scripts": {
     "prepare": "cd .. && husky",
-    "dev": "node --import tsx/esm src/main.ts",
+    "dev": "node --import tsx/esm src/main.tsx",
     "typecheck": "tsc --noEmit && pnpm -r typecheck",
+    "test": "vitest run",
     "lint": "eslint --ext .js,.cjs,.mjs,.ts,.tsx src packages",
     "lint:fix": "pnpm run lint -- --fix",
     "format": "prettier --write src packages package.json",
@@ -16,16 +17,23 @@
     "build": "pnpm -r build"
   },
   "dependencies": {
-    "@cocode/tui-connection": "workspace:*"
+    "@cocode/tui-connection": "workspace:*",
+    "ink": "^5.2.1",
+    "marked": "^18.0.9",
+    "react": "^18.3.1",
+    "string-width": "^7.2.0",
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
     "@dtyq/eslint-config": "0.0.11",
     "@types/node": "^22.20.1",
+    "@types/react": "^18.3.24",
     "eslint": "8.57.1",
     "husky": "9.1.7",
     "lint-staged": "15.5.2",
     "prettier": "2.8.8",
     "tsx": "^4.20.5",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
   }
 }

@@ -1,0 +1,95 @@
+# Cocode TUI usage
+
+[中文](../zh/usage.md) · [English](./usage.md)
+
+## Before launch
+
+Prepare a sibling `cocode-harness` clone, then set `cocode-tui/.env`:
+
+```dotenv
+COCODE_HARNESS_CMD=node
+COCODE_HARNESS_ARGS=--import,tsx/esm,../../cocode-harness/packages/examples/jsonrpc-demo/src/bin.ts
+DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
+```
+
+Configure a key on the first-run gate, or set `DEEPSEEK_API_KEY` for this process. For development, point `COCODE_HOME` at a separate config directory. Sessions default to `$DSH_HOME/sessions`, or `~/.dsh/sessions` when `DSH_HOME` is unset; `DSH_SESSION_ROOT` can override it.
+
+## Screen regions
+
+Set `COCODE_TUI_SCREEN=inline` (the default) to keep the main screen and scrollback, or `alternate` for a fullscreen alternate buffer that is restored on exit. Legacy Windows consoles without alternate-buffer support fall back to `inline`.
+
+- The header shows the workspace, git branch, session, provider, model, and live Agent state.
+- The transcript projects `you`, `cocode`, reasoning, and tool results as separate node groups.
+- The status bar shows runtime state, notices, and input/output token usage when supplied by the runtime.
+- The composer is a bordered `prompt` panel; a dead runtime is shown as `locked` instead of looking editable.
+- The `/` command menu and `?` help panel appear between status and composer. The transcript shrinks first, then overlay height is bounded by the remaining rows.
+- A multiline draft shows at most six logical lines around the cursor without deleting the full draft. If the fixed chrome cannot fit, the TUI asks for a taller terminal and pauses ordinary input.
+
+## Editing
+
+- `Enter` sends; `Shift+Enter` inserts a newline.
+- `←` `→` move the cursor; `Backspace` deletes the character before it.
+- `↑` `↓` walk local input history.
+- `Ctrl+R` opens history search; type to filter recent messages, use `↑` `↓` to select, Enter to restore the draft, and `Esc` to close.
+- `Ctrl+G` opens the draft in `$VISUAL` or `$EDITOR`; the edited Markdown is restored to the composer when the editor exits. Non-zero exits, invalid UTF-8, and drafts over 256 KiB are reported as errors.
+- `Shift+↑` enters message selection; use `↑` `↓` to move, Enter to expand or collapse the current message, and `Esc` to exit.
+- `/lang zh` or `/lang en` switches the interface immediately; startup language follows `COCODE_LANG`, `LANG`, and related locale variables.
+- `/model <model-id>` restarts the runtime with a new model and starts a new session; a failed switch attempts to restore the previous model.
+- `Ctrl+O` toggles verbose mode for full reasoning and tool I/O.
+- While a turn is running, the status line shows `thinking…` so a quiet interval before the next stream chunk is distinguishable from an idle runtime. It also shows the latest assistant input/output usage and current subagent activity when the wire reports it. When optional events are present, it also shows decode TPS, cache hit rate, context-window percentage, reasoning effort, current working activity, compact context segments (`S/P/A/T/X` for system, prompt, assistant, thinking, and tools), todo progress, goal phase, and the active agent preset. Segment values are estimates based on text length, not provider billing data.
+- While a turn is running, press `Tab` to queue the current draft. Up to eight queued prompts are sent in order after `session.status=idle`; this is local queuing, not steer or cancellation.
+- `Esc` closes overlays (help, command menu) first; while a turn is running, the first press requests cancellation and the second exits. When idle, press twice to quit.
+- `Ctrl+L` redraws the screen without clearing the session.
+- Type `@` at any position in the message to search workspace files and directories; use `Tab`, `↑`, or `↓` to select, then Enter to insert the reference.
+- On send, selected files are appended with their contents and selected directories with a bounded listing; references must stay inside the workspace.
+- When the runtime exposes a Skills registry, `/skills` opens a searchable workspace catalog. Select a skill to insert `/skill-name ` into the composer, then edit the prompt before sending. The command stays hidden when the runtime does not mount a Skills registry.
+- When an agent calls `ask_user_question`, the composer is replaced by a question panel. Use `↑` `↓` to move, `Space` to toggle multiple choices, `Tab` to reach the custom answer, `Enter` to answer, and `Esc` to cancel. Batched and concurrent requests are presented in FIFO order.
+
+Tool output is truncated by display mode; while a node remains in the projection cache, its raw payload is retained in node state, and the complete event stays in the session log. When the transcript is tight, the composer stays visible.
+
+Long sessions use a bounded projection cache: by default it retains up to 2,048 completed nodes and about 8 MiB of node state. A streaming assistant node or a tool waiting for its result is kept until it is complete; once a budget is exceeded, the oldest completed nodes are evicted first and the status line reports the hidden count. The persisted JSONL remains the full source of truth, and `/resume` replays hidden history again.
+
+Assistant messages render common Markdown including headings, lists, quotes, inline code, fenced code, tables, and links. During streaming, completed Markdown blocks stay stable and only the growing final block is reparsed, so long replies do not reparse their full history for every token.
+
+## Slash commands
+
+Type `/` to open the command menu. Keep typing to filter by prefix. `Tab` or arrows select; Enter runs the command. A space returns you to ordinary text editing.
+
+| Command                        | What it does                                                                |
+| ------------------------------ | --------------------------------------------------------------------------- |
+| `/help`                        | Keyboard shortcuts and currently available commands                         |
+| `/status`                      | Session, model, runtime, and auth mode                                      |
+| `/doctor`                      | TTY, launch flags, initialize result, session root, and closed capabilities |
+| `/clear`                       | Clear the on-screen projection; does not delete the session log             |
+| `/new`                         | Start a new session id (not a fork)                                         |
+| `/compact`                     | Request host conversation compaction through the prompt path                |
+| `/export`                      | Export the current projection as Markdown                                   |
+| `/init`                        | Create a minimal `AGENTS.md` only when the workspace has none               |
+| `/theme dark` / `/theme light` | Switch the display theme                                                    |
+| `/lang zh` / `/lang en`        | Switch between Chinese and English UI                                       |
+| `/model <model-id>`            | Switch models and start a new session                                       |
+| `/resume`                      | Open the local session picker and replay a selected session                 |
+| `/skills`                      | Browse user-invocable skills from the current workspace                     |
+| `/use byok` / `/use cocode`    | Switch between your key and Cocode; switching starts a new session          |
+| `/login` / `/logout`           | Sign in or out of Cocode Cloud; logout keeps your key and stays in chat     |
+| `/exit`                        | Shut down TUI and restore the terminal                                      |
+
+`/resume` reads local session headers, supports text filtering plus `↑` `↓` selection, streams the selected JSONL into a temporary projection, and asks the runtime to reopen the same persisted session before swapping it into the current TUI. Follow-up prompts use the selected session id and continue writing to that session. The TUI does not claim cross-process locking; avoid resuming a session that another client is currently writing.
+
+`/compact` sends the literal `/compact` prompt to the current session. A host compaction plugin must recognize that prompt; the TUI does not claim compaction succeeded without a corresponding event.
+
+## Errors
+
+Failures show `CODE · explanation` on the status line. Language follows `COCODE_LANG`, then `LANG` / `LC_MESSAGES`. Full catalog: [error codes](./errors.md).
+
+## Several terminals
+
+You can run several TUI windows against the same home and the same channels. Each window is its own process and `sessionId`; in-flight turns do not affect each other.
+
+If another TUI window is still open, `/use`, `/login`, and `/logout` refuse so they cannot rewrite the machine-wide default channel or tear down the Cloud slot. Close the other windows, then switch or sign out in the one that remains. Different providers per window is not a current product capability.
+
+## Runtime capability boundaries
+
+The `/skills` command is enabled only after `skills/list` returns a real catalog from the harness. A composition without `@deepseek-ai/dsh-skill` (and a provider such as `@deepseek-ai/dsh-skill-filesystem`) keeps the command hidden; an empty or failed probe is not presented as a usable feature.
+
+Interactive questions require the harness composition to mount the user-questions service and an ask-user consumer. The SDK server then forwards `question/ask` to the TUI and waits for the complete answer batch. A composition without that service does not register the terminal as a question provider.

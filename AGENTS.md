@@ -17,7 +17,7 @@ Cocode 产品由三个 **同级目录** 组成：桌面/Web GUI、终端 TUI、A
 ## 仓库边界
 
 | 目录 | 职责 | 连 harness 的方式 |
-|------|------|-------------------|
+| --- | --- | --- |
 | **cocode-gui/** | 品牌 UI、设计系统、Host 客户端 | HTTP POST + 双 WebSocket → `dsh web` |
 | **cocode-tui/** | 终端 UI、JSON-RPC 客户端 | stdio NDJSON-RPC → jsonrpc-agent 子进程 |
 | **cocode-harness/** | Cordis 插件树、`@cocode/dsh-*` 运行时 | — |
@@ -94,12 +94,13 @@ pnpm dsh web          # GUI 联调
 - **配置**：可变项走环境变量（见各目录 `.env.example`），禁止硬编码 harness 路径、模型、API Key。
 - **密钥**：`.env` 不入库；key 只走 harness credentials。
 - **模型可见 ⟺ 可重建**：UI 呈现态不进 session log。
+- **pnpm store**：用默认全局 store（macOS：`~/Library/pnpm/store`）。禁止 `--store-dir .pnpm-store`，不要在仓库内创建 `.pnpm-store/`。
 - **文件末尾**：恰好一个 trailing newline。
 
 ## 开发检查
 
 | 改动 | 检查 |
-|------|------|
+| --- | --- |
 | GUI 组件 / 令牌 | `cd cocode-gui && pnpm run dev:web` + `.dev/guide/design-system.html` 对照 |
 | TUI 交互 | `cd cocode-tui && pnpm run dev` + JSON-RPC 联调 |
 | harness API | 先在 harness 落地，再更新对应 `packages/connection` |
