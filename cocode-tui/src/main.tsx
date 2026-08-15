@@ -67,9 +67,9 @@ async function main(): Promise<void> {
   }
 
   const resolved = auth.resolved()
-  await registerLiveInstance(resolved.home)
+  await registerLiveInstance(resolved.dshHome)
   process.on('exit', () => {
-    releaseLiveInstanceSync(resolved.home)
+    releaseLiveInstanceSync(resolved.dshHome)
   })
   const init = parseInitFromEnv({
     ...process.env,
@@ -100,10 +100,10 @@ async function main(): Promise<void> {
       envLocked: auth.snapshot().envLocked,
       accountLabel: auth.snapshot().profile?.displayName,
       logout: () => auth.logout(),
-      exclusiveHome: async () => (await otherLiveCount(resolved.home)) === 0,
+      exclusiveHome: async () => (await otherLiveCount(resolved.dshHome)) === 0,
       selectMode: (mode) => auth.selectMode(mode),
       login: () => auth.dispatch({ type: 'chooseCocode' }),
-      submitByok: (key) => saveByokKey(resolved.home, key),
+      submitByok: (key) => saveByokKey(resolved.dshHome, key),
       resolved: () => auth.resolved(),
       snapshot: () => auth.snapshot(),
       subscribe: (listener) => auth.subscribe(listener),
@@ -134,11 +134,11 @@ async function main(): Promise<void> {
     await screen.unmount()
     leaveScreen()
     try {
-      await releaseLiveInstance(resolved.home)
+      await releaseLiveInstance(resolved.dshHome)
       await app.close()
       process.exit(0)
     } catch (error) {
-      await releaseLiveInstance(resolved.home).catch(() => undefined)
+      await releaseLiveInstance(resolved.dshHome).catch(() => undefined)
       process.stderr.write(`Cocode TUI shutdown failed: ${displayError(error)}\n`)
       process.exit(1)
     }

@@ -34,7 +34,8 @@ cocode
 `packages/examples/jsonrpc-demo/src/runner.ts` (or its built runner) and
 `examples/package.json`.
 The CLI uses the current directory as the Agent workspace. Set `COCODE_HOME` to
-isolate credentials, or `DSH_SESSION_ROOT` to move session files.
+isolate the Cocode account, `DSH_HOME` to isolate the official Harness home,
+or `DSH_SESSION_ROOT` to move session files.
 
 The first launch opens the authentication gate. Choose a DeepSeek API key or
 sign in to Cocode. Later launches reuse the local configuration. The `cocode`
@@ -55,7 +56,7 @@ Both `scripts/companion-runner.mjs` and `companion/cordis.yml` belong to `cocode
 
 The local sibling-Harness composition is currently verified on macOS. Windows, Linux, and real terminal key combinations still require separate acceptance as described in [platform notes](./platforms.md); automated tests are not a substitute for a real TTY check.
 
-Configure a key on the first-run gate, or set `DEEPSEEK_API_KEY` for this process. For development, point `COCODE_HOME` at a separate config directory. Sessions default to `$DSH_HOME/sessions`, or `~/.dsh/sessions` when `DSH_HOME` is unset; `DSH_SESSION_ROOT` can override it.
+Configure a key on the first-run gate, or set `DEEPSEEK_API_KEY` for this process. For development, point `COCODE_HOME` at a separate account directory and `DSH_HOME` at a separate Harness directory. DSH settings and credentials follow the official `$DSH_HOME` layout; sessions default to `$DSH_HOME/sessions`, or `~/.dsh/sessions` when `DSH_HOME` is unset. `DSH_SESSION_ROOT` can override the session directory.
 
 The same build runs on Windows, macOS, and Linux. On Windows, `notepad.exe` is used when neither `$VISUAL` nor `$EDITOR` is configured. WSL uses Linux process semantics and can fall back to `clip.exe` and `explorer.exe`; configure a GUI editor with a wait flag when using an editor such as VS Code.
 

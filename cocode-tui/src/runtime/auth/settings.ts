@@ -156,6 +156,17 @@ export async function unsetCloudRoute(home: string): Promise<void> {
   await writeYamlFile(settingsPath(home), root, 0o600)
 }
 
+/** Remove a legacy persisted Cocode route without changing the selected model. */
+export async function removeCloudRoute(home: string): Promise<void> {
+  const root = await loadRoot(home)
+  const llm = isRecord(root['llm-pi-ai']) ? root['llm-pi-ai'] : {}
+  const providers = isRecord(llm.providers) ? llm.providers : {}
+  delete providers[CLOUD_PROVIDER]
+  llm.providers = providers
+  root['llm-pi-ai'] = llm
+  await writeYamlFile(settingsPath(home), root, 0o600)
+}
+
 async function loadRoot(home: string): Promise<Record<string, unknown>> {
   const loaded = await readYamlUnknown(settingsPath(home))
   if (loaded.missing) return {}

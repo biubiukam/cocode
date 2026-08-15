@@ -40,16 +40,17 @@
 
 ## 和桌面版的关系
 
-图形界面和终端共用同一份「这台电脑上的模型配置」。在一边保存过的提供方 Key，另一边可以直接用。当前用哪一套也写在这份共享配置里。
-
-文件默认在你的用户目录下的 `.cocode` 里。如果这台机器上已经有 `.dsh`（现在桌面版还在用它），终端会先用那一份，这样你以前配过的东西不会突然不见。
+图形界面和终端共用官方 Harness 目录下的 settings 和 credentials，默认是
+`~/.dsh`。Cocode 账号 token 保存在 `~/.cocode/account.yaml`；TUI 只在当前
+进程中动态生成 Cocode provider，不会把它写进 `settings.yaml`。
 
 ## 临时覆盖
 
 偶尔想用另一把 Key、又不改本机保存的内容时，可以在启动环境里设置：
 
 - `DEEPSEEK_API_KEY` — 这次只用这把 DeepSeek Key
-- `COCODE_HOME` — 换一个配置目录（默认是 `~/.cocode`）
+- `COCODE_HOME` — 换一个 Cocode 账号目录（默认是 `~/.cocode`）
+- `DSH_HOME` — 换一个遵循官方规范的 Harness 目录，用于 settings 和 credentials（默认是 `~/.dsh`）
 
 日常使用不需要碰这些。开发启动参数见 `.env.example`。
 

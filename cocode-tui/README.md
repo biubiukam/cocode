@@ -34,12 +34,14 @@ cocode
 `packages/examples/jsonrpc-demo/src/runner.ts` (or its built runner) and
 `examples/package.json`.
 The CLI keeps the current working directory as the agent workspace. Set
-`COCODE_HOME` to isolate credentials, and set `DSH_SESSION_ROOT` when sessions
-must live outside the default Harness home.
+`COCODE_HOME` to isolate the Cocode account, `DSH_HOME` to isolate the official
+Harness settings and credentials, and `DSH_SESSION_ROOT` when sessions must
+live outside the default Harness home.
 
 The first launch shows the authentication choice. You can paste a DeepSeek API
-key or sign in to Cocode. The key is stored in the local Cocode configuration,
-not in the session log.
+key or sign in to Cocode. DeepSeek keys use the official Harness credentials
+file under `$DSH_HOME`; Cocode identity tokens use `account.yaml` under
+`~/.cocode`. Neither is stored in the session log.
 
 After the package is published, the installation command becomes:
 

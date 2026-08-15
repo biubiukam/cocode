@@ -27,6 +27,14 @@ export type MeProfile = {
 
 export type CloudModel = { id: string; name: string }
 
+export type CloudProviderProfile = {
+  displayName: string
+  api: 'openai-responses'
+  baseURL: string
+  apiKeyEnv: typeof CLOUD_KEY_REF
+  models: CloudModel[]
+}
+
 export type AccountRecord = {
   origin: string
   accessToken: string
@@ -42,7 +50,9 @@ export type ResolvedAuth = {
   model: string
   cwd: string
   origin: string
-  home: string
+  accountHome: string
+  dshHome: string
+  cloudProvider?: CloudProviderProfile
   env: NodeJS.ProcessEnv
 }
 

@@ -33,8 +33,9 @@ cocode
 `COCODE_HARNESS_ROOT` 必须指向已经构建完成的 Harness 根目录，目录中应存在
 `packages/examples/jsonrpc-demo/src/runner.ts`（或对应的构建入口）和
 `examples/package.json`。
-CLI 会把当前目录作为 Agent 工作区。需要隔离凭据时设置 `COCODE_HOME`，需要
-修改会话目录时设置 `DSH_SESSION_ROOT`。
+CLI 会把当前目录作为 Agent 工作区。需要隔离 Cocode 账号时设置
+`COCODE_HOME`，需要隔离官方 Harness 目录时设置 `DSH_HOME`，需要修改会话目录
+时设置 `DSH_SESSION_ROOT`。
 
 首次启动会进入登录引导，可选择粘贴 DeepSeek API Key 或登录 Cocode 账号。
 后续启动会复用本机配置。`cocode --help`、`--version` 和 `--doctor` 不要求
@@ -54,7 +55,7 @@ DSH_CORDIS_CONFIG=companion/cordis.yml
 
 当前已验证的是 macOS 上的本地 sibling Harness 组合。Windows、Linux 和真实终端组合键仍需按 [平台说明](./platforms.md) 单独验收；自动化测试不会替代真实 TTY 验收。
 
-密钥可以通过首屏登录配置，也可以临时设置 `DEEPSEEK_API_KEY`。开发环境可用 `COCODE_HOME` 指向单独的配置目录。会话目录默认使用 `$DSH_HOME/sessions`；未设置 `DSH_HOME` 时使用 `~/.dsh/sessions`，也可以用 `DSH_SESSION_ROOT` 覆盖。
+密钥可以通过首屏登录配置，也可以临时设置 `DEEPSEEK_API_KEY`。开发环境可用 `COCODE_HOME` 指向单独的账号目录，用 `DSH_HOME` 指向单独的 Harness 目录。DSH 配置和凭据遵循官方 `$DSH_HOME` 目录规范。会话目录默认使用 `$DSH_HOME/sessions`；未设置 `DSH_HOME` 时使用 `~/.dsh/sessions`，也可以用 `DSH_SESSION_ROOT` 覆盖。
 
 同一份程序支持 Windows、macOS 和 Linux。Windows 未配置 `$VISUAL` 或 `$EDITOR` 时使用 `notepad.exe`；WSL 使用 Linux 进程语义，并可回退到 `clip.exe` 和 `explorer.exe`。使用 VS Code 等图形编辑器时，请配置带等待参数的命令。
 

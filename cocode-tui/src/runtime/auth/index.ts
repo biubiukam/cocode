@@ -3,7 +3,14 @@
  */
 
 export { createAuthStore, type AuthStore, type SelectModeResult } from './store.ts'
-export { homeDisplay, productHome, defaultHomeContext } from './paths.ts'
+export {
+  accountHome,
+  dshHome,
+  homeDisplay,
+  productHome,
+  productHomes,
+  defaultHomeContext,
+} from './paths.ts'
 export { saveByokKey } from './resolve.ts'
 export {
   HomeBusyError,

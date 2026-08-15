@@ -12,13 +12,21 @@ import {
   DEFAULT_PROVIDER,
   DEEPSEEK_KEY_REF,
   type AuthMode,
+  type CloudModel,
+  type CloudProviderProfile,
   type ResolvedAuth,
 } from './types.ts'
 
 export type ResolveInput = {
-  home: string
+  /** DSH home containing credentials and settings. */
+  dshHome?: string
+  /** Legacy test/caller alias; new code should pass dshHome. */
+  home?: string
   env: NodeJS.ProcessEnv
   cwd?: string
+  accountHome?: string
+  cloudAccount?: boolean
+  cloudModels?: CloudModel[]
 }
 
 export type ResolveResult =
@@ -27,7 +35,8 @@ export type ResolveResult =
 
 export async function resolveAuth(input: ResolveInput): Promise<ResolveResult> {
   const env = input.env
-  const home = input.home
+  const home = input.dshHome ?? input.home
+  if (home === undefined) throw new Error('resolveAuth requires dshHome')
   const cwd = input.cwd?.trim() || process.cwd()
   const origin = agencyOrigin(env)
   const settings = await readSettings(home)
@@ -42,6 +51,9 @@ export async function resolveAuth(input: ResolveInput): Promise<ResolveResult> {
     origin,
     settings,
     credentials,
+    cloudAccount: input.cloudAccount ?? false,
+    cloudModels: input.cloudModels,
+    accountHome: input.accountHome,
   })
   if (preferredReady !== undefined) return preferredReady
 
@@ -53,6 +65,9 @@ export async function resolveAuth(input: ResolveInput): Promise<ResolveResult> {
       origin,
       settings,
       credentials,
+      cloudAccount: input.cloudAccount ?? false,
+      cloudModels: input.cloudModels,
+      accountHome: input.accountHome,
     })
     if (byok !== undefined) return byok
   } else if (preferred === DEFAULT_PROVIDER) {
@@ -63,6 +78,9 @@ export async function resolveAuth(input: ResolveInput): Promise<ResolveResult> {
       origin,
       settings,
       credentials,
+      cloudAccount: input.cloudAccount ?? false,
+      cloudModels: input.cloudModels,
+      accountHome: input.accountHome,
     })
     if (cloud !== undefined) return cloud
   }
@@ -74,6 +92,7 @@ export function channelAvailability(
   credentials: Record<string, string>,
   settings: { hasCloudRoute: boolean },
   env: NodeJS.ProcessEnv = {},
+  cloudAccount = false,
 ): { byok: boolean; cocode: boolean } {
   return {
     byok:
@@ -82,7 +101,7 @@ export function channelAvailability(
     cocode:
       (nonempty(env[CLOUD_KEY_REF]) !== undefined ||
         nonempty(credentials[CLOUD_KEY_REF]) !== undefined) &&
-      settings.hasCloudRoute,
+      cloudAccount,
   }
 }
 
@@ -106,6 +125,9 @@ type ChannelInput = {
   origin: string
   settings: ProductSettings
   credentials: Record<string, string>
+  cloudAccount: boolean
+  cloudModels?: CloudModel[]
+  accountHome?: string
 }
 
 function tryChannel(
@@ -113,21 +135,46 @@ function tryChannel(
   isPreferred: boolean,
   input: ChannelInput,
 ): { status: 'ready'; auth: ResolvedAuth } | undefined {
-  const { env, home, cwd, origin, settings, credentials } = input
+  const { env, home, cwd, origin, settings, credentials, cloudAccount, cloudModels, accountHome } = input
   const providerSettings = settings.providerCredentials[provider]
   const ref = apiKeyEnvFor(provider, providerSettings?.apiKeyEnv)
   const value = ref === undefined ? undefined : nonempty(env[ref]) ?? nonempty(credentials[ref])
-  const model = channelModel(provider, isPreferred, env, settings)
+  const model = channelModel(provider, isPreferred, env, settings, cloudModels)
   const mode: AuthMode = provider === CLOUD_PROVIDER ? 'cocode' : 'byok'
 
-  if (provider === CLOUD_PROVIDER && value !== undefined && !settings.hasCloudRoute) {
+  if (provider === CLOUD_PROVIDER && !cloudAccount) {
     return undefined
   }
   if (value !== undefined && ref !== undefined) {
-    return ready(mode, provider, model, cwd, origin, home, env, { [ref]: value })
+    const cloudProvider =
+      provider === CLOUD_PROVIDER && cloudAccount
+        ? createCloudProvider(origin, model, cloudModels)
+        : undefined
+    return ready(
+      mode,
+      provider,
+      model,
+      cwd,
+      origin,
+      accountHome ?? home,
+      home,
+      env,
+      { [ref]: value },
+      cloudProvider,
+    )
   }
   if (providerSettings?.writable === false) {
-    return ready(mode, provider, model, cwd, origin, home, env, {})
+    return ready(
+      mode,
+      provider,
+      model,
+      cwd,
+      origin,
+      accountHome ?? home,
+      home,
+      env,
+      {},
+    )
   }
   return undefined
 }
@@ -137,9 +184,13 @@ function channelModel(
   isPreferred: boolean,
   env: NodeJS.ProcessEnv,
   settings: ProductSettings,
+  cloudModels?: CloudModel[],
 ): string {
   if (isPreferred) {
     return nonempty(env.COCODE_MODEL) ?? settings.model ?? DEFAULT_MODEL
+  }
+  if (provider === CLOUD_PROVIDER) {
+    return cloudModels?.[0]?.id ?? settings.cloudModel ?? DEFAULT_MODEL
   }
   return DEFAULT_MODEL
 }
@@ -150,17 +201,23 @@ function ready(
   model: string,
   cwd: string,
   origin: string,
-  home: string,
+  accountHome: string,
+  dshHome: string,
   env: NodeJS.ProcessEnv,
   extra: NodeJS.ProcessEnv,
+  cloudProvider?: CloudProviderProfile,
 ): { status: 'ready'; auth: ResolvedAuth } {
   const spawn: NodeJS.ProcessEnv = { ...env }
   delete spawn[CLOUD_KEY_REF]
   delete spawn[DEEPSEEK_KEY_REF]
+  delete spawn.COCODE_LLM_PROVIDERS
   Object.assign(spawn, extra)
-  spawn.DSH_HOME = home
+  spawn.DSH_HOME = dshHome
   spawn.COCODE_PROVIDER = provider
   spawn.COCODE_MODEL = model
+  if (cloudProvider !== undefined) {
+    spawn.COCODE_LLM_PROVIDERS = JSON.stringify({ [CLOUD_PROVIDER]: cloudProvider })
+  }
   return {
     status: 'ready',
     auth: {
@@ -169,9 +226,27 @@ function ready(
       model,
       cwd,
       origin,
-      home,
+      accountHome,
+      dshHome,
+      ...(cloudProvider === undefined ? {} : { cloudProvider }),
       env: spawn,
     },
+  }
+}
+
+function createCloudProvider(
+  origin: string,
+  model: string,
+  cloudModels?: CloudModel[],
+): CloudProviderProfile {
+  return {
+    displayName: 'Cocode Cloud',
+    api: 'openai-responses',
+    baseURL: `${origin.replace(/\/$/, '')}/v1`,
+    apiKeyEnv: CLOUD_KEY_REF,
+    models: cloudModels?.length === 0 || cloudModels === undefined
+      ? [{ id: model, name: model }]
+      : cloudModels.map((entry) => ({ ...entry })),
   }
 }
 

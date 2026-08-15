@@ -23,12 +23,12 @@ import {
 } from './live-instances.ts'
 import { displayError, formatError, TuiError } from '../errors/index.ts'
 import { agencyOrigin } from './origin.ts'
-import { defaultHomeContext, productHome } from './paths.ts'
+import { accountHome as defaultAccountHome, defaultHomeContext, dshHome as defaultDshHome } from './paths.ts'
 import { apiKeyEnvFor, channelAvailability, resolveAuth, saveByokKey } from './resolve.ts'
 import {
   captureCloudSettings,
   patchAgentDefaultModel,
-  patchCloudRoute,
+  removeCloudRoute,
   restoreCloudSettings,
   unsetCloudRoute,
   readSettings,
@@ -44,6 +44,7 @@ import {
   type AuthAction,
   type AuthMode,
   type AuthSnapshot,
+  type CloudModel,
   type MeProfile,
   type ResolvedAuth,
 } from './types.ts'
@@ -66,7 +67,10 @@ export type AuthStore = {
 }
 
 export type AuthStoreOptions = {
+  /** Legacy alias used by isolated tests; applies to both homes. */
   home?: string
+  accountHome?: string
+  dshHome?: string
   env?: NodeJS.ProcessEnv
   cwd?: string
   client?: AgencyClient
@@ -76,9 +80,12 @@ export type AuthStoreOptions = {
 
 export async function createAuthStore(options: AuthStoreOptions = {}): Promise<AuthStore> {
   const env = options.env ?? process.env
-  const home = options.home ?? productHome(defaultHomeContext(env))
+  const context = defaultHomeContext(env)
+  const accountHome = options.accountHome ?? options.home ?? defaultAccountHome(context)
+  const dshHome = options.dshHome ?? options.home ?? defaultDshHome(context)
   const store = new AuthStoreImpl(
-    home,
+    accountHome,
+    dshHome,
     env,
     options.cwd,
     options.client,
@@ -101,9 +108,11 @@ class AuthStoreImpl implements AuthStore {
   private refreshInFlight: Promise<void> | undefined
   private readyWaiters: Array<(auth: ResolvedAuth) => void> = []
   private profile: MeProfile | undefined
+  private cloudModels: CloudModel[] | undefined
 
   constructor(
-    private readonly home: string,
+    private readonly accountHome: string,
+    private readonly dshHome: string,
     private readonly env: NodeJS.ProcessEnv,
     private readonly cwd: string | undefined,
     private readonly client: AgencyClient | undefined,
@@ -112,28 +121,60 @@ class AuthStoreImpl implements AuthStore {
   ) {}
 
   private async homeIsBusy(): Promise<boolean> {
-    return (await otherLiveCount(this.home, this.live)) > 0
+    return (await otherLiveCount(this.dshHome, this.live)) > 0
   }
 
   async hydrate(signal?: AbortSignal): Promise<void> {
     try {
       await this.refreshCloudAccount(signal)
       if (signal?.aborted) return
+      const account = await readAccount(this.accountHome)
+      const credentials = await readCredentials(this.dshHome)
+      const cloudKey = nonempty(credentials[CLOUD_KEY_REF])
+      if (
+        account !== undefined &&
+        this.cloudModels === undefined &&
+        cloudKey !== undefined
+      ) {
+        try {
+          this.cloudModels = await listHostedModels(
+            account.origin,
+            cloudKey,
+            this.client,
+            signal,
+          )
+        } catch {
+          this.cloudModels = []
+        }
+      }
+      if (signal?.aborted) return
+      const settings = await readSettings(this.dshHome)
+      if (account !== undefined && settings.hasCloudRoute) {
+        await removeCloudRoute(this.dshHome)
+      }
       const resolved = await resolveAuth({
-        home: this.home,
+        dshHome: this.dshHome,
+        accountHome: this.accountHome,
         env: this.env,
         cwd: this.cwd,
+        cloudAccount: account !== undefined,
+        cloudModels: this.cloudModels,
       })
       if (signal?.aborted) return
       if (resolved.status === 'ready') {
         this.auth = resolved.auth
-        const credentials = await readCredentials(this.home)
-        const settings = await readSettings(this.home)
+        const currentCredentials = await readCredentials(this.dshHome)
+        const currentSettings = await readSettings(this.dshHome)
         this.snap = {
           phase: 'ready',
           mode: resolved.auth.mode,
           envLocked: this.envLocked(resolved.auth.mode),
-          channels: channelAvailability(credentials, settings, this.env),
+          channels: channelAvailability(
+            currentCredentials,
+            currentSettings,
+            this.env,
+            account !== undefined,
+          ),
           ...(this.profile === undefined ? {} : { profile: this.profile }),
         }
         this.flushReady()
@@ -207,21 +248,23 @@ class AuthStoreImpl implements AuthStore {
       return { status: 'env-locked' }
     }
     if (await this.homeIsBusy()) return { status: 'home-busy' }
-    const settings = await readSettings(this.home)
-    const credentials = await readCredentials(this.home)
+    const settings = await readSettings(this.dshHome)
+    const credentials = await readCredentials(this.dshHome)
     if (mode === 'byok') {
       const has =
         nonempty(this.env[DEEPSEEK_KEY_REF]) !== undefined ||
         nonempty(credentials[DEEPSEEK_KEY_REF]) !== undefined
       if (!has) return { status: 'need-byok' }
-      await patchAgentDefaultModel(this.home, DEFAULT_PROVIDER, DEFAULT_MODEL)
+      await patchAgentDefaultModel(this.dshHome, DEFAULT_PROVIDER, DEFAULT_MODEL)
     } else {
+      const account = await readAccount(this.accountHome)
       const has =
         (nonempty(this.env[CLOUD_KEY_REF]) !== undefined ||
           nonempty(credentials[CLOUD_KEY_REF]) !== undefined) &&
-        settings.hasCloudRoute
+        account !== undefined
       if (!has) return { status: 'need-login' }
-      await patchAgentDefaultModel(this.home, CLOUD_PROVIDER, settings.cloudModel ?? settings.model)
+      const model = this.cloudModels?.[0]?.id ?? settings.cloudModel ?? DEFAULT_MODEL
+      await patchAgentDefaultModel(this.dshHome, CLOUD_PROVIDER, model)
     }
     await this.hydrate()
     return { status: 'ready' }
@@ -233,7 +276,7 @@ class AuthStoreImpl implements AuthStore {
     let firstError: unknown
     let account: AccountRecord | undefined
     try {
-      account = await readAccount(this.home)
+      account = await readAccount(this.accountHome)
     } catch (error) {
       firstError = error
     }
@@ -241,9 +284,9 @@ class AuthStoreImpl implements AuthStore {
       await revokeToken(account.origin, account.refreshToken, this.client, operation.signal)
     }
     for (const cleanup of [
-      () => deleteAccount(this.home),
-      () => patchCredential(this.home, CLOUD_KEY_REF, undefined),
-      () => unsetCloudRoute(this.home),
+      () => deleteAccount(this.accountHome),
+      () => patchCredential(this.dshHome, CLOUD_KEY_REF, undefined),
+      () => unsetCloudRoute(this.dshHome),
     ]) {
       try {
         await cleanup()
@@ -252,6 +295,7 @@ class AuthStoreImpl implements AuthStore {
       }
     }
     this.profile = undefined
+    this.cloudModels = undefined
     await this.hydrate()
     this.emit()
     if (firstError !== undefined) throw firstError
@@ -281,9 +325,9 @@ class AuthStoreImpl implements AuthStore {
     let didWrite = false
     try {
       this.ensureCurrent(operation)
-      previousKey = (await readCredentials(this.home)).DEEPSEEK_API_KEY
+      previousKey = (await readCredentials(this.dshHome)).DEEPSEEK_API_KEY
       this.ensureCurrent(operation)
-      await saveByokKey(this.home, trimmed)
+      await saveByokKey(this.dshHome, trimmed)
       didWrite = true
       this.ensureCurrent(operation)
       await this.hydrate(operation.signal)
@@ -292,7 +336,7 @@ class AuthStoreImpl implements AuthStore {
     } catch (error) {
       if (this.isCancelled(error, operation)) {
         if (didWrite) {
-          await patchCredential(this.home, 'DEEPSEEK_API_KEY', previousKey).catch(() => undefined)
+          await patchCredential(this.dshHome, 'DEEPSEEK_API_KEY', previousKey).catch(() => undefined)
         }
         return
       }
@@ -364,8 +408,8 @@ class AuthStoreImpl implements AuthStore {
       }
       const profile = await loadProfile(origin, account.accessToken, this.client, poll.signal)
       this.ensureCurrent(operation)
-      const existing = await readAccount(this.home)
-      const credentials = await readCredentials(this.home)
+      const existing = await readAccount(this.accountHome)
+      const credentials = await readCredentials(this.dshHome)
       const reusable =
         existing?.personalKeyId !== undefined &&
         credentials[CLOUD_KEY_REF]?.trim() !== undefined &&
@@ -392,18 +436,21 @@ class AuthStoreImpl implements AuthStore {
       if (models.length === 0) {
         throw new TuiError('AUTH_NO_HOSTED_MODELS')
       }
-      const settingsBackup = await captureCloudSettings(this.home)
+      this.cloudModels = models
+      const settingsBackup = await captureCloudSettings(this.dshHome)
       const previousCloudKey = credentials[CLOUD_KEY_REF]
       try {
         this.ensureCurrent(operation)
         if (!reusable && secret !== undefined) {
-          await patchCredential(this.home, CLOUD_KEY_REF, secret)
+          await patchCredential(this.dshHome, CLOUD_KEY_REF, secret)
         }
         this.ensureCurrent(operation)
-        await patchCloudRoute(this.home, origin, models)
+        await removeCloudRoute(this.dshHome)
+        await patchAgentDefaultModel(this.dshHome, CLOUD_PROVIDER, models[0].id)
         this.ensureCurrent(operation)
-        await writeAccount(this.home, account)
+        await writeAccount(this.accountHome, account)
       } catch (error) {
+        this.cloudModels = undefined
         await this.restoreLoginState(existing, previousCloudKey, settingsBackup)
         throw error
       }
@@ -468,11 +515,11 @@ class AuthStoreImpl implements AuthStore {
     settingsBackup: Awaited<ReturnType<typeof captureCloudSettings>>,
   ): Promise<void> {
     await Promise.allSettled([
-      account === undefined ? deleteAccount(this.home) : writeAccount(this.home, account),
+      account === undefined ? deleteAccount(this.accountHome) : writeAccount(this.accountHome, account),
       cloudKey === undefined
-        ? patchCredential(this.home, CLOUD_KEY_REF, undefined)
-        : patchCredential(this.home, CLOUD_KEY_REF, cloudKey),
-      restoreCloudSettings(this.home, settingsBackup),
+        ? patchCredential(this.dshHome, CLOUD_KEY_REF, undefined)
+        : patchCredential(this.dshHome, CLOUD_KEY_REF, cloudKey),
+      restoreCloudSettings(this.dshHome, settingsBackup),
     ])
   }
 
@@ -491,9 +538,9 @@ class AuthStoreImpl implements AuthStore {
   }
 
   private async doRefreshCloudAccount(signal?: AbortSignal): Promise<void> {
-    const account = await readAccount(this.home)
+    const account = await readAccount(this.accountHome)
     if (account === undefined || account.accessExpiresAt > Date.now() + 30_000) return
-    const credentials = await readCredentials(this.home)
+    const credentials = await readCredentials(this.dshHome)
     if (nonempty(credentials[CLOUD_KEY_REF]) === undefined) return
     try {
       const refreshed = await refreshAccess(
@@ -503,7 +550,7 @@ class AuthStoreImpl implements AuthStore {
         signal,
       )
       if (signal?.aborted) return
-      await writeAccount(this.home, {
+      await writeAccount(this.accountHome, {
         ...account,
         accessToken: refreshed.access_token,
         refreshToken: refreshed.refresh_token,
@@ -517,11 +564,12 @@ class AuthStoreImpl implements AuthStore {
   }
 
   private async clearCloudState(): Promise<void> {
+    this.cloudModels = undefined
     const errors: unknown[] = []
     for (const cleanup of [
-      () => deleteAccount(this.home),
-      () => patchCredential(this.home, CLOUD_KEY_REF, undefined),
-      () => unsetCloudRoute(this.home),
+      () => deleteAccount(this.accountHome),
+      () => patchCredential(this.dshHome, CLOUD_KEY_REF, undefined),
+      () => unsetCloudRoute(this.dshHome),
     ]) {
       try {
         await cleanup()
