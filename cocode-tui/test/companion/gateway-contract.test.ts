@@ -1,3 +1,4 @@
+import { resolve } from 'node:path'
 import { PassThrough } from 'node:stream'
 import { describe, expect, it } from 'vitest'
 import { TuiCompanionGateway } from '../../packages/companion/src/gateway.ts'
@@ -5,6 +6,9 @@ import { CompanionTransport } from '../../packages/companion/src/transport.ts'
 import type { Agent, AgentHandle, RuntimeContext, SessionEvent } from '../../packages/companion/src/types.ts'
 
 type TestAgent = Agent & { calls: string[]; disposed: boolean }
+
+const WORKSPACE_CWD = resolve('/workspace')
+const OTHER_WORKSPACE_CWD = resolve('/other')
 
 function createFixture() {
   const input = new PassThrough()
@@ -21,7 +25,7 @@ function createFixture() {
     const agent: TestAgent = {
       id,
       options: {},
-      session: { id, events: seed, header: { id, createdAt: 10, cwd: '/workspace' } },
+      session: { id, events: seed, header: { id, createdAt: 10, cwd: WORKSPACE_CWD } },
       status: 'idle',
       calls: [],
       disposed: false,
@@ -53,13 +57,13 @@ function createFixture() {
   const persistence = {
     async list() {
       return [
-        { id: 'old', createdAt: 1, cwd: '/workspace', seedLength: 2 },
-        { id: 'other', createdAt: 2, cwd: '/other' },
+        { id: 'old', createdAt: 1, cwd: WORKSPACE_CWD, seedLength: 2 },
+        { id: 'other', createdAt: 2, cwd: OTHER_WORKSPACE_CWD },
       ]
     },
     async inspect(id: string) {
       return {
-        meta: { id, createdAt: 1, cwd: '/workspace' },
+        meta: { id, createdAt: 1, cwd: WORKSPACE_CWD },
         events: [
           { type: 'session/title', seq: 1, time: 2, data: { title: 'Saved session' } },
           { type: 'user/message', seq: 2, time: 3, data: { content: [{ type: 'text', text: 'old' }] } },
@@ -147,7 +151,7 @@ describe('TuiCompanionGateway RPC contract', () => {
   it('routes initialize, prompt, capabilities, list, mode, skills, and shutdown', async () => {
     const { gateway, agents } = createFixture()
     const initialized = await gateway.handleRequest('initialize', {
-      cwd: '/workspace',
+      cwd: WORKSPACE_CWD,
       provider: 'provider',
       model: 'model',
       maxTokens: 1024,
@@ -174,7 +178,7 @@ describe('TuiCompanionGateway RPC contract', () => {
     })
     expect(agents.get('live')?.calls).toEqual(['steer:hello', 'cancel'])
     expect(await gateway.handleRequest('cocode/capabilities')).toMatchObject({ protocolVersion: 1 })
-    expect(await gateway.handleRequest('session/list', { cwd: '/workspace' })).toMatchObject({
+    expect(await gateway.handleRequest('session/list', { cwd: WORKSPACE_CWD })).toMatchObject({
       sessions: [{ sessionId: 'old', title: 'Saved session', eventCount: 2 }],
     })
     expect(await gateway.handleRequest('skills/list', { sessionId: 'live' })).toEqual({
@@ -207,7 +211,7 @@ describe('TuiCompanionGateway RPC contract', () => {
 
   it('opens and forks persisted sessions while replacing the current session', async () => {
     const { gateway, agents } = createFixture()
-    await gateway.initialize({ cwd: '/workspace', provider: 'p', model: 'm' })
+    await gateway.initialize({ cwd: WORKSPACE_CWD, provider: 'p', model: 'm' })
     await gateway.prompt({ sessionId: 'current', contentBlocks: [{ type: 'text', text: 'start' }] })
     const opened = await gateway.open({ sessionId: 'old', replaceSessionId: 'current' })
     expect(opened).toMatchObject({ opened: true, seedLength: 2 })
@@ -220,7 +224,7 @@ describe('TuiCompanionGateway RPC contract', () => {
 
   it('emits notification frames for runtime events', async () => {
     const { gateway, events, output } = createFixture()
-    await gateway.initialize({ cwd: '/workspace', provider: 'p', model: 'm' })
+    await gateway.initialize({ cwd: WORKSPACE_CWD, provider: 'p', model: 'm' })
     const agent = {
       session: {
         id: 'child',
@@ -238,7 +242,7 @@ describe('TuiCompanionGateway RPC contract', () => {
 
   it('round-trips the question request through the response RPC', async () => {
     const { gateway, output, askQuestion } = createFixture()
-    await gateway.initialize({ cwd: '/workspace', provider: 'p', model: 'm' })
+    await gateway.initialize({ cwd: WORKSPACE_CWD, provider: 'p', model: 'm' })
     expect(askQuestion).toBeDefined()
     const pending = askQuestion?.({
       questions: [{ id: 'mode', question: 'Mode?', options: [{ label: 'fast' }] }],
@@ -254,7 +258,7 @@ describe('TuiCompanionGateway RPC contract', () => {
 
   it('propagates an explicit question cancellation without validating an empty answer batch', async () => {
     const { gateway, output, askQuestion } = createFixture()
-    await gateway.initialize({ cwd: '/workspace', provider: 'p', model: 'm' })
+    await gateway.initialize({ cwd: WORKSPACE_CWD, provider: 'p', model: 'm' })
     const pending = askQuestion?.({
       questions: [{ id: 'mode', question: 'Mode?', options: [{ label: 'fast' }] }],
     })

@@ -1,3 +1,4 @@
+import { resolve } from 'node:path'
 import { PassThrough } from 'node:stream'
 import { describe, expect, it } from 'vitest'
 import { TuiCompanionGateway } from '../../packages/companion/src/gateway.ts'
@@ -10,6 +11,8 @@ import type {
 } from '../../packages/companion/src/types.ts'
 
 type TestAgent = Agent & { calls: { kind: 'followup' | 'steer'; message: unknown }[] }
+
+const PROJECT_CWD = resolve('/tmp/project')
 
 function createHarnessContext(
   options: {
@@ -181,7 +184,7 @@ describe('TuiCompanionGateway', () => {
 
   it('routes normal, queue, and steer prompts to the agent', async () => {
     const { gateway, agents } = createGateway()
-    await gateway.initialize({ cwd: '/tmp/project', provider: 'provider', model: 'model' })
+    await gateway.initialize({ cwd: PROJECT_CWD, provider: 'provider', model: 'model' })
     await gateway.prompt({ sessionId: 'session-a', contentBlocks: [{ type: 'text', text: 'one' }] })
     await gateway.prompt({
       sessionId: 'session-a',
@@ -200,7 +203,7 @@ describe('TuiCompanionGateway', () => {
 
   it('rejects an unavailable optional service with an explicit error', async () => {
     const { gateway } = createGateway()
-    await gateway.initialize({ cwd: '/tmp/project', provider: 'provider', model: 'model' })
+    await gateway.initialize({ cwd: PROJECT_CWD, provider: 'provider', model: 'model' })
     await expect(gateway.listSkills({ sessionId: 'session-a' })).rejects.toThrow(
       'skills registry is not configured',
     )
@@ -208,7 +211,7 @@ describe('TuiCompanionGateway', () => {
 
   it('rejects model listing when the LLM service is absent', async () => {
     const { gateway } = createGateway()
-    await gateway.initialize({ cwd: '/tmp/project', provider: 'provider', model: 'model' })
+    await gateway.initialize({ cwd: PROJECT_CWD, provider: 'provider', model: 'model' })
     expect(gateway.capabilities().modelList).toBe(false)
     await expect(gateway.listModels()).rejects.toThrow('llm is not configured')
   })
@@ -229,7 +232,7 @@ describe('TuiCompanionGateway', () => {
         },
       },
     })
-    await gateway.initialize({ cwd: '/tmp/project', provider: 'provider', model: 'model' })
+    await gateway.initialize({ cwd: PROJECT_CWD, provider: 'provider', model: 'model' })
 
     await expect(gateway.planMode({ sessionId: 'session-a' })).resolves.toEqual({ active: false })
     expect(agents.has('session-a')).toBe(false)
@@ -259,7 +262,7 @@ describe('TuiCompanionGateway', () => {
         },
       },
     })
-    await gateway.initialize({ cwd: '/tmp/project', provider: 'provider', model: 'model' })
+    await gateway.initialize({ cwd: PROJECT_CWD, provider: 'provider', model: 'model' })
 
     await expect(gateway.permissionMode({ sessionId: 'session-a' })).resolves.toEqual({
       mode: 'manual',
@@ -293,7 +296,7 @@ describe('TuiCompanionGateway', () => {
           },
           async inspect() {
             await inspection
-            return { meta: { id: 'session-a', cwd: '/tmp/project' }, events: [] }
+            return { meta: { id: 'session-a', cwd: PROJECT_CWD }, events: [] }
           },
         },
         planMode: {
@@ -307,7 +310,7 @@ describe('TuiCompanionGateway', () => {
         },
       },
     })
-    await gateway.initialize({ cwd: '/tmp/project', provider: 'provider', model: 'model' })
+    await gateway.initialize({ cwd: PROJECT_CWD, provider: 'provider', model: 'model' })
 
     const opening = gateway.open({ sessionId: 'session-a' })
     await new Promise<void>((resolve) => setImmediate(resolve))
@@ -329,12 +332,12 @@ describe('TuiCompanionGateway', () => {
           async inspect() {
             inspections += 1
             if (inspections === 1) throw new Error('temporary persistence failure')
-            return { meta: { id: 'session-a', cwd: '/tmp/project' }, events: [] }
+            return { meta: { id: 'session-a', cwd: PROJECT_CWD }, events: [] }
           },
         },
       },
     })
-    await gateway.initialize({ cwd: '/tmp/project', provider: 'provider', model: 'model' })
+    await gateway.initialize({ cwd: PROJECT_CWD, provider: 'provider', model: 'model' })
 
     await expect(gateway.open({ sessionId: 'session-a' })).rejects.toThrow(
       'temporary persistence failure',
@@ -347,7 +350,7 @@ describe('TuiCompanionGateway', () => {
 
   it('round-trips an approval response through notification and request', async () => {
     const { gateway, events, output } = createGateway({ services: { approval: {} } })
-    await gateway.initialize({ cwd: '/tmp/project', provider: 'provider', model: 'model' })
+    await gateway.initialize({ cwd: PROJECT_CWD, provider: 'provider', model: 'model' })
     const promptResult = await gateway.prompt({
       sessionId: 'session-a',
       contentBlocks: [{ type: 'text', text: 'start' }],
