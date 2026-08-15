@@ -27,6 +27,12 @@ const runtimeRoot =
 const stageScript = path.resolve("scripts/stage-dsh-runtime.mjs")
 const clientWatcherScript = path.resolve("scripts/watch-dsh-client.mjs")
 const devLockPath = resolveDevLockPath()
+// Benign macOS IMK / Chromium stderr noise; see electron/electron#45002.
+const BENIGN_MACOS_STDERR_PATTERNS = [
+	/error messaging the mach port for IMKCFRunLoopWakeUpReliable/,
+	/\+\[IMKClient subclass\]: chose IMKClient_Modern/,
+	/\+\[IMKInputSession subclass\]: chose IMKInputSession_Modern/,
+]
 let clientWatcher
 let electron
 let stopping = false
@@ -48,10 +54,16 @@ try {
 	await waitForClientWatcher(clientWatcher)
 
 	electron = spawn("pnpm", ["exec", "electron-forge", "start"], {
-		stdio: "inherit",
+		stdio: ["inherit", "inherit", process.platform === "darwin" ? "pipe" : "inherit"],
 		cwd: process.cwd(),
 		env: { ...process.env, DSH_RUNTIME_ROOT: runtimeRoot },
 	})
+	if (process.platform === "darwin" && electron.stderr) {
+		electron.stderr.on("data", (chunk) => {
+			if (isBenignMacOsStderr(chunk)) return
+			process.stderr.write(chunk)
+		})
+	}
 
 	const forwardSignal = (signal) => {
 		stopping = true
@@ -88,6 +100,11 @@ try {
 	if (!configuredRuntimeRoot && !useRuntimeCache)
 		rmSync(runtimeRoot, { recursive: true, force: true })
 	releaseDevLock(devLockPath, devLock)
+}
+
+function isBenignMacOsStderr(chunk) {
+	const text = chunk.toString()
+	return BENIGN_MACOS_STDERR_PATTERNS.some((pattern) => pattern.test(text))
 }
 
 function resolveDevLockPath() {
