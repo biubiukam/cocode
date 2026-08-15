@@ -5,6 +5,7 @@
 import type {
   SkillEntry,
   SessionEvent,
+  TuiSessionOpenResult,
   TuiNotification,
   TuiCapabilitySnapshot,
   TuiApprovalAnswer,
@@ -1091,11 +1092,16 @@ class TuiAppImpl implements TuiApp {
     const previousSessionId = this.sessionId
     try {
       const opened = await this.runtime.open(item.session.id, previousSessionId)
-      if (!opened) throw new Error(text(this.locale, 'sessionTreeOpenFailed'))
+      const openResult = normalizeOpenResult(opened)
+      if (!openResult.opened) throw new Error(text(this.locale, 'sessionTreeOpenFailed'))
       this.sessionId = item.session.id
-      this.assembler.reset()
-      this.telemetry.reset()
-      this.sessionState.reset()
+      if (openResult.seed === undefined) {
+        this.assembler.reset()
+        this.telemetry.reset()
+        this.sessionState.reset()
+      } else {
+        this.replaceSessionProjection(openResult.seed)
+      }
       this.sessionTitleOverride = item.session.title
       this.resetSubagentActivity()
       this.queuedPrompts.clear()
@@ -1427,7 +1433,9 @@ class TuiAppImpl implements TuiApp {
       const previousSessionId = this.sessionId
       const nextProjection = await loadSessionProjection(path)
       const opened = await this.runtime.open(sessionId, previousSessionId)
-      if (!opened) throw new Error(text(this.locale, 'sessionTreeOpenFailed'))
+      if (!normalizeOpenResult(opened).opened) {
+        throw new Error(text(this.locale, 'sessionTreeOpenFailed'))
+      }
       this.sessionId = sessionId
       this.assembler = nextProjection.assembler
       this.telemetry = nextProjection.telemetry
@@ -1749,6 +1757,10 @@ function makeSessionTreeItems(
       ...(sourceSession?.updatedAt === undefined ? {} : { updatedAt: sourceSession.updatedAt }),
     }
   })
+}
+
+function normalizeOpenResult(result: boolean | TuiSessionOpenResult): TuiSessionOpenResult {
+  return typeof result === 'boolean' ? { opened: result } : result
 }
 
 function safeSubagentId(value: string): string {

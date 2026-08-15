@@ -17,6 +17,7 @@ import type {
   TuiLaunch,
   TuiNotification,
   TuiRuntime,
+  TuiSessionOpenResult,
 } from './types.ts'
 import {
   fallbackCapabilitySnapshot,
@@ -171,17 +172,33 @@ class SdkTuiRuntime implements TuiRuntime {
     return result.cancelled
   }
 
-  async open(sessionId: string, replaceSessionId?: string): Promise<boolean> {
+  async open(
+    sessionId: string,
+    replaceSessionId?: string,
+  ): Promise<boolean | TuiSessionOpenResult> {
     const client = this.requireClient()
     this.requireCapability('open')
-    const result = await client.request('session/open', {
+    const params = {
       sessionId,
       ...(replaceSessionId === undefined ? {} : { replaceSessionId }),
-    })
+    }
+    const openSession = Reflect.get(client, 'openSession')
+    const result =
+      typeof openSession === 'function'
+        ? await openSession.call(client, sessionId, replaceSessionId)
+        : await client.request('session/open', params)
     if (!isRecord(result) || typeof result.opened !== 'boolean') {
       throw new Error(`session/open returned no open result: ${JSON.stringify(result)}`)
     }
-    return result.opened
+    if (!Array.isArray(result.seed)) return result.opened
+    if (!result.seed.every(isSessionEvent)) {
+      throw new Error(`session/open returned an invalid seed: ${JSON.stringify(result)}`)
+    }
+    return {
+      opened: result.opened,
+      seed: result.seed,
+      ...(typeof result.seedLength === 'number' ? { seedLength: result.seedLength } : {}),
+    }
   }
 
   async fork(

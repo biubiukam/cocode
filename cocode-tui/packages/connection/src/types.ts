@@ -88,6 +88,12 @@ export type TuiSessionSummary = {
   eventCount?: number
 }
 
+export type TuiSessionOpenResult = {
+  opened: boolean
+  seedLength?: number
+  seed?: SessionEvent[]
+}
+
 export type TuiLaunch = {
   command: string
   args: string[]
@@ -176,7 +182,7 @@ export type TuiRuntime = {
   ): Promise<{ name: string; version: string; capabilities?: TuiRuntimeAdvertisement }>
   prompt(sessionId: string, blocks: ContentBlock[], mode?: TuiPromptMode): Promise<string>
   cancel(sessionId: string, keepInbox?: boolean): Promise<boolean>
-  open(sessionId: string, replaceSessionId?: string): Promise<boolean>
+  open(sessionId: string, replaceSessionId?: string): Promise<boolean | TuiSessionOpenResult>
   fork(
     sourceSessionId: string,
     boundary?: number,

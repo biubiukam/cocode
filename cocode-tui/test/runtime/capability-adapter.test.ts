@@ -48,4 +48,12 @@ describe('capability adapter', () => {
     expect(state.snapshot).toBeUndefined()
     expect(state.capabilities).toEqual(configured)
   })
+
+  it('does not preserve configured RPC session listing when runtime disables it', () => {
+    const capabilities = applyRuntimeCapabilities(
+      { ...P0_CAPABILITIES, sessionList: 'rpc' },
+      { ...snapshot, capabilities: { ...snapshot.capabilities, sessionList: false } },
+    )
+    expect(capabilities.sessionList).toBe('none')
+  })
 })

@@ -198,7 +198,7 @@ export function createBuiltinCommands(): CommandRegistry {
     summary: 'List sessions from the runtime when supported',
     summaryZh: '列出运行时会话（如果支持）',
     kind: 'local',
-    available: (caps) => caps.sessionList !== 'none' && caps.open,
+    available: (caps) => caps.sessionList === 'rpc' && caps.open,
     run: (ctx) => {
       void ctx.showSessionTree?.()
     },

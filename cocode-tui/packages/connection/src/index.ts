@@ -24,6 +24,7 @@ export type {
   TuiPromptMode,
   TuiRuntimeAdvertisement,
   TuiSessionSummary,
+  TuiSessionOpenResult,
   TuiCapabilitySnapshot,
   TuiRuntimeCapabilities,
   TuiRuntimeCapabilityName,
