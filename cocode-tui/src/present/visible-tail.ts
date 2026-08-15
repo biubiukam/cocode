@@ -6,6 +6,10 @@ import type { ConversationNode } from '../runtime/nodes/types.ts'
 import { nodeKey } from '../runtime/nodes/types.ts'
 import stringWidth from 'string-width'
 import { formatReasoning, formatToolResult } from './text-format.ts'
+import {
+  extractPartialJsonStringArgument,
+  truncatePlanProgress,
+} from '../runtime/nodes/tool-view.ts'
 
 export function visibleTail(
   nodes: readonly ConversationNode[],
@@ -51,10 +55,19 @@ export function estimateNodeRows(
     }
     case 'tool': {
       const result = formatToolResult(node.result, detailed)
-      if (!detailed) return 2
+      const plan =
+        (node.name === '' ? 'tool' : node.name) === 'exit_plan_mode'
+          ? extractPartialJsonStringArgument(node.args, 'plan')
+          : undefined
+      const planRows =
+        plan === undefined
+          ? 0
+          : lineCount(truncatePlanProgress(plan), contentColumns(maxColumns, 6)) + 1
+      if (!detailed) return 2 + planRows
       const columns = contentColumns(maxColumns, 4)
       return (
         2 +
+        planRows +
         lineCount(node.args, columns) +
         lineCount(result, columns) +
         (node.error === undefined ? 0 : 1)

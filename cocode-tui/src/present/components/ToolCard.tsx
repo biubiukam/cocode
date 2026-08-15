@@ -2,9 +2,14 @@ import { Box, Text } from 'ink'
 import type { ToolNode } from '../../runtime/nodes/types.ts'
 import { formatToolResult } from '../text-format.ts'
 import { theme } from '../theme.ts'
-import type { UiLocale } from '../../runtime/ui-locale.ts'
-import { toolViewDetail } from '../../runtime/nodes/tool-view.ts'
+import { text, type UiLocale } from '../../runtime/ui-locale.ts'
+import {
+  extractPartialJsonStringArgument,
+  toolViewDetail,
+  truncatePlanProgress,
+} from '../../runtime/nodes/tool-view.ts'
 import { formatDiffSummary } from '../../runtime/diff-summary.ts'
+import { Markdown, StreamingMarkdown } from './Markdown.tsx'
 
 export function ToolCard(props: {
   node: ToolNode
@@ -32,6 +37,12 @@ export function ToolCard(props: {
   const summary = !verbose ? result ?? node.error?.code : undefined
   const detail = toolViewDetail(node.view)
   const diffSummary = node.view?.kind === 'diff' ? node.view.summary : undefined
+  const toolName = node.name === '' ? 'tool' : node.name
+  const plan =
+    toolName === 'exit_plan_mode'
+      ? extractPartialJsonStringArgument(node.args, 'plan')
+      : undefined
+  const planProgress = plan === undefined ? undefined : truncatePlanProgress(plan)
   return (
     <Box
       flexDirection="column"
@@ -42,14 +53,28 @@ export function ToolCard(props: {
     >
       <Text color={color}>
         <Text color={theme.mute}>↳ </Text>
-        {mark} <Text bold>{node.name}</Text> · {state}
+        {mark} <Text bold>{toolName}</Text> · {state}
         {summary ? ` · ${summary}` : ''}
       </Text>
       {detail !== undefined ? <Text color={theme.mute}> {detail}</Text> : null}
       {diffSummary !== undefined ? (
         <Text color={theme.info}> {formatDiffSummary(diffSummary)}</Text>
       ) : null}
-      {verbose && node.args !== '' ? <Text color={theme.mute}> args {node.args}</Text> : null}
+      {planProgress !== undefined ? (
+        <Box flexDirection="column" paddingLeft={2}>
+          <Text color={theme.info} wrap="truncate-end">
+            {text(props.locale, node.streaming ? 'planStreaming' : 'planReady')}
+          </Text>
+          {node.streaming ? (
+            <StreamingMarkdown text={planProgress} maxColumns={props.maxColumns} />
+          ) : (
+            <Markdown text={planProgress} maxColumns={props.maxColumns} />
+          )}
+        </Box>
+      ) : null}
+      {verbose && node.args !== '' && planProgress === undefined ? (
+        <Text color={theme.mute}> args {node.args}</Text>
+      ) : null}
       {verbose && diffSummary === undefined && result !== undefined ? (
         <Text color={theme.tool}> {result}</Text>
       ) : null}

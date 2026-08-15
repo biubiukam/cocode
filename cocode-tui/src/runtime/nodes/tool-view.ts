@@ -32,6 +32,41 @@ export function toolViewDetail(view: ToolView | undefined): string | undefined {
   return view.command === undefined ? 'terminal' : `terminal ${view.command}`
 }
 
+export const PLAN_PROGRESS_MAX_CHARS = 1600
+
+/** Extract a complete or still-growing JSON string argument from a tool call. */
+export function extractPartialJsonStringArgument(
+  args: string,
+  key: string,
+): string | undefined {
+  const marker = new RegExp(`(?:^|[,{])\\s*\\"${escapeRegExp(key)}\\"\\s*:\\s*\\"`).exec(args)
+  if (marker === null) return undefined
+  const start = marker.index + marker[0].length
+  let raw = ''
+  let escaped = false
+  for (let index = start; index < args.length; index += 1) {
+    const character = args[index]
+    if (escaped) {
+      raw += character
+      escaped = false
+      continue
+    }
+    if (character === '\\') {
+      raw += character
+      escaped = true
+      continue
+    }
+    if (character === '"') return decodeJsonString(raw)
+    raw += character
+  }
+  return decodeJsonString(raw, true)
+}
+
+export function truncatePlanProgress(value: string): string {
+  if (value.length <= PLAN_PROGRESS_MAX_CHARS) return value
+  return `${value.slice(0, PLAN_PROGRESS_MAX_CHARS)}\n…`
+}
+
 function parseArgs(args: string): Record<string, unknown> {
   if (args.trim() === '') return {}
   try {
@@ -61,4 +96,19 @@ function pathValues(input: Record<string, unknown>): string[] | undefined {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function decodeJsonString(raw: string, partial = false): string | undefined {
+  for (let end = raw.length; end >= 0; end -= 1) {
+    try {
+      return JSON.parse(`"${raw.slice(0, end)}"`) as string
+    } catch {
+      if (!partial) return undefined
+    }
+  }
+  return undefined
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }

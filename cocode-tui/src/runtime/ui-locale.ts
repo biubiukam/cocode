@@ -184,6 +184,8 @@ type UiKey =
   | 'planReviewPreview'
   | 'planReviewEmpty'
   | 'planReviewFooter'
+  | 'planStreaming'
+  | 'planReady'
   | 'steerSending'
   | 'forkUnavailable'
   | 'forkCreated'
@@ -382,6 +384,8 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     planReviewPreview: 'Plan preview',
     planReviewEmpty: 'The plan preview is empty.',
     planReviewFooter: '↑↓ choose an action · PgUp/PgDn scroll · Enter confirm · Esc cancel',
+    planStreaming: 'plan is streaming…',
+    planReady: 'plan ready for review',
     steerSending: 'Sending follow-up at the next tool boundary…',
     forkUnavailable: 'Session fork is unavailable or the turn is still running.',
     forkCreated: 'Created a child session from the current conversation.',
@@ -579,6 +583,8 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     planReviewPreview: '计划预览',
     planReviewEmpty: '计划内容为空。',
     planReviewFooter: '↑↓ 选择操作 · PgUp/PgDn 滚动 · 回车确认 · Esc 取消',
+    planStreaming: '计划生成中…',
+    planReady: '计划已生成，等待审阅',
     steerSending: '将在下一个工具步骤完成后发送后续输入……',
     forkUnavailable: '当前无法创建会话分支，或任务仍在运行。',
     forkCreated: '已从当前对话创建子会话。',

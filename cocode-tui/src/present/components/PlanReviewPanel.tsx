@@ -62,8 +62,16 @@ export function buildPlanPreview(markdown: string, maxColumns = 80): readonly Pl
 
 export function planReviewPanelRows(state: TuiQuestionSnapshot, maxColumns = 80): number {
   const previewLines = buildPlanPreview(state.question.detail ?? '', maxColumns)
-  const optionRows = Math.max(1, state.question.options?.length ?? 0)
-  return PANEL_CHROME_ROWS + Math.min(MAX_RESERVED_PREVIEW_ROWS, Math.max(3, previewLines.length)) + optionRows
+  const optionRows = (state.question.options ?? []).reduce(
+    (rows, option) => rows + 1 + Number(option.description !== undefined),
+    0,
+  )
+  return (
+    PANEL_CHROME_ROWS +
+    Math.min(MAX_RESERVED_PREVIEW_ROWS, Math.max(3, previewLines.length)) +
+    Math.max(1, optionRows) +
+    2
+  )
 }
 
 export function planReviewActionIndexAtRow(props: {
@@ -72,7 +80,7 @@ export function planReviewActionIndexAtRow(props: {
   previewRows: number
   hasAbove: boolean
   hasBelow: boolean
-  optionCount: number
+  optionHasDescription: readonly boolean[]
 }): number | undefined {
   const firstActionRow =
     props.panelStartRow +
@@ -80,8 +88,13 @@ export function planReviewActionIndexAtRow(props: {
     Number(props.hasAbove) +
     props.previewRows +
     Number(props.hasBelow)
-  const index = props.row - firstActionRow
-  return index >= 0 && index < props.optionCount ? index : undefined
+  let cursor = firstActionRow
+  for (const [index, hasDescription] of props.optionHasDescription.entries()) {
+    const rows = 1 + Number(hasDescription)
+    if (props.row >= cursor && props.row < cursor + rows) return index
+    cursor += rows
+  }
+  return undefined
 }
 
 export function PlanReviewPanel(props: {
@@ -103,7 +116,16 @@ export function PlanReviewPanel(props: {
     1,
     Math.min(
       preview.length || 1,
-      Math.max(1, Math.min(MAX_RESERVED_PREVIEW_ROWS, Math.trunc(props.maxRows ?? 16) - PANEL_CHROME_ROWS - options.length)),
+      Math.max(
+        1,
+        Math.min(
+          MAX_RESERVED_PREVIEW_ROWS,
+          Math.trunc(props.maxRows ?? 16) -
+            PANEL_CHROME_ROWS -
+            options.reduce((rows, option) => rows + 1 + Number(option.description !== undefined), 0) -
+            2,
+        ),
+      ),
     ),
   )
   const [scrollOffset, setScrollOffset] = useState(0)
@@ -126,7 +148,7 @@ export function PlanReviewPanel(props: {
       previewRows,
       hasAbove,
       hasBelow,
-      optionCount: options.length,
+      optionHasDescription: options.map((option) => option.description !== undefined),
     })
     if (index === undefined) return
     setSelected(index)
@@ -134,7 +156,7 @@ export function PlanReviewPanel(props: {
       const option = options[index]
       if (option !== undefined) props.dispatch({ type: 'question.answer', selected: [option.label] })
     }
-  }, [hasAbove, hasBelow, options, previewRows, props])
+  }, [hasAbove, hasBelow, options, previewRows, props.dispatch, props.mousePointer, props.panelStartRow])
 
   useInput((input, key) => {
     if (key.escape || (key.ctrl && input === 'c')) {

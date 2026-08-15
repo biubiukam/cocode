@@ -248,6 +248,10 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     snap.status.todos.length,
     stdout.columns >= 120 ? CHECKLIST_STRIP_MAX_ITEMS : 2,
   )
+  const wideInspector = stdout.columns >= 120
+  const mainColumns = wideInspector
+    ? Math.max(1, stdout.columns - INSPECTOR_WIDTH - 1)
+    : stdout.columns
   const layout = calculateChatLayout({
     viewportRows: stdout.rows,
     composerLines: snap.composer.text.split('\n').length,
@@ -296,7 +300,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
         snap.question === undefined
           ? undefined
         : isPlanReviewQuestion(snap.question.question)
-        ? planReviewPanelRows(snap.question)
+        ? planReviewPanelRows(snap.question, mainColumns)
         : questionPanelRows(snap.question),
     approvalRows: approvalOpen ? 12 : undefined,
     reviewRows: reviewOpen ? reviewRowsFor(snap.reviewPicker) : undefined,
@@ -308,10 +312,6 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
   const editorRows = Number(editorBusy) + Number(editorError !== undefined)
   const contentOverlayStartRow =
     CHAT_HEADER_ROWS + 1 + messageMaxRows + mainChecklistRows + statusRows + editorRows
-  const wideInspector = stdout.columns >= 120
-  const mainColumns = wideInspector
-    ? Math.max(1, stdout.columns - INSPECTOR_WIDTH - 1)
-    : stdout.columns
   const messageContentColumns = Math.max(1, mainColumns - (messageSelectionActive ? 2 : 0))
   const composerHeader = composerHeaderLayout({
     composer: snap.composer,

@@ -54,6 +54,7 @@ export type ToolNode = {
   name: string
   args: string
   status: 'running' | 'success' | 'error'
+  streaming?: boolean
   view?: ToolView
   result?: string
   error?: { name: string; code: string }

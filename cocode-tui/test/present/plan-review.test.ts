@@ -53,10 +53,40 @@ describe('plan review presentation', () => {
     const long = planReviewPanelRows(state(`# Plan\n\n${Array.from({ length: 80 }, () => '- step').join('\n')}`), 80)
 
     expect(long).toBeGreaterThan(compact)
-    expect(long).toBeLessThanOrEqual(27)
+    expect(long).toBeLessThanOrEqual(29)
   })
 
   it('maps clicks to actions after the visible preview window', () => {
+    expect(
+      planReviewActionIndexAtRow({
+        row: 17,
+        panelStartRow: 5,
+        previewRows: 8,
+        hasAbove: false,
+        hasBelow: false,
+        optionHasDescription: [false, false],
+      }),
+    ).toBe(0)
+    expect(
+      planReviewActionIndexAtRow({
+        row: 18,
+        panelStartRow: 5,
+        previewRows: 8,
+        hasAbove: false,
+        hasBelow: false,
+        optionHasDescription: [false, false],
+      }),
+    ).toBe(1)
+    expect(
+      planReviewActionIndexAtRow({
+        row: 19,
+        panelStartRow: 5,
+        previewRows: 8,
+        hasAbove: false,
+        hasBelow: false,
+        optionHasDescription: [false, false],
+      }),
+    ).toBeUndefined()
     expect(
       planReviewActionIndexAtRow({
         row: 19,
@@ -64,19 +94,9 @@ describe('plan review presentation', () => {
         previewRows: 8,
         hasAbove: true,
         hasBelow: true,
-        optionCount: 2,
+        optionHasDescription: [true, false],
       }),
     ).toBe(0)
-    expect(
-      planReviewActionIndexAtRow({
-        row: 20,
-        panelStartRow: 5,
-        previewRows: 8,
-        hasAbove: true,
-        hasBelow: true,
-        optionCount: 2,
-      }),
-    ).toBe(1)
     expect(
       planReviewActionIndexAtRow({
         row: 21,
@@ -84,8 +104,8 @@ describe('plan review presentation', () => {
         previewRows: 8,
         hasAbove: true,
         hasBelow: true,
-        optionCount: 2,
+        optionHasDescription: [true, false],
       }),
-    ).toBeUndefined()
+    ).toBe(1)
   })
 })
