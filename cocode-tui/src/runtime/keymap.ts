@@ -8,11 +8,14 @@ export type CommandId =
   | 'input.newline'
   | 'session.interruptOrQuit'
   | 'app.quit'
+  | 'app.redraw'
   | 'transcript.toggleVerbose'
   | 'editor.open'
   | 'help.toggle'
   | 'history.prev'
   | 'history.next'
+  | 'history.search'
+  | 'messages.select'
 
 export type KeyMatch = {
   id: CommandId
@@ -20,27 +23,118 @@ export type KeyMatch = {
   emptyOnly?: boolean
 }
 
-export function matchKey(input: {
+export type Keymap = Readonly<Record<CommandId, readonly KeyBinding[]>>
+
+export type KeyBinding = {
+  key: string
+  ctrl: boolean
+  alt: boolean
+  shift: boolean
+  emptyOnly?: boolean
+}
+
+type KeymapInput = {
   raw: string
   return?: boolean
   escape?: boolean
   upArrow?: boolean
   downArrow?: boolean
+  leftArrow?: boolean
+  rightArrow?: boolean
+  tab?: boolean
+  backspace?: boolean
+  delete?: boolean
   ctrl?: boolean
+  alt?: boolean
   shift?: boolean
   empty: boolean
-}): KeyMatch | undefined {
-  if (input.return && (input.shift || (input.ctrl && input.raw === 'j'))) {
-    return { id: 'input.newline' }
+}
+
+export const DEFAULT_BINDINGS: Readonly<Record<CommandId, readonly KeyBinding[]>> = {
+  'input.submit': [binding('enter')],
+  'input.newline': [binding('enter', { shift: true }), binding('j', { ctrl: true })],
+  'session.interruptOrQuit': [binding('escape'), binding('c', { ctrl: true })],
+  'app.quit': [binding('d', { ctrl: true, emptyOnly: true })],
+  'app.redraw': [binding('l', { ctrl: true })],
+  'transcript.toggleVerbose': [binding('o', { ctrl: true })],
+  'editor.open': [binding('g', { ctrl: true })],
+  'help.toggle': [binding('?', { emptyOnly: true })],
+  'history.prev': [binding('up')],
+  'history.next': [binding('down')],
+  'history.search': [binding('r', { ctrl: true })],
+  'messages.select': [binding('up', { shift: true })],
+}
+
+function binding(
+  key: string,
+  options: { ctrl?: boolean; alt?: boolean; shift?: boolean; emptyOnly?: boolean } = {},
+): KeyBinding {
+  return {
+    key,
+    ctrl: options.ctrl === true,
+    alt: options.alt === true,
+    shift: options.shift === true,
+    emptyOnly: options.emptyOnly,
   }
-  if (input.return) return { id: 'input.submit' }
-  if (input.ctrl && input.raw === 'c') return { id: 'session.interruptOrQuit' }
-  if (input.ctrl && input.raw === 'd') return { id: 'app.quit', emptyOnly: true }
-  if (input.escape) return { id: 'session.interruptOrQuit' }
-  if (input.ctrl && input.raw === 'o') return { id: 'transcript.toggleVerbose' }
-  if (input.ctrl && input.raw === 'g') return { id: 'editor.open' }
-  if (input.raw === '?' && input.empty) return { id: 'help.toggle' }
-  if (input.upArrow) return { id: 'history.prev' }
-  if (input.downArrow) return { id: 'history.next' }
+}
+
+export function matchKey(
+  input: KeymapInput,
+  keymap: Keymap = DEFAULT_BINDINGS,
+): KeyMatch | undefined {
+  const order: CommandId[] = [
+    'input.newline',
+    'input.submit',
+    'session.interruptOrQuit',
+    'app.quit',
+    'app.redraw',
+    'transcript.toggleVerbose',
+    'editor.open',
+    'help.toggle',
+    'history.search',
+    'messages.select',
+    'history.prev',
+    'history.next',
+  ]
+  for (const id of order) {
+    for (const current of keymap[id]) {
+      if (current.emptyOnly === true && !input.empty) continue
+      if (matchesBinding(input, current)) {
+        return current.emptyOnly === true && id === 'app.quit' ? { id, emptyOnly: true } : { id }
+      }
+    }
+  }
   return undefined
+}
+
+function matchesBinding(input: KeymapInput, binding: KeyBinding): boolean {
+  if (Boolean(input.ctrl) !== binding.ctrl) return false
+  if (Boolean(input.alt) !== binding.alt) return false
+  const implicitShift = binding.key === '?' && input.raw === '?'
+  if (!implicitShift && Boolean(input.shift) !== binding.shift) return false
+  switch (binding.key) {
+    case 'enter':
+      return input.return === true
+    case 'escape':
+      return input.escape === true
+    case 'up':
+      return input.upArrow === true
+    case 'down':
+      return input.downArrow === true
+    case 'left':
+      return input.leftArrow === true
+    case 'right':
+      return input.rightArrow === true
+    case 'tab':
+      return input.tab === true || input.raw === '\t'
+    case 'backspace':
+      return input.backspace === true
+    case 'delete':
+      return input.delete === true
+    default:
+      return (
+        input.raw.toLowerCase() === binding.key ||
+        (binding.key === 'j' && input.return === true && input.raw === 'j')
+      )
+  }
 }

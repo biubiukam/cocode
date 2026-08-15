@@ -1,3 +1,5 @@
+import { detectTerminalEnvironment } from '../runtime/platform.ts'
+
 export type ScreenMode = 'inline' | 'alternate'
 
 type ScreenOutput = {
@@ -17,10 +19,7 @@ export function supportsAlternateScreen(
   platform: NodeJS.Platform = process.platform,
   env: NodeJS.ProcessEnv = process.env,
 ): boolean {
-  if (platform !== 'win32') return true
-  return [env.WT_SESSION, env.TERM_PROGRAM, env.ANSICON].some(
-    (value) => value !== undefined && value !== '',
-  )
+  return detectTerminalEnvironment({ platform, env }).supportsAlternateScreen
 }
 
 export function enterScreen(
@@ -30,7 +29,8 @@ export function enterScreen(
   env: NodeJS.ProcessEnv = process.env,
 ): () => void {
   if (output.isTTY !== true) return () => undefined
-  const alternate = mode === 'alternate' && supportsAlternateScreen(platform, env)
+  const alternate =
+    mode === 'alternate' && output.isTTY === true && supportsAlternateScreen(platform, env)
   output.write(alternate ? ENTER_ALTERNATE : CLEAR_VIEWPORT)
   let closed = false
   return () => {

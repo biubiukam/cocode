@@ -1,39 +1,60 @@
 {
-  "name": "@cocode/tui-root",
-  "private": true,
+  "name": "@cocode/tui",
+  "version": "0.1.0",
+  "description": "Cocode terminal client for DeepSeek Harness sessions",
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "engines": {
     "node": "^22.19 || >=24"
   },
   "scripts": {
-    "prepare": "cd .. && husky",
     "dev": "node --import tsx/esm src/main.tsx",
+    "start": "node ./bin/cocode-tui.mjs",
     "typecheck": "tsc --noEmit && pnpm -r typecheck",
     "test": "vitest run",
-    "lint": "eslint --ext .js,.cjs,.mjs,.ts,.tsx src packages",
-    "lint:fix": "pnpm run lint -- --fix",
-    "format": "prettier --write src packages package.json",
-    "format:check": "prettier --check src packages package.json",
-    "build": "pnpm -r build"
+    "lint": "node ../scripts/run-oxlint.mjs --config .oxlintrc.json src packages test",
+    "lint:fix": "node ../scripts/run-oxlint.mjs --config .oxlintrc.json --fix src packages test",
+    "format": "pnpm run lint:fix",
+    "format:check": "pnpm run lint",
+    "build": "node scripts/build.mjs",
+    "pack:check": "pnpm run build && node scripts/release-check.mjs",
+    "release:check": "pnpm run pack:check"
   },
+  "bin": {
+    "cocode": "bin/cocode-tui.mjs"
+  },
+  "files": [
+    "bin",
+    "dist/cocode-tui.mjs",
+    "dist/companion-layout.mjs",
+    "dist/companion-runner.mjs",
+    "dist/companion.cordis.yml",
+    "dist/companion.mjs",
+    "docs",
+    "README.md",
+    "scripts/companion-layout.mjs",
+    "scripts/companion-runner.mjs"
+  ],
   "dependencies": {
-    "@cocode/tui-connection": "workspace:*",
-    "ink": "^5.2.1",
-    "marked": "^18.0.9",
-    "react": "^18.3.1",
-    "string-width": "^7.2.0",
-    "yaml": "^2.9.0"
+    "tsx": "^4.20.5"
   },
   "devDependencies": {
-    "@dtyq/eslint-config": "0.0.11",
+    "@cocode/tui-connection": "workspace:*",
+    "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "^22.20.1",
     "@types/react": "^18.3.24",
-    "eslint": "8.57.1",
+    "esbuild": "^0.28.2",
     "husky": "9.1.7",
+    "ink": "^5.2.1",
     "lint-staged": "15.5.2",
-    "prettier": "2.8.8",
-    "tsx": "^4.20.5",
+    "marked": "^18.0.9",
+    "oxlint": "1.76.0",
+    "react": "^18.3.1",
+    "string-width": "^7.2.0",
     "typescript": "^5.9.2",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "yaml": "^2.9.0"
   }
 }

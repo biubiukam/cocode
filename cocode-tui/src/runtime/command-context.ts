@@ -2,6 +2,7 @@
 
 import type { TuiAuthInfo, TuiCommandCtx } from './app.ts'
 import type { TuiCapabilities } from './capabilities.ts'
+import type { TuiCapabilitySnapshot } from '@cocode/tui-connection'
 import { formatDoctor } from './diagnostics.ts'
 import { formatError } from './errors/index.ts'
 import { writeSessionExport } from './export-file.ts'
@@ -28,7 +29,16 @@ export type CommandContextOptions = {
   setModel?: TuiCommandCtx['setModel']
   locale?: UiLocale
   showResumePicker?: (sessions: readonly SessionSummary[]) => void
+  resumeSessions?: TuiCommandCtx['resumeSessions']
   showSkillsPicker?: TuiCommandCtx['showSkillsPicker']
+  copyLatestAssistant?: TuiCommandCtx['copyLatestAssistant']
+  toggleFocus?: TuiCommandCtx['toggleFocus']
+  review?: TuiCommandCtx['review']
+  forkSession?: TuiCommandCtx['forkSession']
+  cloneSession?: TuiCommandCtx['cloneSession']
+  showSessionTree?: TuiCommandCtx['showSessionTree']
+  showForkPicker?: TuiCommandCtx['showForkPicker']
+  showQueuePicker?: TuiCommandCtx['showQueuePicker']
 }
 
 export type AppCommandContextOptions = {
@@ -42,6 +52,8 @@ export type AppCommandContextOptions = {
   showStatus: () => void
   initError?: string
   capabilities: TuiCapabilities
+  configuredCapabilities: TuiCapabilities
+  runtimeCapabilities?: TuiCapabilitySnapshot
   cwd: string
   provider: string
   model: string
@@ -54,7 +66,16 @@ export type AppCommandContextOptions = {
   setModel?: TuiCommandCtx['setModel']
   locale: UiLocale
   showResumePicker: (sessions: readonly SessionSummary[]) => void
+  resumeSessions?: TuiCommandCtx['resumeSessions']
   showSkillsPicker: TuiCommandCtx['showSkillsPicker']
+  copyLatestAssistant?: TuiCommandCtx['copyLatestAssistant']
+  toggleFocus?: TuiCommandCtx['toggleFocus']
+  review?: TuiCommandCtx['review']
+  forkSession?: TuiCommandCtx['forkSession']
+  cloneSession?: TuiCommandCtx['cloneSession']
+  showSessionTree?: TuiCommandCtx['showSessionTree']
+  showForkPicker?: TuiCommandCtx['showForkPicker']
+  showQueuePicker?: TuiCommandCtx['showQueuePicker']
 }
 
 export function createCommandContext(options: CommandContextOptions): TuiCommandCtx {
@@ -83,27 +104,37 @@ export function createCommandContext(options: CommandContextOptions): TuiCommand
           : `AGENTS.md already exists: ${result.path}`,
       )
     },
-    resumeSessions: async () => {
-      if (options.sessionRoot === undefined) {
-        options.notice('error', formatError('SESSION_ROOT_UNAVAILABLE'))
-        return
-      }
-      try {
-        const result = await listSessionSummaries({
-          root: options.sessionRoot,
-          cwd: options.cwd,
-          limit: 50,
-        })
-        if (result.sessions.length === 0) {
-          options.notice('info', text(options.locale ?? 'en', 'resumeEmpty'))
+    resumeSessions:
+      options.resumeSessions ??
+      (async () => {
+        if (options.sessionRoot === undefined) {
+          options.notice('error', formatError('SESSION_ROOT_UNAVAILABLE'))
           return
         }
-        options.showResumePicker?.(result.sessions)
-      } catch {
-        options.notice('error', formatError('SESSION_ROOT_UNAVAILABLE'))
-      }
-    },
+        try {
+          const result = await listSessionSummaries({
+            root: options.sessionRoot,
+            cwd: options.cwd,
+            limit: 50,
+          })
+          if (result.sessions.length === 0) {
+            options.notice('info', text(options.locale ?? 'en', 'resumeEmpty'))
+            return
+          }
+          options.showResumePicker?.(result.sessions)
+        } catch {
+          options.notice('error', formatError('SESSION_ROOT_UNAVAILABLE'))
+        }
+      }),
     showSkillsPicker: options.showSkillsPicker,
+    copyLatestAssistant: options.copyLatestAssistant,
+    toggleFocus: options.toggleFocus,
+    review: options.review,
+    forkSession: options.forkSession,
+    cloneSession: options.cloneSession,
+    showSessionTree: options.showSessionTree,
+    showForkPicker: options.showForkPicker,
+    showQueuePicker: options.showQueuePicker,
   }
 }
 
@@ -128,6 +159,8 @@ export function createAppCommandContext(options: AppCommandContextOptions): TuiC
           model: options.model,
           sessionId: options.sessionId(),
           capabilities: options.capabilities,
+          configuredCapabilities: options.configuredCapabilities,
+          runtimeCapabilities: options.runtimeCapabilities,
         }),
       )
     },
@@ -140,6 +173,15 @@ export function createAppCommandContext(options: AppCommandContextOptions): TuiC
     setModel: options.setModel,
     locale: options.locale,
     showResumePicker: options.showResumePicker,
+    resumeSessions: options.resumeSessions,
     showSkillsPicker: options.showSkillsPicker,
+    copyLatestAssistant: options.copyLatestAssistant,
+    toggleFocus: options.toggleFocus,
+    review: options.review,
+    forkSession: options.forkSession,
+    cloneSession: options.cloneSession,
+    showSessionTree: options.showSessionTree,
+    showForkPicker: options.showForkPicker,
+    showQueuePicker: options.showQueuePicker,
   })
 }

@@ -6,6 +6,7 @@ import {
 } from '../../runtime/resume-picker.ts'
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
 import { listWindowStart } from '../list-window.ts'
+import { resumeItemPreview } from '../resume-preview.ts'
 import { theme } from '../theme.ts'
 
 export function ResumePicker(props: {
@@ -62,7 +63,8 @@ export function ResumePicker(props: {
             >
               {active ? '›' : ' '} {current ? '✓' : ' '} {item.id.slice(0, 12)}{' '}
               <Text color={active ? theme.text : theme.dim}>
-                · {formatTimestamp(item.createdAt, props.locale)}
+                · {formatTimestamp(item.createdAt, props.locale)} ·{' '}
+                {resumeItemPreview(item, props.locale)}
               </Text>
             </Text>
           )

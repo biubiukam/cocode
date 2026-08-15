@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { TuiAction } from '../../src/runtime/app.ts'
-import { createBuiltinCommands, parseSlash } from '../../src/runtime/commands.ts'
+import { createBuiltinCommands, helpText, parseSlash } from '../../src/runtime/commands.ts'
 import { P0_CAPABILITIES } from '../../src/runtime/capabilities.ts'
 
 describe('commands', () => {
@@ -24,17 +24,42 @@ describe('commands', () => {
       'lang',
       'model',
       'export',
+      'copy',
+      'review',
+      'focus',
       'init',
       'new',
       'compact',
       'use',
       'login',
       'logout',
+      'fork',
+      'clone',
+      'queue',
     ])
   })
 
   it('unknown names are absent', () => {
     expect(createBuiltinCommands().find('resume', P0_CAPABILITIES)).toBeUndefined()
+  })
+
+  it('hides resume when the runtime cannot open persisted sessions', () => {
+    const registry = createBuiltinCommands()
+    expect(
+      registry.find('resume', { ...P0_CAPABILITIES, sessionList: 'jsonl', open: false }),
+    ).toBeUndefined()
+    expect(
+      registry.find('resume', { ...P0_CAPABILITIES, sessionList: 'jsonl', open: true }),
+    ).toBeDefined()
+    expect(
+      registry.find('resume', { ...P0_CAPABILITIES, sessionList: 'rpc', open: true }),
+    ).toBeDefined()
+  })
+
+  it('localizes the focus command summary in Chinese help', () => {
+    expect(helpText(P0_CAPABILITIES, createBuiltinCommands(), 'zh')).toContain(
+      '/focus  切换最近一轮聚焦视图',
+    )
   })
 
   it('/exit dispatches quit', () => {
@@ -96,6 +121,20 @@ describe('commands', () => {
     command?.run(commandCtx({ dispatch: (action) => actions.push(action) }), '')
     expect(actions).toEqual([{ type: 'compact' }])
   })
+
+  it('/copy delegates to the latest assistant callback', () => {
+    let called = false
+    const command = createBuiltinCommands().find('copy', P0_CAPABILITIES)
+    command?.run(commandCtx({ copyLatestAssistant: () => (called = true) }), '')
+    expect(called).toBe(true)
+  })
+
+  it('/focus delegates to the focus callback', () => {
+    let called = false
+    const command = createBuiltinCommands().find('focus', P0_CAPABILITIES)
+    command?.run(commandCtx({ toggleFocus: () => (called = true) }), '')
+    expect(called).toBe(true)
+  })
 })
 
 function commandCtx(
@@ -105,6 +144,8 @@ function commandCtx(
     useAuth: (target: 'byok' | 'cocode' | 'login') => void
     setLocale: (value: string) => void
     setModel: (value: string) => void
+    copyLatestAssistant: () => void
+    toggleFocus: () => void
   }> = {},
 ) {
   return {
@@ -117,5 +158,7 @@ function commandCtx(
     useAuth: overrides.useAuth,
     setLocale: overrides.setLocale,
     setModel: overrides.setModel,
+    copyLatestAssistant: overrides.copyLatestAssistant,
+    toggleFocus: overrides.toggleFocus,
   }
 }

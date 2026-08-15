@@ -19,6 +19,7 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
+          - macos-latest
           - windows-latest
 
     defaults:
@@ -44,14 +45,20 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
 
+      - name: Build and validate release package
+        run: pnpm run release:check
+
       - name: Run tests
         run: pnpm test
 
       - name: Typecheck TUI source
         run: pnpm exec tsc --noEmit --project tsconfig.json
 
+      - name: Typecheck connection package
+        run: pnpm exec tsc --noEmit --project packages/connection/tsconfig.json
+
       - name: Lint TUI source
         run: pnpm exec eslint src packages
 
       - name: Check formatting
-        run: pnpm exec prettier --check src/main.tsx src/present/clear-screen.ts src/present/whale-animation.ts src/present/components/EmptyState.tsx src/present/components/Header.tsx src/present/components/MessageList.tsx src/present/components/WhaleLogo.tsx src/runtime/auth/io.ts src/runtime/auth/open-url.ts src/runtime/errors/locale.ts src/runtime/export-file.ts src/runtime/external-editor.ts src/runtime/file-context.ts src/runtime/sessions-fs.ts src/runtime/sessions-root.ts src/runtime/workspace-files.ts test/present/clear-screen.test.ts test/present/whale-animation.test.ts test/runtime/auth/account.test.ts test/runtime/auth/credentials.test.ts test/runtime/auth/open-url.test.ts test/runtime/auth/paths.test.ts test/runtime/errors.test.ts test/runtime/p1/export-file.test.ts test/runtime/p1/file-context.test.ts test/runtime/p1/history-editor.test.ts test/runtime/p1/sessions-fs.test.ts test/runtime/p1/sessions-root.test.ts
+        run: pnpm exec prettier --check src packages test docs .dev/rfc/pending .dev/rfc/implemented package.json

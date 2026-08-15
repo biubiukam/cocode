@@ -1,8 +1,9 @@
 /** Load safe workspace file attachments and format them as prompt text. */
 
 import { readFile, readdir, realpath, stat } from 'node:fs/promises'
-import { isAbsolute, posix, relative, resolve, sep, win32 } from 'node:path'
+import { isAbsolute, relative, resolve, sep } from 'node:path'
 import type { ContentBlock } from '@cocode/tui-connection'
+import { pathForPlatform } from './platform.ts'
 
 export type FileContext =
   | { kind: 'file'; path: string; text: string; bytes: number }
@@ -93,7 +94,7 @@ export function isPathInside(
   target: string,
   platform: NodeJS.Platform = process.platform,
 ): boolean {
-  const pathApi = platform === 'win32' ? win32 : posix
+  const pathApi = pathForPlatform(platform)
   const rest = pathApi.relative(root, target)
   return rest !== '..' && !rest.startsWith(`..${pathApi.sep}`) && !pathApi.isAbsolute(rest)
 }

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { formatReasoning, formatToolResult, truncateText } from '../../src/present/text-format.ts'
+import {
+  formatReasoning,
+  formatToolResult,
+  sanitizeSingleLine,
+  truncateText,
+} from '../../src/present/text-format.ts'
 
 describe('presentation text formatting', () => {
   it('summarizes reasoning until verbose mode is enabled', () => {
@@ -25,5 +30,9 @@ describe('presentation text formatting', () => {
   it('truncates without exceeding the requested length', () => {
     expect(truncateText('abcdef', 4)).toBe('abc…')
     expect(truncateText('abcdef', 0)).toBe('')
+  })
+
+  it('removes terminal escapes and control characters from one-line labels', () => {
+    expect(sanitizeSingleLine('first\n\u001b[31mred\u001b[0m\u0000 end')).toBe('first red end')
   })
 })

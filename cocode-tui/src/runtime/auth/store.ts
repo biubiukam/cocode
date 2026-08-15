@@ -70,7 +70,7 @@ export type AuthStoreOptions = {
   env?: NodeJS.ProcessEnv
   cwd?: string
   client?: AgencyClient
-  openUrl?: (url: string) => void
+  openUrl?: (url: string, onFailure?: () => void) => void
   live?: LiveInstanceContext
 }
 
@@ -107,7 +107,7 @@ class AuthStoreImpl implements AuthStore {
     private readonly env: NodeJS.ProcessEnv,
     private readonly cwd: string | undefined,
     private readonly client: AgencyClient | undefined,
-    private readonly openUrl: ((url: string) => void) | undefined,
+    private readonly openUrl: ((url: string, onFailure?: () => void) => void) | undefined,
     private readonly live: LiveInstanceContext,
   ) {}
 
@@ -334,7 +334,15 @@ class AuthStoreImpl implements AuthStore {
         },
       }
       this.emit()
-      ;(this.openUrl ?? openExternal)(authorization.verification_uri_complete)
+      const onOpenFailure = (): void => {
+        if (this.snap.phase !== 'device') return
+        this.snap = {
+          ...this.snap,
+          error: formatError('AUTH_BROWSER_OPEN_FAILED'),
+        }
+        this.emit()
+      }
+      ;(this.openUrl ?? openExternal)(authorization.verification_uri_complete, onOpenFailure)
       const token = await pollDeviceToken(
         origin,
         authorization.device_code,

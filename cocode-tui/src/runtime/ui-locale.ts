@@ -49,6 +49,7 @@ type UiKey =
   | 'resumeHint'
   | 'resumeQuery'
   | 'resumeEmpty'
+  | 'resumeNoSummary'
   | 'resumeLoading'
   | 'resumeLoaded'
   | 'resumeUnavailable'
@@ -69,6 +70,7 @@ type UiKey =
   | 'rewindEmpty'
   | 'rewindLoading'
   | 'rewindLoaded'
+  | 'forkLoading'
   | 'rewindConfirm'
   | 'rewindUnavailable'
   | 'subagentsRunning'
@@ -78,7 +80,16 @@ type UiKey =
   | 'queueAdded'
   | 'queueFull'
   | 'queueSending'
+  | 'queueTitle'
+  | 'queueHint'
+  | 'queueQuery'
+  | 'queueEmpty'
+  | 'queueAttachments'
+  | 'queueDeleted'
+  | 'queueRestored'
+  | 'turnComplete'
   | 'turnBusy'
+  | 'sessionChanging'
   | 'cancelRequested'
   | 'cancelNotRunning'
   | 'cancelFailed'
@@ -104,6 +115,63 @@ type UiKey =
   | 'inspectorEmpty'
   | 'inspectorGoal'
   | 'inspectorTodos'
+  | 'copySuccess'
+  | 'copyEmpty'
+  | 'copyUnavailable'
+  | 'focusStatusOn'
+  | 'focusEnabled'
+  | 'focusDisabled'
+  | 'reviewTitle'
+  | 'reviewHint'
+  | 'reviewLoading'
+  | 'reviewPreview'
+  | 'reviewScopeWorkingTree'
+  | 'reviewScopeStaged'
+  | 'reviewScopeLastCommit'
+  | 'reviewScopeBranch'
+  | 'reviewConfirm'
+  | 'reviewEmpty'
+  | 'reviewFailed'
+  | 'reviewSending'
+  | 'reviewUsage'
+  | 'reviewBinary'
+  | 'reviewUntracked'
+  | 'reviewTruncated'
+  | 'reviewDiffFolded'
+  | 'reviewFilesFolded'
+  | 'reviewTextFolded'
+  | 'reviewSummary'
+  | 'reviewOmittedFiles'
+  | 'approvalTitle'
+  | 'approvalHint'
+  | 'approvalAllowed'
+  | 'approvalAllowedForTurn'
+  | 'approvalRejected'
+  | 'approvalUnavailable'
+  | 'approvalTimedOut'
+  | 'approvalTarget'
+  | 'approvalRisk'
+  | 'approvalSource'
+  | 'approvalUnavailableValue'
+  | 'permissionUnavailable'
+  | 'permissionChanged'
+  | 'planUnavailable'
+  | 'planEnabled'
+  | 'planDisabled'
+  | 'steerSending'
+  | 'forkUnavailable'
+  | 'forkCreated'
+  | 'forkTitle'
+  | 'forkHint'
+  | 'forkConfirm'
+  | 'forkEmpty'
+  | 'sessionTreeUnavailable'
+  | 'sessionTreeEmpty'
+  | 'sessionTreeTitle'
+  | 'sessionTreeHint'
+  | 'sessionTreeQuery'
+  | 'sessionTreeLoading'
+  | 'sessionTreeOpenFailed'
 
 const TEXT: Record<UiLocale, Record<UiKey, string>> = {
   en: {
@@ -128,7 +196,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     help: 'help',
     helpHint: 'esc close',
     messageMode: 'message mode',
-    messageModeHint: '↑↓ move · enter expand · esc close',
+    messageModeHint: '↑↓ move · enter expand · c copy · esc close',
     footerHistory: '↑↓ history',
     footerMessages: 'shift+↑ messages',
     footerDetails: 'ctrl+o details',
@@ -153,6 +221,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     resumeHint: 'type to filter · ↑↓ select · enter choose · esc close',
     resumeQuery: 'filter: {query}',
     resumeEmpty: 'No sessions found for this workspace.',
+    resumeNoSummary: 'No summary',
     resumeLoading: 'Loading session history…',
     resumeLoaded: 'Resumed session {session}.',
     resumeUnavailable: 'Cannot resume session {session}: the session file is unavailable.',
@@ -173,6 +242,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     rewindEmpty: 'No user messages available to rewind.',
     rewindLoading: 'Creating a rewind session…',
     rewindLoaded: 'Rewind ready. Edit the draft and press enter to resend.',
+    forkLoading: 'Creating a child session…',
     rewindConfirm: 'Rewind to this message? Press enter again to confirm · esc cancel',
     rewindUnavailable: 'Rewind is unavailable.',
     subagentsRunning: '{count} subagents running',
@@ -182,7 +252,16 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     queueAdded: 'Queued prompt ({count}); it will send when the current turn finishes.',
     queueFull: 'Prompt queue is full (8).',
     queueSending: 'Sending queued prompt…',
+    queueTitle: 'Prompt queue',
+    queueHint: 'type to filter · ↑↓ select · enter prioritize/retry · ctrl+d remove · esc close',
+    queueQuery: 'filter: {query}',
+    queueEmpty: 'No queued prompts.',
+    queueAttachments: '{count} attachments',
+    queueDeleted: 'Queued prompt deleted.',
+    queueRestored: 'Queued prompt restored to the front of the queue.',
+    turnComplete: 'Turn complete',
     turnBusy: 'Turn in progress. Press Tab to queue this prompt.',
+    sessionChanging: 'Session is changing. Wait for it to finish.',
     cancelRequested: 'Cancel requested; waiting for the runtime to become idle.',
     cancelNotRunning: 'No active turn to cancel.',
     cancelFailed: 'Cancel request failed',
@@ -208,6 +287,63 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     inspectorEmpty: 'no active details',
     inspectorGoal: 'goal',
     inspectorTodos: 'todos',
+    copySuccess: 'Copied to clipboard.',
+    copyEmpty: 'There is no message text to copy.',
+    copyUnavailable: 'Clipboard unavailable on this terminal.',
+    focusStatusOn: 'focus: latest turn',
+    focusEnabled: 'Focus mode enabled: showing the latest turn.',
+    focusDisabled: 'Focus mode disabled: showing the full transcript.',
+    reviewTitle: 'Code review',
+    reviewHint: '↑↓ select · enter continue · esc close',
+    reviewLoading: 'Collecting a read-only Git diff…',
+    reviewPreview: 'enter send to Cocode · esc close',
+    reviewScopeWorkingTree: 'working tree (staged + unstaged)',
+    reviewScopeStaged: 'staged changes',
+    reviewScopeLastCommit: 'last commit',
+    reviewScopeBranch: 'current branch vs base',
+    reviewConfirm: 'Review this diff? Press enter to send · esc cancel',
+    reviewEmpty: 'No changes found for this review scope.',
+    reviewFailed: 'Review unavailable',
+    reviewSending: 'Sending review context…',
+    reviewUsage: 'Use /review, /review working-tree, staged, last-commit, or branch [base].',
+    reviewBinary: 'binary',
+    reviewUntracked: 'untracked',
+    reviewTruncated: 'truncated',
+    reviewDiffFolded: 'diff lines folded',
+    reviewFilesFolded: 'files folded',
+    reviewTextFolded: 'diff text folded',
+    reviewSummary: '{files} files · +{additions}/-{deletions}{binary}{truncated}',
+    reviewOmittedFiles: '… {count} untracked files omitted',
+    approvalTitle: 'Approval required',
+    approvalHint: 'enter/a allow once · t allow for turn · d/n reject · esc cancel',
+    approvalAllowed: 'Tool allowed once.',
+    approvalAllowedForTurn: 'Tool allowed for this turn.',
+    approvalRejected: 'Tool request rejected.',
+    approvalUnavailable: 'Approval is unavailable; the tool request was not allowed.',
+    approvalTimedOut: 'Approval timed out; the tool request was cancelled.',
+    approvalTarget: 'target',
+    approvalRisk: 'risk',
+    approvalSource: 'source',
+    approvalUnavailableValue: 'unavailable',
+    permissionUnavailable: 'Permission modes are unavailable in this runtime.',
+    permissionChanged: 'Permission mode: {mode}',
+    planUnavailable: 'Plan mode is unavailable in this runtime.',
+    planEnabled: 'Plan mode enabled.',
+    planDisabled: 'Plan mode disabled.',
+    steerSending: 'Sending follow-up at the next tool boundary…',
+    forkUnavailable: 'Session fork is unavailable or the turn is still running.',
+    forkCreated: 'Created a child session from the current conversation.',
+    forkTitle: 'Fork session',
+    forkHint: '↑↓ select user message · enter confirm · esc close',
+    forkConfirm: 'Fork from this message? Press enter again to confirm · esc cancel',
+    forkEmpty: 'No previous user message can be used as a fork boundary.',
+    sessionTreeUnavailable: 'Runtime session tree is unavailable.',
+    sessionTreeEmpty: 'No runtime sessions found.',
+    sessionTreeTitle: 'Sessions',
+    sessionTreeHint: 'type to filter · ↑↓ select · enter open · esc close',
+    sessionTreeQuery: 'filter: {query}',
+    sessionTreeLoading: 'Loading sessions…',
+    sessionTreeOpenFailed: 'The runtime could not open this session.',
   },
   zh: {
     session: '会话',
@@ -231,7 +367,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     help: '帮助',
     helpHint: 'Esc 关闭',
     messageMode: '消息模式',
-    messageModeHint: '↑↓ 移动 · 回车展开 · Esc 关闭',
+    messageModeHint: '↑↓ 移动 · 回车展开 · c 复制 · Esc 关闭',
     footerHistory: '↑↓ 历史',
     footerMessages: 'Shift+↑ 消息',
     footerDetails: 'Ctrl+O 详情',
@@ -256,6 +392,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     resumeHint: '输入关键词过滤 · ↑↓ 选择 · 回车确认 · Esc 关闭',
     resumeQuery: '筛选：{query}',
     resumeEmpty: '当前工作区没有可用的历史会话。',
+    resumeNoSummary: '无摘要',
     resumeLoading: '正在加载会话历史…',
     resumeLoaded: '已恢复会话 {session}。',
     resumeUnavailable: '无法恢复会话 {session}：会话文件不可用。',
@@ -276,6 +413,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     rewindEmpty: '没有可回滚的用户消息。',
     rewindLoading: '正在创建回滚会话…',
     rewindLoaded: '已准备回滚草稿，修改后按回车重新发送。',
+    forkLoading: '正在创建子会话…',
     rewindConfirm: '确定回滚到这条消息？再次回车确认 · Esc 取消',
     rewindUnavailable: '当前无法回滚。',
     subagentsRunning: '{count} 个子代理运行中',
@@ -285,7 +423,16 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     queueAdded: '已加入队列（{count} 条），当前任务结束后自动发送。',
     queueFull: '输入队列已满（最多 8 条）。',
     queueSending: '正在发送队列中的输入…',
+    queueTitle: '输入队列',
+    queueHint: '输入过滤 · ↑↓ 选择 · Enter 置顶/重试 · Ctrl+D 删除 · Esc 关闭',
+    queueQuery: '筛选：{query}',
+    queueEmpty: '当前没有排队中的输入。',
+    queueAttachments: '{count} 个附件',
+    queueDeleted: '已删除队列中的输入。',
+    queueRestored: '已将队列输入恢复到队首。',
+    turnComplete: '本轮任务已完成',
     turnBusy: '当前任务仍在运行，按 Tab 可将输入加入队列。',
+    sessionChanging: '正在切换会话，请等待当前操作完成。',
     cancelRequested: '已请求取消，等待运行时进入空闲状态。',
     cancelNotRunning: '当前没有可取消的任务。',
     cancelFailed: '取消请求失败',
@@ -311,6 +458,63 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     inspectorEmpty: '暂无活动详情',
     inspectorGoal: '目标',
     inspectorTodos: '待办',
+    copySuccess: '已复制到剪贴板。',
+    copyEmpty: '没有可复制的消息文本。',
+    copyUnavailable: '当前终端无法使用剪贴板。',
+    focusStatusOn: '聚焦：最近一轮',
+    focusEnabled: '已开启聚焦模式：仅显示最近一轮。',
+    focusDisabled: '已关闭聚焦模式：显示完整会话。',
+    reviewTitle: '代码 Review',
+    reviewHint: '↑↓ 选择 · 回车继续 · Esc 关闭',
+    reviewLoading: '正在读取只读 Git Diff…',
+    reviewPreview: '回车发送给 Cocode · Esc 关闭',
+    reviewScopeWorkingTree: '工作树（已暂存 + 未暂存）',
+    reviewScopeStaged: '已暂存改动',
+    reviewScopeLastCommit: '最近一次提交',
+    reviewScopeBranch: '当前分支相对基线',
+    reviewConfirm: '确认 Review 这份 Diff？回车发送 · Esc 取消',
+    reviewEmpty: '当前 Review 范围没有改动。',
+    reviewFailed: 'Review 不可用',
+    reviewSending: '正在发送 Review 上下文…',
+    reviewUsage: '使用 /review、/review working-tree、staged、last-commit 或 branch [base]。',
+    reviewBinary: '二进制',
+    reviewUntracked: '未跟踪',
+    reviewTruncated: '已截断',
+    reviewDiffFolded: 'Diff 行已折叠',
+    reviewFilesFolded: '个文件已折叠',
+    reviewTextFolded: 'Diff 文本已折叠',
+    reviewSummary: '{files} 个文件 · +{additions}/-{deletions}{binary}{truncated}',
+    reviewOmittedFiles: '… {count} 个未跟踪文件未展示',
+    approvalTitle: '需要审批',
+    approvalHint: '回车/a 允许一次 · t 允许本轮 · d/n 拒绝 · Esc 取消',
+    approvalAllowed: '已允许本次工具调用。',
+    approvalAllowedForTurn: '已允许本轮中的工具调用。',
+    approvalRejected: '已拒绝工具调用。',
+    approvalUnavailable: '审批不可用，工具调用未获允许。',
+    approvalTimedOut: '审批超时，工具调用已取消。',
+    approvalTarget: '目标',
+    approvalRisk: '风险',
+    approvalSource: '来源',
+    approvalUnavailableValue: '不可用',
+    permissionUnavailable: '当前运行时不支持权限模式。',
+    permissionChanged: '权限模式：{mode}',
+    planUnavailable: '当前运行时不支持计划模式。',
+    planEnabled: '已启用计划模式。',
+    planDisabled: '已关闭计划模式。',
+    steerSending: '将在下一个工具步骤完成后发送后续输入……',
+    forkUnavailable: '当前无法创建会话分支，或任务仍在运行。',
+    forkCreated: '已从当前对话创建子会话。',
+    forkTitle: '创建子会话',
+    forkHint: '↑↓ 选择用户消息 · 回车确认 · Esc 关闭',
+    forkConfirm: '从这条消息创建分支？再次回车确认 · Esc 取消',
+    forkEmpty: '没有可用于创建分支边界的历史用户消息。',
+    sessionTreeUnavailable: '当前运行时不支持会话树。',
+    sessionTreeEmpty: '没有找到运行时会话。',
+    sessionTreeTitle: '会话列表',
+    sessionTreeHint: '输入过滤 · ↑↓ 选择 · 回车打开 · Esc 关闭',
+    sessionTreeQuery: '筛选：{query}',
+    sessionTreeLoading: '正在加载会话列表……',
+    sessionTreeOpenFailed: '运行时无法打开该会话。',
   },
 }
 

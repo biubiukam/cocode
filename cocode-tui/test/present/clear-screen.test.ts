@@ -41,6 +41,13 @@ describe('screen mode', () => {
     expect(target.writes).toEqual(['\x1b[2J\x1b[H'])
   })
 
+  it('uses inline mode inside a terminal multiplexer', () => {
+    const target = output()
+    const leave = enterScreen('alternate', target, 'linux', { TMUX: '1' })
+    leave()
+    expect(target.writes).toEqual(['\x1b[2J\x1b[H'])
+  })
+
   it('does not write control sequences when output is not a TTY', () => {
     const target = output(false)
     const leave = enterScreen('alternate', target, 'darwin', {})

@@ -24,13 +24,18 @@ describe('listSessionSummaries', () => {
         root,
         'project-a',
         's1',
-        JSON.stringify({
+        `${JSON.stringify({
           type: 'session',
           version: 0,
           id: 's1',
           createdAt: 10,
           cwd,
-        }) + '\n',
+        })}\n${JSON.stringify({
+          type: 'user/message',
+          seq: 1,
+          time: 11,
+          data: { content: [{ type: 'text', text: 'Fix the resume picker summary' }] },
+        })}\n`,
       )
       await writeSession(
         root,
@@ -38,13 +43,27 @@ describe('listSessionSummaries', () => {
         's2',
         zstdCompressSync(
           Buffer.from(
-            JSON.stringify({
+            `${JSON.stringify({
               type: 'session',
               version: 0,
               id: 's2',
               createdAt: 20,
               cwd,
-            }) + '\n',
+              parentSession: 's1',
+              seedLength: 2,
+            })}\n${JSON.stringify({
+              type: 'user/message',
+              seq: 1,
+              time: 21,
+              data: {
+                content: [
+                  {
+                    type: 'text',
+                    text: 'A compressed session with a first prompt summary',
+                  },
+                ],
+              },
+            })}\n`,
           ),
         ),
       )
@@ -63,6 +82,64 @@ describe('listSessionSummaries', () => {
       const result = await listSessionSummaries({ root, cwd })
       expect(result.sessions.map((session) => session.id)).toEqual(['s2', 's1'])
       expect(result.sessions[0]?.path.endsWith('session.jsonl.zstd')).toBe(true)
+      expect(result.sessions[0]).toMatchObject({ parentSession: 's1', seedLength: 2 })
+      expect(result.sessions.map((session) => session.preview)).toEqual([
+        'A compressed session with a first prompt summary',
+        'Fix the resume picker summary',
+      ])
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('uses the latest sanitized session title for display metadata', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'cocode-session-title-'))
+    const cwd = '/work/project'
+    try {
+      await writeSession(
+        root,
+        'project',
+        's1',
+        `${JSON.stringify({ type: 'session', id: 's1', createdAt: 1, cwd })}\n${JSON.stringify({
+          type: 'session/title',
+          seq: 1,
+          time: 2,
+          data: { title: 'First title' },
+        })}\n${JSON.stringify({
+          type: 'session/title',
+          seq: 2,
+          time: 3,
+          data: { title: '\u001b[31mLatest\u001b[0m title' },
+        })}\n`,
+      )
+      const result = await listSessionSummaries({ root, cwd })
+      expect(result.sessions[0]?.title).toBe('Latest title')
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('sanitizes and bounds the first user prompt preview', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'cocode-session-list-'))
+    const cwd = '/work/project'
+    const prompt = `\u001b[31m${'界'.repeat(80)}\u001b[0m\nnext line`
+    try {
+      await writeSession(
+        root,
+        'project',
+        's1',
+        `${JSON.stringify({ type: 'session', id: 's1', createdAt: 1, cwd })}\n${JSON.stringify({
+          type: 'user/message',
+          seq: 1,
+          time: 2,
+          data: { content: [{ type: 'text', text: prompt }] },
+        })}\n`,
+      )
+      const result = await listSessionSummaries({ root, cwd })
+      const preview = result.sessions[0]?.preview
+      expect(preview).toBe(`${'界'.repeat(71)}…`)
+      expect(Array.from(preview ?? '')).toHaveLength(72)
+      expect(preview).not.toMatch(/[\u0000-\u001f\u007f-\u009f]/)
     } finally {
       await rm(root, { recursive: true, force: true })
     }
