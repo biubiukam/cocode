@@ -103,11 +103,11 @@ export function ConversationSessionHeader({
                 {renderSlot('conversation.session.header.actions', {})}
               </div>
             </div>
-            <div className={css.headerUtilities}>
+            {/* <div className={css.headerUtilities}>
               {renderSlot('conversation.session.header.utilities', {})}
-            </div>
+            </div> */}
           </div>
-          {tabs.length > 1 && (
+          {/* {tabs.length > 1 && (
             <div className={css.tabs} role="tablist">
               {tabs.map(viewTab => (
                 <button
@@ -122,7 +122,7 @@ export function ConversationSessionHeader({
                 </button>
               ))}
             </div>
-          )}
+          )} */}
         </>
       )}
     </header>

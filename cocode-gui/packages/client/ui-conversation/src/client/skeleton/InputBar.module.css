@@ -158,6 +158,7 @@
    MUST share font, line-height, padding and wrapping rules or heights diverge. */
 .grow {
   position: relative;
+  min-height: 56px;
 }
 
 /* Decoration backdrop: same metrics as the textarea, transparent glyphs; only
