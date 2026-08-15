@@ -39,6 +39,8 @@ export type ChannelSwitchHost = {
   assembler: { reset(): void }
   resetTelemetry?: () => void
   resetSessionState?: () => void
+  resetSessionControls?: () => void
+  resetPromptQueue?: () => void
   emit(): void
   beginQuit(): void
 }
@@ -205,6 +207,7 @@ async function applyResolved(host: ChannelSwitchHost, target: 'byok' | 'cocode')
   host.agent = 'starting'
   host.emit()
   try {
+    host.resetPromptQueue?.()
     await host.runtime.restart(
       { cwd: host.cwd, provider: auth.provider, model: auth.model },
       auth.env,
@@ -215,6 +218,7 @@ async function applyResolved(host: ChannelSwitchHost, target: 'byok' | 'cocode')
     host.assembler.reset()
     host.resetTelemetry?.()
     host.resetSessionState?.()
+    host.resetSessionControls?.()
     host.capturingByok = false
     if (host.auth !== undefined) host.auth.mode = auth.mode
     host.agent = 'idle'

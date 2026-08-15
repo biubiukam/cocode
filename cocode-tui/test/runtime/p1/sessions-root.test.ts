@@ -45,4 +45,15 @@ describe('resolveSessionRoot', () => {
       }),
     ).toEqual({ path: join(homedir, '.dsh', 'sessions'), source: 'default' })
   })
+
+  it('uses Windows path semantics when the platform is simulated', () => {
+    expect(
+      resolveSessionRoot({
+        env: { DSH_SESSION_ROOT: 'sessions' },
+        cwd: 'C:\\workspace',
+        homedir: 'C:\\Users\\coder',
+        platform: 'win32',
+      }),
+    ).toEqual({ path: 'C:\\workspace\\sessions', source: 'DSH_SESSION_ROOT' })
+  })
 })

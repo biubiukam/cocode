@@ -19,6 +19,7 @@ TUI 自己产生的失败会显示为 `CODE · 解释`。语言由 `COCODE_LANG`
 | `AUTH_HOME_BUSY`              | 同一产品家目录已有其它 TUI 在跑     | 其它 Cocode TUI 还在运行。先关掉它们，再切换通道或退出账号。 |
 | `AUTH_LOGIN_FAILED`           | 登录失败且没有更具体的 code         | 登录失败。                                                   |
 | `AUTH_LOGIN_CANCELLED`        | 用户取消 device flow                | 已取消登录。                                                 |
+| `AUTH_BROWSER_OPEN_FAILED`    | 无法打开设备确认页面                | 无法打开验证页面，请手动打开上方的 URL。                     |
 | `AUTH_DEVICE_START_FAILED`    | 无法开始设备登录                    | 无法开始设备登录。                                           |
 | `AUTH_DEVICE_INVALID`         | Agency 返回的设备授权不完整         | 服务返回了无效的设备授权。                                   |
 | `AUTH_DEVICE_EXPIRED`         | 设备授权超时                        | 设备登录已过期。                                             |

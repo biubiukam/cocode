@@ -4,6 +4,20 @@ import { agentMark } from './agent-status.ts'
 import { theme } from '../theme.ts'
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
 
+const NOTICE_MAX_LINES = 12
+
+export function noticeLines(message: string, maxLines = NOTICE_MAX_LINES): string[] {
+  const limit = Number.isFinite(maxLines)
+    ? Math.max(1, Math.floor(maxLines))
+    : NOTICE_MAX_LINES
+  const lines = message.split('\n')
+  if (lines.length <= limit) return lines
+  return [
+    ...lines.slice(0, limit - 1),
+    `… (${String(lines.length - limit + 1)} more lines)`,
+  ]
+}
+
 export function StatusLine(props: {
   status: TuiSnapshot['status']
   agent: TuiSnapshot['agent']
@@ -69,8 +83,14 @@ export function StatusLine(props: {
           {agentMark(props.agent)} {props.status.line}
         </Text>
         <Box flexShrink={0}>
+          {props.status.focusMode ? (
+            <Text color={theme.info} wrap="truncate-end">
+              {text(props.locale, 'focusStatusOn')}
+            </Text>
+          ) : null}
           {props.status.tokens !== undefined ? (
             <Text color={theme.mute} wrap="truncate-end">
+              {props.status.focusMode ? ' · ' : null}
               {text(props.locale, 'tokensIn')} {props.status.tokens.input} ·{' '}
               {text(props.locale, 'tokensOut')} {props.status.tokens.output}
             </Text>
@@ -119,8 +139,13 @@ function hasContextSegments(telemetry: TuiSnapshot['status']['telemetry']): bool
 function Notice(props: { notice: NonNullable<TuiSnapshot['notice']> }) {
   const color = props.notice.tone === 'error' ? theme.error : theme.info
   return (
-    <Text color={color} wrap="truncate-end">
-      ! {props.notice.message}
-    </Text>
+    <Box flexDirection="column">
+      {noticeLines(props.notice.message).map((line, index) => (
+        <Text key={`${index}:${line}`} color={color} wrap="truncate-end">
+          {index === 0 ? '! ' : '  '}
+          {line}
+        </Text>
+      ))}
+    </Box>
   )
 }

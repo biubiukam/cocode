@@ -9,6 +9,7 @@ import type { UiLocale } from './ui-locale.ts'
 export type Command = {
   name: string
   summary: string
+  summaryZh?: string
   kind: 'local' | 'prompt-text'
   available: (caps: TuiCapabilities) => boolean
   run: (app: TuiCommandCtx, args: string) => void
@@ -86,6 +87,29 @@ export function createBuiltinCommands(): CommandRegistry {
   local('export', 'Export the projected session as Markdown', (ctx) => {
     void ctx.exportTranscript?.()
   })
+  local('copy', 'Copy the latest assistant reply to the clipboard', (ctx) => {
+    ctx.copyLatestAssistant?.()
+  })
+  registry.register({
+    name: 'review',
+    summary: 'Review Git changes in the current workspace',
+    summaryZh: 'Review 当前工作区的 Git 改动',
+    kind: 'local',
+    available: () => true,
+    run: (ctx, args) => {
+      ctx.review?.(args)
+    },
+  })
+  registry.register({
+    name: 'focus',
+    summary: 'Toggle the latest-turn focus view',
+    summaryZh: '切换最近一轮聚焦视图',
+    kind: 'local',
+    available: () => true,
+    run: (ctx) => {
+      ctx.toggleFocus?.()
+    },
+  })
   local('init', 'Create AGENTS.md when the workspace has none', (ctx) => {
     void ctx.initWorkspace?.()
   })
@@ -93,7 +117,7 @@ export function createBuiltinCommands(): CommandRegistry {
     name: 'resume',
     summary: 'List local session history for this workspace',
     kind: 'local',
-    available: (caps) => caps.sessionList === 'jsonl',
+    available: (caps) => caps.sessionList !== 'none' && caps.open,
     run: (ctx) => {
       void ctx.resumeSessions?.()
     },
@@ -127,6 +151,66 @@ export function createBuiltinCommands(): CommandRegistry {
       ctx.showSkillsPicker?.()
     },
   })
+  registry.register({
+    name: 'permissions',
+    summary: 'Cycle runtime permission mode',
+    summaryZh: '切换运行时权限模式',
+    kind: 'local',
+    available: (caps) => caps.permissionMode,
+    run: (ctx) => ctx.dispatch({ type: 'permission.toggle' }),
+  })
+  registry.register({
+    name: 'plan',
+    summary: 'Toggle runtime plan mode',
+    summaryZh: '切换计划模式',
+    kind: 'local',
+    available: (caps) => caps.planMode,
+    run: (ctx) => ctx.dispatch({ type: 'plan.toggle' }),
+  })
+  registry.register({
+    name: 'fork',
+    summary: 'Create a child session from the current conversation',
+    summaryZh: '从当前对话创建子会话',
+    kind: 'local',
+    available: (caps) => caps.fork,
+    run: (ctx) => ctx.showForkPicker?.(),
+  })
+  registry.register({
+    name: 'clone',
+    summary: 'Clone the current conversation into a new session',
+    summaryZh: '将当前对话复制到新会话',
+    kind: 'local',
+    available: (caps) => caps.fork,
+    run: (ctx) => ctx.cloneSession?.(),
+  })
+  registry.register({
+    name: 'tree',
+    summary: 'Show the session tree from runtime metadata',
+    summaryZh: '显示运行时会话树',
+    kind: 'local',
+    available: (caps) => caps.sessionList !== 'none' && caps.open,
+    run: (ctx) => {
+      void ctx.showSessionTree?.()
+    },
+  })
+  registry.register({
+    name: 'sessions',
+    summary: 'List sessions from the runtime when supported',
+    summaryZh: '列出运行时会话（如果支持）',
+    kind: 'local',
+    available: (caps) => caps.sessionList === 'rpc' && caps.open,
+    run: (ctx) => {
+      void ctx.showSessionTree?.()
+    },
+  })
+  registry.register({
+    name: 'queue',
+    summary: 'Inspect queued prompts',
+    summaryZh: '查看待发送输入队列',
+    kind: 'local',
+    available: () => true,
+    run: (ctx) => ctx.showQueuePicker?.(),
+  })
 
   return registry
 }
@@ -146,7 +230,7 @@ export function helpText(
 ): string {
   const commands = registry
     .list(caps)
-    .map((command) => `/${command.name}  ${command.summary}`)
+    .map((command) => `/${command.name}  ${commandSummary(command, locale)}`)
     .join('\n')
   return [
     locale === 'zh' ? 'Cocode TUI（终端界面）' : 'Cocode TUI',
@@ -162,4 +246,8 @@ export function helpText(
       : 'Local commands (not the GUI command registry):',
     commands,
   ].join('\n')
+}
+
+export function commandSummary(command: Command, locale: UiLocale): string {
+  return locale === 'zh' ? command.summaryZh ?? command.summary : command.summary
 }

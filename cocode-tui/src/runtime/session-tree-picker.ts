@@ -1,0 +1,61 @@
+import type { SessionTreeRow } from './session-tree.ts'
+
+export type SessionTreePickerItem = SessionTreeRow & {
+  path?: string
+  source: 'rpc' | 'jsonl'
+  updatedAt?: number
+}
+
+export type SessionTreePickerState = {
+  items: readonly SessionTreePickerItem[]
+  query: string
+  selected: number
+  open: boolean
+}
+
+export const SESSION_TREE_WINDOW_SIZE = 8
+
+export function createSessionTreePicker(
+  items: readonly SessionTreePickerItem[],
+): SessionTreePickerState {
+  return { items: [...items], query: '', selected: 0, open: true }
+}
+
+export function setSessionTreeQuery(
+  state: SessionTreePickerState,
+  query: string,
+): SessionTreePickerState {
+  return { ...state, query, selected: 0 }
+}
+
+export function moveSessionTreeSelection(
+  state: SessionTreePickerState,
+  delta: number,
+): SessionTreePickerState {
+  const visible = visibleSessionTreeItems(state)
+  if (visible.length === 0) return { ...state, selected: 0 }
+  const selected = (((state.selected + delta) % visible.length) + visible.length) % visible.length
+  return { ...state, selected }
+}
+
+export function selectedSessionTreeItem(
+  state: SessionTreePickerState,
+): SessionTreePickerItem | undefined {
+  return visibleSessionTreeItems(state)[state.selected]
+}
+
+export function closeSessionTreePicker(state: SessionTreePickerState): SessionTreePickerState {
+  return { ...state, open: false }
+}
+
+export function visibleSessionTreeItems(state: SessionTreePickerState): SessionTreePickerItem[] {
+  const query = state.query.trim().toLocaleLowerCase()
+  if (query === '') return [...state.items]
+  return state.items.filter((item) =>
+    `${item.session.id} ${item.session.title ?? ''} ${item.session.preview ?? ''} ${
+      item.session.cwd ?? ''
+    }`
+      .toLocaleLowerCase()
+      .includes(query),
+  )
+}

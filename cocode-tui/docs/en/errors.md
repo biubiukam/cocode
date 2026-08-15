@@ -19,6 +19,7 @@ Sign-in, device authorization, credentials, and the agency origin.
 | `AUTH_HOME_BUSY`              | Another TUI is using the same product home         | Another Cocode TUI is using this home. Close it before switching or signing out. |
 | `AUTH_LOGIN_FAILED`           | Sign-in failed without a more specific code        | Sign-in failed.                                                                  |
 | `AUTH_LOGIN_CANCELLED`        | The user cancelled device flow                     | Sign-in cancelled.                                                               |
+| `AUTH_BROWSER_OPEN_FAILED`    | The verification page could not be opened          | Could not open the verification page. Open the URL shown above manually.         |
 | `AUTH_DEVICE_START_FAILED`    | Device login could not start                       | Could not start device login.                                                    |
 | `AUTH_DEVICE_INVALID`         | Agency returned an incomplete device authorization | Agency returned an invalid device authorization.                                 |
 | `AUTH_DEVICE_EXPIRED`         | Device authorization timed out                     | Device authorization expired.                                                    |

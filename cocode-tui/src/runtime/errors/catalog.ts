@@ -34,6 +34,11 @@ export const ERROR_CATALOG = {
     en: 'Sign-in cancelled.',
     zh: '已取消登录。',
   },
+  AUTH_BROWSER_OPEN_FAILED: {
+    domain: 'AUTH',
+    en: 'Could not open the verification page. Open the URL shown above manually.',
+    zh: '无法打开验证页面，请手动打开上方的 URL。',
+  },
   AUTH_DEVICE_START_FAILED: {
     domain: 'AUTH',
     en: 'Could not start device login.',

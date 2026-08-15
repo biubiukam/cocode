@@ -3,58 +3,53 @@
  */
 
 import type {
+  TuiCapabilitySnapshot,
+  TuiApprovalAnswer,
+  TuiApprovalRequest,
   SessionEvent,
   SkillEntry,
+  TuiPromptMode,
+  TuiSessionSummary,
+  TuiRuntimeAdvertisement,
   TuiQuestionAnswer,
   TuiQuestionRequest,
   TuiInitialize,
   TuiLaunch,
   TuiNotification,
   TuiRuntime,
+  TuiSessionOpenResult,
 } from './types.ts'
+import { fallbackCapabilitySnapshot, probeRuntimeCapabilities } from './capability.ts'
 
 type SdkClient = typeof import('@deepseek-ai/dsh-sdk-client')
 type HarnessClient = InstanceType<SdkClient['HarnessClient']>
-type RequestAwareHarnessClient = HarnessClient & {
-  onRequest?: (
-    handler: (method: string, params: Record<string, unknown>) => Promise<unknown>,
-  ) => () => void
-}
-type CancelableHarnessClient = HarnessClient & {
-  cancel(sessionId: string, keepInbox?: boolean): Promise<boolean>
-  open(sessionId: string, replaceSessionId?: string): Promise<boolean>
-  fork(
-    sourceSessionId: string,
-    boundary?: number,
-    replaceSessionId?: string,
-  ): Promise<{ sessionId: string; seedLength: number; seed: SessionEvent[] }>
-  rewind(
-    sourceSessionId: string,
-    messageSeq: number,
-    replaceSessionId?: string,
-  ): Promise<{ sessionId: string; seedLength: number; seed: SessionEvent[] }>
-}
 
 export function createTuiRuntime(launch: TuiLaunch): TuiRuntime {
   return new SdkTuiRuntime(launch)
 }
 
 class SdkTuiRuntime implements TuiRuntime {
-  private client: RequestAwareHarnessClient | undefined
+  private client: HarnessClient | undefined
   private launch: TuiLaunch
+  private wire: 'unknown' | 'companion' | 'legacy' = 'unknown'
   private readonly handlers = new Set<(n: TuiNotification) => void>()
   private readonly closeHandlers = new Set<(error?: string) => void>()
   private pump: Promise<void> | undefined
   private subscription: { close(): void } | undefined
   private closing = false
   private questionHandler: ((request: TuiQuestionRequest) => Promise<TuiQuestionAnswer>) | undefined
-  private clientRequestDisposer: (() => void) | undefined
+  private approvalHandler: ((request: TuiApprovalRequest) => Promise<TuiApprovalAnswer>) | undefined
+  private capabilitySnapshot: TuiCapabilitySnapshot = fallbackCapabilitySnapshot()
 
   constructor(launch: TuiLaunch) {
     this.launch = launch
   }
 
-  async start(init: TuiInitialize): Promise<{ name: string; version: string }> {
+  async start(init: TuiInitialize): Promise<{
+    name: string
+    version: string
+    capabilities?: import('./types.ts').TuiRuntimeAdvertisement
+  }> {
     const { HarnessClient } = await import('@deepseek-ai/dsh-sdk-client')
     const client = new HarnessClient({
       command: this.launch.command,
@@ -62,22 +57,21 @@ class SdkTuiRuntime implements TuiRuntime {
       cwd: this.launch.cwd,
       env: this.launch.env,
     })
-    const requestAwareClient = client as RequestAwareHarnessClient
-    this.client = requestAwareClient
+    this.client = client
     this.closing = false
+    this.wire = 'unknown'
+    this.capabilitySnapshot = fallbackCapabilitySnapshot()
     try {
       client.start()
-      this.clientRequestDisposer = requestAwareClient.onRequest?.(async (method, params) => {
-        if (method !== 'question/ask') throw new Error(`unknown server request: ${method}`)
-        const handler = this.questionHandler
-        if (handler === undefined) throw new Error('TUI has no question handler')
-        return handler(parseQuestionRequest(params))
-      })
       const sub = client.subscribe()
       this.subscription = sub
       this.pump = this.readLoop(sub)
       const result = await client.initialize(init)
-      return result.serverInfo
+      const advertised = await this.negotiateWire(client)
+      return {
+        ...result.serverInfo,
+        ...(advertised === undefined ? {} : { capabilities: advertised }),
+      }
     } catch (error) {
       this.closing = true
       await this.close().catch(() => undefined)
@@ -88,7 +82,11 @@ class SdkTuiRuntime implements TuiRuntime {
   async restart(
     init: TuiInitialize,
     env?: NodeJS.ProcessEnv,
-  ): Promise<{ name: string; version: string }> {
+  ): Promise<{
+    name: string
+    version: string
+    capabilities?: import('./types.ts').TuiRuntimeAdvertisement
+  }> {
     await this.close()
     this.closing = false
     this.client = undefined
@@ -112,28 +110,84 @@ class SdkTuiRuntime implements TuiRuntime {
     }
   }
 
-  async prompt(sessionId: string, blocks: { type: string; text?: string }[]): Promise<string> {
+  async prompt(
+    sessionId: string,
+    blocks: { type: string; text?: string }[],
+    mode: TuiPromptMode = 'normal',
+  ): Promise<string> {
     const client = this.requireClient()
-    return client.prompt(sessionId, blocks as never)
+    if (mode !== 'normal') {
+      const modes = this.capabilitySnapshot.modes?.promptModes ?? []
+      if (!modes.includes(mode))
+        this.requireCapability(mode === 'queue' ? 'queueMode' : 'promptMode')
+    }
+    const result = await client.request('session/prompt', {
+      sessionId,
+      contentBlocks: blocks,
+      ...(mode === 'normal' ? {} : { mode }),
+    })
+    if (!isRecord(result) || typeof result.messageId !== 'string') {
+      throw new Error(`session/prompt returned no message id: ${JSON.stringify(result)}`)
+    }
+    return result.messageId
   }
 
   async cancel(sessionId: string, keepInbox = false): Promise<boolean> {
     const client = this.requireClient()
-    return (client as CancelableHarnessClient).cancel(sessionId, keepInbox)
+    this.requireCapability('cancel')
+    const result = await client.request(
+      this.wireMethod('cocode/session/cancel', 'session/cancel'),
+      { sessionId, keepInbox },
+    )
+    if (!isRecord(result) || typeof result.cancelled !== 'boolean') {
+      throw new Error(`session/cancel returned no cancellation result: ${JSON.stringify(result)}`)
+    }
+    return result.cancelled
   }
 
-  async open(sessionId: string, replaceSessionId?: string): Promise<boolean> {
+  async open(
+    sessionId: string,
+    replaceSessionId?: string,
+  ): Promise<boolean | TuiSessionOpenResult> {
     const client = this.requireClient()
-    return (client as CancelableHarnessClient).open(sessionId, replaceSessionId)
+    this.requireCapability('open')
+    const params = {
+      sessionId,
+      ...(replaceSessionId === undefined ? {} : { replaceSessionId }),
+    }
+    const result = await client.request(
+      this.wireMethod('cocode/session/open', 'session/open'),
+      params,
+    )
+    if (!isRecord(result) || typeof result.opened !== 'boolean') {
+      throw new Error(`session/open returned no open result: ${JSON.stringify(result)}`)
+    }
+    if (!Array.isArray(result.seed)) return result.opened
+    if (!result.seed.every(isSessionEvent)) {
+      throw new Error(`session/open returned an invalid seed: ${JSON.stringify(result)}`)
+    }
+    return {
+      opened: result.opened,
+      seed: result.seed,
+      ...(typeof result.seedLength === 'number' ? { seedLength: result.seedLength } : {}),
+    }
   }
 
   async fork(
     sourceSessionId: string,
     boundary?: number,
     replaceSessionId?: string,
+    rewindToMessageSeq?: number,
   ): Promise<{ sessionId: string; seedLength: number; seed: SessionEvent[] }> {
     const client = this.requireClient()
-    return (client as CancelableHarnessClient).fork(sourceSessionId, boundary, replaceSessionId)
+    this.requireCapability('fork')
+    const result = await client.request(this.wireMethod('cocode/session/fork', 'session/fork'), {
+      sourceSessionId,
+      ...(boundary === undefined ? {} : { boundary }),
+      ...(replaceSessionId === undefined ? {} : { replaceSessionId }),
+      ...(rewindToMessageSeq === undefined ? {} : { rewindToMessageSeq }),
+    })
+    return parseSessionForkResult(result, 'fork')
   }
 
   async rewind(
@@ -142,14 +196,89 @@ class SdkTuiRuntime implements TuiRuntime {
     replaceSessionId?: string,
   ): Promise<{ sessionId: string; seedLength: number; seed: SessionEvent[] }> {
     const client = this.requireClient()
-    return (client as CancelableHarnessClient).rewind(sourceSessionId, messageSeq, replaceSessionId)
+    this.requireCapability('rewind')
+    const result = await client.request(this.wireMethod('cocode/session/fork', 'session/fork'), {
+      sourceSessionId,
+      rewindToMessageSeq: messageSeq,
+      ...(replaceSessionId === undefined ? {} : { replaceSessionId }),
+    })
+    return parseSessionForkResult(result, 'rewind')
   }
 
   async listSkills(sessionId: string): Promise<SkillEntry[]> {
-    const client = this.requireClient() as HarnessClient & {
-      listSkills(sessionId: string): Promise<SkillEntry[]>
+    const client = this.requireClient()
+    this.requireCapability('skills')
+    const result = await client.request(this.wireMethod('cocode/skills/list', 'skills/list'), {
+      sessionId,
+    })
+    if (!isRecord(result) || !Array.isArray(result.skills)) {
+      throw new Error(`skills/list returned no skill catalog: ${JSON.stringify(result)}`)
     }
-    return client.listSkills(sessionId)
+    return parseSkillEntries(result.skills)
+  }
+
+  async listSessions(cwd?: string): Promise<TuiSessionSummary[]> {
+    const client = this.requireClient()
+    this.requireCapability('sessionList')
+    const result = await client.request(
+      this.wireMethod('cocode/session/list', 'session/list'),
+      cwd === undefined ? {} : { cwd },
+    )
+    const rows = Array.isArray(result)
+      ? result
+      : isRecord(result) && Array.isArray(result.sessions)
+      ? result.sessions
+      : undefined
+    if (rows === undefined)
+      throw new Error(`session/list returned no session list: ${JSON.stringify(result)}`)
+    return rows.map(parseSessionSummary)
+  }
+
+  async permissionMode(
+    sessionId: string,
+    mode?: string,
+  ): Promise<{ mode: string; supportedModes: string[] }> {
+    const client = this.requireClient()
+    this.requireCapability('permissionMode')
+    const result = await client.request(
+      this.wireMethod('cocode/permission/mode', 'permission/mode'),
+      {
+        sessionId,
+        ...(mode === undefined ? {} : { mode }),
+      },
+    )
+    if (
+      !isRecord(result) ||
+      typeof result.mode !== 'string' ||
+      !Array.isArray(result.supportedModes)
+    ) {
+      throw new Error(`permission/mode returned an invalid result: ${JSON.stringify(result)}`)
+    }
+    return {
+      mode: result.mode,
+      supportedModes: result.supportedModes.filter(
+        (value): value is string => typeof value === 'string',
+      ),
+    }
+  }
+
+  async planMode(
+    sessionId: string,
+    active?: boolean,
+  ): Promise<{ active: boolean; pending?: boolean }> {
+    const client = this.requireClient()
+    this.requireCapability('planMode')
+    const result = await client.request(this.wireMethod('cocode/plan/mode', 'plan/mode'), {
+      sessionId,
+      ...(active === undefined ? {} : { active }),
+    })
+    if (!isRecord(result) || typeof result.active !== 'boolean') {
+      throw new Error(`plan/mode returned an invalid result: ${JSON.stringify(result)}`)
+    }
+    return {
+      active: result.active,
+      ...(typeof result.pending === 'boolean' ? { pending: result.pending } : {}),
+    }
   }
 
   onQuestion(handler: (request: TuiQuestionRequest) => Promise<TuiQuestionAnswer>): () => void {
@@ -157,6 +286,17 @@ class SdkTuiRuntime implements TuiRuntime {
     return () => {
       if (this.questionHandler === handler) this.questionHandler = undefined
     }
+  }
+
+  onApproval(handler: (request: TuiApprovalRequest) => Promise<TuiApprovalAnswer>): () => void {
+    this.approvalHandler = handler
+    return () => {
+      if (this.approvalHandler === handler) this.approvalHandler = undefined
+    }
+  }
+
+  getCapabilities(): TuiCapabilitySnapshot {
+    return this.capabilitySnapshot
   }
 
   subscribe(handler: (n: TuiNotification) => void): () => void {
@@ -177,8 +317,6 @@ class SdkTuiRuntime implements TuiRuntime {
     this.closing = true
     this.subscription?.close()
     this.subscription = undefined
-    this.clientRequestDisposer?.()
-    this.clientRequestDisposer = undefined
     await this.client?.close()
     await this.pump?.catch(() => undefined)
   }
@@ -190,12 +328,75 @@ class SdkTuiRuntime implements TuiRuntime {
     return this.client
   }
 
+  private wireMethod(companion: string, legacy: string): string {
+    return this.wire === 'companion' ? companion : legacy
+  }
+
+  private async negotiateWire(client: HarnessClient): Promise<TuiRuntimeAdvertisement | undefined> {
+    try {
+      const result = await client.request('cocode/capabilities', {}, 1_000)
+      const companion = parseCompanionCapabilities(result)
+      if (companion === undefined) throw new Error('invalid companion capability response')
+      this.wire = 'companion'
+      const advertised = parseRuntimeAdvertisement(companion)
+      this.capabilitySnapshot = {
+        source: 'runtime',
+        capabilities: {
+          cancel: true,
+          open: true,
+          fork: true,
+          rewind: true,
+          skills: companion.skills,
+          onRequest: false,
+          approval: companion.approval,
+          permissionMode: companion.permissionMode,
+          planMode: companion.planMode,
+          sessionList: companion.sessionList,
+          promptMode: companion.promptModes.includes('steer'),
+          queueMode: companion.promptModes.includes('queue'),
+        },
+        modes: advertised,
+        errors: {},
+      }
+      return advertised
+    } catch (error) {
+      if (!isUnsupportedCompanionError(error)) throw error
+      this.wire = 'legacy'
+      const request = (method: string, params: object, timeoutMs?: number) =>
+        client.request(method, params, timeoutMs)
+      const advertised = undefined
+      this.capabilitySnapshot = await probeRuntimeCapabilities(
+        { request },
+        { onRequest: false, advertised },
+      )
+      return advertised
+    }
+  }
+
+  private requireCapability(name: keyof TuiCapabilitySnapshot['capabilities']): void {
+    if (this.capabilitySnapshot.capabilities[name]) return
+    const detail = this.capabilitySnapshot.errors[name]
+    throw new Error(
+      detail === undefined
+        ? `runtime capability "${name}" is unavailable`
+        : `runtime capability "${name}" is unavailable: ${detail}`,
+    )
+  }
+
   private async readLoop(
     sub: AsyncIterable<{ method: string; params: Record<string, unknown> }>,
   ): Promise<void> {
     let errorMessage: string | undefined
     try {
       for await (const notification of sub) {
+        if (notification.method === 'cocode/question/request') {
+          void this.respondToQuestion(notification.params)
+          continue
+        }
+        if (notification.method === 'cocode/approval/request') {
+          void this.respondToApproval(notification.params)
+          continue
+        }
         const mapped = mapNotification(notification)
         if (mapped === undefined) continue
         for (const handler of this.handlers) handler(mapped)
@@ -207,6 +408,196 @@ class SdkTuiRuntime implements TuiRuntime {
         for (const handler of this.closeHandlers) handler(errorMessage)
       }
     }
+  }
+
+  private async respondToQuestion(params: Record<string, unknown>): Promise<void> {
+    const requestId = params.requestId
+    if (typeof requestId !== 'string') return
+    let answer: TuiQuestionAnswer = { answers: [] }
+    try {
+      const handler = this.questionHandler
+      if (handler === undefined) throw new Error('TUI has no question handler')
+      answer = await handler(parseQuestionRequest(params))
+    } catch {
+      // The companion validates the answer and rejects the waiting operation;
+      // an empty answer is intentionally sent to settle the request.
+    }
+    await this.requireClient()
+      .request('cocode/question/respond', { requestId, answer })
+      .catch(() => undefined)
+  }
+
+  private async respondToApproval(params: Record<string, unknown>): Promise<void> {
+    const requestId = params.requestId
+    if (typeof requestId !== 'string') return
+    let outcome: TuiApprovalAnswer = { outcome: 'unavailable' }
+    try {
+      const handler = this.approvalHandler
+      if (handler !== undefined) outcome = await handler(parseApprovalRequest(params))
+    } catch {
+      outcome = { outcome: 'unavailable' }
+    }
+    await this.requireClient()
+      .request('cocode/approval/respond', { requestId, outcome: outcome.outcome })
+      .catch(() => undefined)
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+type CompanionCapabilities = {
+  protocolVersion: number
+  promptModes: TuiPromptMode[]
+  approval: boolean
+  permissionMode: boolean
+  planMode: boolean
+  sessionList: boolean
+  interactions: 'notification-response'
+  checkpoint: false
+  skills: boolean
+}
+
+function parseCompanionCapabilities(value: unknown): CompanionCapabilities | undefined {
+  if (!isRecord(value) || value.protocolVersion !== 1) return undefined
+  if (
+    value.interactions !== 'notification-response' ||
+    value.checkpoint !== false ||
+    !Array.isArray(value.promptModes)
+  ) {
+    return undefined
+  }
+  const promptModes = value.promptModes.filter(
+    (mode): mode is TuiPromptMode => mode === 'normal' || mode === 'queue' || mode === 'steer',
+  )
+  if (!promptModes.includes('normal')) return undefined
+  if (
+    typeof value.approval !== 'boolean' ||
+    typeof value.permissionMode !== 'boolean' ||
+    typeof value.planMode !== 'boolean' ||
+    typeof value.sessionList !== 'boolean'
+  ) {
+    return undefined
+  }
+  return {
+    protocolVersion: 1,
+    promptModes,
+    approval: value.approval,
+    permissionMode: value.permissionMode,
+    planMode: value.planMode,
+    sessionList: value.sessionList,
+    interactions: 'notification-response',
+    checkpoint: false,
+    skills: value.skills === true,
+  }
+}
+
+function isUnsupportedCompanionError(error: unknown): boolean {
+  if (isRecord(error) && error.code === -32601) return true
+  const message = error instanceof Error ? error.message : String(error)
+  return /unknown(?: [^\n]*)? method|method not found|unsupported method|not implemented/i.test(
+    message,
+  )
+}
+
+function isForkResult(
+  value: unknown,
+): value is { sessionId: string; seedLength: number; seed: SessionEvent[] } {
+  return (
+    isRecord(value) &&
+    typeof value.sessionId === 'string' &&
+    typeof value.seedLength === 'number' &&
+    Number.isSafeInteger(value.seedLength) &&
+    value.seedLength >= 0 &&
+    Array.isArray(value.seed) &&
+    value.seed.every(isSessionEvent)
+  )
+}
+
+function parseSessionForkResult(
+  value: unknown,
+  operation: 'fork' | 'rewind',
+): { sessionId: string; seedLength: number; seed: SessionEvent[] } {
+  if (!isForkResult(value)) {
+    throw new Error(`session/fork returned no ${operation} result: ${JSON.stringify(value)}`)
+  }
+  return {
+    sessionId: value.sessionId,
+    seedLength: value.seedLength,
+    seed: value.seed,
+  }
+}
+
+function parseSkillEntries(value: unknown[]): SkillEntry[] {
+  const skills: SkillEntry[] = []
+  for (const entry of value) {
+    if (
+      !isRecord(entry) ||
+      typeof entry.name !== 'string' ||
+      typeof entry.description !== 'string'
+    ) {
+      throw new Error(`skills/list returned an invalid skill entry: ${JSON.stringify(entry)}`)
+    }
+    skills.push({
+      name: entry.name,
+      description: entry.description,
+      ...(typeof entry.whenToUse === 'string' ? { whenToUse: entry.whenToUse } : {}),
+    })
+  }
+  return skills
+}
+
+function parseRuntimeAdvertisement(value: Record<string, unknown>): TuiRuntimeAdvertisement {
+  const promptModes: TuiPromptMode[] = Array.isArray(value.promptModes)
+    ? value.promptModes.filter(
+        (mode): mode is TuiPromptMode => mode === 'normal' || mode === 'queue' || mode === 'steer',
+      )
+    : ['normal']
+  return {
+    promptModes,
+    approval: value.approval === true,
+    permissionMode: value.permissionMode === true,
+    planMode: value.planMode === true,
+    sessionList: value.sessionList === true,
+    checkpoint: false,
+  }
+}
+
+function parseApprovalRequest(params: Record<string, unknown>): TuiApprovalRequest {
+  if (typeof params.sessionId !== 'string' || typeof params.toolName !== 'string') {
+    throw new Error('invalid approval/request')
+  }
+  return {
+    sessionId: params.sessionId,
+    toolName: params.toolName,
+    ...(typeof params.callId === 'string' ? { callId: params.callId } : {}),
+    ...(typeof params.reason === 'string' ? { reason: params.reason } : {}),
+    ...(typeof params.target === 'string' ? { target: params.target } : {}),
+    ...(typeof params.risk === 'string' ? { risk: params.risk } : {}),
+    ...(typeof params.source === 'string' ? { source: params.source } : {}),
+  }
+}
+
+function parseSessionSummary(value: unknown): TuiSessionSummary {
+  if (
+    !isRecord(value) ||
+    typeof value.sessionId !== 'string' ||
+    typeof value.createdAt !== 'number'
+  ) {
+    throw new Error(`session/list returned an invalid session: ${JSON.stringify(value)}`)
+  }
+  return {
+    sessionId: value.sessionId,
+    createdAt: value.createdAt,
+    ...(typeof value.updatedAt === 'number' ? { updatedAt: value.updatedAt } : {}),
+    ...(typeof value.cwd === 'string' ? { cwd: value.cwd } : {}),
+    ...(typeof value.parentSessionId === 'string'
+      ? { parentSessionId: value.parentSessionId }
+      : {}),
+    ...(typeof value.seedLength === 'number' ? { seedLength: value.seedLength } : {}),
+    ...(typeof value.title === 'string' ? { title: value.title } : {}),
+    ...(typeof value.eventCount === 'number' ? { eventCount: value.eventCount } : {}),
   }
 }
 
