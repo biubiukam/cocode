@@ -3,12 +3,43 @@ import {
   approvalActionAtRow,
   actionMenuItemIndexAtRow,
   listItemIndexAtRow,
+  modelHeaderHit,
   popupContains,
   questionCustomRow,
   questionOptionIndexAtRow,
 } from '../../src/present/mouse-hit.ts'
 
 describe('mouse hit zones', () => {
+  it('maps the visible model label to a clickable header range', () => {
+    expect(modelHeaderHit({
+      row: 2,
+      x: 23,
+      provider: 'deepseek-official',
+      model: 'm1',
+      compact: false,
+    })).toBe(true)
+    expect(modelHeaderHit({
+      row: 2,
+      x: 3,
+      provider: 'deepseek-official',
+      model: 'm1',
+      compact: true,
+    })).toBe(true)
+    expect(modelHeaderHit({
+      row: 2,
+      x: 3,
+      provider: 'deepseek-official',
+      model: 'm1',
+      compact: false,
+    })).toBe(false)
+    expect(modelHeaderHit({
+      row: 1,
+      x: 23,
+      provider: 'deepseek-official',
+      model: 'm1',
+      compact: false,
+    })).toBe(false)
+  })
   it('maps clicks to the currently visible menu window', () => {
     expect(actionMenuItemIndexAtRow({
       row: 14,

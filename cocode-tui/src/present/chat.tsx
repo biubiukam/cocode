@@ -8,6 +8,7 @@ import type { TuiApp, TuiSnapshot } from '../runtime/app.ts'
 import { matchKey, type Keymap } from '../runtime/keymap.ts'
 import { resolveKeymap } from '../runtime/keymap-config.ts'
 import { Composer } from './components/Composer.tsx'
+import { ModelSwitchPanel } from './components/ModelSwitchPanel.tsx'
 import { ActionMenu, type ActionMenuItem } from './components/ActionMenu.tsx'
 import { FileMenu } from './components/FileMenu.tsx'
 import { Header } from './components/Header.tsx'
@@ -65,7 +66,12 @@ import {
   CHECKLIST_STRIP_MAX_ITEMS,
   checklistStripRows,
 } from './components/ChecklistStrip.tsx'
-import { dispatchKeyCommand, dispatchPickerInput, moveSelection } from './chat-input.ts'
+import {
+  dispatchComposerTab,
+  dispatchKeyCommand,
+  dispatchPickerInput,
+  moveSelection,
+} from './chat-input.ts'
 import {
   createMouseDecoder,
   enableMouseTracking,
@@ -80,6 +86,7 @@ import { CHECKLIST_WINDOW_SIZE } from '../runtime/checklist.ts'
 import {
   actionMenuItemIndexAtRow,
   listItemIndexAtRow,
+  modelHeaderHit,
   popupContains,
 } from './mouse-hit.ts'
 
@@ -106,6 +113,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
   const [commandPaletteIndex, setCommandPaletteIndex] = useState(0)
   const [editorBusy, setEditorBusy] = useState(false)
   const [editorError, setEditorError] = useState<string | undefined>()
+  const [modelSwitchOpen, setModelSwitchOpen] = useState(false)
   const [questionMousePointer, setQuestionMousePointer] = useState<TuiMousePointer>()
   const [approvalMousePointer, setApprovalMousePointer] = useState<TuiMousePointer>()
   const mouseClickId = useRef(0)
@@ -145,6 +153,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     !historySearchOpen &&
     !commandPaletteOpen &&
     !messageActionMenuOpen &&
+    !modelSwitchOpen &&
     !snap.helpOpen &&
     !slashDismissed &&
     slashItems.length > 0
@@ -166,6 +175,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     !historySearchOpen &&
     !commandPaletteOpen &&
     !messageActionMenuOpen &&
+    !modelSwitchOpen &&
     !snap.helpOpen &&
     !slashOpen &&
     !fileDismissed &&
@@ -268,6 +278,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     approvalRows: approvalOpen ? 12 : undefined,
     reviewRows: reviewOpen ? reviewRowsFor(snap.reviewPicker) : undefined,
     actionMenuItems: actionMenuItems.length > 0 ? actionMenuItems.length : undefined,
+    modelSwitchRows: modelSwitchOpen ? 6 : undefined,
   })
   const messageMaxRows = layout.messageRows
   const statusRows = 2 + Number(snap.notice !== undefined) + Number(hasStatusDetails(snap.status))
@@ -309,6 +320,13 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
   const openCommandPalette = (): void => {
     setCommandPaletteOpen(true)
     setCommandPaletteIndex(0)
+    setMessageActionMenuOpen(false)
+  }
+
+  const openModelSwitch = (): void => {
+    if (snap.composer.disabled) return
+    setModelSwitchOpen(true)
+    setCommandPaletteOpen(false)
     setMessageActionMenuOpen(false)
   }
 
@@ -361,6 +379,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     }
     const insidePopup = popupContains(popupBounds, event.x, event.y)
     const hitRow = insidePopup ? event.y : -1
+    if (modelSwitchOpen) return
     if (questionOpen || approvalOpen) {
       if ((event.action === 'press' || event.action === 'move') && event.button === 0) {
         const pointer = { id: mouseClickId.current++, row: hitRow, action: event.action }
@@ -614,6 +633,18 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     }
     if (!isPress) return
     if (
+      modelHeaderHit({
+        row: event.y,
+        x: event.x,
+        provider: snap.header.provider,
+        model: snap.header.model,
+        compact: mainColumns < 84,
+      })
+    ) {
+      openModelSwitch()
+      return
+    }
+    if (
       event.y <= headerRows ||
       (event.y >= messageStart + messageMaxRows && event.y < contentOverlayStartRow)
     ) {
@@ -722,6 +753,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
   useInput((input, key) => {
     if (editorBusy) return
     if (isMouseInput(input)) return
+    if (modelSwitchOpen) return
     if (key.meta && input.toLowerCase() === 'm') {
       if (props.mouseSupported !== false) setMouseMode((enabled) => !enabled)
       return
@@ -1079,8 +1111,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
       return
     }
 
-    if (key.tab && snap.agent === 'running' && snap.composer.text.trim() !== '') {
-      app.dispatch({ type: 'queuePrompt' })
+    if (key.tab && !key.shift && dispatchComposerTab(app, snap)) {
       return
     }
 
@@ -1254,6 +1285,17 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
       {skillsOpen && skillsState !== undefined ? (
         <SkillsPicker state={skillsState} locale={snap.locale} maxRows={layout.overlayRows} />
       ) : null}
+      {modelSwitchOpen ? (
+        <ModelSwitchPanel
+          currentModel={snap.header.model}
+          locale={snap.locale}
+          onSubmit={(model) => {
+            setModelSwitchOpen(false)
+            app.dispatch({ type: 'command', line: `/model ${model}` })
+          }}
+          onClose={() => setModelSwitchOpen(false)}
+        />
+      ) : null}
       {snap.question !== undefined ? (
         <QuestionPanel
           key={snap.question.key}
@@ -1355,6 +1397,9 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
         ) : null}
         <Composer
           composer={snap.composer}
+          agent={snap.agent}
+          planMode={snap.status.planMode}
+          planModeAvailable={snap.capabilities.planMode}
           locale={snap.locale}
           maxRows={layout.composerRows}
           maxColumns={mainColumns}
@@ -1366,16 +1411,43 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
             </Text>
           ) : (
             <>
-              <Text color={theme.mute} wrap="truncate-end">
-                {text(snap.locale, 'footerHistory')} · {text(snap.locale, 'footerScroll')} ·{' '}
-                {text(snap.locale, 'footerMessages')} · {mouseMode ? text(snap.locale, 'footerMenu') : snap.locale === 'zh' ? 'Ctrl+P 菜单' : 'ctrl+p menu'} ·{' '}
-                {text(snap.locale, 'footerDetails')} · {text(snap.locale, 'footerHelp')}
+              <Text color={snap.agent === 'running' ? theme.info : theme.mute} wrap="truncate-end">
+                {snap.agent === 'running' ? (
+                  text(snap.locale, 'footerRunning')
+                ) : (
+                  <>
+                    {text(snap.locale, 'footerHistory')}
+                    {wideInspector ? null : (
+                      <>
+                        {' · '}
+                        {text(snap.locale, 'footerScroll')} · {text(snap.locale, 'footerMessages')} ·{' '}
+                        {mouseMode
+                          ? text(snap.locale, 'footerMenu')
+                          : snap.locale === 'zh' ? 'Ctrl+P 菜单' : 'ctrl+p menu'}{' '}
+                        · {text(snap.locale, 'footerDetails')}
+                      </>
+                    )}
+                    {' · '}
+                    {text(snap.locale, 'footerHelp')}
+                  </>
+                )}
               </Text>
-              <Text color={mouseMode ? theme.brand : theme.mute} wrap="truncate-end">
-                {text(snap.locale, 'footerQuit')} · {text(snap.locale, 'footerRedraw')} ·{' '}
-                {mouseMode
-                  ? snap.locale === 'zh' ? '鼠标模式 · Alt+M 选择文本' : 'mouse mode · alt+m select text'
-                  : snap.locale === 'zh' ? '文本选择 · Alt+M 鼠标模式' : 'text select · alt+m mouse mode'}
+              <Text
+                color={snap.agent === 'running' ? theme.info : mouseMode ? theme.brand : theme.mute}
+                wrap="truncate-end"
+              >
+                {snap.agent === 'running' && snap.composer.text.trim() !== ''
+                  ? text(snap.locale, 'footerQueueDraft')
+                  : text(snap.locale, 'footerQuit')}{' '}
+                · {text(snap.locale, 'footerRedraw')}
+                {snap.agent === 'running' ? null : (
+                  <>
+                    {' · '}
+                    {mouseMode
+                      ? snap.locale === 'zh' ? '鼠标模式 · Alt+M 选择文本' : 'mouse mode · alt+m select text'
+                      : snap.locale === 'zh' ? '文本选择 · Alt+M 鼠标模式' : 'text select · alt+m mouse mode'}
+                  </>
+                )}
               </Text>
             </>
           )}

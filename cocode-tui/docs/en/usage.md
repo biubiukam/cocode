@@ -68,8 +68,8 @@ Inside `tmux` or `screen`, the TUI automatically uses inline rendering and suppr
 - The header shows the workspace, git branch, session, provider, model, and live Agent state.
 - The transcript projects `you`, `cocode`, reasoning, and tool results as separate node groups.
 - The status bar shows runtime state, notices, and input/output token usage when supplied by the runtime.
-- The composer is a bordered `prompt` panel; a dead runtime is shown as `locked` instead of looking editable.
-- The `/` command menu, pickers, and confirmation panels appear between the status area and composer; the transcript shrinks first, then overlay height is bounded by the remaining rows.
+- The composer is a bordered `prompt` panel that shows the current `Build` / `Plan` mode; a dead runtime is shown as `locked` instead of looking editable.
+- The `/` command menu, pickers, and confirmation panels open as centered floating popups. The transcript shrinks first, then popup height is bounded by the remaining rows.
 - A multiline draft shows at most six logical lines around the cursor without deleting the full draft. If the fixed chrome cannot fit, the TUI asks for a taller terminal and pauses ordinary input.
 
 ## Editing
@@ -87,7 +87,8 @@ Inside `tmux` or `screen`, the TUI automatically uses inline rendering and suppr
 - `/model <model-id>` restarts the runtime with a new model and starts a new session; a failed switch attempts to restore the previous model.
 - Reasoning is expanded by default while it streams, then folds back to a summary when the reply is complete; `Ctrl+O` keeps full reasoning and tool I/O expanded.
 - While a turn is running, the status line shows `thinking…` so a quiet interval before the next stream chunk is distinguishable from an idle runtime. It also shows the latest assistant input/output usage and current subagent activity when the wire reports it. When optional events are present, it also shows decode TPS, cache hit rate, context-window percentage, reasoning effort, current working activity, compact context segments (`S/P/A/T/X` for system, prompt, assistant, thinking, and tools), todo progress, goal phase, and the active agent preset. Segment values are estimates based on text length, not provider billing data.
-- While a turn is running, press `Tab` to queue the current draft. Up to eight queued prompts are sent in order after `session.status=idle`; this is local queuing, not steer or cancellation.
+- When the runtime supports plan mode, press `Tab` while idle to switch the composer between `Build` and `Plan`. Open Slash-command and `@` file pickers keep using `Tab` for selection.
+- While a turn is running, the footer changes to `esc interrupt`; type a draft and press `Tab` to queue it. Up to eight queued prompts are sent in order after `session.status=idle`; this is local queuing, not steer or cancellation.
 - Use `/queue` while prompts are queued to inspect them. Type to filter, use `↑`/`↓` to select, `Enter` to move the selected prompt to the front, and `Ctrl+D` to remove it. When the runtime is idle after a send failure, `Enter` retries the selected prompt immediately. The picker closes with `Esc`; an empty queue produces a notice instead of an empty overlay. Queued text is not written to the session log until it is actually sent. If sending fails, the prompt is restored to the front. The local queue is cleared when the runtime restarts or the session changes.
 - The main area keeps a compact Checklist summary below the conversation. Use `/todos` to open the full current-turn Checklist. It shows each task as completed, in progress, or pending; use `↑`/`↓` to select, click a row in mouse mode, and press `Esc` to close. The list is driven by Harness `todo/write` events rather than local edits, and is cleared when the next turn starts.
 - `/review` opens a read-only Git review. Choose `working-tree`, `staged`, `last-commit`, or `branch`; inspect the bounded summary, then press Enter to send the structured review context to the current session.

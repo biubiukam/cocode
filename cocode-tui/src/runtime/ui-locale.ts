@@ -25,6 +25,9 @@ type UiKey =
   | 'helpHint'
   | 'messageMode'
   | 'messageModeHint'
+  | 'modeBuild'
+  | 'modePlan'
+  | 'modeSwitchHint'
   | 'footerHistory'
   | 'footerScroll'
   | 'footerMessages'
@@ -32,6 +35,8 @@ type UiKey =
   | 'footerDetails'
   | 'footerHelp'
   | 'footerQuit'
+  | 'footerRunning'
+  | 'footerQueueDraft'
   | 'footerRedraw'
   | 'agentIdle'
   | 'agentRunning'
@@ -47,6 +52,10 @@ type UiKey =
   | 'modelSwitching'
   | 'modelChanged'
   | 'modelRestored'
+  | 'modelSwitchTitle'
+  | 'modelSwitchCurrent'
+  | 'modelSwitchHint'
+  | 'modelSwitchPlaceholder'
   | 'resumeTitle'
   | 'resumeHint'
   | 'resumeQuery'
@@ -116,6 +125,7 @@ type UiKey =
   | 'inspectorContext'
   | 'inspectorFiles'
   | 'inspectorSession'
+  | 'inspectorShortcuts'
   | 'inspectorEmpty'
   | 'inspectorGoal'
   | 'inspectorTodos'
@@ -201,13 +211,18 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     helpHint: 'esc close',
     messageMode: 'message mode',
     messageModeHint: '↑↓ move · enter expand · m menu · c copy · esc close',
+    modeBuild: 'Build',
+    modePlan: 'Plan',
+    modeSwitchHint: 'tab switch mode',
     footerHistory: '↑↓ history',
     footerScroll: 'wheel / pgup / pgdn scroll',
     footerMessages: 'shift+↑ messages',
-    footerMenu: 'click header/message · ctrl+p menu',
+    footerMenu: 'click model/header/message · ctrl+p menu',
     footerDetails: 'ctrl+o details',
     footerHelp: '? help',
     footerQuit: 'esc interrupt / quit',
+    footerRunning: 'esc interrupt',
+    footerQueueDraft: 'tab queue draft',
     footerRedraw: 'ctrl+l redraw',
     agentIdle: 'idle',
     agentRunning: 'running',
@@ -223,6 +238,10 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     modelSwitching: 'Switching model to {model}…',
     modelChanged: 'Model changed to {model}; new session started.',
     modelRestored: 'Model switch failed; restored {model}.',
+    modelSwitchTitle: 'Switch model',
+    modelSwitchCurrent: 'current: {model}',
+    modelSwitchHint: 'type a model id · enter apply · esc close',
+    modelSwitchPlaceholder: 'model id',
     resumeTitle: 'Recent sessions',
     resumeHint: 'type to filter · ↑↓ select · enter choose · esc close',
     resumeQuery: 'filter: {query}',
@@ -292,6 +311,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     inspectorContext: 'context',
     inspectorFiles: 'files',
     inspectorSession: 'session',
+    inspectorShortcuts: 'shortcuts',
     inspectorEmpty: 'no active details',
     inspectorGoal: 'goal',
     inspectorTodos: 'todos',
@@ -376,13 +396,18 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     helpHint: 'Esc 关闭',
     messageMode: '消息模式',
     messageModeHint: '↑↓ 移动 · 回车展开 · m 菜单 · c 复制 · Esc 关闭',
+    modeBuild: 'Build',
+    modePlan: 'Plan',
+    modeSwitchHint: 'Tab 切换模式',
     footerHistory: '↑↓ 历史',
     footerScroll: '滚轮 / PageUp / PageDown 滚动',
     footerMessages: 'Shift+↑ 消息',
-    footerMenu: '点击顶部或消息 · Ctrl+P 菜单',
+    footerMenu: '点击模型、顶部或消息 · Ctrl+P 菜单',
     footerDetails: 'Ctrl+O 详情',
     footerHelp: '? 帮助',
     footerQuit: 'Esc 中断 / 退出',
+    footerRunning: '按 Esc 终止',
+    footerQueueDraft: '按 Tab 加入队列',
     footerRedraw: 'Ctrl+L 重绘',
     agentIdle: '空闲',
     agentRunning: '运行中',
@@ -398,6 +423,10 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     modelSwitching: '正在切换模型到 {model}…',
     modelChanged: '已切换到 {model}，并创建新会话。',
     modelRestored: '模型切换失败，已恢复为 {model}。',
+    modelSwitchTitle: '切换模型',
+    modelSwitchCurrent: '当前：{model}',
+    modelSwitchHint: '输入模型名称 · 回车应用 · Esc 关闭',
+    modelSwitchPlaceholder: '模型名称',
     resumeTitle: '最近会话',
     resumeHint: '输入关键词过滤 · ↑↓ 选择 · 回车确认 · Esc 关闭',
     resumeQuery: '筛选：{query}',
@@ -467,6 +496,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     inspectorContext: '上下文',
     inspectorFiles: '文件',
     inspectorSession: '会话',
+    inspectorShortcuts: '快捷键',
     inspectorEmpty: '暂无活动详情',
     inspectorGoal: '目标',
     inspectorTodos: '待办',

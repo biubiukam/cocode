@@ -44,6 +44,7 @@ export type ChatLayoutInput = {
   reviewRows?: number
   actionMenuItems?: number
   actionMenuQuery?: boolean
+  modelSwitchRows?: number
 }
 
 export type ChatLayout = {
@@ -82,7 +83,8 @@ export function calculateChatLayout(input: ChatLayoutInput): ChatLayout {
     questionRows(input.questionRows) +
     questionRows(input.approvalRows) +
     reviewRows(input.reviewRows) +
-    actionMenuRows(input.actionMenuItems, input.actionMenuQuery)
+    actionMenuRows(input.actionMenuItems, input.actionMenuQuery) +
+    modelSwitchRows(input.modelSwitchRows)
   const availableRows = Math.max(0, viewportRows - baseRows)
   const minimumOverlayRows = minimumOverlayHeight(input)
   const minimumRows =
@@ -149,6 +151,7 @@ function minimumOverlayHeight(input: ChatLayoutInput): number {
   if (input.approvalRows !== undefined) return MIN_OVERLAY_ROWS
   if (input.reviewRows !== undefined) return MIN_OVERLAY_ROWS
   if (input.actionMenuItems !== undefined) return MIN_OVERLAY_ROWS
+  if (input.modelSwitchRows !== undefined) return MIN_OVERLAY_ROWS
   if (input.historyMatches !== undefined) return MIN_OVERLAY_ROWS
   if (input.fileItems !== undefined || input.fileLoading === true) {
     return MIN_OVERLAY_ROWS + optionalRow(input.fileLoading)
@@ -196,6 +199,10 @@ function questionRows(rows: number | undefined): number {
 }
 
 function reviewRows(rows: number | undefined): number {
+  return rows === undefined ? 0 : Math.max(MIN_OVERLAY_ROWS, nonNegativeInteger(rows))
+}
+
+function modelSwitchRows(rows: number | undefined): number {
   return rows === undefined ? 0 : Math.max(MIN_OVERLAY_ROWS, nonNegativeInteger(rows))
 }
 

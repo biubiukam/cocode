@@ -72,6 +72,7 @@ describe('chat layout rows', () => {
     ['windowed checklist', { checklistItems: 12, checklistSelected: 6 }, 26],
     ['rewind results', { rewindItems: 4 }, 22],
     ['windowed rewind', { rewindItems: 12, rewindSelected: 6 }, 26],
+    ['model switch', { modelSwitchRows: 6 }, 18],
   ] as const)('covers the %s overlay height', (_name, overlay, reservedRows) => {
     const layout = calculateChatLayout({
       viewportRows: 80,

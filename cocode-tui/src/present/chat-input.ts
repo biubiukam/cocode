@@ -1,4 +1,4 @@
-import type { TuiApp } from '../runtime/app.ts'
+import type { TuiApp, TuiSnapshot } from '../runtime/app.ts'
 
 /** Wrap a selection index while keeping empty menus at index zero. */
 export function moveSelection(index: number, delta: number, count: number): number {
@@ -37,6 +37,19 @@ export function dispatchKeyCommand(app: TuiApp, id: string, draft: string): void
       app.dispatch({ type: 'historyNext' })
       return
   }
+}
+
+/** Route the composer Tab key without stealing Tab from open completion panels. */
+export function dispatchComposerTab(app: TuiApp, snapshot: TuiSnapshot): boolean {
+  if (snapshot.agent === 'running' && snapshot.composer.text.trim() !== '') {
+    app.dispatch({ type: 'queuePrompt' })
+    return true
+  }
+  if (snapshot.agent === 'idle' && snapshot.capabilities.planMode) {
+    app.dispatch({ type: 'plan.toggle' })
+    return true
+  }
+  return false
 }
 
 type PickerKey = {

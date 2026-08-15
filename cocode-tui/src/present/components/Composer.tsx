@@ -7,6 +7,9 @@ import { text, type UiLocale } from '../../runtime/ui-locale.ts'
 
 export function Composer(props: {
   composer: TuiSnapshot['composer']
+  agent: TuiSnapshot['agent']
+  planMode: boolean
+  planModeAvailable: boolean
   locale: UiLocale
   maxRows?: number
   maxColumns?: number
@@ -29,9 +32,21 @@ export function Composer(props: {
       <Box width="100%" justifyContent="space-between">
         <Text color={composer.disabled ? theme.mute : theme.brand} bold>
           {composer.mask ? text(props.locale, 'secret') : text(props.locale, 'prompt')}
+          {!composer.mask ? (
+            <Text color={props.planMode ? theme.info : theme.brand}>
+              {' · '}
+              {text(props.locale, props.planMode ? 'modePlan' : 'modeBuild')}
+            </Text>
+          ) : null}
         </Text>
         <Text color={theme.mute}>
-          {composer.disabled ? text(props.locale, 'locked') : text(props.locale, 'send')}
+          {composer.disabled
+            ? text(props.locale, 'locked')
+            : props.agent === 'running'
+            ? text(props.locale, 'footerRunning')
+            : props.planModeAvailable
+            ? text(props.locale, 'modeSwitchHint')
+            : text(props.locale, 'send')}
         </Text>
       </Box>
       <Box flexDirection="column" marginTop={1}>

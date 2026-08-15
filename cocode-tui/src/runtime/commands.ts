@@ -246,8 +246,8 @@ export function helpText(
       ? '回车发送 · Esc/Ctrl+C 中断或退出 · ? 帮助'
       : 'enter send · esc/ctrl+c interrupt-or-quit · ? help',
     locale === 'zh'
-      ? 'Ctrl+O 详情 · Ctrl+G 编辑 · ↑↓ 历史 · Ctrl+R 搜索 · Shift+↑ 消息选择'
-      : 'ctrl+o verbose · ctrl+g editor · up/down history · ctrl+r search · shift+up messages',
+      ? `Ctrl+O 详情 · Ctrl+G 编辑 · ↑↓ 历史 · Ctrl+R 搜索 · ${caps.planMode ? 'Tab Build/Plan · ' : ''}Shift+↑ 消息选择`
+      : `ctrl+o verbose · ctrl+g editor · up/down history · ctrl+r search · ${caps.planMode ? 'tab Build/Plan · ' : ''}shift+up messages`,
     '',
     locale === 'zh'
       ? '本地命令（不是 GUI 命令注册表）：'

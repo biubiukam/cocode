@@ -43,13 +43,13 @@ export function Header(props: {
       </Box>
       <Box gap={1} minWidth={0}>
         <Text color={agentColor(agent)}>{agentMark(agent)}</Text>
-        <Text color={theme.dim} wrap="truncate-end">
+        <Text color={compact ? theme.brand : theme.dim} underline={compact} wrap="truncate-end">
           {compact ? header.model : header.provider}
         </Text>
         {!compact ? (
           <>
             <Text color={theme.mute}>·</Text>
-            <Text color={theme.dim} wrap="truncate-end">
+            <Text color={theme.brand} underline wrap="truncate-end">
               {header.model}
             </Text>
           </>
