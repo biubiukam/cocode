@@ -14,13 +14,13 @@ export function emptyStateLayout(
     return { logoSize: 'inline', showTitle: false, showHint: false }
   }
   if (maxColumns !== undefined && maxColumns < 56) {
-    if (maxRows === undefined || maxRows >= 8) {
+    if (maxRows === undefined || maxRows >= 11) {
       return { logoSize: 'small', showTitle: true, showHint: false }
     }
     return { logoSize: 'inline', showTitle: false, showHint: false }
   }
   if (maxColumns !== undefined && maxColumns < 72) {
-    if (maxRows === undefined || maxRows >= 14) {
+    if (maxRows === undefined || maxRows >= 15) {
       return { logoSize: 'medium', showTitle: true, showHint: true }
     }
     return { logoSize: 'small', showTitle: true, showHint: false }
@@ -28,10 +28,10 @@ export function emptyStateLayout(
   if (maxRows === undefined || maxRows >= 17) {
     return { logoSize: 'large', showTitle: true, showHint: true }
   }
-  if (maxRows >= 14) {
+  if (maxRows >= 15) {
     return { logoSize: 'medium', showTitle: true, showHint: true }
   }
-  if (maxRows >= 8) {
+  if (maxRows >= 11) {
     return { logoSize: 'small', showTitle: true, showHint: false }
   }
   return { logoSize: 'inline', showTitle: false, showHint: false }

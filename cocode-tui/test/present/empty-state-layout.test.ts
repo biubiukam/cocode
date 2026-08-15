@@ -7,8 +7,8 @@ describe('empty state layout', () => {
   })
 
   it('steps down without hiding the whale on short viewports', () => {
-    expect(emptyStateLayout(14)).toEqual({ logoSize: 'medium', showTitle: true, showHint: true })
-    expect(emptyStateLayout(8)).toEqual({ logoSize: 'small', showTitle: true, showHint: false })
+    expect(emptyStateLayout(15)).toEqual({ logoSize: 'medium', showTitle: true, showHint: true })
+    expect(emptyStateLayout(11)).toEqual({ logoSize: 'small', showTitle: true, showHint: false })
   })
 
   it('keeps a single-line mark when almost no rows are available', () => {

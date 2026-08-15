@@ -43,8 +43,7 @@ function InlineFrame(props: { frame: string }) {
 
 function WhaleFrameLine(props: { line: string; accent: boolean }) {
   if (props.accent) return <Text color={theme.accent}>{props.line}</Text>
-
-  const segments = props.line.match(/cocode|●|0+|1+|[^01●]+/g) ?? [props.line]
+  const segments = props.line.match(/cocode|●|█+|0+|1+|[^01●█]+/g) ?? [props.line]
   return (
     <Text>
       {segments.map((segment, index) => (
@@ -57,7 +56,7 @@ function WhaleFrameLine(props: { line: string; accent: boolean }) {
 }
 
 function segmentColor(segment: string): string {
-  if (segment === 'cocode' || segment === '●') return theme.accent
+  if (segment === 'cocode' || segment === '●' || segment.startsWith('█')) return theme.accent
   if (segment.startsWith('0')) return theme.info
   return theme.brand
 }

@@ -11,33 +11,60 @@ type WhaleSpec = {
   bodyMask: readonly string[]
   spoutMasks: readonly (readonly string[])[]
   eye: { row: number; column: number }
-  brand: { row: number; column: number }
+  brand: { row: number; column: number; lines: readonly string[] }
 }
 
 const BINARY_PATTERN = '0001110100111010'
 
+const SPOUT_STAGES = [
+  ['', '', '', '', ''],
+  ['', '', '', '', '#####'],
+  ['', '', '', '   #####   ', '  #######  '],
+  ['', '', '   #######   ', '  #########  ', '   #####   '],
+  ['', '   ###   ###   ', '  ###########  ', '###############', '   #######   '],
+  ['  ####  ####  ', '#################', ' ############### ', '   #######   ', '   #######   '],
+  [
+    '###   ###   ###',
+    '#####################',
+    '#################',
+    '  #########  ',
+    '   #######   ',
+  ],
+  [
+    '  ##  ##  ##  ',
+    '  ###############  ',
+    '   ###########   ',
+    '    #######    ',
+    '    #######    ',
+  ],
+  ['', '', '    #######    ', '     #####     ', ''],
+] as const
+
+const SPOUT_SEQUENCE = [0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 8, 7, 6, 5, 3, 1]
+
+const LARGE_GLYPHS = {
+  C: ['█████', '█    ', '█    ', '█    ', '█████'],
+  O: ['█████', '█   █', '█   █', '█   █', '█████'],
+  D: ['████ ', '█   █', '█   █', '█   █', '████ '],
+  E: ['█████', '█    ', '███  ', '█    ', '█████'],
+} as const
+
+const LARGE_WORDMARK = createWordmark(LARGE_GLYPHS, ' ')
+
+const MEDIUM_WORDMARK = LARGE_WORDMARK
+
+const SMALL_GLYPHS = {
+  C: ['███', '█  ', '█  ', '███'],
+  O: ['███', '█ █', '█ █', '███'],
+  D: ['██ ', '█ █', '█ █', '██ '],
+  E: ['███', '█  ', '██ ', '███'],
+} as const
+
+const SMALL_WORDMARK = createWordmark(SMALL_GLYPHS, ' ')
+
 const LARGE_SPEC: WhaleSpec = {
   width: 68,
-  spoutMasks: [
-    [
-      '                       ###     ###',
-      '                   ######## ########',
-      '                     #############',
-      '                         ######',
-    ],
-    [
-      '                    ###   ###   ###',
-      '                 ###################',
-      '                    ###############',
-      '                        ########',
-    ],
-    [
-      '                  ####  #######  ####',
-      '                #####################',
-      '                   ################',
-      '                       #########',
-    ],
-  ],
+  spoutMasks: createSpoutMasks(68),
   bodyMask: [
     '               #####################################                ',
     '        ###################################################    #####',
@@ -50,16 +77,12 @@ const LARGE_SPEC: WhaleSpec = {
     '                              ########                              ',
   ],
   eye: { row: 3, column: 7 },
-  brand: { row: 4, column: 29 },
+  brand: { row: 1, column: 17, lines: LARGE_WORDMARK },
 }
 
 const MEDIUM_SPEC: WhaleSpec = {
   width: 50,
-  spoutMasks: [
-    ['                 ###   ###', '              #############', '                  ######'],
-    ['               ### ### ###', '             ###############', '                 #######'],
-    ['              #### ##### ####', '            #################', '                ########'],
-  ],
+  spoutMasks: createSpoutMasks(50),
   bodyMask: [
     '          ############################          ',
     '     ###################################   #### ',
@@ -71,15 +94,12 @@ const MEDIUM_SPEC: WhaleSpec = {
     '                       ####                     ',
   ],
   eye: { row: 3, column: 5 },
-  brand: { row: 4, column: 18 },
+  brand: { row: 0, column: 8, lines: MEDIUM_WORDMARK },
 }
 
 const SMALL_SPEC: WhaleSpec = {
   width: 34,
-  spoutMasks: [
-    ['            ### ###', '          ###########'],
-    ['          ### ### ###', '         #############'],
-  ],
+  spoutMasks: createSpoutMasks(34),
   bodyMask: [
     '       ###################        ',
     '   #########################  ### ',
@@ -88,7 +108,7 @@ const SMALL_SPEC: WhaleSpec = {
     '       ###################        ',
   ],
   eye: { row: 2, column: 4 },
-  brand: { row: 2, column: 13 },
+  brand: { row: 0, column: 6, lines: SMALL_WORDMARK },
 }
 
 export const LARGE_WHALE_ANIMATION = createWhaleAnimation(LARGE_SPEC)
@@ -118,8 +138,8 @@ function createWhaleAnimation(spec: WhaleSpec): CharacterAnimation {
   return {
     interval: 140,
     accentRows: spec.spoutMasks[0]?.length ?? 0,
-    frames: Array.from({ length: 12 }, (_, phase) => {
-      const spoutMask = spec.spoutMasks[phase % spec.spoutMasks.length] ?? []
+    frames: Array.from({ length: SPOUT_SEQUENCE.length }, (_, phase) => {
+      const spoutMask = spec.spoutMasks[SPOUT_SEQUENCE[phase] ?? 0] ?? []
       return [...renderBinaryMask(spoutMask, phase + 5), ...renderWhaleBody(spec, phase)]
         .map((line) => normalizeLine(line, spec.width))
         .join('\n')
@@ -127,10 +147,17 @@ function createWhaleAnimation(spec: WhaleSpec): CharacterAnimation {
   }
 }
 
+function createSpoutMasks(width: number): readonly (readonly string[])[] {
+  return SPOUT_STAGES.map((stage) => stage.map((line) => centerLine(line, width)))
+}
+
 function renderWhaleBody(spec: WhaleSpec, phase: number): string[] {
   const body = renderBinaryMask(spec.bodyMask, phase)
   body[spec.eye.row] = replaceAt(body[spec.eye.row] ?? '', spec.eye.column, '●')
-  body[spec.brand.row] = replaceAt(body[spec.brand.row] ?? '', spec.brand.column, 'cocode')
+  for (const [index, line] of spec.brand.lines.entries()) {
+    const row = spec.brand.row + index
+    body[row] = replaceAt(body[row] ?? '', spec.brand.column, line)
+  }
   return body
 }
 
@@ -151,4 +178,17 @@ function replaceAt(line: string, index: number, value: string): string {
 
 function normalizeLine(line: string, width: number): string {
   return line.slice(0, width).padEnd(width)
+}
+
+function createWordmark(glyphs: Record<string, readonly string[]>, gap: string): readonly string[] {
+  const letters = 'COCODE'.split('')
+  const rows = glyphs.C?.length ?? 0
+  return Array.from({ length: rows }, (_, row) =>
+    letters.map((letter) => glyphs[letter]?.[row] ?? '').join(gap),
+  )
+}
+
+function centerLine(line: string, width: number): string {
+  const left = Math.max(0, Math.floor((width - line.length) / 2))
+  return `${' '.repeat(left)}${line}`
 }
