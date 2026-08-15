@@ -26,7 +26,9 @@ type UiKey =
   | 'messageMode'
   | 'messageModeHint'
   | 'footerHistory'
+  | 'footerScroll'
   | 'footerMessages'
+  | 'footerMenu'
   | 'footerDetails'
   | 'footerHelp'
   | 'footerQuit'
@@ -95,10 +97,8 @@ type UiKey =
   | 'cancelFailed'
   | 'telemetryTps'
   | 'telemetryCache'
-  | 'telemetryContext'
   | 'telemetryReasoning'
   | 'telemetryActivity'
-  | 'telemetrySegments'
   | 'todoProgress'
   | 'goalPhase'
   | 'agentPreset'
@@ -196,9 +196,11 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     help: 'help',
     helpHint: 'esc close',
     messageMode: 'message mode',
-    messageModeHint: '↑↓ move · enter expand · c copy · esc close',
+    messageModeHint: '↑↓ move · enter expand · m menu · c copy · esc close',
     footerHistory: '↑↓ history',
+    footerScroll: 'wheel / pgup / pgdn scroll',
     footerMessages: 'shift+↑ messages',
+    footerMenu: 'click header/message · ctrl+p menu',
     footerDetails: 'ctrl+o details',
     footerHelp: '? help',
     footerQuit: 'esc interrupt / quit',
@@ -267,10 +269,8 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     cancelFailed: 'Cancel request failed',
     telemetryTps: 'TPS {value}',
     telemetryCache: 'cache {value}%',
-    telemetryContext: 'context {value}%',
     telemetryReasoning: 'reasoning {value}',
     telemetryActivity: '{phase}: {line}',
-    telemetrySegments: 'segments S{system} P{prompt} A{assistant} T{thinking} X{tools}',
     todoProgress: 'todos {done}/{total}',
     goalPhase: 'goal {phase}',
     agentPreset: 'preset {name}',
@@ -367,9 +367,11 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     help: '帮助',
     helpHint: 'Esc 关闭',
     messageMode: '消息模式',
-    messageModeHint: '↑↓ 移动 · 回车展开 · c 复制 · Esc 关闭',
+    messageModeHint: '↑↓ 移动 · 回车展开 · m 菜单 · c 复制 · Esc 关闭',
     footerHistory: '↑↓ 历史',
+    footerScroll: '滚轮 / PageUp / PageDown 滚动',
     footerMessages: 'Shift+↑ 消息',
+    footerMenu: '点击顶部或消息 · Ctrl+P 菜单',
     footerDetails: 'Ctrl+O 详情',
     footerHelp: '? 帮助',
     footerQuit: 'Esc 中断 / 退出',
@@ -438,10 +440,8 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     cancelFailed: '取消请求失败',
     telemetryTps: 'TPS {value}',
     telemetryCache: '缓存命中 {value}%',
-    telemetryContext: '上下文 {value}%',
     telemetryReasoning: '推理 {value}',
     telemetryActivity: '{phase}：{line}',
-    telemetrySegments: '分段 系统{system} 输入{prompt} 回复{assistant} 思考{thinking} 工具{tools}',
     todoProgress: '待办 {done}/{total}',
     goalPhase: '目标 {phase}',
     agentPreset: '预设 {name}',

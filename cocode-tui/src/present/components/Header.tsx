@@ -38,7 +38,7 @@ export function Header(props: {
           ) : null}
         </Box>
         <Text color={theme.mute} wrap="truncate-start">
-          {text(props.locale, 'session')} {session}
+          {text(props.locale, 'session')} {session}⌄
         </Text>
       </Box>
       <Box gap={1} minWidth={0}>

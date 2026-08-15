@@ -38,6 +38,8 @@ export type ChatLayoutInput = {
   questionRows?: number
   approvalRows?: number
   reviewRows?: number
+  actionMenuItems?: number
+  actionMenuQuery?: boolean
 }
 
 export type ChatLayout = {
@@ -73,7 +75,8 @@ export function calculateChatLayout(input: ChatLayoutInput): ChatLayout {
     skillsRows(input.skillsItems, input.skillsSelected) +
     questionRows(input.questionRows) +
     questionRows(input.approvalRows) +
-    reviewRows(input.reviewRows)
+    reviewRows(input.reviewRows) +
+    actionMenuRows(input.actionMenuItems, input.actionMenuQuery)
   const availableRows = Math.max(0, viewportRows - baseRows)
   const minimumOverlayRows = minimumOverlayHeight(input)
   const minimumRows =
@@ -138,6 +141,7 @@ function minimumOverlayHeight(input: ChatLayoutInput): number {
   if (input.questionRows !== undefined) return MIN_OVERLAY_ROWS
   if (input.approvalRows !== undefined) return MIN_OVERLAY_ROWS
   if (input.reviewRows !== undefined) return MIN_OVERLAY_ROWS
+  if (input.actionMenuItems !== undefined) return MIN_OVERLAY_ROWS
   if (input.historyMatches !== undefined) return MIN_OVERLAY_ROWS
   if (input.fileItems !== undefined || input.fileLoading === true) {
     return MIN_OVERLAY_ROWS + optionalRow(input.fileLoading)
@@ -146,6 +150,11 @@ function minimumOverlayHeight(input: ChatLayoutInput): number {
     return MIN_OVERLAY_ROWS
   }
   return MIN_OVERLAY_ROWS
+}
+
+function actionMenuRows(items: number | undefined, query = false): number {
+  if (items === undefined) return 0
+  return Math.max(1, nonNegativeInteger(items)) + 4 + optionalRow(query)
 }
 
 function rewindRows(items: number | undefined, selected = 0, confirming = false): number {

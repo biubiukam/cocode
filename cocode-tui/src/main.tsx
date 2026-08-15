@@ -25,6 +25,8 @@ import { AuthGate } from './present/auth-gate.tsx'
 import { Chat } from './present/chat.tsx'
 import { clearViewport, enterScreen, parseScreenMode } from './present/clear-screen.ts'
 import { resolveUiLocale } from './runtime/ui-locale.ts'
+import { detectTerminalEnvironment } from './runtime/platform.ts'
+import { enableMouseTracking } from './present/mouse.ts'
 
 loadDotenv(resolve(process.cwd(), '.env'))
 
@@ -47,7 +49,21 @@ async function main(): Promise<void> {
   }
 
   const leaveScreen = enterScreen(parseScreenMode(process.env.COCODE_TUI_SCREEN))
+  const terminal = detectTerminalEnvironment({
+    stdinIsTTY: process.stdin.isTTY === true,
+    stdoutIsTTY: process.stdout.isTTY === true,
+    stdoutColumns: process.stdout.columns,
+    stdoutRows: process.stdout.rows,
+  })
+  const releaseMouse = terminal.supportsMouse ? enableMouseTracking(process.stdout) : () => undefined
+  let mouseReleased = false
+  const leaveMouse = (): void => {
+    if (mouseReleased) return
+    mouseReleased = true
+    releaseMouse()
+  }
   process.once('exit', () => leaveScreen())
+  process.once('exit', () => leaveMouse())
 
   const auth = await createAuthStore()
   if (auth.snapshot().phase !== 'ready') {
@@ -125,6 +141,7 @@ async function main(): Promise<void> {
     process.off('SIGTERM', onTerminate)
     process.off('SIGHUP', onTerminate)
     await screen.unmount()
+    leaveMouse()
     leaveScreen()
     try {
       await releaseLiveInstance(resolved.home)

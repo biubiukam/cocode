@@ -1,7 +1,7 @@
 import { Box, Text } from 'ink'
 import type { ConversationNode } from '../../runtime/nodes/types.ts'
 import { nodeKey } from '../../runtime/nodes/types.ts'
-import { visibleTail } from '../visible-tail.ts'
+import { visibleMessageWindow } from '../message-scroll.ts'
 import { renderNode } from '../nodes.tsx'
 import { theme } from '../theme.ts'
 import { EmptyState } from './EmptyState.tsx'
@@ -11,6 +11,7 @@ export function MessageList(props: {
   nodes: readonly ConversationNode[]
   verbose: boolean
   maxRows?: number
+  scrollOffset?: number
   selectedNodeId?: string | null
   expandedNodeIds?: ReadonlySet<string>
   locale: UiLocale
@@ -19,7 +20,13 @@ export function MessageList(props: {
   const nodes =
     props.maxRows === undefined
       ? props.nodes
-      : visibleTail(props.nodes, props.maxRows, props.verbose, props.expandedNodeIds)
+      : visibleMessageWindow(
+          props.nodes,
+          props.maxRows,
+          props.verbose,
+          props.expandedNodeIds,
+          props.scrollOffset,
+        )
   const contentColumns =
     props.maxColumns === undefined
       ? undefined

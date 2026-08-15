@@ -25,6 +25,8 @@ const COMMAND_ALIASES: Readonly<Record<string, CommandId>> = {
   historySearch: 'history.search',
   'messages.select': 'messages.select',
   messagesSelect: 'messages.select',
+  'command.palette': 'command.palette',
+  commandPalette: 'command.palette',
 }
 
 export function resolveKeymap(

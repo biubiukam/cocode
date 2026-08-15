@@ -16,6 +16,7 @@ export type CommandId =
   | 'history.next'
   | 'history.search'
   | 'messages.select'
+  | 'command.palette'
 
 export type KeyMatch = {
   id: CommandId
@@ -63,6 +64,7 @@ export const DEFAULT_BINDINGS: Readonly<Record<CommandId, readonly KeyBinding[]>
   'history.next': [binding('down')],
   'history.search': [binding('r', { ctrl: true })],
   'messages.select': [binding('up', { shift: true })],
+  'command.palette': [binding('p', { ctrl: true })],
 }
 
 function binding(
@@ -93,6 +95,7 @@ export function matchKey(
     'help.toggle',
     'history.search',
     'messages.select',
+    'command.palette',
     'history.prev',
     'history.next',
   ]
