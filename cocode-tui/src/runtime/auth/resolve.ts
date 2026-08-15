@@ -6,6 +6,7 @@ import { patchCredential, readCredentials } from './credentials.ts'
 import { agencyOrigin } from './origin.ts'
 import { readSettings, type ProductSettings } from './settings.ts'
 import {
+  CLOUD_API,
   CLOUD_KEY_REF,
   CLOUD_PROVIDER,
   DEFAULT_MODEL,
@@ -241,7 +242,7 @@ function createCloudProvider(
 ): CloudProviderProfile {
   return {
     displayName: 'Cocode Cloud',
-    api: 'openai-completions',
+    api: CLOUD_API,
     baseURL: `${origin.replace(/\/$/, '')}/v1`,
     apiKeyEnv: CLOUD_KEY_REF,
     models: cloudModels?.length === 0 || cloudModels === undefined

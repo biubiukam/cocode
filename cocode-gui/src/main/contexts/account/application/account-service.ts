@@ -25,6 +25,7 @@ const CLOUD_PROVIDER = "cocode-cloud"
 const CLOUD_NAMESPACE = "llm-pi-ai"
 const CLOUD_PATH = ["providers", CLOUD_PROVIDER] as const
 const CLOUD_CREDENTIAL = "COCODE_CLOUD_API_KEY"
+const CLOUD_API = "openai-responses"
 const CLOUD_KEY_PATTERN = /^ck_[A-Za-z0-9_-]+$/
 const CLOUD_READY_ATTEMPTS = 6
 const CLOUD_READY_RETRY_MS = 100
@@ -167,16 +168,36 @@ function routeOf(namespaces: readonly SettingsNamespace[]): Record<string, unkno
 	return recordOf(valueAt(namespace?.value, CLOUD_PATH))
 }
 
-function routeMatches(
+function isManagedCloudRoute(
 	route: Record<string, unknown> | undefined,
 	managedRoute: { readonly baseURL: string; readonly apiKeyEnv: string } | undefined,
 ): boolean {
 	return (
 		managedRoute !== undefined &&
-		route?.api === "openai-completions" &&
+		(route?.api === CLOUD_API || route?.api === "openai-completions") &&
 		route.baseURL === managedRoute.baseURL &&
 		route.apiKeyEnv === managedRoute.apiKeyEnv
 	)
+}
+
+function routeIsCurrent(
+	route: Record<string, unknown> | undefined,
+	managedRoute: { readonly baseURL: string; readonly apiKeyEnv: string } | undefined,
+): boolean {
+	return isManagedCloudRoute(route, managedRoute) && route?.api === CLOUD_API
+}
+
+function cloudRouteValue(
+	baseURL: string,
+	models: readonly { readonly id: string; readonly name: string }[],
+): Record<string, unknown> {
+	return {
+		displayName: "Cocode Cloud",
+		api: CLOUD_API,
+		baseURL,
+		apiKeyEnv: CLOUD_CREDENTIAL,
+		models: models.map((model) => ({ id: model.id, name: model.name })),
+	}
 }
 
 function isExpectedCloudProvider(provider: ProviderView): boolean {
@@ -539,7 +560,7 @@ export class AccountService {
 			state.managedRoute?.baseURL === baseURL &&
 			state.managedRoute.apiKeyEnv === CLOUD_CREDENTIAL
 		const managed =
-			route === undefined ? hasManagedMetadata : routeMatches(route, intendedRoute)
+			route === undefined ? hasManagedMetadata : isManagedCloudRoute(route, intendedRoute)
 		if (route !== undefined && !managed) throw new CloudProviderConflictError()
 		const existingProvider = providersBefore.find(
 			(provider) => provider.provider === CLOUD_PROVIDER,
@@ -551,7 +572,7 @@ export class AccountService {
 		)
 			throw new CloudProviderConflictError()
 		if (
-			routeMatches(route, intendedRoute) &&
+			routeIsCurrent(route, intendedRoute) &&
 			existingCredential?.configured === true &&
 			existingProvider?.active === true
 		) {
@@ -597,13 +618,7 @@ export class AccountService {
 					{
 						op: "set",
 						path: CLOUD_PATH,
-						value: {
-							displayName: "Cocode Cloud",
-							api: "openai-completions",
-							baseURL,
-							apiKeyEnv: CLOUD_CREDENTIAL,
-							models: models.map((model) => ({ id: model.id, name: model.name })),
-						},
+						value: cloudRouteValue(baseURL, models),
 					},
 				],
 			})
@@ -642,7 +657,7 @@ export class AccountService {
 			const namespace = settings.namespaces.find((item) => item.ns === CLOUD_NAMESPACE)
 			const currentRoute = routeOf(settings.namespaces)
 			const intendedRoute = { baseURL, apiKeyEnv: CLOUD_CREDENTIAL }
-			const routeWasWritten = routeMatches(currentRoute, intendedRoute)
+			const routeWasWritten = routeIsCurrent(currentRoute, intendedRoute)
 			const credentialWasWrittenWithoutRoute =
 				currentRoute === undefined && oldRoute === undefined
 			if (!routeWasWritten && !credentialWasWrittenWithoutRoute) return
@@ -732,7 +747,7 @@ export class AccountService {
 		const settings = await this.dsh.describeSettings()
 		const namespace = settings.namespaces.find((item) => item.ns === CLOUD_NAMESPACE)
 		const route = routeOf(settings.namespaces)
-		if (routeMatches(route, managedRoute)) {
+		if (isManagedCloudRoute(route, managedRoute)) {
 			await this.dsh.mutateSettings({
 				ns: CLOUD_NAMESPACE,
 				expectedRevision: namespace?.revision,

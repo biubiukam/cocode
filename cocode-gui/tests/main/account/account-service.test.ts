@@ -289,7 +289,7 @@ test("reuses a ready device cloud route without minting another API key", async 
 	let writes = 0
 	const route = {
 		displayName: "Cocode Cloud",
-		api: "openai-completions",
+		api: "openai-responses",
 		baseURL: "https://cocode.agency/v1",
 		apiKeyEnv: "COCODE_CLOUD_API_KEY",
 		models: [{ id: "cloud-model", name: "Cloud Model" }],
@@ -345,6 +345,78 @@ test("reuses a ready device cloud route without minting another API key", async 
 		baseURL: "https://cocode.agency/v1",
 		apiKeyEnv: "COCODE_CLOUD_API_KEY",
 	})
+})
+
+test("upgrades a Completions cloud route to Responses without minting another key", async () => {
+	const identity = new MemoryVault(
+		validIdentity({
+			personalKeyId: "key-from-tui",
+			personalKeyName: "Cocode Device — test-host",
+		}),
+	)
+	const { client, createdKeys } = agency()
+	let route: Record<string, unknown> = {
+		displayName: "Cocode Cloud",
+		api: "openai-completions",
+		baseURL: "https://cocode.agency/v1",
+		apiKeyEnv: "COCODE_CLOUD_API_KEY",
+		models: [{ id: "cloud-model", name: "Cloud Model" }],
+	}
+	const writes: string[] = []
+	const dsh = {
+		currentDefault: async () => ({ provider: "cocode-cloud", model: "cloud-model" }),
+		describeSettings: async () => ({
+			writable: true,
+			namespaces: [
+				{
+					ns: "llm-pi-ai",
+					revision: 3,
+					value: { providers: { "cocode-cloud": route } },
+				},
+			],
+		}),
+		describeCredentials: async () => ({
+			COCODE_CLOUD_API_KEY: { configured: true, writable: true },
+		}),
+		providers: async (): Promise<ProviderView[]> => [
+			{
+				provider: "cocode-cloud",
+				displayName: "Cocode Cloud",
+				settingsNs: "llm-pi-ai",
+				settingsPath: ["providers", "cocode-cloud"],
+				active: true,
+			},
+		],
+		models: async (): Promise<ModelGroup[]> => [
+			{
+				id: "cocode-cloud",
+				name: "Cocode Cloud",
+				models: [{ id: "cloud-model", name: "Cloud Model" }],
+			},
+		],
+		mutateSettings: async (request: { ops: { op: "set" | "unset"; value?: unknown }[] }) => {
+			route = request.ops[0]?.value as Record<string, unknown>
+			writes.push("route:set")
+		},
+		setCredential: async () => {
+			writes.push("credential:set")
+		},
+		unsetCredential: async () => {
+			writes.push("credential:unset")
+		},
+	} as never
+	const cloudKey = new MemoryVault("ck_live_existing")
+
+	const snapshot = await new AccountService(
+		dsh,
+		client,
+		dependencies(identity, cloudKey).deps,
+	).signIn()
+	assert.equal(snapshot.phase, "signed-in")
+	assert.equal(snapshot.cloud.status, "ready")
+	assert.deepEqual(createdKeys, [])
+	assert.equal(route.api, "openai-responses")
+	assert.deepEqual(writes, ["credential:set", "route:set"])
 })
 
 test("failed provider activation rolls back the managed route and credential", async () => {

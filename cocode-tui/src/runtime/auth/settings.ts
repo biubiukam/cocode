@@ -3,6 +3,7 @@
  */
 
 import {
+  CLOUD_API,
   CLOUD_KEY_REF,
   CLOUD_PROVIDER,
   DEFAULT_MODEL,
@@ -113,10 +114,7 @@ export async function patchCloudRoute(
   const providers = isRecord(llm.providers) ? llm.providers : {}
   providers[CLOUD_PROVIDER] = {
     displayName: 'Cocode Cloud',
-    // Cocode Agency currently exposes these hosted models through the
-    // OpenAI Chat Completions protocol. Using Responses makes the gateway
-    // reject otherwise valid models with model_capability_unavailable.
-    api: 'openai-completions',
+    api: CLOUD_API,
     baseURL: `${origin.replace(/\/$/, '')}/v1`,
     apiKeyEnv: CLOUD_KEY_REF,
     models: models.map((model) => ({ id: model.id, name: model.name })),

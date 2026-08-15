@@ -54,7 +54,7 @@ describe('resolveAuth', () => {
     await patchCredential(home, 'COCODE_CLOUD_API_KEY', 'ck_live_x')
     await patchCloudRoute(home, 'https://cocode.agency', [{ id: 'cloud-1', name: 'Cloud' }])
     await expect(readFile(join(home, 'settings.yaml'), 'utf8')).resolves.toContain(
-      'api: openai-completions',
+      'api: openai-responses',
     )
     const result = await resolveAuth({
       home,

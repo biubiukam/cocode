@@ -30,9 +30,11 @@ export type MeProfile = {
 
 export type CloudModel = { id: string; name: string }
 
+export const CLOUD_API = 'openai-responses'
+
 export type CloudProviderProfile = {
   displayName: string
-  api: 'openai-completions'
+  api: typeof CLOUD_API
   baseURL: string
   apiKeyEnv: typeof CLOUD_KEY_REF
   models: CloudModel[]
