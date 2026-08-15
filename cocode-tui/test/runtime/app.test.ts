@@ -159,6 +159,27 @@ function fakeRuntime(): TuiRuntime & {
 }
 
 describe('TuiApp', () => {
+  it('prevents starting a new session while the current turn is running', async () => {
+    const runtime = fakeRuntime()
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+    })
+    await app.start()
+    runtime.emit({ method: 'session.status', params: { sessionId: 's1', status: 'running' } })
+
+    app.dispatch({ type: 'session.new' })
+
+    expect(app.snapshot().header.sessionId).toBe('s1')
+    expect(app.snapshot().notice?.message).toContain('Turn in progress')
+    runtime.emit({ method: 'session.status', params: { sessionId: 's1', status: 'idle' } })
+    app.dispatch({ type: 'session.new' })
+    expect(app.snapshot().header.sessionId).not.toBe('s1')
+  })
+
   it('toggles latest-turn focus without changing the assembled transcript', async () => {
     const runtime = fakeRuntime()
     const app = createTuiApp({

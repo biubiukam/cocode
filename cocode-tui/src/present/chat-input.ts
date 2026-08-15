@@ -18,6 +18,12 @@ export function dispatchKeyCommand(app: TuiApp, id: string, draft: string): void
     case 'session.interruptOrQuit':
       app.dispatch({ type: 'interruptOrQuit' })
       return
+    case 'session.new':
+      app.dispatch({ type: 'session.new' })
+      return
+    case 'session.open':
+      app.dispatch({ type: 'session.open' })
+      return
     case 'app.quit':
       app.dispatch({ type: 'quit' })
       return
@@ -41,6 +47,9 @@ export function dispatchKeyCommand(app: TuiApp, id: string, draft: string): void
       return
     case 'history.next':
       app.dispatch({ type: 'historyNext' })
+      return
+    case 'permission.toggle':
+      app.dispatch({ type: 'permission.toggle' })
       return
   }
 }

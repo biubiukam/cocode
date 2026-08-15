@@ -19,10 +19,16 @@ describe('chat input helpers', () => {
     const app = { dispatch } as unknown as TuiApp
     dispatchKeyCommand(app, 'input.submit', 'hello')
     dispatchKeyCommand(app, 'input.newline', '')
+    dispatchKeyCommand(app, 'session.new', '')
+    dispatchKeyCommand(app, 'session.open', '')
+    dispatchKeyCommand(app, 'permission.toggle', '')
     dispatchKeyCommand(app, 'history.next', '')
     expect(dispatch.mock.calls).toEqual([
       [{ type: 'submit', text: 'hello' }],
       [{ type: 'insertDraft', text: '\n' }],
+      [{ type: 'session.new' }],
+      [{ type: 'session.open' }],
+      [{ type: 'permission.toggle' }],
       [{ type: 'historyNext' }],
     ])
   })

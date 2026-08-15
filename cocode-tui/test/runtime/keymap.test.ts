@@ -19,6 +19,14 @@ describe('keymap', () => {
     expect(matchKey({ raw: 'l', alt: true, empty: false }, keymap)).toEqual({ id: 'model.open' })
   })
 
+  it('matches Crush session and permission shortcuts', () => {
+    expect(matchKey({ raw: 'n', ctrl: true, empty: false })).toEqual({ id: 'session.new' })
+    expect(matchKey({ raw: 's', ctrl: true, empty: false })).toEqual({ id: 'session.open' })
+    expect(matchKey({ raw: 'y', ctrl: true, empty: false })).toEqual({
+      id: 'permission.toggle',
+    })
+  })
+
   it('allows known commands to override their default bindings', () => {
     const keymap = resolveKeymap(
       { COCODE_TUI_KEYMAP: '{"historySearch":"ctrl+f","editor.open":"alt+e"}' },

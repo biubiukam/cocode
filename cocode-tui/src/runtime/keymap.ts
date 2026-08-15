@@ -7,6 +7,8 @@ export type CommandId =
   | 'input.submit'
   | 'input.newline'
   | 'session.interruptOrQuit'
+  | 'session.new'
+  | 'session.open'
   | 'app.quit'
   | 'app.redraw'
   | 'model.open'
@@ -19,6 +21,7 @@ export type CommandId =
   | 'history.search'
   | 'messages.select'
   | 'command.palette'
+  | 'permission.toggle'
 
 export type KeyMatch = {
   id: CommandId
@@ -34,6 +37,30 @@ export type KeyBinding = {
   alt: boolean
   shift: boolean
   emptyOnly?: boolean
+}
+
+export function formatKeyBinding(binding: KeyBinding | undefined): string | undefined {
+  if (binding === undefined) return undefined
+  const modifiers = [
+    binding.ctrl ? 'Ctrl' : undefined,
+    binding.alt ? 'Alt' : undefined,
+    binding.shift ? 'Shift' : undefined,
+  ].filter((value): value is string => value !== undefined)
+  const key =
+    binding.key.length === 1
+      ? binding.key.toUpperCase()
+      : ({
+          up: '↑',
+          down: '↓',
+          left: '←',
+          right: '→',
+          enter: 'Enter',
+          escape: 'Esc',
+          tab: 'Tab',
+          backspace: 'Backspace',
+          delete: 'Delete',
+        }[binding.key] ?? binding.key)
+  return [...modifiers, key].join('+')
 }
 
 type KeymapInput = {
@@ -57,6 +84,8 @@ export const DEFAULT_BINDINGS: Readonly<Record<CommandId, readonly KeyBinding[]>
   'input.submit': [binding('enter')],
   'input.newline': [binding('enter', { shift: true }), binding('j', { ctrl: true })],
   'session.interruptOrQuit': [binding('escape'), binding('c', { ctrl: true })],
+  'session.new': [binding('n', { ctrl: true })],
+  'session.open': [binding('s', { ctrl: true })],
   'app.quit': [binding('d', { ctrl: true, emptyOnly: true })],
   'app.redraw': [],
   'model.open': [binding('l', { ctrl: true })],
@@ -69,6 +98,7 @@ export const DEFAULT_BINDINGS: Readonly<Record<CommandId, readonly KeyBinding[]>
   'history.search': [binding('r', { ctrl: true })],
   'messages.select': [binding('up', { shift: true })],
   'command.palette': [binding('p', { ctrl: true })],
+  'permission.toggle': [binding('y', { ctrl: true })],
 }
 
 function binding(
@@ -92,6 +122,8 @@ export function matchKey(
     'input.newline',
     'input.submit',
     'session.interruptOrQuit',
+    'session.new',
+    'session.open',
     'app.quit',
     'model.open',
     'image.paste',
@@ -102,6 +134,7 @@ export function matchKey(
     'history.search',
     'messages.select',
     'command.palette',
+    'permission.toggle',
     'history.prev',
     'history.next',
   ]

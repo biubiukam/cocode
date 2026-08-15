@@ -4,6 +4,7 @@
 
 import type { TuiCapabilities } from './capabilities.ts'
 import type { TuiCommandCtx } from './app.ts'
+import { DEFAULT_BINDINGS, formatKeyBinding, type CommandId, type Keymap } from './keymap.ts'
 import type { UiLocale } from './ui-locale.ts'
 
 export type Command = {
@@ -256,18 +257,88 @@ export function helpText(
   registry: CommandRegistry,
   locale: UiLocale = 'en',
   additional: readonly Command[] = [],
+  keymap: Keymap = DEFAULT_BINDINGS,
 ): string {
   const commands = [...registry.list(caps), ...additional]
     .map((command) => `/${command.name}  ${commandSummary(command, locale)}`)
     .join('\n')
+  const shortcut = (id: CommandId): string | undefined =>
+    formatKeyBinding(keymap[id][0])
+  const displayShortcut = (id: CommandId): string | undefined => {
+    const value = shortcut(id)
+    return value === undefined || locale === 'zh' ? value : value.toLowerCase()
+  }
+  const globalShortcuts = [
+    shortcut('session.new') === undefined
+      ? undefined
+      : locale === 'zh'
+        ? `${shortcut('session.new')} 新会话`
+        : `${shortcut('session.new')} new session`,
+    caps.sessionList !== 'none' && caps.open && shortcut('session.open') !== undefined
+      ? locale === 'zh'
+        ? `${shortcut('session.open')} 会话`
+        : `${shortcut('session.open')} sessions`
+      : undefined,
+    caps.permissionMode && shortcut('permission.toggle') !== undefined
+      ? locale === 'zh'
+        ? `${shortcut('permission.toggle')} 权限`
+        : `${shortcut('permission.toggle')} permissions`
+      : undefined,
+  ].filter((item): item is string => item !== undefined)
+  const detailShortcuts = [
+    displayShortcut('transcript.toggleVerbose') === undefined
+      ? undefined
+      : locale === 'zh'
+        ? `${displayShortcut('transcript.toggleVerbose')} 详情`
+        : `${displayShortcut('transcript.toggleVerbose')} verbose`,
+    displayShortcut('editor.open') === undefined
+      ? undefined
+      : locale === 'zh'
+        ? `${displayShortcut('editor.open')} 编辑`
+        : `${displayShortcut('editor.open')} editor`,
+    displayShortcut('history.prev') === undefined || displayShortcut('history.next') === undefined
+      ? undefined
+      : locale === 'zh'
+        ? `${displayShortcut('history.prev')}/${displayShortcut('history.next')} 历史`
+        : `${displayShortcut('history.prev')}/${displayShortcut('history.next')} history`,
+    displayShortcut('history.search') === undefined
+      ? undefined
+      : locale === 'zh'
+        ? `${displayShortcut('history.search')} 搜索`
+        : `${displayShortcut('history.search')} search`,
+    displayShortcut('messages.select') === undefined
+      ? undefined
+      : locale === 'zh'
+        ? `${displayShortcut('messages.select')} 消息选择`
+        : `${displayShortcut('messages.select')} message select`,
+  ].filter((item): item is string => item !== undefined)
+  const coreShortcuts = [
+    displayShortcut('input.submit') === undefined
+      ? undefined
+      : locale === 'zh'
+        ? `${displayShortcut('input.submit')} 发送`
+        : `${displayShortcut('input.submit')} send`,
+    displayShortcut('session.interruptOrQuit') === undefined
+      ? undefined
+      : locale === 'zh'
+        ? `${displayShortcut('session.interruptOrQuit')} 中断或退出`
+        : `${displayShortcut('session.interruptOrQuit')} interrupt-or-quit`,
+    displayShortcut('help.toggle') === undefined
+      ? undefined
+      : locale === 'zh'
+        ? `${displayShortcut('help.toggle')} 帮助`
+        : `${displayShortcut('help.toggle')} help`,
+  ].filter((item): item is string => item !== undefined)
   return [
     locale === 'zh' ? 'Cocode TUI（终端界面）' : 'Cocode TUI',
-    locale === 'zh'
-      ? '回车发送 · Esc/Ctrl+C 中断或退出 · ? 帮助'
-      : 'enter send · esc/ctrl+c interrupt-or-quit · ? help',
-    locale === 'zh'
-      ? `Ctrl+O 详情 · Ctrl+G 编辑 · ↑↓ 历史 · Ctrl+R 搜索 · ${caps.planMode ? 'Tab Build/Plan · ' : ''}Shift+↑ 消息选择`
-      : `ctrl+o verbose · ctrl+g editor · up/down history · ctrl+r search · ${caps.planMode ? 'tab Build/Plan · ' : ''}shift+up messages`,
+    coreShortcuts.join(' · '),
+    [
+      ...detailShortcuts,
+      caps.planMode ? (locale === 'zh' ? 'Tab Build/Plan' : 'tab Build/Plan') : undefined,
+    ]
+      .filter((item): item is string => item !== undefined)
+      .join(' · '),
+    globalShortcuts.join(' · '),
     '',
     locale === 'zh'
       ? '本地命令（不是 GUI 命令注册表）：'

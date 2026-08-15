@@ -140,6 +140,8 @@ import {
   type ChecklistState,
 } from './checklist.ts'
 import { ClipboardImageError, readClipboardImage } from './image-clipboard.ts'
+import type { Keymap } from './keymap.ts'
+import { resolveKeymap } from './keymap-config.ts'
 
 export type TuiAction =
   | { type: 'submit'; text: string }
@@ -155,6 +157,8 @@ export type TuiAction =
   | { type: 'toggleVerbose' }
   | { type: 'toggleHelp' }
   | { type: 'interruptOrQuit' }
+  | { type: 'session.new' }
+  | { type: 'session.open' }
   | { type: 'quit' }
   | { type: 'redraw' }
   | { type: 'resume.setQuery'; query: string }
@@ -411,6 +415,7 @@ class TuiAppImpl implements TuiApp {
   private readonly auth: TuiAuthInfo | undefined
   private readonly terminalNotify: NonNullable<TuiAppOptions['terminalNotify']>
   private readonly imageReader: () => Promise<TuiImageInput>
+  private readonly keymap: Keymap
   private imageSerial = 0
   private readonly activeSubagents = new Set<string>()
   private lastSubagent: TuiSubagentActivity['last']
@@ -463,6 +468,7 @@ class TuiAppImpl implements TuiApp {
     this.terminalNotify =
       options.terminalNotify ?? (process.stdout.isTTY === true ? {} : { mode: 'off' })
     this.imageReader = options.readClipboardImage ?? (() => readClipboardImage())
+    this.keymap = resolveKeymap()
     this.questions = createQuestionCoordinator({ emit: () => this.emit() })
   }
 
@@ -631,6 +637,7 @@ class TuiAppImpl implements TuiApp {
         this.commands,
         this.locale,
         this.skillCommands(),
+        this.keymap,
       ),
       commands: this.visibleCommands().map((command) => ({
         name: command.name,
@@ -739,6 +746,12 @@ class TuiAppImpl implements TuiApp {
         return
       case 'interruptOrQuit':
         this.interruptOrQuit()
+        return
+      case 'session.new':
+        this.requestNewSession()
+        return
+      case 'session.open':
+        void this.showSessionTree()
         return
       case 'quit':
         this.beginQuit()
@@ -1091,25 +1104,7 @@ class TuiAppImpl implements TuiApp {
   private commandCtx(): TuiCommandCtx {
     return createAppCommandContext({
       dispatch: (action) => this.dispatch(action),
-      newSession: () => {
-        this.sessionId = createSessionId()
-        this.assembler.reset()
-        this.telemetry.reset()
-        this.sessionState.reset()
-        this.sessionTitleOverride = undefined
-        this.resetSubagentActivity()
-        this.clearQueuedPrompts()
-        this.agent = 'idle'
-        this.interruptArmed = false
-        this.resetSessionControls()
-        this.attachments = []
-        this.images = []
-        this.notice = {
-          tone: 'info',
-          message: `New session ${this.sessionId}`,
-        }
-        this.emit()
-      },
+      newSession: () => this.startNewSession(),
       clearTranscript: () => {
         this.assembler.reset()
         this.telemetry.reset()
@@ -1346,6 +1341,35 @@ class TuiAppImpl implements TuiApp {
       }
     }
     this.emit()
+  }
+
+  private startNewSession(): void {
+    this.sessionId = createSessionId()
+    this.assembler.reset()
+    this.telemetry.reset()
+    this.sessionState.reset()
+    this.sessionTitleOverride = undefined
+    this.resetSubagentActivity()
+    this.clearQueuedPrompts()
+    this.agent = 'idle'
+    this.interruptArmed = false
+    this.resetSessionControls()
+    this.attachments = []
+    this.images = []
+    this.notice = {
+      tone: 'info',
+      message: `New session ${this.sessionId}`,
+    }
+    this.emit()
+  }
+
+  private requestNewSession(): void {
+    if (this.agent !== 'idle') {
+      this.notice = { tone: 'info', message: text(this.locale, 'turnBusy') }
+      this.emit()
+      return
+    }
+    this.startNewSession()
   }
 
   private async loadRpcSessionTree(): Promise<SessionTreePickerItem[]> {
