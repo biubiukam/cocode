@@ -1,6 +1,6 @@
 import { Box, Text } from 'ink'
 import type { TuiSnapshot } from '../../runtime/app.ts'
-import { agentMark } from './agent-status.ts'
+import { AgentStatusIndicator } from './AgentStatusIndicator.tsx'
 import { theme } from '../theme.ts'
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
 
@@ -66,7 +66,7 @@ export function StatusLine(props: {
     <Box flexDirection="column" marginBottom={1}>
       <Box width="100%" justifyContent="space-between">
         <Text color={theme.dim} wrap="truncate-end">
-          {agentMark(props.agent)} {props.status.line}
+          <AgentStatusIndicator agent={props.agent} /> {props.status.line}
         </Text>
         <Box flexShrink={0}>
           {props.status.focusMode ? (

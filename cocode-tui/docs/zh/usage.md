@@ -80,11 +80,11 @@ DSH_CORDIS_CONFIG=companion/cordis.yml
 - `Ctrl+R` 打开历史搜索；输入文字过滤最近消息，使用 `↑` `↓` 选择，回车回填到输入区，`Esc` 关闭。
 - `Ctrl+G` 使用 `$VISUAL` 或 `$EDITOR` 打开临时 Markdown 草稿；退出编辑器后内容回填到输入区。编辑器退出码非 0、草稿不是 UTF-8 或超过 256 KiB 时会显示错误。
 - `Shift+↑` 进入消息选择模式；使用 `↑` `↓` 移动，回车展开或收起当前消息，`Esc` 退出。
-- 默认不接管鼠标，保留终端原生的拖动选中文本。按 `Alt+M` 可切换鼠标模式；此时点击带下划线的模型名称会打开模型输入浮窗，点击顶部其他位置会打开命令菜单。模型目录尚未接入当前 runtime wire，因此浮窗接受模型 id，并沿用 `/model` 的 runtime restart 和新建 session 语义。移动到其他浮窗选项会显示 hover 反馈，点击执行。浮窗通过键盘打开时会临时启用鼠标，关闭后自动恢复文本选择。消息正文不会响应左键菜单，消息操作仍通过 `Shift+↑` 进入后按 `m` 打开。
+- 支持鼠标报告的终端会由 TUI 接管鼠标拖动，在 Transcript 区域内选择并复制文本；选区会限制在消息区域，不会包含右侧 Inspector。释放鼠标后自动复制，`Ctrl+C` 或 `Ctrl+Y` 可再次复制，`Esc` 清除选区。按 `Alt+M` 可切换鼠标菜单模式；此时点击带下划线的模型名称会打开模型选择器，点击顶部其他位置会打开命令菜单。模型选择器按 provider 分组展示 runtime 提供的模型，支持过滤、方向键、回车和鼠标选择；旧 runtime 不提供模型目录时会降级为手动输入 model id。模型切换仍通过 runtime restart 完成，并创建新 session。弹窗打开期间会暂停消息文本选择，关闭后恢复。消息操作仍可通过 `Shift+↑` 进入消息选择模式后按 `m` 打开。
 - 在消息选择模式按 `c` 可复制当前消息；也可以使用 `/copy` 复制最近一条 assistant 回复。复制依次尝试 macOS `pbcopy`、Windows `clip.exe`，以及 Linux 的 `wl-copy`、`xclip`、`xsel`；命令不可用时只显示提示，不影响会话。
 - `/focus` 切换本地「最近一轮」视图。开启后，对话区只显示最近一条用户消息及其后续节点，状态栏显示「聚焦：最近一轮」。它只改变界面投影，不修改 `/clear`、`/resume`、`/rewind`、导出或持久化 session log 的语义；再次执行可恢复完整会话视图。
 - `/lang zh` 或 `/lang en` 立即切换界面语言；未指定时启动语言由 `COCODE_LANG`、`LANG` 等环境变量决定。
-- `/model <model-id>` 通过 runtime restart 切换当前模型，并创建新 session；切换失败会尝试恢复原模型。
+- `/model` 和 `/models` 无参数时打开模型选择器；`/model <model-id>` 直接切换当前 provider 下的模型。选择器可以同时切换 provider 和 model；所有切换都通过 runtime restart 创建新 session，失败会尝试恢复原 provider/model。旧 runtime 没有模型目录时仍可手动输入 model id。
 - 思考内容在流式生成期间默认展开，回复完成后自动收起为摘要；`Ctrl+O` 可保持完整思考内容和工具输入输出展开。
 - 对话运行中，状态栏会显示「思考中…」。即使下一段流式输出暂时没有到达，也能和空闲状态区分开。状态栏还会显示最近一次 assistant 的输入/输出 token，以及 wire 已报告的当前子代理活动。收到可选事件后，还会显示解码 TPS、缓存命中率、上下文窗口占用比例、推理等级、当前工作状态、紧凑的上下文分段（`S/P/A/T/X` 分别表示系统、输入、回复、思考和工具）、待办进度、目标阶段和当前 agent preset。分段数值按文本长度估算，不代表 provider 的计费数据。
 - runtime 支持计划模式时，输入区空闲状态按 `Tab` 可在 `Build` 与 `Plan` 之间切换；Slash 命令和 `@` 文件选择器打开时，`Tab` 仍用于移动选项。
@@ -136,7 +136,9 @@ DSH_CORDIS_CONFIG=companion/cordis.yml
 | `/init`                        | 仅在缺少 `AGENTS.md` 时创建最小工作区模板                            |
 | `/theme dark` / `/theme light` | 切换显示主题                                                         |
 | `/lang zh` / `/lang en`        | 切换中英文界面                                                       |
-| `/model <model-id>`            | 切换模型并创建新 session                                             |
+| `/model`                      | 打开模型选择器                                                         |
+| `/models`                     | 打开模型选择器                                                         |
+| `/model <model-id>`            | 直接切换当前 provider 下的模型并创建新 session                         |
 | `/resume`                      | 打开当前工作区的 session 选择器并回放选中会话                        |
 | `/skills`                      | 浏览当前工作区中可由用户调用的技能                                   |
 | `/use byok` / `/use cocode`    | 在自己的 Key 和 Cocode 之间切换；切换即新会话                        |

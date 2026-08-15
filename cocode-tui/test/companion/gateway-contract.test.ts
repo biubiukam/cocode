@@ -68,6 +68,17 @@ function createFixture() {
     },
   }
   const services = {
+    llm: {
+      listProviders() {
+        return [
+          { id: 'provider', name: 'Provider' },
+          { id: 'p', name: 'P' },
+        ]
+      },
+      async listModels(provider: string) {
+        return provider === 'provider' ? [{ id: 'model', name: 'Model' }] : []
+      },
+    },
     skills: {
       async list() {
         return [
@@ -148,6 +159,7 @@ describe('TuiCompanionGateway RPC contract', () => {
         permissionMode: true,
         planMode: true,
         sessionList: true,
+        modelList: true,
       },
     })
 
@@ -168,6 +180,15 @@ describe('TuiCompanionGateway RPC contract', () => {
     expect(await gateway.handleRequest('skills/list', { sessionId: 'live' })).toEqual({
       skills: [{ name: 'review', description: 'Review' }],
     })
+    const modelCatalog = {
+      groups: [
+        { id: 'provider', name: 'Provider', models: [{ id: 'model', name: 'Model' }] },
+        { id: 'p', name: 'P', models: [] },
+      ],
+      failures: [],
+    }
+    expect(await gateway.handleRequest('cocode/model/list')).toEqual(modelCatalog)
+    expect(await gateway.handleRequest('model/list')).toEqual(modelCatalog)
     expect(await gateway.handleRequest('permission/mode', { sessionId: 'live' })).toEqual({
       mode: 'default',
       supportedModes: ['default', 'allow-all'],

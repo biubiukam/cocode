@@ -82,7 +82,16 @@ export function createBuiltinCommands(): CommandRegistry {
     ctx.setLocale?.(value)
   })
   local('model', 'Switch the active model and start a new session', (ctx, args) => {
-    ctx.setModel?.(args)
+    const value = args.trim()
+    if (value === '') ctx.showModelPicker?.()
+    else ctx.setModel?.(value)
+  })
+  local('models', 'Browse available models and switch the active model', (ctx, args) => {
+    if (args.trim() !== '') {
+      ctx.notice('info', 'Use /models without arguments.')
+      return
+    }
+    ctx.showModelPicker?.()
   })
   local('export', 'Export the projected session as Markdown', (ctx) => {
     void ctx.exportTranscript?.()

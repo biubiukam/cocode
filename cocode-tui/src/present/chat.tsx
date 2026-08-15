@@ -9,6 +9,7 @@ import { matchKey, type Keymap } from '../runtime/keymap.ts'
 import { resolveKeymap } from '../runtime/keymap-config.ts'
 import { Composer } from './components/Composer.tsx'
 import { ModelSwitchPanel } from './components/ModelSwitchPanel.tsx'
+import { ModelPicker } from './components/ModelPicker.tsx'
 import { ActionMenu, type ActionMenuItem } from './components/ActionMenu.tsx'
 import { FileMenu } from './components/FileMenu.tsx'
 import { Header } from './components/Header.tsx'
@@ -20,6 +21,11 @@ import { SessionTreePicker } from './components/SessionTreePicker.tsx'
 import { RewindPicker } from './components/RewindPicker.tsx'
 import { ForkPicker } from './components/ForkPicker.tsx'
 import { QuestionPanel } from './components/QuestionPanel.tsx'
+import {
+  isPlanReviewQuestion,
+  PlanReviewPanel,
+  planReviewPanelRows,
+} from './components/PlanReviewPanel.tsx'
 import { SkillsPicker } from './components/SkillsPicker.tsx'
 import { StatusLine } from './components/StatusLine.tsx'
 import {
@@ -35,8 +41,15 @@ import { listWorkspaceEntries, rankFileMatches } from '../runtime/workspace-file
 import { moveMessageSelection, selectableMessageKeys } from './message-selection.ts'
 import {
   maxMessageScrollOffset,
+  resolveMessageWindow,
   scrollOffsetForMessage,
 } from './message-scroll.ts'
+import {
+  pointForMouse,
+  selectedText,
+  type TextSelection,
+  visibleSelectableLines,
+} from './text-selection.ts'
 import { focusConversationNodes } from '../runtime/focus.ts'
 import { text } from '../runtime/ui-locale.ts'
 import {
@@ -53,9 +66,11 @@ import {
 } from '../runtime/session-tree-picker.ts'
 import { REWIND_WINDOW_SIZE } from '../runtime/rewind-picker.ts'
 import { SKILLS_WINDOW_SIZE, visibleSkills } from '../runtime/skills-picker.ts'
+import { MODEL_PICKER_WINDOW_SIZE, visibleModelItems } from '../runtime/model-picker.ts'
 import { editDraft } from '../runtime/external-editor.ts'
 import { listWindowStart } from './list-window.ts'
-import { calculateChatLayout } from './chat-layout.ts'
+import { calculateChatLayout, CHAT_HEADER_ROWS } from './chat-layout.ts'
+import { composerHeaderLayout } from './composer-header.ts'
 import { Inspector, INSPECTOR_WIDTH } from './components/Inspector.tsx'
 import { ReviewPicker } from './components/ReviewPicker.tsx'
 import { ApprovalPanel } from './components/ApprovalPanel.tsx'
@@ -87,7 +102,7 @@ import { CHECKLIST_WINDOW_SIZE } from '../runtime/checklist.ts'
 import {
   actionMenuItemIndexAtRow,
   listItemIndexAtRow,
-  modelHeaderHit,
+  composerModelHit,
   popupContains,
 } from './mouse-hit.ts'
 
@@ -114,9 +129,10 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
   const [commandPaletteIndex, setCommandPaletteIndex] = useState(0)
   const [editorBusy, setEditorBusy] = useState(false)
   const [editorError, setEditorError] = useState<string | undefined>()
-  const [modelSwitchOpen, setModelSwitchOpen] = useState(false)
   const [questionMousePointer, setQuestionMousePointer] = useState<TuiMousePointer>()
   const [approvalMousePointer, setApprovalMousePointer] = useState<TuiMousePointer>()
+  const [textSelection, setTextSelection] = useState<TextSelection>()
+  const [textSelectionDragging, setTextSelectionDragging] = useState(false)
   const mouseClickId = useRef(0)
   const [mouseMode, setMouseMode] = useState(false)
   const { stdout } = useStdout()
@@ -137,6 +153,9 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
   const forkOpen = forkState?.open === true
   const skillsState = snap.skillsPicker
   const skillsOpen = skillsState?.open === true
+  const modelPickerOpen = snap.modelPicker?.open === true
+  const modelInputOpen = snap.modelInputOpen
+  const modelOverlayOpen = modelPickerOpen || modelInputOpen
   const questionOpen = snap.question !== undefined
   const approvalOpen = snap.approval?.open === true
   const reviewOpen = snap.reviewPicker?.open === true
@@ -154,7 +173,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     !historySearchOpen &&
     !commandPaletteOpen &&
     !messageActionMenuOpen &&
-    !modelSwitchOpen &&
+    !modelOverlayOpen &&
     !snap.helpOpen &&
     !slashDismissed &&
     slashItems.length > 0
@@ -176,7 +195,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     !historySearchOpen &&
     !commandPaletteOpen &&
     !messageActionMenuOpen &&
-    !modelSwitchOpen &&
+    !modelOverlayOpen &&
     !snap.helpOpen &&
     !slashOpen &&
     !fileDismissed &&
@@ -225,16 +244,17 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     [snap.commands],
   )
   const actionMenuItems = commandPaletteOpen ? commandPaletteItems : messageActionItems
+  const mainChecklistRows = checklistStripRows(
+    snap.status.todos.length,
+    stdout.columns >= 120 ? CHECKLIST_STRIP_MAX_ITEMS : 2,
+  )
   const layout = calculateChatLayout({
     viewportRows: stdout.rows,
     composerLines: snap.composer.text.split('\n').length,
     hasAttachments: snap.composer.attachments.length > 0,
     hasNotice: snap.notice !== undefined,
     hasStatusDetails: hasStatusDetails(snap.status),
-    checklistStripRows: checklistStripRows(
-      snap.status.todos.length,
-      stdout.columns >= 120 ? CHECKLIST_STRIP_MAX_ITEMS : 2,
-    ),
+    checklistStripRows: mainChecklistRows,
     editorFeedbackRows: Number(editorBusy) + Number(editorError !== undefined),
     helpLines: snap.helpOpen ? snap.helpText.split('\n').length : undefined,
     slashItems: slashOpen ? slashItems.length : undefined,
@@ -272,23 +292,38 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
       : undefined,
     skillsItems: skillsOpen ? skillsState.skills.length : undefined,
     skillsSelected: skillsOpen ? skillsState.selected : undefined,
-    questionRows:
-      snap.question === undefined
-        ? undefined
+      questionRows:
+        snap.question === undefined
+          ? undefined
+        : isPlanReviewQuestion(snap.question.question)
+        ? planReviewPanelRows(snap.question)
         : questionPanelRows(snap.question),
     approvalRows: approvalOpen ? 12 : undefined,
     reviewRows: reviewOpen ? reviewRowsFor(snap.reviewPicker) : undefined,
     actionMenuItems: actionMenuItems.length > 0 ? actionMenuItems.length : undefined,
-    modelSwitchRows: modelSwitchOpen ? 6 : undefined,
+    modelSwitchRows: modelPickerOpen ? 14 : modelInputOpen ? 6 : undefined,
   })
   const messageMaxRows = layout.messageRows
   const statusRows = 2 + Number(snap.notice !== undefined) + Number(hasStatusDetails(snap.status))
   const editorRows = Number(editorBusy) + Number(editorError !== undefined)
-  const contentOverlayStartRow = 4 + messageMaxRows + statusRows + editorRows
+  const contentOverlayStartRow =
+    CHAT_HEADER_ROWS + 1 + messageMaxRows + mainChecklistRows + statusRows + editorRows
   const wideInspector = stdout.columns >= 120
   const mainColumns = wideInspector
     ? Math.max(1, stdout.columns - INSPECTOR_WIDTH - 1)
     : stdout.columns
+  const messageContentColumns = Math.max(1, mainColumns - (messageSelectionActive ? 2 : 0))
+  const composerHeader = composerHeaderLayout({
+    composer: snap.composer,
+    agent: snap.agent,
+    planMode: snap.status.planMode,
+    planModeAvailable: snap.capabilities.planMode,
+    locale: snap.locale,
+    provider: snap.header.provider,
+    model: snap.header.model,
+    columns: mainColumns,
+  })
+  const composerTitleRow = contentOverlayStartRow + layout.overlayRows + 1
   const popupBounds = {
     startRow: contentOverlayStartRow,
     startColumn: 1,
@@ -300,16 +335,48 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     supported: props.mouseSupported !== false,
     manualMode: mouseMode,
     overlayOpen: layout.overlayRows > 0,
+    textSelection: true,
   })
   const selectableMessages = useMemo(
     () => selectableMessageKeys(displayNodes),
     [displayNodes],
   )
   const messageScrollMax = useMemo(
-    () => maxMessageScrollOffset(displayNodes, messageMaxRows, snap.verbose, expandedMessageIds),
-    [displayNodes, expandedMessageIds, messageMaxRows, snap.verbose],
+    () =>
+      maxMessageScrollOffset(
+        displayNodes,
+        messageMaxRows,
+        snap.verbose,
+        expandedMessageIds,
+        messageContentColumns,
+      ),
+    [displayNodes, expandedMessageIds, messageContentColumns, messageMaxRows, snap.verbose],
   )
-
+  const selectableLines = useMemo(() => {
+    const window = resolveMessageWindow(
+      displayNodes,
+      messageMaxRows,
+      snap.verbose,
+      expandedMessageIds,
+      messageScrollOffset,
+      mainColumns,
+    )
+    return visibleSelectableLines(
+      window.nodes,
+      messageMaxRows,
+      window.hiddenRowsBefore,
+      snap.verbose,
+      expandedMessageIds,
+      mainColumns,
+    )
+  }, [
+    displayNodes,
+    expandedMessageIds,
+    mainColumns,
+    messageMaxRows,
+    messageScrollOffset,
+    snap.verbose,
+  ])
   useEffect(
     () =>
       app.subscribe(() => {
@@ -326,7 +393,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
 
   const openModelSwitch = (): void => {
     if (snap.composer.disabled) return
-    setModelSwitchOpen(true)
+    app.dispatch({ type: 'model.open' })
     setCommandPaletteOpen(false)
     setMessageActionMenuOpen(false)
   }
@@ -367,6 +434,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
         queueOpen ||
         checklistOpen ||
         historySearchOpen ||
+        modelOverlayOpen ||
         messageSelectionActive ||
         snap.composer.disabled
       ) {
@@ -380,7 +448,76 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     }
     const insidePopup = popupContains(popupBounds, event.x, event.y)
     const hitRow = insidePopup ? event.y : -1
-    if (modelSwitchOpen) return
+    if (modelPickerOpen && snap.modelPicker !== undefined) {
+      if (!insidePopup || event.button !== 0) return
+      const items = visibleModelItems(snap.modelPicker)
+      const windowSize = pickerWindowSize(layout.overlayRows, MODEL_PICKER_WINDOW_SIZE, 7)
+      const start = listWindowStart(snap.modelPicker.selected, items.length, windowSize)
+      const index = listItemIndexAtRow({
+        row: hitRow,
+        itemStartRow: popupStartRow + 3 + Number(start > 0),
+        itemCount: items.length,
+        selectedIndex: snap.modelPicker.selected,
+        windowSize,
+      })
+      if (index !== undefined) {
+        app.dispatch({ type: 'model.move', delta: index - snap.modelPicker.selected })
+        if (event.action === 'press') app.dispatch({ type: 'model.confirm' })
+      }
+      return
+    }
+    if (modelOverlayOpen) return
+    const messageStartRow = CHAT_HEADER_ROWS + 1
+    const messageEndRow = messageStartRow + messageMaxRows
+    const selectionPoint = pointForMouse(
+      event.y - messageStartRow,
+      event.x - 1,
+      messageMaxRows,
+      mainColumns,
+    )
+    if (textSelectionDragging) {
+      if (event.button !== 0) return
+      if (event.action === 'move') {
+        setTextSelection((current) =>
+          current === undefined ? undefined : { ...current, focus: selectionPoint },
+        )
+        return
+      }
+      if (event.action === 'release') {
+        const current = textSelection
+        setTextSelectionDragging(false)
+        if (current !== undefined) {
+          const next = { ...current, focus: selectionPoint }
+          setTextSelection(next)
+          const value = selectedText(selectableLines, next)
+          if (value !== '') app.dispatch({ type: 'copyText', text: value })
+        }
+        return
+      }
+      return
+    }
+    const canSelectText =
+      layout.overlayRows === 0 &&
+      !questionOpen &&
+      !approvalOpen &&
+      !reviewOpen &&
+      !messageSelectionActive &&
+      !messageActionMenuOpen &&
+      !commandPaletteOpen &&
+      !layout.tooSmall
+    if (
+      canSelectText &&
+      event.action === 'press' &&
+      event.button === 0 &&
+      event.x >= 1 &&
+      event.x <= mainColumns &&
+      event.y >= messageStartRow &&
+      event.y < messageEndRow
+    ) {
+      setTextSelection({ anchor: selectionPoint, focus: selectionPoint })
+      setTextSelectionDragging(true)
+      return
+    }
     if (questionOpen || approvalOpen) {
       if ((event.action === 'press' || event.action === 'move') && event.button === 0) {
         const pointer = { id: mouseClickId.current++, row: hitRow, action: event.action }
@@ -395,8 +532,8 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
       layout.tooSmall
     ) return
     const isPress = event.action === 'press'
-    const headerRows = 3
-    const messageStart = headerRows + 1
+    const headerRows = CHAT_HEADER_ROWS
+    const messageStart = messageStartRow
     if (commandPaletteOpen) {
       const index = actionMenuItemIndexAtRow({
         row: hitRow,
@@ -634,12 +771,12 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     }
     if (!isPress) return
     if (
-      modelHeaderHit({
+      composerModelHit({
         row: event.y,
         x: event.x,
-        provider: snap.header.provider,
-        model: snap.header.model,
-        compact: mainColumns < 84,
+        titleRow: composerTitleRow,
+        modelStartColumn: composerHeader.modelStartColumn,
+        modelEndColumn: composerHeader.modelEndColumn,
       })
     ) {
       openModelSwitch()
@@ -754,7 +891,42 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
   useInput((input, key) => {
     if (editorBusy) return
     if (isMouseInput(input)) return
-    if (modelSwitchOpen) return
+    if (textSelection !== undefined) {
+      if (key.escape) {
+        setTextSelection(undefined)
+        setTextSelectionDragging(false)
+        return
+      }
+      if (key.ctrl && (input === 'c' || input === 'y')) {
+        const value = selectedText(selectableLines, textSelection)
+        if (value !== '') app.dispatch({ type: 'copyText', text: value })
+        return
+      }
+      setTextSelection(undefined)
+    }
+    if (modelPickerOpen) {
+      if (key.escape) {
+        app.dispatch({ type: 'model.close' })
+        return
+      }
+      if (key.upArrow || key.downArrow) {
+        app.dispatch({ type: 'model.move', delta: key.upArrow ? -1 : 1 })
+        return
+      }
+      if (key.return) {
+        app.dispatch({ type: 'model.confirm' })
+        return
+      }
+      if (key.backspace || key.delete) {
+        app.dispatch({ type: 'model.setQuery', query: snap.modelPicker?.query.slice(0, -1) ?? '' })
+        return
+      }
+      if (input !== '' && !key.ctrl && !key.meta) {
+        app.dispatch({ type: 'model.setQuery', query: `${snap.modelPicker?.query ?? ''}${input}` })
+      }
+      return
+    }
+    if (modelInputOpen) return
     if (snap.helpOpen) {
       dispatchHelpInput(app, input, key)
       return
@@ -1290,26 +1462,47 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
       {skillsOpen && skillsState !== undefined ? (
         <SkillsPicker state={skillsState} locale={snap.locale} maxRows={layout.overlayRows} />
       ) : null}
-      {modelSwitchOpen ? (
+      {modelPickerOpen && snap.modelPicker !== undefined ? (
+        <ModelPicker
+          state={snap.modelPicker}
+          currentProvider={snap.header.provider}
+          currentModel={snap.header.model}
+          locale={snap.locale}
+          maxRows={layout.overlayRows}
+        />
+      ) : null}
+      {modelInputOpen ? (
         <ModelSwitchPanel
           currentModel={snap.header.model}
           locale={snap.locale}
           onSubmit={(model) => {
-            setModelSwitchOpen(false)
-            app.dispatch({ type: 'command', line: `/model ${model}` })
+            app.dispatch({ type: 'model.input.submit', model })
           }}
-          onClose={() => setModelSwitchOpen(false)}
+          onClose={() => app.dispatch({ type: 'model.input.close' })}
         />
       ) : null}
       {snap.question !== undefined ? (
-        <QuestionPanel
-          key={snap.question.key}
-          state={snap.question}
-          locale={snap.locale}
-          panelStartRow={popupStartRow}
-          mousePointer={questionMousePointer}
-          dispatch={app.dispatch}
-        />
+        isPlanReviewQuestion(snap.question.question) ? (
+          <PlanReviewPanel
+            key={snap.question.key}
+            state={snap.question}
+            locale={snap.locale}
+            panelStartRow={popupStartRow}
+            maxRows={layout.overlayRows}
+            maxColumns={mainColumns}
+            mousePointer={questionMousePointer}
+            dispatch={app.dispatch}
+          />
+        ) : (
+          <QuestionPanel
+            key={snap.question.key}
+            state={snap.question}
+            locale={snap.locale}
+            panelStartRow={popupStartRow}
+            mousePointer={questionMousePointer}
+            dispatch={app.dispatch}
+          />
+        )
       ) : null}
       {approvalOpen && snap.approval !== undefined ? (
         <ApprovalPanel
@@ -1360,7 +1553,6 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
       >
         <Header
           header={snap.header}
-          agent={snap.agent}
           locale={snap.locale}
           columns={mainColumns}
         />
@@ -1405,6 +1597,8 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
           agent={snap.agent}
           planMode={snap.status.planMode}
           planModeAvailable={snap.capabilities.planMode}
+          provider={snap.header.provider}
+          model={snap.header.model}
           locale={snap.locale}
           maxRows={layout.composerRows}
           maxColumns={mainColumns}
@@ -1426,9 +1620,9 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
                       <>
                         {' · '}
                         {text(snap.locale, 'footerScroll')} · {text(snap.locale, 'footerMessages')} ·{' '}
-                        {mouseMode
-                          ? text(snap.locale, 'footerMenu')
-                          : snap.locale === 'zh' ? 'Ctrl+P 菜单' : 'ctrl+p menu'}{' '}
+                    {mouseMode
+                      ? text(snap.locale, 'footerMenu')
+                      : snap.locale === 'zh' ? 'Ctrl+P 菜单' : 'ctrl+p menu'}{' '}
                         · {text(snap.locale, 'footerDetails')}
                       </>
                     )}
@@ -1448,9 +1642,9 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
                 {snap.agent === 'running' ? null : (
                   <>
                     {' · '}
-                    {mouseMode
-                      ? snap.locale === 'zh' ? '鼠标模式 · Alt+M 选择文本' : 'mouse mode · alt+m select text'
-                      : snap.locale === 'zh' ? '文本选择 · Alt+M 鼠标模式' : 'text select · alt+m mouse mode'}
+                    {snap.locale === 'zh'
+                      ? '鼠标拖动选择文本 · Alt+M 菜单模式'
+                      : 'drag to select text · alt+m menu mode'}
                   </>
                 )}
               </Text>

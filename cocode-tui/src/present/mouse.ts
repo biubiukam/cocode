@@ -20,8 +20,9 @@ export function shouldEnableMouseTracking(props: {
   supported: boolean
   manualMode: boolean
   overlayOpen: boolean
+  textSelection?: boolean
 }): boolean {
-  return props.supported && (props.manualMode || props.overlayOpen)
+  return props.supported && (props.manualMode || props.overlayOpen || props.textSelection === true)
 }
 
 /** Convert a pressed mouse wheel event into transcript movement. */

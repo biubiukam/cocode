@@ -69,6 +69,12 @@ type SkillService = {
     }[]
   >
 }
+type LlmService = {
+  listProviders(): readonly { id: string; name?: string }[]
+  listModels(provider: string): Promise<
+    readonly { id: string; name?: string; description?: string }[]
+  >
+}
 type PersistenceService = {
   list(): Promise<
     readonly {
@@ -200,10 +206,14 @@ export class TuiCompanionGateway {
 
   /** Advertise only services that are actually present in this composition. */
   capabilities(): CompanionCapabilities {
+    const llm = this.ctx.get('llm') as
+      | { listProviders?: unknown; listModels?: unknown }
+      | undefined
     return {
       protocolVersion: 1,
       promptModes: ['normal', 'queue', 'steer'],
       skills: this.ctx.get('skills') !== undefined,
+      modelList: typeof llm?.listProviders === 'function' && typeof llm.listModels === 'function',
       approval: this.ctx.get('approval') !== undefined,
       permissionMode: this.ctx.get('permissionPresets') !== undefined,
       planMode: this.ctx.get('planMode') !== undefined,
@@ -491,6 +501,43 @@ export class TuiCompanionGateway {
     }
   }
 
+  async listModels(): Promise<{
+    groups: Record<string, unknown>[]
+    failures: Record<string, unknown>[]
+  }> {
+    const llm = this.ctx.get('llm') as
+      | { listProviders?: unknown; listModels?: unknown }
+      | undefined
+    if (typeof llm?.listProviders !== 'function' || typeof llm.listModels !== 'function') {
+      throw new Error('model/list capability is unavailable: llm is not configured')
+    }
+    const service = llm as LlmService
+    const groups: Record<string, unknown>[] = []
+    const failures: Record<string, unknown>[] = []
+    for (const provider of service.listProviders()) {
+      const name = provider.name ?? provider.id
+      try {
+        const models = await service.listModels(provider.id)
+        groups.push({
+          id: provider.id,
+          name,
+          models: models.map((model) => ({
+            id: model.id,
+            name: model.name ?? model.id,
+            ...(model.description === undefined ? {} : { description: model.description }),
+          })),
+        })
+      } catch (error) {
+        failures.push({
+          id: provider.id,
+          name,
+          message: safeModelCatalogError(error),
+        })
+      }
+    }
+    return { groups, failures }
+  }
+
   async respondQuestion(params: Record<string, unknown>): Promise<Record<string, never>> {
     const requestId = stringValue(params.requestId)
     const pending = requestId === undefined ? undefined : this.pendingQuestions.get(requestId)
@@ -552,6 +599,9 @@ export class TuiCompanionGateway {
       case 'cocode/skills/list':
       case 'skills/list':
         return this.listSkills(params as { sessionId: string })
+      case 'cocode/model/list':
+      case 'model/list':
+        return this.listModels()
       case 'cocode/permission/mode':
       case 'permission/mode':
         return this.permissionMode(params as { sessionId: string; mode?: string })
@@ -746,6 +796,20 @@ export class TuiCompanionGateway {
     if (failures.length > 1) throw new AggregateError(failures, 'TUI companion teardown failed')
     return {}
   }
+}
+
+function safeModelCatalogError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error)
+  const redacted = message
+    .replace(/https?:\/\/[^\s]+/gi, '[redacted endpoint]')
+    .replace(
+      /\b(?:api[-_ ]?key|access[-_ ]?token|authorization|auth|token|secret|password)\s*[:=]\s*(?:Bearer\s+)?[^\s,;]+/gi,
+      '[redacted]',
+    )
+    .replace(/\b(?:sk-|sk_|ck_(?:live|test)_)[A-Za-z0-9_-]+/g, '[redacted]')
+    .replace(/[\r\n]+/g, ' ')
+    .trim()
+  return redacted.length > 240 ? `${redacted.slice(0, 237)}...` : redacted
 }
 
 function createUserMessage(content: ContentBlock[]): UserMessage {

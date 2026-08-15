@@ -113,8 +113,69 @@ describe('TuiCompanionGateway', () => {
       permissionMode: false,
       planMode: false,
       sessionList: false,
+      modelList: false,
       interactions: 'notification-response',
       checkpoint: false,
+    })
+  })
+
+  it('lists every available model group while preserving provider failures', async () => {
+    const { gateway } = createGateway({
+      services: {
+        llm: {
+          listProviders() {
+            return [
+              { id: 'provider-a', name: 'Provider A' },
+              { id: 'provider-b', name: 'Provider B' },
+              { id: 'provider-c', name: 'Provider C' },
+            ]
+          },
+          async listModels(provider: string) {
+            if (provider === 'provider-b') throw new Error('catalog unavailable')
+            if (provider === 'provider-c') return []
+            return [
+              { id: 'model-a', name: 'Model A', description: 'Primary model' },
+              { id: 'model-b', name: 'Model B' },
+            ]
+          },
+        },
+      },
+    })
+
+    expect(gateway.capabilities().modelList).toBe(true)
+    await expect(gateway.listModels()).resolves.toEqual({
+      groups: [
+        {
+          id: 'provider-a',
+          name: 'Provider A',
+          models: [
+            { id: 'model-a', name: 'Model A', description: 'Primary model' },
+            { id: 'model-b', name: 'Model B' },
+          ],
+        },
+        { id: 'provider-c', name: 'Provider C', models: [] },
+      ],
+      failures: [
+        { id: 'provider-b', name: 'Provider B', message: 'catalog unavailable' },
+      ],
+    })
+  })
+
+  it('redacts provider error details from the model catalog', async () => {
+    const { gateway } = createGateway({
+      services: {
+        llm: {
+          listProviders: () => [{ id: 'provider', name: 'Provider' }],
+          async listModels() {
+            throw new Error('GET https://api.example.test/models?api_key=sk-secret failed')
+          },
+        },
+      },
+    })
+
+    await expect(gateway.listModels()).resolves.toEqual({
+      groups: [],
+      failures: [{ id: 'provider', name: 'Provider', message: 'GET [redacted endpoint] failed' }],
     })
   })
 
@@ -143,6 +204,13 @@ describe('TuiCompanionGateway', () => {
     await expect(gateway.listSkills({ sessionId: 'session-a' })).rejects.toThrow(
       'skills registry is not configured',
     )
+  })
+
+  it('rejects model listing when the LLM service is absent', async () => {
+    const { gateway } = createGateway()
+    await gateway.initialize({ cwd: '/tmp/project', provider: 'provider', model: 'model' })
+    expect(gateway.capabilities().modelList).toBe(false)
+    await expect(gateway.listModels()).rejects.toThrow('llm is not configured')
   })
 
   it('enables plan mode before the first prompt without creating a session on read', async () => {

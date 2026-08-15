@@ -125,14 +125,22 @@ export function Inspector(props: { snapshot: TuiSnapshot; locale: UiLocale }) {
           </>
         ) : null}
         {snapshot.status.todos.length > 0 ? (
-          <Line
-            label={text(locale, 'inspectorTodos')}
-            value={`${completedTodos}/${snapshot.status.todos.length}`}
-          />
+          <>
+            <Line
+              label={text(locale, 'inspectorTodos')}
+              value={`${completedTodos}/${snapshot.status.todos.length}`}
+            />
+          </>
         ) : null}
         {snapshot.status.agentPreset !== undefined ? (
           <Line label="preset" value={snapshot.status.agentPreset} />
         ) : null}
+      </Section>
+      <Section title={text(locale, 'inspectorShortcuts')}>
+        <Shortcut text={text(locale, 'footerScroll')} />
+        <Shortcut text={text(locale, 'footerMessages')} />
+        <Shortcut text={text(locale, 'footerMenu')} />
+        <Shortcut text={text(locale, 'footerDetails')} />
       </Section>
     </Box>
   )
@@ -153,6 +161,14 @@ function Line(props: { label: string; value: string; color?: string }) {
   return (
     <Text color={props.color ?? theme.dim} wrap="truncate-end">
       {props.label}: {props.value}
+    </Text>
+  )
+}
+
+function Shortcut(props: { text: string }) {
+  return (
+    <Text color={theme.mute} wrap="truncate-end">
+      {props.text}
     </Text>
   )
 }

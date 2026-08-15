@@ -1,17 +1,18 @@
-import stringWidth from 'string-width'
 import { listWindowStart } from './list-window.ts'
 
-export function modelHeaderHit(props: {
+export function composerModelHit(props: {
   row: number
   x: number
-  provider: string
-  model: string
-  compact: boolean
+  titleRow: number
+  modelStartColumn?: number
+  modelEndColumn?: number
 }): boolean {
-  if (props.row !== 2 || props.x < 3) return false
-  const start = props.compact ? 3 : 6 + stringWidth(props.provider)
-  const end = start + stringWidth(props.model)
-  return props.x >= start && props.x < end
+  if (
+    props.row !== props.titleRow ||
+    props.modelStartColumn === undefined ||
+    props.modelEndColumn === undefined
+  ) return false
+  return props.x >= props.modelStartColumn && props.x < props.modelEndColumn
 }
 
 export type PopupBounds = {

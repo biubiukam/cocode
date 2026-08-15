@@ -18,6 +18,9 @@ import type {
   TuiNotification,
   TuiRuntime,
   TuiSessionOpenResult,
+  TuiModelCatalog,
+  TuiModelCatalogFailure,
+  TuiModelProviderGroup,
 } from './types.ts'
 import { fallbackCapabilitySnapshot, probeRuntimeCapabilities } from './capability.ts'
 
@@ -234,6 +237,13 @@ class SdkTuiRuntime implements TuiRuntime {
     return rows.map(parseSessionSummary)
   }
 
+  async listModels(): Promise<TuiModelCatalog> {
+    const client = this.requireClient()
+    this.requireCapability('modelList')
+    const result = await client.request(this.wireMethod('cocode/model/list', 'model/list'))
+    return parseModelCatalogResult(result)
+  }
+
   async permissionMode(
     sessionId: string,
     mode?: string,
@@ -352,6 +362,7 @@ class SdkTuiRuntime implements TuiRuntime {
           permissionMode: companion.permissionMode,
           planMode: companion.planMode,
           sessionList: companion.sessionList,
+          modelList: companion.modelList,
           promptMode: companion.promptModes.includes('steer'),
           queueMode: companion.promptModes.includes('queue'),
         },
@@ -454,6 +465,7 @@ type CompanionCapabilities = {
   permissionMode: boolean
   planMode: boolean
   sessionList: boolean
+  modelList: boolean
   interactions: 'notification-response'
   checkpoint: false
   skills: boolean
@@ -476,7 +488,8 @@ function parseCompanionCapabilities(value: unknown): CompanionCapabilities | und
     typeof value.approval !== 'boolean' ||
     typeof value.permissionMode !== 'boolean' ||
     typeof value.planMode !== 'boolean' ||
-    typeof value.sessionList !== 'boolean'
+    typeof value.sessionList !== 'boolean' ||
+    (value.modelList !== undefined && typeof value.modelList !== 'boolean')
   ) {
     return undefined
   }
@@ -487,6 +500,7 @@ function parseCompanionCapabilities(value: unknown): CompanionCapabilities | und
     permissionMode: value.permissionMode,
     planMode: value.planMode,
     sessionList: value.sessionList,
+    modelList: value.modelList === true,
     interactions: 'notification-response',
     checkpoint: false,
     skills: value.skills === true,
@@ -560,8 +574,56 @@ function parseRuntimeAdvertisement(value: Record<string, unknown>): TuiRuntimeAd
     permissionMode: value.permissionMode === true,
     planMode: value.planMode === true,
     sessionList: value.sessionList === true,
+    modelList: value.modelList === true,
     checkpoint: false,
   }
+}
+
+export function parseModelCatalogResult(value: unknown): TuiModelCatalog {
+  if (!isRecord(value) || !Array.isArray(value.groups) || !Array.isArray(value.failures)) {
+    throw new Error('model/list returned an invalid catalog')
+  }
+  const groups: TuiModelProviderGroup[] = value.groups.map((group) => {
+    if (
+      !isRecord(group) ||
+      typeof group.id !== 'string' ||
+      typeof group.name !== 'string' ||
+      !Array.isArray(group.models)
+    ) {
+      throw new Error('model/list returned an invalid provider group')
+    }
+    return {
+      id: group.id,
+      name: group.name,
+      models: group.models.map((model) => {
+        if (
+          !isRecord(model) ||
+          typeof model.id !== 'string' ||
+          typeof model.name !== 'string' ||
+          (model.description !== undefined && typeof model.description !== 'string')
+        ) {
+          throw new Error('model/list returned an invalid model entry')
+        }
+        return {
+          id: model.id,
+          name: model.name,
+          ...(model.description === undefined ? {} : { description: model.description }),
+        }
+      }),
+    }
+  })
+  const failures: TuiModelCatalogFailure[] = value.failures.map((failure) => {
+    if (
+      !isRecord(failure) ||
+      typeof failure.id !== 'string' ||
+      typeof failure.name !== 'string' ||
+      typeof failure.message !== 'string'
+    ) {
+      throw new Error('model/list returned an invalid provider failure')
+    }
+    return { id: failure.id, name: failure.name, message: failure.message }
+  })
+  return { groups, failures }
 }
 
 function parseApprovalRequest(params: Record<string, unknown>): TuiApprovalRequest {

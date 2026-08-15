@@ -4,7 +4,6 @@ export type UiLocale = 'zh' | 'en'
 
 type UiKey =
   | 'session'
-  | 'interactive'
   | 'tokensIn'
   | 'tokensOut'
   | 'secret'
@@ -56,6 +55,14 @@ type UiKey =
   | 'modelSwitchCurrent'
   | 'modelSwitchHint'
   | 'modelSwitchPlaceholder'
+  | 'modelCatalogTitle'
+  | 'modelCatalogHint'
+  | 'modelCatalogQuery'
+  | 'modelCatalogEmpty'
+  | 'modelCatalogLoading'
+  | 'modelCatalogUnavailable'
+  | 'modelCatalogFailed'
+  | 'modelCatalogPartial'
   | 'resumeTitle'
   | 'resumeHint'
   | 'resumeQuery'
@@ -172,6 +179,11 @@ type UiKey =
   | 'planUnavailable'
   | 'planEnabled'
   | 'planDisabled'
+  | 'planReviewTitle'
+  | 'planReviewHint'
+  | 'planReviewPreview'
+  | 'planReviewEmpty'
+  | 'planReviewFooter'
   | 'steerSending'
   | 'forkUnavailable'
   | 'forkCreated'
@@ -190,7 +202,6 @@ type UiKey =
 const TEXT: Record<UiLocale, Record<UiKey, string>> = {
   en: {
     session: 'session',
-    interactive: 'interactive',
     tokensIn: 'tokens in',
     tokensOut: 'out',
     secret: 'secret',
@@ -224,11 +235,11 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     footerRunning: 'esc interrupt',
     footerQueueDraft: 'tab queue draft',
     footerRedraw: 'ctrl+l redraw',
-    agentIdle: 'idle',
+    agentIdle: 'ready',
     agentRunning: 'running',
     agentThinking: 'thinking…',
-    agentStarting: 'starting',
-    agentDead: 'dead',
+    agentStarting: 'connecting…',
+    agentDead: 'runtime stopped',
     emptyTitle: 'cocode is ready',
     emptyHint: 'Ask a question or describe a task to start.',
     langChanged: 'Language: {lang}',
@@ -242,6 +253,14 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     modelSwitchCurrent: 'current: {model}',
     modelSwitchHint: 'type a model id · enter apply · esc close',
     modelSwitchPlaceholder: 'model id',
+    modelCatalogTitle: 'Available models',
+    modelCatalogHint: 'type to filter · ↑↓ select · enter apply · esc close',
+    modelCatalogQuery: 'filter: {query}',
+    modelCatalogEmpty: 'No model catalog is available; enter a model id manually.',
+    modelCatalogLoading: 'Loading model catalog…',
+    modelCatalogUnavailable: 'This runtime has no model catalog; enter a model id manually.',
+    modelCatalogFailed: 'Could not load model catalog',
+    modelCatalogPartial: 'Some providers could not be listed.',
     resumeTitle: 'Recent sessions',
     resumeHint: 'type to filter · ↑↓ select · enter choose · esc close',
     resumeQuery: 'filter: {query}',
@@ -358,6 +377,11 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     planUnavailable: 'Plan mode is unavailable in this runtime.',
     planEnabled: 'Plan mode enabled.',
     planDisabled: 'Plan mode disabled.',
+    planReviewTitle: 'Plan review',
+    planReviewHint: '↑↓ choose · pgup/pgdn scroll · enter confirm · esc cancel',
+    planReviewPreview: 'Plan preview',
+    planReviewEmpty: 'The plan preview is empty.',
+    planReviewFooter: '↑↓ choose an action · PgUp/PgDn scroll · Enter confirm · Esc cancel',
     steerSending: 'Sending follow-up at the next tool boundary…',
     forkUnavailable: 'Session fork is unavailable or the turn is still running.',
     forkCreated: 'Created a child session from the current conversation.',
@@ -375,7 +399,6 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
   },
   zh: {
     session: '会话',
-    interactive: '交互模式',
     tokensIn: '输入 token',
     tokensOut: '输出',
     secret: '密钥',
@@ -409,11 +432,11 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     footerRunning: '按 Esc 终止',
     footerQueueDraft: '按 Tab 加入队列',
     footerRedraw: 'Ctrl+L 重绘',
-    agentIdle: '空闲',
+    agentIdle: '就绪',
     agentRunning: '运行中',
     agentThinking: '思考中…',
-    agentStarting: '连接中',
-    agentDead: '已停止',
+    agentStarting: '连接中…',
+    agentDead: '运行时已停止',
     emptyTitle: 'cocode 已准备好',
     emptyHint: '输入问题或描述任务，开始工作。',
     langChanged: '界面语言：{lang}',
@@ -427,6 +450,14 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     modelSwitchCurrent: '当前：{model}',
     modelSwitchHint: '输入模型名称 · 回车应用 · Esc 关闭',
     modelSwitchPlaceholder: '模型名称',
+    modelCatalogTitle: '可用模型',
+    modelCatalogHint: '输入过滤 · ↑↓ 选择 · 回车应用 · Esc 关闭',
+    modelCatalogQuery: '筛选：{query}',
+    modelCatalogEmpty: '没有可用的模型目录，请手动输入模型名称。',
+    modelCatalogLoading: '正在加载模型目录…',
+    modelCatalogUnavailable: '当前 runtime 不提供模型目录，请手动输入模型名称。',
+    modelCatalogFailed: '模型目录加载失败',
+    modelCatalogPartial: '部分 provider 无法列出模型。',
     resumeTitle: '最近会话',
     resumeHint: '输入关键词过滤 · ↑↓ 选择 · 回车确认 · Esc 关闭',
     resumeQuery: '筛选：{query}',
@@ -543,6 +574,11 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     planUnavailable: '当前运行时不支持计划模式。',
     planEnabled: '已启用计划模式。',
     planDisabled: '已关闭计划模式。',
+    planReviewTitle: '计划审阅',
+    planReviewHint: '↑↓ 选择 · PgUp/PgDn 滚动 · 回车确认 · Esc 取消',
+    planReviewPreview: '计划预览',
+    planReviewEmpty: '计划内容为空。',
+    planReviewFooter: '↑↓ 选择操作 · PgUp/PgDn 滚动 · 回车确认 · Esc 取消',
     steerSending: '将在下一个工具步骤完成后发送后续输入……',
     forkUnavailable: '当前无法创建会话分支，或任务仍在运行。',
     forkCreated: '已从当前对话创建子会话。',

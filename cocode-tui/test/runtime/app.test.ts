@@ -10,6 +10,7 @@ import type {
   TuiQuestionRequest,
   TuiRuntime,
   TuiPromptMode,
+  TuiModelCatalog,
 } from '@cocode/tui-connection'
 import { createTuiApp } from '../../src/runtime/app.ts'
 import { P0_CAPABILITIES } from '../../src/runtime/capabilities.ts'
@@ -28,6 +29,8 @@ function fakeRuntime(): TuiRuntime & {
   failStart?: Error
   cancelError?: Error
   failRestartModels: Set<string>
+  modelCatalog: TuiModelCatalog
+  modelListError?: Error
 } {
   const handlers = new Set<(n: TuiNotification) => void>()
   const closeHandlers = new Set<(error?: string) => void>()
@@ -44,6 +47,7 @@ function fakeRuntime(): TuiRuntime & {
     opens: [],
     rewinds: [],
     failRestartModels: new Set(),
+    modelCatalog: { groups: [], failures: [] },
     emit(n) {
       for (const handler of handlers) handler(n)
     },
@@ -69,6 +73,10 @@ function fakeRuntime(): TuiRuntime & {
       const text = typeof blocks[0]?.text === 'string' ? blocks[0].text : ''
       runtime.prompts.push({ sessionId, text, ...(mode === 'normal' ? {} : { mode }) })
       return 'mid-1'
+    },
+    async listModels() {
+      if (runtime.modelListError !== undefined) throw runtime.modelListError
+      return runtime.modelCatalog
     },
     async cancel(sessionId, keepInbox = false) {
       if (runtime.cancelError !== undefined) throw runtime.cancelError
@@ -191,7 +199,13 @@ describe('TuiApp', () => {
         rewind: false,
         skills: false,
         onRequest: false,
+        approval: false,
+        permissionMode: false,
+        planMode: false,
+        sessionList: false,
+        modelList: false,
         queueMode: false,
+        promptMode: false,
       },
       errors: {
         cancel: 'protocol method is not supported by the runtime',
@@ -371,6 +385,80 @@ describe('TuiApp', () => {
     expect(app.snapshot().header.model).toBe('m1')
     expect(app.snapshot().header.sessionId).toBe('s1')
     expect(app.snapshot().notice?.message).toBe('模型切换失败，已恢复为 m1。')
+  })
+
+  it('opens a model picker from /model and switches provider and model', async () => {
+    const runtime = fakeRuntime()
+    runtime.modelCatalog = {
+      groups: [
+        {
+          id: 'p2',
+          name: 'Provider 2',
+          models: [{ id: 'm2', name: 'Model 2' }],
+        },
+      ],
+      failures: [],
+    }
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p1',
+      model: 'm1',
+      sessionId: 's1',
+      capabilities: { ...P0_CAPABILITIES, modelList: true },
+    })
+    await app.start()
+    app.dispatch({ type: 'command', line: '/model' })
+    await expect.poll(() => app.snapshot().modelPicker?.open).toBe(true)
+    expect(app.snapshot().modelPicker?.groups[0]?.id).toBe('p2')
+    app.dispatch({ type: 'model.confirm' })
+    await expect.poll(() => app.snapshot().header.provider).toBe('p2')
+    expect(runtime.restarts).toEqual([{ provider: 'p2', model: 'm2' }])
+    expect(app.snapshot().header.model).toBe('m2')
+    expect(app.snapshot().header.sessionId).not.toBe('s1')
+  })
+
+  it('opens the manual model input for /models when the runtime has no catalog', async () => {
+    const runtime = fakeRuntime()
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm1',
+      capabilities: P0_CAPABILITIES,
+    })
+    await app.start()
+    app.dispatch({ type: 'command', line: '/models' })
+    expect(app.snapshot().modelInputOpen).toBe(true)
+  })
+
+  it('restores both provider and model when a cross-provider switch fails', async () => {
+    const runtime = fakeRuntime()
+    runtime.failRestartModels.add('m2')
+    runtime.modelCatalog = {
+      groups: [{ id: 'p2', name: 'Provider 2', models: [{ id: 'm2', name: 'Model 2' }] }],
+      failures: [],
+    }
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p1',
+      model: 'm1',
+      sessionId: 's1',
+      capabilities: { ...P0_CAPABILITIES, modelList: true },
+      locale: 'zh',
+    })
+    await app.start()
+    app.dispatch({ type: 'command', line: '/model' })
+    await expect.poll(() => app.snapshot().modelPicker?.open).toBe(true)
+    app.dispatch({ type: 'model.confirm' })
+    await expect.poll(() => app.snapshot().agent).toBe('idle')
+    expect(runtime.restarts).toEqual([
+      { provider: 'p2', model: 'm2' },
+      { provider: 'p1', model: 'm1' },
+    ])
+    expect(app.snapshot().header.provider).toBe('p1')
+    expect(app.snapshot().header.model).toBe('m1')
   })
 
   it('resumes a searchable local session from its event log', async () => {
@@ -602,12 +690,12 @@ describe('TuiApp', () => {
       params: { sessionId: 's1', status: 'running' },
     })
 
-    expect(app.snapshot().status.line).toBe('fake-runtime · 思考中…')
+    expect(app.snapshot().status.line).toBe('思考中…')
     runtime.emit({
       method: 'session.status',
       params: { sessionId: 's1', status: 'idle' },
     })
-    expect(app.snapshot().status.line).toBe('fake-runtime · 空闲')
+    expect(app.snapshot().status.line).toBe('就绪')
   })
 
   it('sends /compact through the prompt path', async () => {

@@ -25,6 +25,7 @@ export async function probeRuntimeCapabilities(
     capabilities.permissionMode = options.advertised.permissionMode
     capabilities.planMode = options.advertised.planMode
     capabilities.sessionList = options.advertised.sessionList
+    capabilities.modelList = options.advertised.modelList
     // The running submit path uses `steer`; queue is implemented locally and
     // must not accidentally enable a wire mode the runtime does not advertise.
     capabilities.promptMode = options.advertised.promptModes.includes('steer')
@@ -83,6 +84,12 @@ export async function probeRuntimeCapabilities(
       method: 'session/list',
       params: {},
       validate: (result) => isRecord(result) && Array.isArray(result.sessions),
+    },
+    {
+      name: 'modelList',
+      method: 'model/list',
+      params: {},
+      validate: isModelCatalogResult,
     },
     {
       name: 'permissionMode',
@@ -162,6 +169,7 @@ function emptyCapabilities(onRequest: boolean): TuiCapabilitySnapshot['capabilit
     sessionList: false,
     promptMode: false,
     queueMode: false,
+    modelList: false,
   }
 }
 
@@ -200,6 +208,35 @@ function errorMessage(error: unknown): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function isModelCatalogResult(value: unknown): boolean {
+  if (!isRecord(value) || !Array.isArray(value.groups) || !Array.isArray(value.failures)) {
+    return false
+  }
+  return (
+    value.groups.every(
+      (group) =>
+        isRecord(group) &&
+        typeof group.id === 'string' &&
+        typeof group.name === 'string' &&
+        Array.isArray(group.models) &&
+        group.models.every(
+          (model) =>
+            isRecord(model) &&
+            typeof model.id === 'string' &&
+            typeof model.name === 'string' &&
+            (model.description === undefined || typeof model.description === 'string'),
+        ),
+    ) &&
+    value.failures.every(
+      (failure) =>
+        isRecord(failure) &&
+        typeof failure.id === 'string' &&
+        typeof failure.name === 'string' &&
+        typeof failure.message === 'string',
+    )
+  )
 }
 
 function isForkResult(

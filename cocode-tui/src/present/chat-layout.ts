@@ -6,7 +6,7 @@ import { SKILLS_WINDOW_SIZE } from '../runtime/skills-picker.ts'
 import { CHECKLIST_WINDOW_SIZE } from '../runtime/checklist.ts'
 import { listWindowStart } from './list-window.ts'
 
-const HEADER_ROWS = 3
+export const CHAT_HEADER_ROWS = 2
 const STATUS_ROWS = 2
 const COMPOSER_CHROME_ROWS = 4
 const FOOTER_ROWS = 2
@@ -61,7 +61,7 @@ export function calculateChatLayout(input: ChatLayoutInput): ChatLayout {
   const viewportRows = nonNegativeInteger(input.viewportRows)
   const composerRows = Math.min(MAX_COMPOSER_ROWS, atLeastOne(input.composerLines))
   const baseRows =
-    HEADER_ROWS +
+    CHAT_HEADER_ROWS +
     STATUS_ROWS +
     COMPOSER_CHROME_ROWS +
     FOOTER_ROWS +

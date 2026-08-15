@@ -11,6 +11,7 @@ export type TuiCapabilities = {
   planMode: boolean
   promptMode: boolean
   queueMode: boolean
+  modelList: boolean
   rewind: boolean
   sessionList: 'none' | 'jsonl' | 'rpc'
   skills: boolean
@@ -25,6 +26,7 @@ export const P0_CAPABILITIES: TuiCapabilities = {
   planMode: false,
   promptMode: false,
   queueMode: false,
+  modelList: false,
   rewind: true,
   sessionList: 'none',
   skills: false,

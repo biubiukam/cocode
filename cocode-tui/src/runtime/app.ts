@@ -75,6 +75,14 @@ import {
   type SkillsPickerState,
 } from './skills-picker.ts'
 import {
+  closeModelPicker,
+  createModelPicker,
+  moveModelSelection,
+  selectedModel,
+  setModelQuery,
+  type ModelPickerState,
+} from './model-picker.ts'
+import {
   logoutChannel,
   requestChannelSwitch,
   submitCapturedByok,
@@ -163,6 +171,13 @@ export type TuiAction =
   | { type: 'skills.move'; delta: number }
   | { type: 'skills.close' }
   | { type: 'skills.confirm' }
+  | { type: 'model.open' }
+  | { type: 'model.setQuery'; query: string }
+  | { type: 'model.move'; delta: number }
+  | { type: 'model.close' }
+  | { type: 'model.confirm' }
+  | { type: 'model.input.close' }
+  | { type: 'model.input.submit'; model: string }
   | { type: 'question.answer'; selected: string[]; custom?: string }
   | { type: 'question.cancel' }
   | { type: 'approval.answer'; outcome: TuiApprovalAnswer['outcome'] }
@@ -180,6 +195,7 @@ export type TuiAction =
   | { type: 'checklist.move'; delta: number }
   | { type: 'checklist.close' }
   | { type: 'copyNode'; nodeKey: string }
+  | { type: 'copyText'; text: string }
   | { type: 'review.move'; delta: number }
   | { type: 'review.close' }
   | { type: 'review.confirm' }
@@ -235,6 +251,8 @@ export type TuiSnapshot = {
   rewindPicker?: RewindPickerState
   forkPicker?: RewindPickerState
   skillsPicker?: SkillsPickerState
+  modelPicker?: ModelPickerState
+  modelInputOpen: boolean
   skills: readonly SkillEntry[]
   question?: TuiQuestionSnapshot
   approval?: ApprovalState
@@ -281,6 +299,7 @@ export type TuiCommandCtx = {
   setModel?: (value: string) => void
   resumeSessions?: () => Promise<void>
   showSkillsPicker?: () => void
+  showModelPicker?: () => void
   copyLatestAssistant?: () => void
   toggleFocus?: () => void
   review?: (args: string) => void
@@ -375,6 +394,8 @@ class TuiAppImpl implements TuiApp {
   private rewindPicker: RewindPickerState | undefined
   private forkPicker: RewindPickerState | undefined
   private skillsPicker: SkillsPickerState | undefined
+  private modelPicker: ModelPickerState | undefined
+  private modelInputOpen = false
   private skills: SkillEntry[] = []
   private readonly questions: QuestionCoordinator
   private readonly approvalQueue: PendingApproval[] = []
@@ -562,6 +583,8 @@ class TuiAppImpl implements TuiApp {
       rewindPicker: this.rewindPicker,
       forkPicker: this.forkPicker,
       skillsPicker: this.skillsPicker,
+      modelPicker: this.modelPicker,
+      modelInputOpen: this.modelInputOpen,
       skills: this.skills,
       question: this.questions.snapshot(),
       approval:
@@ -799,6 +822,43 @@ class TuiAppImpl implements TuiApp {
         this.emit()
         return
       }
+      case 'model.open':
+        void this.openModelPicker()
+        return
+      case 'model.setQuery':
+        if (this.modelPicker !== undefined) {
+          this.modelPicker = setModelQuery(this.modelPicker, action.query)
+          this.emit()
+        }
+        return
+      case 'model.move':
+        if (this.modelPicker !== undefined) {
+          this.modelPicker = moveModelSelection(this.modelPicker, action.delta)
+          this.emit()
+        }
+        return
+      case 'model.close':
+        if (this.modelPicker !== undefined) {
+          this.modelPicker = closeModelPicker(this.modelPicker)
+          this.emit()
+        }
+        return
+      case 'model.confirm': {
+        if (this.modelPicker === undefined) return
+        const selected = selectedModel(this.modelPicker)
+        this.modelPicker = closeModelPicker(this.modelPicker)
+        if (selected !== undefined) void this.switchModel(selected.providerId, selected.model.id)
+        this.emit()
+        return
+      }
+      case 'model.input.close':
+        this.modelInputOpen = false
+        this.emit()
+        return
+      case 'model.input.submit':
+        this.modelInputOpen = false
+        this.setModel(action.model)
+        return
       case 'question.answer':
         this.questions.answer(action.selected, action.custom)
         return
@@ -862,6 +922,9 @@ class TuiAppImpl implements TuiApp {
         return
       case 'copyNode':
         this.copyNode(action.nodeKey)
+        return
+      case 'copyText':
+        if (action.text !== '') this.copyText(action.text)
         return
       case 'review.move':
         if (this.reviewPicker !== undefined) {
@@ -1023,18 +1086,10 @@ class TuiAppImpl implements TuiApp {
         this.emit()
       },
       setModel: (value) => {
-        const model = value.trim()
-        if (model === '') {
-          this.notice = { tone: 'info', message: text(this.locale, 'modelUsage') }
-          this.emit()
-          return
-        }
-        if (this.agent === 'running' || this.agent === 'starting') {
-          this.notice = { tone: 'info', message: text(this.locale, 'modelBusy') }
-          this.emit()
-          return
-        }
-        void this.switchModel(model)
+        this.setModel(value)
+      },
+      showModelPicker: () => {
+        void this.openModelPicker()
       },
       locale: this.locale,
       ...(this.capabilities.sessionList === 'rpc'
@@ -1545,7 +1600,57 @@ class TuiAppImpl implements TuiApp {
     this.emit()
   }
 
-  private async switchModel(model: string): Promise<void> {
+  private setModel(value: string): void {
+    const model = value.trim()
+    if (model === '') {
+      this.notice = { tone: 'info', message: text(this.locale, 'modelUsage') }
+      this.emit()
+      return
+    }
+    if (this.agent === 'running' || this.agent === 'starting') {
+      this.notice = { tone: 'info', message: text(this.locale, 'modelBusy') }
+      this.emit()
+      return
+    }
+    void this.switchModel(this.provider, model)
+  }
+
+  private async openModelPicker(): Promise<void> {
+    if (this.agent === 'running' || this.agent === 'starting') {
+      this.notice = { tone: 'info', message: text(this.locale, 'modelBusy') }
+      this.emit()
+      return
+    }
+    if (!this.capabilities.modelList || this.runtime.listModels === undefined) {
+      this.modelInputOpen = true
+      this.notice = { tone: 'info', message: text(this.locale, 'modelCatalogUnavailable') }
+      this.emit()
+      return
+    }
+    this.notice = { tone: 'info', message: text(this.locale, 'modelCatalogLoading') }
+    this.emit()
+    try {
+      const catalog = await this.runtime.listModels()
+      if (catalog.groups.every((group) => group.models.length === 0)) {
+        this.modelInputOpen = true
+        this.notice = { tone: 'info', message: text(this.locale, 'modelCatalogEmpty') }
+      } else {
+        this.modelInputOpen = false
+        this.modelPicker = createModelPicker(catalog, this.provider, this.model)
+        this.notice =
+          catalog.failures.length === 0
+            ? undefined
+            : { tone: 'info', message: text(this.locale, 'modelCatalogPartial') }
+      }
+    } catch {
+      this.modelInputOpen = true
+      this.notice = { tone: 'error', message: text(this.locale, 'modelCatalogFailed') }
+    }
+    this.emit()
+  }
+
+  private async switchModel(provider: string, model: string): Promise<void> {
+    const previousProvider = this.provider
     const previous = this.model
     this.clearQueuedPrompts()
     this.agent = 'starting'
@@ -1555,7 +1660,8 @@ class TuiAppImpl implements TuiApp {
     }
     this.emit()
     try {
-      const info = await this.runtime.restart({ cwd: this.cwd, provider: this.provider, model })
+      const info = await this.runtime.restart({ cwd: this.cwd, provider, model })
+      this.provider = provider
       this.model = model
       this.runtimeName = info.name
       this.refreshRuntimeCapabilities()
@@ -1576,9 +1682,10 @@ class TuiAppImpl implements TuiApp {
       try {
         const info = await this.runtime.restart({
           cwd: this.cwd,
-          provider: this.provider,
+          provider: previousProvider,
           model: previous,
         })
+        this.provider = previousProvider
         this.model = previous
         this.runtimeName = info.name
         this.refreshRuntimeCapabilities()

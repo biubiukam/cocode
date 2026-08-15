@@ -3,41 +3,39 @@ import {
   approvalActionAtRow,
   actionMenuItemIndexAtRow,
   listItemIndexAtRow,
-  modelHeaderHit,
+  composerModelHit,
   popupContains,
   questionCustomRow,
   questionOptionIndexAtRow,
 } from '../../src/present/mouse-hit.ts'
 
 describe('mouse hit zones', () => {
-  it('maps the visible model label to a clickable header range', () => {
-    expect(modelHeaderHit({
-      row: 2,
-      x: 23,
-      provider: 'deepseek-official',
-      model: 'm1',
-      compact: false,
+  it('maps the visible composer model label to its clickable range', () => {
+    expect(composerModelHit({
+      row: 24,
+      x: 31,
+      titleRow: 24,
+      modelStartColumn: 31,
+      modelEndColumn: 33,
     })).toBe(true)
-    expect(modelHeaderHit({
-      row: 2,
-      x: 3,
-      provider: 'deepseek-official',
-      model: 'm1',
-      compact: true,
-    })).toBe(true)
-    expect(modelHeaderHit({
-      row: 2,
-      x: 3,
-      provider: 'deepseek-official',
-      model: 'm1',
-      compact: false,
+    expect(composerModelHit({
+      row: 24,
+      x: 33,
+      titleRow: 24,
+      modelStartColumn: 31,
+      modelEndColumn: 33,
     })).toBe(false)
-    expect(modelHeaderHit({
-      row: 1,
-      x: 23,
-      provider: 'deepseek-official',
-      model: 'm1',
-      compact: false,
+    expect(composerModelHit({
+      row: 23,
+      x: 31,
+      titleRow: 24,
+      modelStartColumn: 31,
+      modelEndColumn: 33,
+    })).toBe(false)
+    expect(composerModelHit({
+      row: 24,
+      x: 31,
+      titleRow: 24,
     })).toBe(false)
   })
   it('maps clicks to the currently visible menu window', () => {

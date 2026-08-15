@@ -97,6 +97,29 @@ export type TuiSessionOpenResult = {
   seed?: SessionEvent[]
 }
 
+export type TuiModel = {
+  id: string
+  name: string
+  description?: string
+}
+
+export type TuiModelProviderGroup = {
+  id: string
+  name: string
+  models: TuiModel[]
+}
+
+export type TuiModelCatalogFailure = {
+  id: string
+  name: string
+  message: string
+}
+
+export type TuiModelCatalog = {
+  groups: TuiModelProviderGroup[]
+  failures: TuiModelCatalogFailure[]
+}
+
 export type TuiLaunch = {
   command: string
   args: string[]
@@ -124,6 +147,7 @@ export type TuiRuntimeCapabilityName =
   | 'sessionList'
   | 'promptMode'
   | 'queueMode'
+  | 'modelList'
 
 export type TuiRuntimeCapabilities = Record<TuiRuntimeCapabilityName, boolean>
 
@@ -133,6 +157,7 @@ export type TuiRuntimeAdvertisement = {
   permissionMode: boolean
   planMode: boolean
   sessionList: boolean
+  modelList: boolean
   checkpoint: false
 }
 
@@ -200,6 +225,7 @@ export type TuiRuntime = {
   ): Promise<{ sessionId: string; seedLength: number; seed: SessionEvent[] }>
   listSkills?(sessionId: string): Promise<SkillEntry[]>
   listSessions?(cwd?: string): Promise<TuiSessionSummary[]>
+  listModels?(): Promise<TuiModelCatalog>
   permissionMode?(
     sessionId: string,
     mode?: string,

@@ -69,6 +69,7 @@ export type CompanionCapabilities = {
   protocolVersion: 1
   promptModes: ('normal' | 'queue' | 'steer')[]
   skills: boolean
+  modelList: boolean
   approval: boolean
   permissionMode: boolean
   planMode: boolean

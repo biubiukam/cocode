@@ -23,6 +23,7 @@ describe('commands', () => {
       'theme',
       'lang',
       'model',
+      'models',
       'export',
       'copy',
       'todos',
@@ -116,6 +117,14 @@ describe('commands', () => {
     expect(models).toEqual(['m2'])
   })
 
+  it('/model without an argument and /models open the model picker', () => {
+    const opened: string[] = []
+    const registry = createBuiltinCommands()
+    registry.find('model', P0_CAPABILITIES)?.run(commandCtx({ showModelPicker: () => opened.push('model') }), '')
+    registry.find('models', P0_CAPABILITIES)?.run(commandCtx({ showModelPicker: () => opened.push('models') }), '')
+    expect(opened).toEqual(['model', 'models'])
+  })
+
   it('/compact sends a prompt-path request', () => {
     const actions: TuiAction[] = []
     const command = createBuiltinCommands().find('compact', P0_CAPABILITIES)
@@ -152,6 +161,7 @@ function commandCtx(
     useAuth: (target: 'byok' | 'cocode' | 'login') => void
     setLocale: (value: string) => void
     setModel: (value: string) => void
+    showModelPicker: () => void
     copyLatestAssistant: () => void
     toggleFocus: () => void
     showChecklist: () => void
@@ -167,6 +177,7 @@ function commandCtx(
     useAuth: overrides.useAuth,
     setLocale: overrides.setLocale,
     setModel: overrides.setModel,
+    showModelPicker: overrides.showModelPicker,
     copyLatestAssistant: overrides.copyLatestAssistant,
     toggleFocus: overrides.toggleFocus,
     showChecklist: overrides.showChecklist,

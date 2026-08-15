@@ -19,6 +19,7 @@ function approvalRuntime(): TuiRuntime & {
       permissionMode: false,
       planMode: false,
       sessionList: false,
+      modelList: false,
       promptMode: false,
       queueMode: false,
     },
