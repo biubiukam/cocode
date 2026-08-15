@@ -14,10 +14,11 @@ export function WhaleLogo(props: { size?: WhaleLogoSize; compact?: boolean; anim
   const frame = useCharacterFrame(animation, animate)
 
   if (size === 'inline') return <InlineFrame frame={frame} />
+  const lines = frame.split('\n')
 
   return (
-    <Box flexDirection="column">
-      {frame.split('\n').map((line, index) => (
+    <Box flexDirection="column" flexShrink={0} height={lines.length}>
+      {lines.map((line, index) => (
         <WhaleFrameLine
           key={`${index}:${line}`}
           line={line}

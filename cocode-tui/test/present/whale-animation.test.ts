@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   INLINE_WHALE_ANIMATION,
+  HORIZONTAL_WHALE_COLUMNS,
+  HORIZONTAL_WHALE_MIN_COLUMNS,
   LARGE_WHALE_ANIMATION,
   MEDIUM_WHALE_ANIMATION,
   SMALL_WHALE_ANIMATION,
@@ -10,8 +12,8 @@ describe('whale animation', () => {
   it('keeps every filled whale frame at a stable size', () => {
     for (const [animation, rows, width] of [
       [LARGE_WHALE_ANIMATION, 14, 68],
-      [MEDIUM_WHALE_ANIMATION, 13, 50],
-      [SMALL_WHALE_ANIMATION, 10, 34],
+      [MEDIUM_WHALE_ANIMATION, 8, 71],
+      [SMALL_WHALE_ANIMATION, 8, 71],
     ] as const) {
       const rowCounts = animation.frames.map((frame) => frame.split('\n').length)
       const widths = animation.frames.flatMap((frame) =>
@@ -46,5 +48,16 @@ describe('whale animation', () => {
   it('keeps the low-height inline animation on one row', () => {
     expect(INLINE_WHALE_ANIMATION.frames.every((frame) => !frame.includes('\n'))).toBe(true)
     expect(new Set(INLINE_WHALE_ANIMATION.frames.map((frame) => frame.length)).size).toBe(1)
+  })
+
+  it('places a small whale to the left of the unchanged wordmark', () => {
+    const frame = SMALL_WHALE_ANIMATION.frames[3]?.split('\n') ?? []
+    const wordmarkColumn = 36
+    expect(HORIZONTAL_WHALE_COLUMNS).toBe(71)
+    expect(HORIZONTAL_WHALE_MIN_COLUMNS).toBe(73)
+    expect(SMALL_WHALE_ANIMATION.accentRows).toBe(3)
+    expect(SMALL_WHALE_ANIMATION.interval).toBe(180)
+    expect(frame[5]?.indexOf('●')).toBeLessThan(wordmarkColumn)
+    expect(frame[3]?.slice(wordmarkColumn)).toBe('█████ █████ █████ █████ ████  █████')
   })
 })
