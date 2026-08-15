@@ -1,7 +1,7 @@
 import { execFile as nodeExecFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { devNull } from 'node:os'
-import { parseDiffSummary } from './diff-summary.ts'
+import { parseDiffSummary, type DiffSummary } from './diff-summary.ts'
 
 const execFile = promisify(nodeExecFile)
 const MAX_PATCH_CHARS = 120_000
@@ -29,6 +29,8 @@ export type GitReview = {
   patch: string
   truncated: boolean
   omittedFiles: readonly string[]
+  /** Bounded structured projection used by the review preview. */
+  diffSummary?: DiffSummary
   prompt: string
 }
 
@@ -142,6 +144,7 @@ export async function collectGitReview(
   const additions = files.reduce((sum, file) => sum + file.additions, 0)
   const deletions = files.reduce((sum, file) => sum + file.deletions, 0)
   const binaryFiles = files.filter((file) => file.binary).length
+  const diffSummary = parseDiffSummary(patch)
   const result: GitReview = {
     scope,
     ...(resolvedBase === undefined ? {} : { base: resolvedBase }),
@@ -152,6 +155,7 @@ export async function collectGitReview(
     patch,
     truncated: truncated || parsed.truncated || untracked.truncated,
     omittedFiles,
+    ...(diffSummary.files.length === 0 ? {} : { diffSummary }),
     prompt: '',
   }
   result.prompt = buildReviewPrompt(result)

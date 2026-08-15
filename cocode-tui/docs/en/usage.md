@@ -82,7 +82,8 @@ Type `/` to open the command menu. Keep typing to filter by prefix. `Tab` or arr
 | `/review`                      | Review Git changes with a bounded, read-only diff preview                                         |
 | `/queue`                       | Inspect, reorder, or remove local queued prompts                                                  |
 | `/permissions` / `/plan`       | Cycle permission mode or toggle plan mode when the runtime advertises them                        |
-| `/fork` / `/clone`             | Create a child session from the current conversation                                              |
+| `/fork`                        | Choose a user message, then create a child session from that boundary                             |
+| `/clone`                       | Create a child session from the current conversation                                              |
 | `/tree`                        | Show the session tree; uses RPC metadata first and JSONL fallback when available                  |
 | `/sessions`                    | Show the runtime session list; available only when RPC session listing is advertised              |
 | `/init`                        | Create a minimal `AGENTS.md` only when the workspace has none                                     |
@@ -96,6 +97,8 @@ Type `/` to open the command menu. Keep typing to filter by prefix. `Tab` or arr
 | `/exit`                        | Shut down TUI and restore the terminal                                                            |
 
 `/resume` reads local session headers, supports text filtering plus `↑` `↓` selection, streams the selected JSONL into a temporary projection, and asks the runtime to reopen the same persisted session before swapping it into the current TUI. Follow-up prompts use the selected session id and continue writing to that session. The TUI does not claim cross-process locking; avoid resuming a session that another client is currently writing.
+
+`/fork` opens a picker of user messages, newest first. Press `↑`/`↓` to choose a boundary, then press Enter twice to confirm. The runtime creates the child session and replaces the current live session through the fork wire. Use `/clone` when you want to copy the complete current conversation without choosing a boundary.
 
 Each picker row includes a short preview generated from the first user message in the session. Control characters and terminal escape sequences are removed, whitespace is collapsed, and the preview is capped at 72 visible characters so a long prompt cannot expand the picker. If the event cannot be read, the picker falls back to the session working directory; when neither value is available it shows `No summary`. The preview is display-only and does not modify the persisted JSONL.
 

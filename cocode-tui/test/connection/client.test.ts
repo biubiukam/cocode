@@ -5,6 +5,30 @@ import { createTuiRuntime } from '../../packages/connection/src/client.ts'
 type ProbeCall = { method: string; params: object; timeoutMs?: number }
 
 describe('runtime capability negotiation', () => {
+  it('does not enable steer when the runtime advertises queue only', async () => {
+    const snapshot = await probeRuntimeCapabilities(
+      {
+        async request() {
+          throw new Error('session does not exist')
+        },
+      },
+      {
+        onRequest: true,
+        advertised: {
+          promptModes: ['normal', 'queue'],
+          approval: false,
+          permissionMode: false,
+          planMode: false,
+          sessionList: false,
+          checkpoint: false,
+        },
+      },
+    )
+
+    expect(snapshot.capabilities.promptMode).toBe(false)
+    expect(snapshot.capabilities.queueMode).toBe(true)
+  })
+
   it('exposes a conservative snapshot before a runtime handshake', () => {
     const runtime = createTuiRuntime({ command: 'node', args: ['unused-runtime.js'] })
 
@@ -22,6 +46,7 @@ describe('runtime capability negotiation', () => {
         planMode: false,
         sessionList: false,
         promptMode: false,
+        queueMode: false,
       },
       errors: { onRequest: 'runtime capability probe has not run' },
     })
@@ -53,6 +78,7 @@ describe('runtime capability negotiation', () => {
         planMode: true,
         sessionList: true,
         promptMode: false,
+        queueMode: false,
       },
       errors: {},
     })
@@ -87,6 +113,7 @@ describe('runtime capability negotiation', () => {
       planMode: false,
       sessionList: false,
       promptMode: false,
+      queueMode: false,
     })
     expect(snapshot.errors).toEqual({
       cancel: 'protocol method is not supported by the runtime',

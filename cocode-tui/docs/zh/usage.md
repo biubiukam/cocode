@@ -82,7 +82,8 @@ DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 | `/review`                      | 使用受限的只读 Diff 预览检查当前 Git 改动                            |
 | `/queue`                       | 查看、调整顺序或删除本地待发送输入                                   |
 | `/permissions` / `/plan`       | 在运行时支持时切换权限模式或计划模式                                 |
-| `/fork` / `/clone`             | 从当前对话创建子会话                                                 |
+| `/fork`                        | 选择一条用户消息，再从该位置创建子会话                               |
+| `/clone`                       | 从当前对话末尾创建子会话                                             |
 | `/tree`                        | 显示会话树；优先使用 RPC 元数据，不可用时回退到 JSONL                |
 | `/sessions`                    | 显示运行时会话列表；只有 runtime 广告 RPC 会话列表时可用             |
 | `/init`                        | 仅在缺少 `AGENTS.md` 时创建最小工作区模板                            |
@@ -96,6 +97,8 @@ DSH_CORDIS_CONFIG=../../cocode-harness/examples/jsonrpc-agent/cordis.cocode.yml
 | `/exit`                        | 关闭 TUI 并恢复终端                                                  |
 
 `/resume` 会读取本地 session header，支持关键词过滤和 `↑` `↓` 选择，以流式方式将选中 JSONL 的事件回放到临时投影，并要求 runtime 重新打开同一个持久化 session 后再替换当前 TUI。后续输入会继续写入选中的 session id。TUI 不负责跨进程写入锁；如果其它客户端正在写同一 session，请不要同时恢复。
+
+`/fork` 会打开用户消息选择器，按最新消息在前排列。使用 `↑`/`↓` 选择分支边界，再连续按两次回车确认。runtime 会通过 fork wire 创建子会话并替换当前活动 session。如果需要复制完整当前对话而不选择边界，使用 `/clone`。
 
 选择器每一行会显示该会话首条用户消息的短摘要。系统会移除控制字符和终端转义序列、合并空白，并限制为最多 72 个可见字符，避免长 prompt 撑开选择器。如果事件读取失败，会回退显示会话工作目录；两者都没有时显示「无摘要」。摘要只用于界面展示，不会修改持久化 JSONL。
 

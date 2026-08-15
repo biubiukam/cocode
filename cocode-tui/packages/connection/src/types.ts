@@ -65,6 +65,9 @@ export type TuiApprovalRequest = {
   toolName: string
   callId?: string
   reason?: string
+  target?: string
+  risk?: string
+  source?: string
 }
 
 /** Approval choices accepted by the harness bridge. */
@@ -120,6 +123,7 @@ export type TuiRuntimeCapabilityName =
   | 'planMode'
   | 'sessionList'
   | 'promptMode'
+  | 'queueMode'
 
 export type TuiRuntimeCapabilities = Record<TuiRuntimeCapabilityName, boolean>
 
@@ -187,6 +191,7 @@ export type TuiRuntime = {
     sourceSessionId: string,
     boundary?: number,
     replaceSessionId?: string,
+    rewindToMessageSeq?: number,
   ): Promise<{ sessionId: string; seedLength: number; seed: SessionEvent[] }>
   rewind(
     sourceSessionId: string,

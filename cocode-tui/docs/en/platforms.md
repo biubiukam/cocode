@@ -14,7 +14,7 @@ Cocode TUI supports Windows, macOS, and Linux. Automated platform simulations an
 | Linux X11                 | Fall back to `xclip` or `xsel`                                                                     |
 | tmux / screen             | Alternate screen, notifications, and mouse controls are disabled to avoid nested terminal glitches |
 
-Use `Ctrl+J` for a newline when `Shift+Enter` is unavailable. Use `Ctrl+M` to change permission mode when `Shift+Tab` is unavailable. Editor, URL opener, clipboard, and terminal notification failures produce notices instead of terminating the session.
+Use `Ctrl+J` for a newline when `Shift+Enter` is unavailable. Use `Ctrl+M` to change permission mode when `Shift+Tab` is unavailable. Editor, URL opener, clipboard, and terminal notifications are best effort; failures do not terminate the session, and clipboard failures produce a notice.
 
 ## Capability detection
 

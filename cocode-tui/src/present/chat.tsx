@@ -16,6 +16,7 @@ import { MessageList } from './components/MessageList.tsx'
 import { ResumePicker } from './components/ResumePicker.tsx'
 import { SessionTreePicker } from './components/SessionTreePicker.tsx'
 import { RewindPicker } from './components/RewindPicker.tsx'
+import { ForkPicker } from './components/ForkPicker.tsx'
 import { QuestionPanel } from './components/QuestionPanel.tsx'
 import { SkillsPicker } from './components/SkillsPicker.tsx'
 import { StatusLine } from './components/StatusLine.tsx'
@@ -41,7 +42,7 @@ import { Inspector, INSPECTOR_WIDTH } from './components/Inspector.tsx'
 import { ReviewPicker } from './components/ReviewPicker.tsx'
 import { ApprovalPanel } from './components/ApprovalPanel.tsx'
 import { QueuePicker } from './components/QueuePicker.tsx'
-import { dispatchKeyCommand, moveSelection } from './chat-input.ts'
+import { dispatchKeyCommand, dispatchPickerInput, moveSelection } from './chat-input.ts'
 
 export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
   const { app } = props
@@ -74,6 +75,8 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
   const resumeItems = snap.resumePicker === undefined ? [] : visibleResumeItems(snap.resumePicker)
   const rewindState = snap.rewindPicker
   const rewindOpen = rewindState?.open === true
+  const forkState = snap.forkPicker
+  const forkOpen = forkState?.open === true
   const skillsState = snap.skillsPicker
   const skillsOpen = skillsState?.open === true
   const questionOpen = snap.question !== undefined
@@ -83,6 +86,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
     !questionOpen &&
     !approvalOpen &&
     !reviewOpen &&
+    !forkOpen &&
     !rewindOpen &&
     !skillsOpen &&
     !resumeOpen &&
@@ -100,6 +104,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
     !questionOpen &&
     !approvalOpen &&
     !reviewOpen &&
+    !forkOpen &&
     !rewindOpen &&
     !skillsOpen &&
     !resumeOpen &&
@@ -143,9 +148,17 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
       : resumeOpen
       ? snap.resumePicker?.selected
       : undefined,
-    rewindItems: rewindOpen ? rewindState.items.length : undefined,
-    rewindSelected: rewindOpen ? rewindState.selected : undefined,
-    rewindConfirming: rewindOpen ? rewindState.confirming : undefined,
+    rewindItems: rewindOpen
+      ? rewindState.items.length
+      : forkOpen
+      ? forkState.items.length
+      : undefined,
+    rewindSelected: rewindOpen ? rewindState.selected : forkOpen ? forkState.selected : undefined,
+    rewindConfirming: rewindOpen
+      ? rewindState.confirming
+      : forkOpen
+      ? forkState.confirming
+      : undefined,
     skillsItems: skillsOpen ? skillsState.skills.length : undefined,
     skillsSelected: skillsOpen ? skillsState.selected : undefined,
     questionRows:
@@ -260,33 +273,15 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
     if (approvalOpen) return
     if (questionOpen) return
     if (reviewOpen) {
-      if (key.escape) {
-        app.dispatch({ type: 'review.close' })
-        return
-      }
-      if (key.upArrow || key.downArrow) {
-        app.dispatch({ type: 'review.move', delta: key.upArrow ? -1 : 1 })
-        return
-      }
-      if (key.return) {
-        app.dispatch({ type: 'review.confirm' })
-        return
-      }
+      dispatchPickerInput(app, 'review', key, false)
       return
     }
     if (rewindOpen) {
-      if (key.escape) {
-        app.dispatch({ type: 'rewind.close' })
-        return
-      }
-      if (!rewindState?.confirming && (key.upArrow || key.downArrow)) {
-        app.dispatch({ type: 'rewind.move', delta: key.upArrow ? -1 : 1 })
-        return
-      }
-      if (key.return) {
-        app.dispatch({ type: 'rewind.confirm' })
-        return
-      }
+      dispatchPickerInput(app, 'rewind', key, rewindState?.confirming ?? false)
+      return
+    }
+    if (forkOpen) {
+      dispatchPickerInput(app, 'fork', key, forkState?.confirming ?? false)
       return
     }
     if (skillsOpen) {
@@ -622,6 +617,13 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
             maxRows={Math.max(1, stdout.rows - 2)}
           />
         ) : null}
+        {forkOpen && forkState !== undefined ? (
+          <ForkPicker
+            state={forkState}
+            locale={snap.locale}
+            maxRows={Math.max(1, stdout.rows - 2)}
+          />
+        ) : null}
       </Box>
     )
   }
@@ -676,6 +678,9 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap }) {
       ) : null}
       {rewindOpen ? (
         <RewindPicker state={rewindState} locale={snap.locale} maxRows={layout.overlayRows} />
+      ) : null}
+      {forkOpen && forkState !== undefined ? (
+        <ForkPicker state={forkState} locale={snap.locale} maxRows={layout.overlayRows} />
       ) : null}
       {skillsOpen && skillsState !== undefined ? (
         <SkillsPicker state={skillsState} locale={snap.locale} maxRows={layout.overlayRows} />

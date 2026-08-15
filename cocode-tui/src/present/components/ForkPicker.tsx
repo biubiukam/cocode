@@ -1,8 +1,9 @@
 import type { RewindPickerState } from '../../runtime/rewind-picker.ts'
 import type { UiLocale } from '../../runtime/ui-locale.ts'
+import { sanitizeSingleLine, truncateText } from '../text-format.ts'
 import { BoundaryPicker } from './BoundaryPicker.tsx'
 
-export function RewindPicker(props: {
+export function ForkPicker(props: {
   state: RewindPickerState
   locale: UiLocale
   maxRows?: number
@@ -12,10 +13,11 @@ export function RewindPicker(props: {
       state={props.state}
       locale={props.locale}
       maxRows={props.maxRows}
-      titleKey="rewindTitle"
-      hintKey="rewindHint"
-      confirmKey="rewindConfirm"
-      emptyKey="rewindEmpty"
+      titleKey="forkTitle"
+      hintKey="forkHint"
+      confirmKey="forkConfirm"
+      emptyKey="forkEmpty"
+      formatItem={(value) => truncateText(sanitizeSingleLine(value), 72)}
     />
   )
 }

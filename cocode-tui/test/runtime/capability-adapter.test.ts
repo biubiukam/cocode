@@ -20,6 +20,7 @@ const snapshot: TuiCapabilitySnapshot = {
     planMode: false,
     sessionList: true,
     promptMode: true,
+    queueMode: true,
   },
   errors: {},
 }
@@ -38,6 +39,7 @@ describe('capability adapter', () => {
       permissionMode: true,
       planMode: false,
       promptMode: true,
+      queueMode: true,
       sessionList: 'rpc',
     })
   })

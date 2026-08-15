@@ -20,6 +20,7 @@ function approvalRuntime(): TuiRuntime & {
       planMode: false,
       sessionList: false,
       promptMode: false,
+      queueMode: false,
     },
     errors: {},
   }

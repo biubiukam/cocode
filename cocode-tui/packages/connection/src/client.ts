@@ -205,6 +205,7 @@ class SdkTuiRuntime implements TuiRuntime {
     sourceSessionId: string,
     boundary?: number,
     replaceSessionId?: string,
+    rewindToMessageSeq?: number,
   ): Promise<{ sessionId: string; seedLength: number; seed: SessionEvent[] }> {
     const client = this.requireClient()
     this.requireCapability('fork')
@@ -212,6 +213,7 @@ class SdkTuiRuntime implements TuiRuntime {
       sourceSessionId,
       ...(boundary === undefined ? {} : { boundary }),
       ...(replaceSessionId === undefined ? {} : { replaceSessionId }),
+      ...(rewindToMessageSeq === undefined ? {} : { rewindToMessageSeq }),
     })
     return parseSessionForkResult(result, 'fork')
   }
@@ -466,6 +468,9 @@ function parseApprovalRequest(params: Record<string, unknown>): TuiApprovalReque
     toolName: params.toolName,
     ...(typeof params.callId === 'string' ? { callId: params.callId } : {}),
     ...(typeof params.reason === 'string' ? { reason: params.reason } : {}),
+    ...(typeof params.target === 'string' ? { target: params.target } : {}),
+    ...(typeof params.risk === 'string' ? { risk: params.risk } : {}),
+    ...(typeof params.source === 'string' ? { source: params.source } : {}),
   }
 }
 

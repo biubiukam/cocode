@@ -38,3 +38,39 @@ export function dispatchKeyCommand(app: TuiApp, id: string, draft: string): void
       return
   }
 }
+
+type PickerKey = {
+  escape?: boolean
+  upArrow?: boolean
+  downArrow?: boolean
+  return?: boolean
+}
+
+/** Route common selection-picker keys without coupling Chat to picker state. */
+export function dispatchPickerInput(
+  app: TuiApp,
+  picker: 'review' | 'rewind' | 'fork',
+  key: PickerKey,
+  confirming: boolean,
+): boolean {
+  if (key.escape) {
+    if (picker === 'review') app.dispatch({ type: 'review.close' })
+    else if (picker === 'rewind') app.dispatch({ type: 'rewind.close' })
+    else app.dispatch({ type: 'fork.close' })
+    return true
+  }
+  if (!confirming && (key.upArrow || key.downArrow)) {
+    const delta = key.upArrow ? -1 : 1
+    if (picker === 'review') app.dispatch({ type: 'review.move', delta })
+    else if (picker === 'rewind') app.dispatch({ type: 'rewind.move', delta })
+    else app.dispatch({ type: 'fork.move', delta })
+    return true
+  }
+  if (key.return) {
+    if (picker === 'review') app.dispatch({ type: 'review.confirm' })
+    else if (picker === 'rewind') app.dispatch({ type: 'rewind.confirm' })
+    else app.dispatch({ type: 'fork.confirm' })
+    return true
+  }
+  return false
+}

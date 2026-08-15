@@ -46,6 +46,12 @@ describe('git review workflow', () => {
     expect(review.prompt).toContain('[severity] file:line')
     expect(review.prompt).toContain('file with space.ts')
     expect(review.prompt).not.toContain('\u001b')
+    expect(review.diffSummary?.files[0]?.lines).toEqual(
+      expect.arrayContaining([
+        { kind: 'remove', text: 'old', oldLine: 1 },
+        { kind: 'add', text: 'new', newLine: 1 },
+      ]),
+    )
     expect(buildReviewPrompt(review)).toBe(review.prompt)
   })
 

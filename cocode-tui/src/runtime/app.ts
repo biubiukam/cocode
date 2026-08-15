@@ -65,14 +65,7 @@ import {
   setResumeQuery,
   type ResumePickerState,
 } from './resume-picker.ts'
-import {
-  closeRewindPicker,
-  confirmRewindSelection,
-  createRewindPicker,
-  moveRewindSelection,
-  selectedRewindItem,
-  type RewindPickerState,
-} from './rewind-picker.ts'
+import { createRewindPicker, type RewindPickerState } from './rewind-picker.ts'
 import {
   closeSkillsPicker,
   createSkillsPicker,
@@ -114,6 +107,7 @@ import {
 import { refreshRuntimeCapabilities } from './capability-adapter.ts'
 import { PromptQueueCoordinator } from './prompt-queue-coordinator.ts'
 import type { PromptQueuePickerState } from './prompt-queue-picker.ts'
+import { routeBoundaryPickerAction } from './action-router.ts'
 import {
   closeSessionTreePicker,
   createSessionTreePicker,
@@ -154,6 +148,10 @@ export type TuiAction =
   | { type: 'rewind.move'; delta: number }
   | { type: 'rewind.close' }
   | { type: 'rewind.confirm' }
+  | { type: 'fork.open' }
+  | { type: 'fork.move'; delta: number }
+  | { type: 'fork.close' }
+  | { type: 'fork.confirm' }
   | { type: 'skills.setQuery'; query: string }
   | { type: 'skills.move'; delta: number }
   | { type: 'skills.close' }
@@ -224,6 +222,7 @@ export type TuiSnapshot = {
   resumePicker?: ResumePickerState
   sessionTreePicker?: SessionTreePickerState
   rewindPicker?: RewindPickerState
+  forkPicker?: RewindPickerState
   skillsPicker?: SkillsPickerState
   skills: readonly SkillEntry[]
   question?: TuiQuestionSnapshot
@@ -277,6 +276,7 @@ export type TuiCommandCtx = {
   forkSession?: () => void
   cloneSession?: () => void
   showSessionTree?: () => Promise<void>
+  showForkPicker?: () => void
   showQueuePicker?: () => void
 }
 
@@ -361,6 +361,7 @@ class TuiAppImpl implements TuiApp {
   private sessionTreePicker: SessionTreePickerState | undefined
   private sessionTitleOverride: string | undefined
   private rewindPicker: RewindPickerState | undefined
+  private forkPicker: RewindPickerState | undefined
   private skillsPicker: SkillsPickerState | undefined
   private skills: SkillEntry[] = []
   private readonly questions: QuestionCoordinator
@@ -406,6 +407,7 @@ class TuiAppImpl implements TuiApp {
     this.unsubscribeApproval = this.runtime.onApproval?.((request) => this.askApproval(request))
     this.unsubscribeRuntimeClose = this.runtime.onClose?.((error) => {
       if (this.exiting) return
+      this.rejectApprovals(new Error(error ?? 'runtime disconnected'))
       this.agent = 'dead'
       this.notice = errorNotice(
         'RUNTIME_STOPPED',
@@ -426,7 +428,7 @@ class TuiAppImpl implements TuiApp {
       this.initError = undefined
       this.notice = undefined
       this.workspaceBranch = (await resolveWorkspaceInfo(this.cwd)).branch
-      await this.refreshPermissionMode()
+      await this.refreshSessionControls()
       await this.loadSkills()
       if (this.exiting) return
     } catch (error) {
@@ -541,6 +543,7 @@ class TuiAppImpl implements TuiApp {
       resumePicker: this.resumePicker,
       sessionTreePicker: this.sessionTreePicker,
       rewindPicker: this.rewindPicker,
+      forkPicker: this.forkPicker,
       skillsPicker: this.skillsPicker,
       skills: this.skills,
       question: this.questions.snapshot(),
@@ -697,27 +700,52 @@ class TuiAppImpl implements TuiApp {
         return
       case 'rewind.move':
         if (this.rewindPicker !== undefined) {
-          this.rewindPicker = moveRewindSelection(this.rewindPicker, action.delta)
+          this.rewindPicker = routeBoundaryPickerAction(this.rewindPicker, {
+            type: 'move',
+            delta: action.delta,
+          }).state
           this.emit()
         }
         return
       case 'rewind.close':
         if (this.rewindPicker !== undefined) {
-          this.rewindPicker = closeRewindPicker(this.rewindPicker)
+          this.rewindPicker = routeBoundaryPickerAction(this.rewindPicker, { type: 'close' }).state
           this.emit()
         }
         return
       case 'rewind.confirm':
         if (this.rewindPicker === undefined) return
-        if (!this.rewindPicker.confirming) {
-          this.rewindPicker = confirmRewindSelection(this.rewindPicker)
-          this.emit()
-          return
-        }
         {
-          const selected = selectedRewindItem(this.rewindPicker)
-          this.rewindPicker = closeRewindPicker(this.rewindPicker)
-          if (selected !== undefined) void this.rewindSession(selected)
+          const transition = routeBoundaryPickerAction(this.rewindPicker, { type: 'confirm' })
+          this.rewindPicker = transition.state
+          if (transition.selected !== undefined) void this.rewindSession(transition.selected)
+          this.emit()
+        }
+        return
+      case 'fork.open':
+        this.openForkPicker()
+        return
+      case 'fork.move':
+        if (this.forkPicker !== undefined) {
+          this.forkPicker = routeBoundaryPickerAction(this.forkPicker, {
+            type: 'move',
+            delta: action.delta,
+          }).state
+          this.emit()
+        }
+        return
+      case 'fork.close':
+        if (this.forkPicker !== undefined) {
+          this.forkPicker = routeBoundaryPickerAction(this.forkPicker, { type: 'close' }).state
+          this.emit()
+        }
+        return
+      case 'fork.confirm':
+        if (this.forkPicker === undefined) return
+        {
+          const transition = routeBoundaryPickerAction(this.forkPicker, { type: 'confirm' })
+          this.forkPicker = transition.state
+          if (transition.selected !== undefined) void this.forkSession(transition.selected.seq)
           this.emit()
         }
         return
@@ -1024,24 +1052,40 @@ class TuiAppImpl implements TuiApp {
         void this.cloneSession()
       },
       showSessionTree: () => this.showSessionTree(),
+      showForkPicker: () => this.openForkPicker(),
       showQueuePicker: () => this.openQueuePicker(),
     })
   }
 
-  private async forkSession(): Promise<void> {
+  private async forkSession(rewindToMessageSeq?: number): Promise<void> {
     if (!this.capabilities.fork || this.agent !== 'idle') {
       this.notice = { tone: 'info', message: text(this.locale, 'forkUnavailable') }
       this.emit()
       return
     }
+    const previousSessionId = this.sessionId
+    this.agent = 'starting'
+    this.notice = { tone: 'info', message: text(this.locale, 'forkLoading') }
+    this.emit()
     try {
-      const result = await this.runtime.fork(this.sessionId, this.assembler.snapshot().length)
+      const result =
+        rewindToMessageSeq === undefined
+          ? await this.runtime.fork(previousSessionId, undefined, previousSessionId)
+          : await this.runtime.fork(
+              previousSessionId,
+              undefined,
+              previousSessionId,
+              rewindToMessageSeq,
+            )
       this.sessionId = result.sessionId
       this.sessionTitleOverride = undefined
       this.replaceSessionProjection(result.seed)
       this.clearQueuedPrompts()
+      await this.refreshSessionControls()
+      this.agent = 'idle'
       this.notice = { tone: 'info', message: text(this.locale, 'forkCreated') }
     } catch (error) {
+      this.agent = 'idle'
       this.notice = {
         tone: 'error',
         message: `${text(this.locale, 'forkUnavailable')}: ${errorMessage(error)}`,
@@ -1052,6 +1096,27 @@ class TuiAppImpl implements TuiApp {
 
   private async cloneSession(): Promise<void> {
     await this.forkSession()
+  }
+
+  private openForkPicker(): void {
+    if (!this.capabilities.fork || this.agent !== 'idle') {
+      this.notice = { tone: 'info', message: text(this.locale, 'forkUnavailable') }
+      this.emit()
+      return
+    }
+    const users = this.assembler
+      .snapshot()
+      .filter((node): node is Extract<ConversationNode, { kind: 'user' }> => node.kind === 'user')
+    const items = users.reverse().map((node) => ({ id: node.id, seq: node.seq, text: node.text }))
+    if (items.length === 0) {
+      this.notice = { tone: 'info', message: text(this.locale, 'forkEmpty') }
+      this.emit()
+      return
+    }
+    this.forkPicker = createRewindPicker(items)
+    this.helpOpen = false
+    this.notice = undefined
+    this.emit()
   }
 
   private async showSessionTree(): Promise<void> {
@@ -1140,6 +1205,7 @@ class TuiAppImpl implements TuiApp {
       this.resetSubagentActivity()
       this.clearQueuedPrompts()
       this.attachments = []
+      await this.refreshSessionControls()
       this.agent = 'idle'
       this.notice = {
         tone: 'info',
@@ -1277,6 +1343,7 @@ class TuiAppImpl implements TuiApp {
   }
 
   private askApproval(request: TuiApprovalRequest): Promise<TuiApprovalAnswer> {
+    if (!this.capabilities.approval) return Promise.resolve({ outcome: 'unavailable' })
     return new Promise<TuiApprovalAnswer>((resolve, reject) => {
       const pending: PendingApproval = { request, resolve, reject }
       this.approvalQueue.push(pending)
@@ -1311,7 +1378,11 @@ class TuiAppImpl implements TuiApp {
       tone: 'info',
       message: text(
         this.locale,
-        outcome === 'allowed-once' ? 'approvalAllowed' : 'approvalRejected',
+        outcome === 'allowed-once'
+          ? 'approvalAllowed'
+          : outcome === 'allowed-for-turn'
+          ? 'approvalAllowedForTurn'
+          : 'approvalRejected',
       ),
     }
     this.startNextApproval()
@@ -1379,6 +1450,26 @@ class TuiAppImpl implements TuiApp {
     }
   }
 
+  private async refreshPlanMode(): Promise<void> {
+    if (!this.capabilities.planMode || this.runtime.planMode === undefined) {
+      this.planMode = false
+      return
+    }
+    try {
+      const result = await this.runtime.planMode(this.sessionId)
+      this.planMode = result.active
+    } catch {
+      this.planMode = false
+    }
+  }
+
+  private async refreshSessionControls(): Promise<void> {
+    this.permissionMode = 'manual'
+    this.supportedPermissionModes = ['manual']
+    this.planMode = false
+    await Promise.all([this.refreshPermissionMode(), this.refreshPlanMode()])
+  }
+
   private async togglePlanMode(): Promise<void> {
     if (!this.capabilities.planMode || this.runtime.planMode === undefined) {
       this.notice = { tone: 'info', message: text(this.locale, 'planUnavailable') }
@@ -1419,8 +1510,7 @@ class TuiAppImpl implements TuiApp {
       this.assembler.reset()
       this.telemetry.reset()
       this.sessionState.reset()
-      this.permissionMode = 'manual'
-      this.planMode = false
+      await this.refreshSessionControls()
       this.resetSubagentActivity()
       this.agent = 'idle'
       this.notice = {
@@ -1439,6 +1529,7 @@ class TuiAppImpl implements TuiApp {
         this.model = previous
         this.runtimeName = info.name
         this.refreshRuntimeCapabilities()
+        await this.refreshSessionControls()
         this.agent = 'idle'
         this.notice = {
           tone: 'error',
@@ -1478,6 +1569,7 @@ class TuiAppImpl implements TuiApp {
       this.resetSubagentActivity()
       this.clearQueuedPrompts()
       this.attachments = []
+      await this.refreshSessionControls()
       this.agent = 'idle'
       this.notice = {
         tone: 'info',
@@ -1522,6 +1614,7 @@ class TuiAppImpl implements TuiApp {
       this.clearQueuedPrompts()
       this.attachments = []
       this.draft = replaceDraft(this.draft, item.text)
+      await this.refreshSessionControls()
       this.agent = 'idle'
       this.notice = { tone: 'info', message: text(this.locale, 'rewindLoaded') }
     } catch (error) {
@@ -1634,7 +1727,8 @@ class TuiAppImpl implements TuiApp {
     this.agent = 'running'
     this.notice = { tone: 'info', message: text(this.locale, 'queueSending') }
     this.emit()
-    void this.promptWithAttachments(ticket.prompt.text, ticket.prompt.attachments).catch(
+    const mode = this.capabilities.queueMode ? 'queue' : 'normal'
+    void this.promptWithAttachments(ticket.prompt.text, ticket.prompt.attachments, mode).catch(
       (error: unknown) => {
         if (sessionId !== this.sessionId || !this.promptQueue.restore(ticket)) return
         this.notice = { tone: 'error', message: errorMessage(error) }

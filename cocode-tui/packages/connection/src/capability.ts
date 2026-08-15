@@ -25,7 +25,10 @@ export async function probeRuntimeCapabilities(
     capabilities.permissionMode = options.advertised.permissionMode
     capabilities.planMode = options.advertised.planMode
     capabilities.sessionList = options.advertised.sessionList
-    capabilities.promptMode = options.advertised.promptModes.some((mode) => mode !== 'normal')
+    // The running submit path uses `steer`; queue is implemented locally and
+    // must not accidentally enable a wire mode the runtime does not advertise.
+    capabilities.promptMode = options.advertised.promptModes.includes('steer')
+    capabilities.queueMode = options.advertised.promptModes.includes('queue')
   }
   const errors: TuiCapabilitySnapshot['errors'] = {}
 
@@ -158,6 +161,7 @@ function emptyCapabilities(onRequest: boolean): TuiCapabilitySnapshot['capabilit
     planMode: false,
     sessionList: false,
     promptMode: false,
+    queueMode: false,
   }
 }
 

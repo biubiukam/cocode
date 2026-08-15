@@ -9,6 +9,7 @@ import type {
   TuiQuestionAnswer,
   TuiQuestionRequest,
   TuiRuntime,
+  TuiPromptMode,
 } from '@cocode/tui-connection'
 import { createTuiApp } from '../../src/runtime/app.ts'
 import { P0_CAPABILITIES } from '../../src/runtime/capabilities.ts'
@@ -32,7 +33,7 @@ function fakeRuntime(): TuiRuntime & {
   const closeHandlers = new Set<(error?: string) => void>()
   let questionHandler: ((request: TuiQuestionRequest) => Promise<TuiQuestionAnswer>) | undefined
   const runtime: TuiRuntime & {
-    prompts: { sessionId: string; text: string }[]
+    prompts: { sessionId: string; text: string; mode?: TuiPromptMode }[]
     emit: (n: TuiNotification) => void
     failStart?: Error
   } = {
@@ -64,9 +65,9 @@ function fakeRuntime(): TuiRuntime & {
       await runtime.close()
       return runtime.start()
     },
-    async prompt(sessionId, blocks) {
+    async prompt(sessionId, blocks, mode = 'normal') {
       const text = typeof blocks[0]?.text === 'string' ? blocks[0].text : ''
-      runtime.prompts.push({ sessionId, text })
+      runtime.prompts.push({ sessionId, text, ...(mode === 'normal' ? {} : { mode }) })
       return 'mid-1'
     },
     async cancel(sessionId, keepInbox = false) {
@@ -190,6 +191,7 @@ describe('TuiApp', () => {
         rewind: false,
         skills: false,
         onRequest: false,
+        queueMode: false,
       },
       errors: {
         cancel: 'protocol method is not supported by the runtime',
@@ -465,7 +467,7 @@ describe('TuiApp', () => {
     })
     await app.start()
 
-    app.dispatch({ type: 'command', line: '/fork' })
+    app.dispatch({ type: 'command', line: '/clone' })
     await expect.poll(() => app.snapshot().header.sessionId).toBe('forked-session')
     expect(app.snapshot().status.sessionTitle).toBe('Forked title')
     expect(
@@ -473,6 +475,60 @@ describe('TuiApp', () => {
         .snapshot()
         .nodes.some((node) => node.kind === 'user' && node.text.includes('Forked prompt')),
     ).toBe(true)
+  })
+
+  it('forks from a selected user message and replaces the live session', async () => {
+    const runtime = fakeRuntime()
+    const forkCalls: unknown[][] = []
+    runtime.fork = async (...args) => {
+      forkCalls.push(args)
+      return {
+        sessionId: 'forked-at-message',
+        seedLength: 0,
+        seed: [],
+      }
+    }
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 'source-session',
+      capabilities: { ...P0_CAPABILITIES, fork: true },
+    })
+    await app.start()
+    runtime.emit({
+      method: 'session.event',
+      params: {
+        sessionId: 'source-session',
+        event: {
+          type: 'user/message',
+          seq: 2,
+          time: 2,
+          data: { id: 'user-1', content: [{ type: 'text', text: 'first prompt' }] },
+        },
+      },
+    })
+    runtime.emit({
+      method: 'session.event',
+      params: {
+        sessionId: 'source-session',
+        event: {
+          type: 'user/message',
+          seq: 5,
+          time: 5,
+          data: { id: 'user-2', content: [{ type: 'text', text: 'latest prompt' }] },
+        },
+      },
+    })
+
+    app.dispatch({ type: 'command', line: '/fork' })
+    expect(app.snapshot().forkPicker?.open).toBe(true)
+    app.dispatch({ type: 'fork.confirm' })
+    app.dispatch({ type: 'fork.confirm' })
+    await expect.poll(() => app.snapshot().header.sessionId).toBe('forked-at-message')
+    expect(forkCalls).toEqual([['source-session', undefined, 'source-session', 5]])
+    expect(app.snapshot().agent).toBe('idle')
   })
 
   it('prompts only when idle', async () => {
@@ -565,6 +621,36 @@ describe('TuiApp', () => {
         { sessionId: 's1', text: 'second' },
       ])
     expect(app.snapshot().status.queueCount).toBe(0)
+  })
+
+  it('uses the advertised queue wire mode when flushing the local queue', async () => {
+    const runtime = fakeRuntime()
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+      capabilities: { ...P0_CAPABILITIES, queueMode: true },
+    })
+    await app.start()
+    app.dispatch({ type: 'submit', text: 'first' })
+    runtime.emit({
+      method: 'session.status',
+      params: { sessionId: 's1', status: 'running' },
+    })
+    app.dispatch({ type: 'setDraft', text: 'second' })
+    app.dispatch({ type: 'queuePrompt' })
+    runtime.emit({
+      method: 'session.status',
+      params: { sessionId: 's1', status: 'idle' },
+    })
+    await expect
+      .poll(() => runtime.prompts)
+      .toEqual([
+        { sessionId: 's1', text: 'first' },
+        { sessionId: 's1', text: 'second', mode: 'queue' },
+      ])
   })
 
   it('opens queue management and restores a queued prompt to the front', async () => {

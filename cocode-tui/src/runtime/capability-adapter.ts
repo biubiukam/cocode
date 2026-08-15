@@ -23,6 +23,7 @@ export function applyRuntimeCapabilities(
     permissionMode: runtime.capabilities.permissionMode,
     planMode: runtime.capabilities.planMode,
     promptMode: runtime.capabilities.promptMode,
+    queueMode: runtime.capabilities.queueMode,
     sessionList: runtime.capabilities.sessionList
       ? 'rpc'
       : configured.sessionList === 'jsonl'

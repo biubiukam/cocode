@@ -173,7 +173,7 @@ export function createBuiltinCommands(): CommandRegistry {
     summaryZh: '从当前对话创建子会话',
     kind: 'local',
     available: (caps) => caps.fork,
-    run: (ctx) => ctx.forkSession?.(),
+    run: (ctx) => ctx.showForkPicker?.(),
   })
   registry.register({
     name: 'clone',

@@ -116,6 +116,9 @@ async function main(): Promise<void> {
     if (exitStarted) return
     exitStarted = true
     stop()
+    process.stdin.off('end', onInputClosed)
+    process.stdin.off('close', onInputClosed)
+    process.stdout.off('resize', onResize)
     await screen.unmount()
     leaveScreen()
     try {
@@ -131,6 +134,15 @@ async function main(): Promise<void> {
   const stop = app.subscribe(() => {
     if (app.snapshot().exiting) void finish()
   })
+  const onInputClosed = (): void => {
+    if (!exitStarted) app.dispatch({ type: 'quit' })
+  }
+  const onResize = (): void => {
+    if (!exitStarted) app.dispatch({ type: 'redraw' })
+  }
+  process.stdin.once('end', onInputClosed)
+  process.stdin.once('close', onInputClosed)
+  process.stdout.on('resize', onResize)
   await app.start()
   if (app.snapshot().exiting) await finish()
   else {

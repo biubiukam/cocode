@@ -2,6 +2,7 @@ import { Box, Text, useInput } from 'ink'
 import type { TuiAction, TuiApprovalSnapshot } from '../../runtime/app.ts'
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
 import { theme } from '../theme.ts'
+import { sanitizeSingleLine } from '../text-format.ts'
 
 export function ApprovalPanel(props: {
   state: TuiApprovalSnapshot
@@ -39,13 +40,21 @@ export function ApprovalPanel(props: {
         {text(props.locale, 'approvalTitle')}
       </Text>
       <Text color={theme.text} wrap="wrap">
-        {request.toolName}
+        {sanitizeSingleLine(request.toolName)}
       </Text>
-      {request.reason === undefined ? null : (
-        <Text color={theme.dim} wrap="wrap">
-          {request.reason}
-        </Text>
-      )}
+      <Text color={theme.dim} wrap="wrap">
+        {text(props.locale, 'approvalTarget')}:{' '}
+        {sanitizeSingleLine(request.target ?? text(props.locale, 'approvalUnavailableValue'))}
+      </Text>
+      <Text color={theme.dim} wrap="wrap">
+        {text(props.locale, 'approvalRisk')}:{' '}
+        {sanitizeSingleLine(
+          request.risk ?? request.reason ?? text(props.locale, 'approvalUnavailableValue'),
+        )}
+      </Text>
+      <Text color={theme.dim} wrap="wrap">
+        {text(props.locale, 'approvalSource')}: {sanitizeSingleLine(request.source ?? 'runtime')}
+      </Text>
       <Text color={theme.mute} wrap="truncate-end">
         {text(props.locale, 'approvalHint')}
       </Text>

@@ -70,6 +70,7 @@ type UiKey =
   | 'rewindEmpty'
   | 'rewindLoading'
   | 'rewindLoaded'
+  | 'forkLoading'
   | 'rewindConfirm'
   | 'rewindUnavailable'
   | 'subagentsRunning'
@@ -132,12 +133,25 @@ type UiKey =
   | 'reviewFailed'
   | 'reviewSending'
   | 'reviewUsage'
+  | 'reviewBinary'
+  | 'reviewUntracked'
+  | 'reviewTruncated'
+  | 'reviewDiffFolded'
+  | 'reviewFilesFolded'
+  | 'reviewTextFolded'
+  | 'reviewSummary'
+  | 'reviewOmittedFiles'
   | 'approvalTitle'
   | 'approvalHint'
   | 'approvalAllowed'
+  | 'approvalAllowedForTurn'
   | 'approvalRejected'
   | 'approvalUnavailable'
   | 'approvalTimedOut'
+  | 'approvalTarget'
+  | 'approvalRisk'
+  | 'approvalSource'
+  | 'approvalUnavailableValue'
   | 'permissionUnavailable'
   | 'permissionChanged'
   | 'planUnavailable'
@@ -146,6 +160,10 @@ type UiKey =
   | 'steerSending'
   | 'forkUnavailable'
   | 'forkCreated'
+  | 'forkTitle'
+  | 'forkHint'
+  | 'forkConfirm'
+  | 'forkEmpty'
   | 'sessionTreeUnavailable'
   | 'sessionTreeEmpty'
   | 'sessionTreeTitle'
@@ -223,6 +241,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     rewindEmpty: 'No user messages available to rewind.',
     rewindLoading: 'Creating a rewind session…',
     rewindLoaded: 'Rewind ready. Edit the draft and press enter to resend.',
+    forkLoading: 'Creating a child session…',
     rewindConfirm: 'Rewind to this message? Press enter again to confirm · esc cancel',
     rewindUnavailable: 'Rewind is unavailable.',
     subagentsRunning: '{count} subagents running',
@@ -285,12 +304,25 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     reviewFailed: 'Review unavailable',
     reviewSending: 'Sending review context…',
     reviewUsage: 'Use /review, /review working-tree, staged, last-commit, or branch [base].',
+    reviewBinary: 'binary',
+    reviewUntracked: 'untracked',
+    reviewTruncated: 'truncated',
+    reviewDiffFolded: 'diff lines folded',
+    reviewFilesFolded: 'files folded',
+    reviewTextFolded: 'diff text folded',
+    reviewSummary: '{files} files · +{additions}/-{deletions}{binary}{truncated}',
+    reviewOmittedFiles: '… {count} untracked files omitted',
     approvalTitle: 'Approval required',
     approvalHint: 'enter/a allow once · t allow for turn · d/n reject · esc cancel',
     approvalAllowed: 'Tool allowed once.',
+    approvalAllowedForTurn: 'Tool allowed for this turn.',
     approvalRejected: 'Tool request rejected.',
     approvalUnavailable: 'Approval is unavailable; the tool request was not allowed.',
     approvalTimedOut: 'Approval timed out; the tool request was cancelled.',
+    approvalTarget: 'target',
+    approvalRisk: 'risk',
+    approvalSource: 'source',
+    approvalUnavailableValue: 'unavailable',
     permissionUnavailable: 'Permission modes are unavailable in this runtime.',
     permissionChanged: 'Permission mode: {mode}',
     planUnavailable: 'Plan mode is unavailable in this runtime.',
@@ -299,6 +331,10 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     steerSending: 'Sending follow-up at the next tool boundary…',
     forkUnavailable: 'Session fork is unavailable or the turn is still running.',
     forkCreated: 'Created a child session from the current conversation.',
+    forkTitle: 'Fork session',
+    forkHint: '↑↓ select user message · enter confirm · esc close',
+    forkConfirm: 'Fork from this message? Press enter again to confirm · esc cancel',
+    forkEmpty: 'No previous user message can be used as a fork boundary.',
     sessionTreeUnavailable: 'Runtime session tree is unavailable.',
     sessionTreeEmpty: 'No runtime sessions found.',
     sessionTreeTitle: 'Sessions',
@@ -375,6 +411,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     rewindEmpty: '没有可回滚的用户消息。',
     rewindLoading: '正在创建回滚会话…',
     rewindLoaded: '已准备回滚草稿，修改后按回车重新发送。',
+    forkLoading: '正在创建子会话…',
     rewindConfirm: '确定回滚到这条消息？再次回车确认 · Esc 取消',
     rewindUnavailable: '当前无法回滚。',
     subagentsRunning: '{count} 个子代理运行中',
@@ -437,12 +474,25 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     reviewFailed: 'Review 不可用',
     reviewSending: '正在发送 Review 上下文…',
     reviewUsage: '使用 /review、/review working-tree、staged、last-commit 或 branch [base]。',
+    reviewBinary: '二进制',
+    reviewUntracked: '未跟踪',
+    reviewTruncated: '已截断',
+    reviewDiffFolded: 'Diff 行已折叠',
+    reviewFilesFolded: '个文件已折叠',
+    reviewTextFolded: 'Diff 文本已折叠',
+    reviewSummary: '{files} 个文件 · +{additions}/-{deletions}{binary}{truncated}',
+    reviewOmittedFiles: '… {count} 个未跟踪文件未展示',
     approvalTitle: '需要审批',
     approvalHint: '回车/a 允许一次 · t 允许本轮 · d/n 拒绝 · Esc 取消',
     approvalAllowed: '已允许本次工具调用。',
+    approvalAllowedForTurn: '已允许本轮中的工具调用。',
     approvalRejected: '已拒绝工具调用。',
     approvalUnavailable: '审批不可用，工具调用未获允许。',
     approvalTimedOut: '审批超时，工具调用已取消。',
+    approvalTarget: '目标',
+    approvalRisk: '风险',
+    approvalSource: '来源',
+    approvalUnavailableValue: '不可用',
     permissionUnavailable: '当前运行时不支持权限模式。',
     permissionChanged: '权限模式：{mode}',
     planUnavailable: '当前运行时不支持计划模式。',
@@ -451,6 +501,10 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     steerSending: '将在下一个工具步骤完成后发送后续输入……',
     forkUnavailable: '当前无法创建会话分支，或任务仍在运行。',
     forkCreated: '已从当前对话创建子会话。',
+    forkTitle: '创建子会话',
+    forkHint: '↑↓ 选择用户消息 · 回车确认 · Esc 关闭',
+    forkConfirm: '从这条消息创建分支？再次回车确认 · Esc 取消',
+    forkEmpty: '没有可用于创建分支边界的历史用户消息。',
     sessionTreeUnavailable: '当前运行时不支持会话树。',
     sessionTreeEmpty: '没有找到运行时会话。',
     sessionTreeTitle: '会话列表',
