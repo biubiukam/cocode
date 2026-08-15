@@ -2,7 +2,7 @@
 
 [中文](../zh/permissions.md) · [English](./permissions.md)
 
-The harness enforces permission policy. The TUI displays the active mode and returns approval decisions. Permission controls remain unavailable when the runtime does not advertise the required capability.
+The harness enforces permission policy. The TUI displays the active mode and returns approval decisions. The table lists common modes; the runtime's `supportedModes` is authoritative. Permission controls remain unavailable when the runtime does not advertise the required capability.
 
 ## Modes
 

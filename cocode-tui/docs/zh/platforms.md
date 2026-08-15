@@ -14,7 +14,7 @@ Cocode TUI 支持 Windows、macOS 和 Linux。平台检查分为自动化模拟�
 | Linux X11                 | 回退 `xclip` 或 `xsel`                                       |
 | tmux / screen             | 关闭备用屏幕、通知和鼠标控制，避免嵌套终端控制序列冲突       |
 
-`Shift+Enter` 无法识别时使用 `Ctrl+J` 换行；`Shift+Tab` 无法识别时使用 `Ctrl+M` 切换权限模式。外部编辑器、URL opener、剪贴板和终端通知采用 best effort；命令失败不会终止会话，剪贴板操作会显示 notice。
+`Shift+Enter` 无法识别时使用 `Ctrl+J` 换行；`Shift+Tab` 无法识别时使用 `Ctrl+M` 切换权限模式。外部编辑器、URL opener、剪贴板和终端通知采用 best effort；命令失败不会终止会话，URL opener 或剪贴板失败时，会在当前流程支持的情况下显示 notice。
 
 ## 能力探测
 

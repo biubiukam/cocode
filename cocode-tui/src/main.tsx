@@ -32,7 +32,10 @@ if (process.stdin.isTTY !== true || process.stdout.isTTY !== true) {
   process.stderr.write('Cocode TUI requires a TTY.\n')
   process.exitCode = 1
 } else {
-  void main()
+  void main().catch((error: unknown) => {
+    process.stderr.write(`Cocode TUI failed to start: ${displayError(error)}\n`)
+    process.exitCode = 1
+  })
 }
 
 async function main(): Promise<void> {
@@ -119,6 +122,8 @@ async function main(): Promise<void> {
     process.stdin.off('end', onInputClosed)
     process.stdin.off('close', onInputClosed)
     process.stdout.off('resize', onResize)
+    process.off('SIGTERM', onTerminate)
+    process.off('SIGHUP', onTerminate)
     await screen.unmount()
     leaveScreen()
     try {
@@ -140,10 +145,21 @@ async function main(): Promise<void> {
   const onResize = (): void => {
     if (!exitStarted) app.dispatch({ type: 'redraw' })
   }
+  const onTerminate = (): void => {
+    if (!exitStarted) app.dispatch({ type: 'quit' })
+  }
   process.stdin.once('end', onInputClosed)
   process.stdin.once('close', onInputClosed)
   process.stdout.on('resize', onResize)
-  await app.start()
+  process.once('SIGTERM', onTerminate)
+  process.once('SIGHUP', onTerminate)
+  try {
+    await app.start()
+  } catch (error: unknown) {
+    process.stderr.write(`Cocode TUI failed to initialize: ${displayError(error)}\n`)
+    await finish()
+    return
+  }
   if (app.snapshot().exiting) await finish()
   else {
     await new Promise<void>(() => {
@@ -155,14 +171,8 @@ async function main(): Promise<void> {
 function runAuthGate(store: AuthStore): Promise<boolean> {
   return new Promise((resolveDone) => {
     let settled = false
-    const finish = (ok: boolean) => {
-      if (settled) return
-      settled = true
-      unsubscribe()
-      void screen.unmount()
-      resolveDone(ok)
-    }
-
+    let unsubscribe: () => void = () => undefined
+    let screen: ReturnType<typeof render> | undefined = undefined
     const view = (snapshot = store.snapshot()) => (
       <AuthGate
         snapshot={snapshot}
@@ -171,9 +181,31 @@ function runAuthGate(store: AuthStore): Promise<boolean> {
       />
     )
 
+    const onInputClosed = (): void => finish(false)
+    const onInterrupt = (): void => finish(false)
+    const onTerminate = (): void => finish(false)
+    const finish = (ok: boolean) => {
+      if (settled) return
+      settled = true
+      process.stdin.off('end', onInputClosed)
+      process.stdin.off('close', onInputClosed)
+      process.off('SIGINT', onInterrupt)
+      process.off('SIGTERM', onTerminate)
+      process.off('SIGHUP', onTerminate)
+      unsubscribe()
+      void screen?.unmount()
+      resolveDone(ok)
+    }
+
+    process.stdin.once('end', onInputClosed)
+    process.stdin.once('close', onInputClosed)
+    process.once('SIGINT', onInterrupt)
+    process.once('SIGTERM', onTerminate)
+    process.once('SIGHUP', onTerminate)
+
     clearViewport()
-    const screen = render(view())
-    const unsubscribe = store.subscribe(() => {
+    screen = render(view())
+    unsubscribe = store.subscribe(() => {
       const snapshot = store.snapshot()
       if (snapshot.phase === 'ready') {
         finish(true)

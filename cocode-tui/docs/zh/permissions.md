@@ -2,7 +2,7 @@
 
 [中文](./permissions.md) · [English](../en/permissions.md)
 
-权限策略由 harness 执行，TUI 只显示当前模式并转发审批结果。Runtime 没有提供对应 capability 时，权限入口不会显示为可用。
+权限策略由 harness 执行，TUI 只显示当前模式并转发审批结果。下面列出常见模式示例，实际可选项以 runtime 返回的 `supportedModes` 为准。Runtime 没有提供对应 capability 时，权限入口不会显示为可用。
 
 ## 模式
 

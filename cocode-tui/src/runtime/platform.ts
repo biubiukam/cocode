@@ -133,6 +133,18 @@ export function externalOpenCommandForPlatform(
   return { command: 'xdg-open', args: [url] }
 }
 
+export function externalOpenCommandCandidates(
+  url: string,
+  platform: NodeJS.Platform = process.platform,
+  env: NodeJS.ProcessEnv = process.env,
+): ExternalCommand[] {
+  const primary = externalOpenCommandForPlatform(url, platform, env)
+  if (platform === 'linux' && isWslEnvironment(env)) {
+    return [primary, { command: 'xdg-open', args: [url] }]
+  }
+  return [primary]
+}
+
 export function defaultEditorCommand(
   platform: NodeJS.Platform = process.platform,
 ): string[] | undefined {

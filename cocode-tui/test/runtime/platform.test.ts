@@ -5,6 +5,7 @@ import {
   detectMultiplexer,
   detectTerminalEnvironment,
   externalOpenCommandForPlatform,
+  externalOpenCommandCandidates,
   isWslEnvironment,
   pathForPlatform,
 } from '../../src/runtime/platform.ts'
@@ -66,6 +67,10 @@ describe('platform helpers', () => {
       command: 'explorer.exe',
       args: [url],
     })
+    expect(externalOpenCommandCandidates(url, 'linux', { WSL_DISTRO_NAME: 'Ubuntu' })).toEqual([
+      { command: 'explorer.exe', args: [url] },
+      { command: 'xdg-open', args: [url] },
+    ])
     expect(defaultEditorCommand('win32')).toEqual(['notepad.exe'])
     expect(defaultEditorCommand('darwin')).toBeUndefined()
   })
