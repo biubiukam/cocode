@@ -209,7 +209,7 @@ test("an active reserved provider without a managed route is a conflict", async 
 
 test("failed provider activation rolls back the managed route and credential", async () => {
 	const identity = new MemoryVault(validIdentity())
-	const { client } = agency()
+	const { client, createdKeys } = agency()
 	let route: Record<string, unknown> | undefined
 	let credentialConfigured = false
 	const mutations: string[] = []
@@ -260,7 +260,11 @@ test("failed provider activation rolls back the managed route and credential", a
 	assert.equal(route, undefined)
 	assert.equal(credentialConfigured, false)
 	assert.deepEqual(mutations, ["credential:set", "route:set", "route:unset", "credential:unset"])
-	assert.equal(cloudKey.value, undefined)
+	// The key is retained in the Main-only vault so a retry does not mint a
+	// second Desktop key after a later DSH activation failure.
+	assert.equal(cloudKey.value, "ck_test")
+	await service.signIn()
+	assert.deepEqual(createdKeys, ["ck_test"])
 })
 
 test("provider write failure before route creation still rolls back the credential", async () => {
@@ -424,6 +428,140 @@ test("an invalid identity session is cleared after Agency rejects it", async () 
 	await service.hydrate()
 	assert.equal(identity.value, undefined)
 	assert.equal((await service.snapshot()).phase, "signed-out")
+})
+
+test("a desktop-key reauthentication requirement clears identity during hydrate", async () => {
+	const identity = new MemoryVault(validIdentity())
+	const { client } = agency({
+		createDesktopKey: async () => {
+			throw new AgencyHttpError(
+				"could not create a desktop API key (HTTP 403): reauthentication_required",
+				403,
+			)
+		},
+	})
+	const dsh = {
+		currentDefault: async () => ({ provider: "deepseek-official", model: "deepseek-v4-flash" }),
+		describeSettings: async () => ({
+			writable: true,
+			namespaces: [{ ns: "llm-pi-ai", revision: 1, value: { providers: {} } }],
+		}),
+		describeCredentials: async () => ({
+			COCODE_CLOUD_API_KEY: { configured: false, writable: true },
+		}),
+		providers: async (): Promise<ProviderView[]> => [],
+		models: async (): Promise<ModelGroup[]> => [],
+		mutateSettings: async (): Promise<void> => undefined,
+		setCredential: async (): Promise<void> => undefined,
+		unsetCredential: async (): Promise<void> => undefined,
+	} as never
+	const { deps, cloudKey } = dependencies(identity)
+	const service = new AccountService(dsh, client, deps)
+
+	await service.hydrate()
+	assert.equal(identity.value, undefined)
+	assert.equal(cloudKey.value, undefined)
+	assert.equal((await service.snapshot()).phase, "signed-out")
+})
+
+test("desktop-key reauthentication opens a browser reauth gate before retry", async () => {
+	const identity = new MemoryVault(validIdentity())
+	let authorizationState = ""
+	let keyAttempts = 0
+	let callbackCount = 0
+	let route: Record<string, unknown> | undefined
+	let credentialConfigured = false
+	const { client } = agency({
+		startAuthorization: async (input: { state: string }) => {
+			authorizationState = input.state
+			return "https://cocode.agency/authorize"
+		},
+		exchangeCode: async () => ({
+			access_token: "fresh-access",
+			refresh_token: "fresh-refresh",
+			expires_in: 3600,
+		}),
+		createDesktopKey: async () => {
+			keyAttempts += 1
+			if (keyAttempts === 1) {
+				throw new AgencyHttpError(
+					"could not create a desktop API key (HTTP 403): Reauthenticate this browser session within ten minutes before creating a personal API key.",
+					403,
+				)
+			}
+			return "ck_fresh"
+		},
+	})
+	const settings = (): SettingsNamespace[] => [{
+		ns: "llm-pi-ai",
+		revision: route === undefined ? 1 : 2,
+		value: route === undefined ? { providers: {} } : { providers: { "cocode-cloud": route } },
+	}]
+	const dsh = {
+		currentDefault: async () => ({ provider: "deepseek-official", model: "deepseek-v4-flash" }),
+		describeSettings: async () => ({ writable: true, namespaces: settings() }),
+		describeCredentials: async () => ({
+			COCODE_CLOUD_API_KEY: { configured: credentialConfigured, writable: true },
+		}),
+		providers: async (): Promise<ProviderView[]> => route === undefined ? [] : [{
+			provider: "cocode-cloud",
+			displayName: "Cocode Cloud",
+			settingsNs: "llm-pi-ai",
+			settingsPath: ["providers", "cocode-cloud"],
+			active: credentialConfigured,
+		}],
+		models: async (): Promise<ModelGroup[]> => route === undefined ? [] : [{
+			id: "cocode-cloud",
+			name: "Cocode Cloud",
+			models: [{ id: "cloud-model", name: "Cloud Model" }],
+		}],
+		setCredential: async () => {
+			credentialConfigured = true
+		},
+		unsetCredential: async () => {
+			credentialConfigured = false
+		},
+		mutateSettings: async (request: { ops: { op: "set" | "unset"; value?: unknown }[] }) => {
+			const op = request.ops[0]
+			route = op?.op === "set" ? op.value as Record<string, unknown> : undefined
+		},
+	} as never
+	const { deps } = dependencies(identity)
+	const opened: string[] = []
+	const service = new AccountService(dsh, client, {
+		...deps,
+		openExternal: async (url) => {
+			opened.push(url)
+		},
+		listenForCallback: async () => {
+			callbackCount += 1
+			return {
+				redirectUri: "http://127.0.0.1:43123/auth/callback",
+				wait: async () => new URL(
+					`http://127.0.0.1:43123/auth/callback?code=fresh-code&state=${authorizationState}`,
+				),
+				close: () => undefined,
+			}
+		},
+	})
+
+	const snapshot = await service.signIn()
+	assert.equal(snapshot.phase, "error")
+	assert.equal(snapshot.error?.code, "reauthentication-required")
+	assert.equal(callbackCount, 0)
+	assert.equal(keyAttempts, 1)
+	assert.equal(identity.value, undefined)
+	assert.deepEqual(opened, ["https://cocode.agency/login?return_to=%2Faccount"])
+
+	const retried = await service.signIn()
+	assert.equal(retried.phase, "signed-in")
+	assert.equal(callbackCount, 1)
+	assert.equal(keyAttempts, 2)
+	assert.equal(identity.value?.accessToken, "fresh-access")
+	assert.deepEqual(opened, [
+		"https://cocode.agency/login?return_to=%2Faccount",
+		"https://cocode.agency/authorize",
+	])
 })
 
 test("sign out does not send an identity token to a changed Agency origin", async () => {

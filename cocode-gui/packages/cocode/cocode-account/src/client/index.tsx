@@ -51,6 +51,7 @@ const COPY = {
     later: "稍后配置",
     conflict: "本机已有同名 Provider 或凭证，请先在模型设置中处理冲突。",
     cleanupPending: "本地账号已退出，Cocode Cloud 配置将在运行时恢复后继续清理。",
+    reauthentication: "请在浏览器中重新认证 Cocode 账号（十分钟内完成），然后点击重试。",
   },
   en: {
     signIn: "Sign in to Cocode",
@@ -65,6 +66,7 @@ const COPY = {
     later: "Configure later",
     conflict: "A provider or credential with the reserved Cocode name already exists. Resolve it in Models settings first.",
     cleanupPending: "The local account is signed out. Cloud configuration cleanup will resume when the runtime is available.",
+    reauthentication: "Reauthenticate your Cocode account in the browser within ten minutes, then retry.",
   },
 } as const
 
@@ -177,6 +179,7 @@ function accountError(snapshot: AccountSnapshot): string | undefined {
   const t = copy()
   if (snapshot.error?.code === "cloud-provider-conflict") return t.conflict
   if (snapshot.error?.code === "cleanup-pending") return t.cleanupPending
+  if (snapshot.error?.code === "reauthentication-required") return t.reauthentication
   return snapshot.error?.message
 }
 
@@ -242,7 +245,7 @@ function AccountOnboarding({ complete, openSection, store }: OnboardingProps): R
 function AccountAction({ wide, store }: AccountProps): ReturnType<typeof createElement> {
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
   const signedIn = snapshot.phase === "signed-in" || snapshot.phase === "provisioning"
-  const canSignOut = signedIn || snapshot.profile !== null
+  const canSignOut = signedIn || snapshot.error?.code === "cleanup-pending"
   const t = copy()
   const title = accountError(snapshot) ?? (canSignOut ? t.signOutTitle : t.signInTitle)
   return createElement(

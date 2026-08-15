@@ -24,6 +24,26 @@ const CLOUD_NAMESPACE = "llm-pi-ai"
 const CLOUD_PATH = ["providers", CLOUD_PROVIDER] as const
 const CLOUD_CREDENTIAL = "COCODE_CLOUD_API_KEY"
 const CLOUD_KEY_PATTERN = /^ck_[A-Za-z0-9_-]+$/
+const CLOUD_READY_ATTEMPTS = 6
+const CLOUD_READY_RETRY_MS = 100
+
+type AccountStage =
+	| "cleanup"
+	| "callback-server"
+	| "authorization"
+	| "exchange-code"
+	| "identity-refresh"
+	| "profile"
+	| "default-model"
+	| "settings.describe"
+	| "credentials.describe"
+	| "providers"
+	| "cloud-key"
+	| "models"
+	| "credentials.set"
+	| "settings.mutate"
+	| "cloud-verification"
+	| "logout"
 
 export type IdentityState = {
 	readonly origin: string
@@ -183,6 +203,7 @@ export class AccountService {
 	private loaded = false
 	private signInTask: Promise<AccountSnapshot> | undefined
 	private refreshTask: Promise<void> | undefined
+	private stage: AccountStage | undefined
 
 	constructor(
 		private readonly dsh: AccountDshPort,
@@ -206,6 +227,7 @@ export class AccountService {
 	}
 
 	async hydrate(): Promise<void> {
+		this.stage = "cleanup"
 		await this.ensureLoaded()
 		const pending = await this.cleanupPending.read()
 		if (pending !== undefined) {
@@ -230,8 +252,10 @@ export class AccountService {
 			return
 		}
 		try {
+			this.stage = "identity-refresh"
 			this.assertIdentityOrigin(state)
 			state = await this.ensureIdentityAccess(state)
+			this.stage = "profile"
 			const profile = await this.loadIdentityProfile(state.accessToken)
 			const next: IdentityState = { ...state, profile }
 			await this.identity.write(next)
@@ -242,6 +266,11 @@ export class AccountService {
 			})
 			await this.provision(next)
 		} catch (error) {
+			this.logFailure("hydrate", error)
+			if (isReauthenticationRequired(error)) {
+				await this.handleInvalidIdentity(state, { clearCloudKey: false })
+				return
+			}
 			if (error instanceof InvalidIdentityError) {
 				await this.handleInvalidIdentity(state)
 				return
@@ -277,6 +306,7 @@ export class AccountService {
 	}
 
 	async signOut(): Promise<void> {
+		this.stage = "logout"
 		await this.ensureLoaded()
 		const state = await this.identity.read()
 		const existingPending = await this.cleanupPending.read()
@@ -288,9 +318,11 @@ export class AccountService {
 		let cleanupError: unknown
 		if (defaultReady) {
 			try {
+				this.stage = "cleanup"
 				await this.cleanupCloud(pending.managedRoute)
 				await this.cleanupPending.clear()
 			} catch (error) {
+				this.logFailure("sign-out cleanup", error)
 				cleanupError = error
 				await this.writePendingBestEffort(pending)
 			}
@@ -334,16 +366,33 @@ export class AccountService {
 		try {
 			const pending = await this.cleanupPending.read()
 			if (pending !== undefined) {
+				this.stage = "cleanup"
 				await this.finishPendingCleanup(pending)
 				await this.clearIdentity()
 				await this.cloudKey.clear()
 			}
 			let state = await this.identity.read()
+			if (state !== undefined) {
+				try {
+					this.stage = "identity-refresh"
+					this.assertIdentityOrigin(state)
+					state = await this.ensureIdentityAccess(state)
+				} catch (error) {
+					if (!(error instanceof InvalidIdentityError)) throw error
+					// An explicit retry should be able to recover from a stale or rotated
+					// identity in one click instead of returning a signed-out snapshot and
+					// requiring the user to click the button a second time.
+					await this.handleInvalidIdentity(state)
+					state = undefined
+				}
+			}
 			if (state === undefined) {
+				this.stage = "callback-server"
 				const callback = await this.listenForCallback("/auth/callback")
 				try {
 					const { verifier, challenge } = createPkce()
 					const stateValue = base64Url(randomBytes(24))
+					this.stage = "authorization"
 					const authorizationUrl = await this.agency.startAuthorization({
 						redirectUri: callback.redirectUri,
 						state: stateValue,
@@ -355,6 +404,7 @@ export class AccountService {
 						throw new Error("login state mismatch")
 					const code = arrived.searchParams.get("code")
 					if (code === null || code === "") throw new Error("login was not approved")
+					this.stage = "exchange-code"
 					const token = await this.agency.exchangeCode({
 						code,
 						redirectUri: callback.redirectUri,
@@ -371,10 +421,13 @@ export class AccountService {
 					callback.close()
 				}
 			}
+			this.stage = "identity-refresh"
 			this.assertIdentityOrigin(state)
 			state = await this.ensureIdentityAccess(state)
+			this.stage = "profile"
 			const profile = await this.loadIdentityProfile(state.accessToken)
 			state = { ...state, profile }
+			this.stage = "default-model"
 			const currentDefault = await this.dsh.currentDefault()
 			if (state.preLoginDefault === undefined)
 				state = { ...state, preLoginDefault: currentDefault }
@@ -386,6 +439,11 @@ export class AccountService {
 			})
 			return await this.provision(state)
 		} catch (error) {
+			this.logFailure("sign-in", error)
+			if (isReauthenticationRequired(error)) {
+				const invalid = await this.identity.read()
+				return this.handleBrowserReauthentication(invalid)
+			}
 			if (error instanceof InvalidIdentityError) {
 				const invalid = await this.identity.read()
 				if (invalid !== undefined) {
@@ -415,12 +473,15 @@ export class AccountService {
 
 	private async provision(state: IdentityState): Promise<AccountSnapshot> {
 		const baseURL = `${this.agency.getOrigin()}/v1`
+		this.stage = "settings.describe"
 		const settings = await this.dsh.describeSettings()
 		const cloudNamespace = settings.namespaces.find((item) => item.ns === CLOUD_NAMESPACE)
 		if (!settings.writable || cloudNamespace === undefined)
 			throw new Error("Cocode Cloud settings are not writable")
 		const route = routeOf(settings.namespaces)
+		this.stage = "credentials.describe"
 		const credentials = await this.dsh.describeCredentials([CLOUD_CREDENTIAL])
+		this.stage = "providers"
 		const providersBefore = await this.dsh.providers()
 		const existingCredential = credentials[CLOUD_CREDENTIAL]
 		if (existingCredential?.writable === false)
@@ -445,12 +506,20 @@ export class AccountService {
 				"COCODE_CLOUD_API_KEY is already configured by another source",
 			)
 		const oldKey = await this.cloudKey.read()
+		this.stage = "cloud-key"
 		const key = await this.ensureCloudKey(state)
+		this.stage = "models"
 		const models = await this.agency.models(key)
 		if (models.length === 0) throw new Error("Cocode Cloud returned no available models")
+		// Persist a newly minted key before the DSH saga starts. If settings
+		// activation fails after the Agency has created the key, the next retry
+		// must reuse it instead of minting another Desktop key.
+		await this.cloudKey.write(key)
 		const oldRoute = route === undefined ? undefined : { ...route }
 		try {
+			this.stage = "credentials.set"
 			await this.dsh.setCredential(CLOUD_CREDENTIAL, key)
+			this.stage = "settings.mutate"
 			await this.dsh.mutateSettings({
 				ns: CLOUD_NAMESPACE,
 				expectedRevision: cloudNamespace?.revision,
@@ -468,13 +537,13 @@ export class AccountService {
 					},
 				],
 			})
-			const ready = await this.isCloudReady(models, await this.dsh.providers())
+			this.stage = "cloud-verification"
+			const ready = await this.waitForCloudReady(models)
 			if (!ready) throw new Error("Cocode Cloud provider did not become active")
 			const next: IdentityState = {
 				...state,
 				managedRoute: { baseURL, apiKeyEnv: CLOUD_CREDENTIAL },
 			}
-			await this.cloudKey.write(key)
 			await this.identity.write(next)
 			const profile = next.profile ?? null
 			const snapshot: AccountSnapshot = {
@@ -546,6 +615,15 @@ export class AccountService {
 		)
 	}
 
+	private async waitForCloudReady(models: readonly AgencyModel[]): Promise<boolean> {
+		for (let attempt = 0; attempt < CLOUD_READY_ATTEMPTS; attempt += 1) {
+			if (attempt > 0)
+				await new Promise((resolve) => setTimeout(resolve, CLOUD_READY_RETRY_MS))
+			if (await this.isCloudReady(models, await this.dsh.providers())) return true
+		}
+		return false
+	}
+
 	private async ensureCloudKey(state: IdentityState): Promise<string> {
 		const existing = await this.cloudKey.read()
 		if (existing !== undefined && CLOUD_KEY_PATTERN.test(existing)) {
@@ -599,7 +677,10 @@ export class AccountService {
 		await this.cleanupPending.clear()
 	}
 
-	private async handleInvalidIdentity(state: IdentityState): Promise<void> {
+	private async handleInvalidIdentity(
+		state: IdentityState,
+		options: { readonly clearCloudKey?: boolean } = {},
+	): Promise<void> {
 		const pending = cleanupStateOf(state)
 		let cleanupError: unknown
 		try {
@@ -611,7 +692,7 @@ export class AccountService {
 			await this.writePendingBestEffort(pending)
 		}
 		await this.clearIdentity()
-		await this.cloudKey.clear()
+		if (options.clearCloudKey !== false) await this.cloudKey.clear()
 		if (cleanupError === undefined) {
 			this.publish(emptySnapshot())
 			return
@@ -622,6 +703,33 @@ export class AccountService {
 			cloud: { status: "error", providerId: CLOUD_PROVIDER },
 			error: safeError(cleanupError, "cleanup-pending"),
 		})
+	}
+
+	private async handleBrowserReauthentication(
+		state: IdentityState | undefined,
+	): Promise<AccountSnapshot> {
+		if (state !== undefined) {
+			await this.handleInvalidIdentity(state, { clearCloudKey: false })
+			if (this.snapshotValue.error?.code === "cleanup-pending") return this.snapshotValue
+		}
+		try {
+			await this.openExternal(browserReauthenticationUrl(this.agency.getOrigin()))
+		} catch {
+			// The actionable state is still shown in the desktop UI if the browser
+			// could not be launched.
+		}
+		const snapshot: AccountSnapshot = {
+			phase: "error",
+			profile: null,
+			cloud: { status: "error", providerId: CLOUD_PROVIDER },
+			error: {
+				code: "reauthentication-required",
+				message:
+					"Cocode requires a recent browser reauthentication. Complete it in the browser, then retry.",
+			},
+		}
+		this.publish(snapshot)
+		return snapshot
 	}
 
 	private async writePendingBestEffort(pending: CleanupPendingState): Promise<void> {
@@ -670,6 +778,7 @@ export class AccountService {
 			return (await this.identity.read()) ?? state
 		}
 		this.refreshTask = (async () => {
+			this.stage = "identity-refresh"
 			const refreshed = await this.agency.refresh(state.refreshToken)
 			await this.identity.write({
 				...state,
@@ -723,12 +832,37 @@ export class AccountService {
 		this.snapshotValue = snapshot
 		for (const listener of [...this.listeners]) listener(snapshot)
 	}
+
+	private logFailure(operation: string, error: unknown): void {
+		const detail = safeError(error, "account-operation-failed")
+		console.error("[cocode-account]", operation, {
+			stage: this.stage ?? "unknown",
+			code: detail.code,
+			message: detail.message,
+		})
+	}
 }
 
 function isSessionFailure(error: unknown): boolean {
 	return error instanceof AgencyHttpError
 		? error.status === 401 || error.status === 403
 		: error instanceof Error && /session expired|could not load account/.test(error.message)
+}
+
+function isReauthenticationRequired(error: unknown): boolean {
+	return (
+		error instanceof AgencyHttpError &&
+		error.status === 403 &&
+		/reauthentication[_\s-]*required|reauthenticate(?:d)?\s+(?:this\s+)?browser\s+session/i.test(
+			error.message,
+		)
+	)
+}
+
+function browserReauthenticationUrl(origin: string): string {
+	const url = new URL("/login", origin)
+	url.searchParams.set("return_to", "/account")
+	return url.href
 }
 
 function isDshUnavailable(error: unknown): boolean {

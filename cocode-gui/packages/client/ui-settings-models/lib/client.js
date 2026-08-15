@@ -67,67 +67,67 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var ModelsSection_module_css_default = {
-			"credentialDot": "GizMjG_credentialDot",
+			"editorActions": "GizMjG_editorActions",
+			"intro": "GizMjG_intro",
+			"savedNotice": "GizMjG_savedNotice",
+			"error": "GizMjG_error",
 			"modelRow": "GizMjG_modelRow",
-			"modelCatalogHeading": "GizMjG_modelCatalogHeading",
-			"fetchDialog": "GizMjG_fetchDialog",
-			"modelListHead": "GizMjG_modelListHead",
-			"editor": "GizMjG_editor",
-			"modelEmpty": "GizMjG_modelEmpty",
-			"field": "GizMjG_field",
+			"candidateLabel": "GizMjG_candidateLabel",
+			"rowHead": "GizMjG_rowHead",
+			"rowActions": "GizMjG_rowActions",
 			"secondaryButton": "GizMjG_secondaryButton",
 			"modelCatalogTitle": "GizMjG_modelCatalogTitle",
-			"addBlock": "GizMjG_addBlock",
-			"modelAdvanced": "GizMjG_modelAdvanced",
-			"addButton": "GizMjG_addButton",
-			"rowIdentity": "GizMjG_rowIdentity",
-			"rowName": "GizMjG_rowName",
-			"modelCatalog": "GizMjG_modelCatalog",
-			"addCard": "GizMjG_addCard",
-			"editorHeader": "GizMjG_editorHeader",
-			"dangerButton": "GizMjG_dangerButton",
-			"candidateId": "GizMjG_candidateId",
-			"editorRoute": "GizMjG_editorRoute",
-			"credentialDotConfigured": "GizMjG_credentialDotConfigured",
-			"fieldLabel": "GizMjG_fieldLabel",
-			"addModelButton": "GizMjG_addModelButton",
-			"notice": "GizMjG_notice",
-			"savedNotice": "GizMjG_savedNotice",
-			"selectInput": "GizMjG_selectInput",
-			"modelFieldLabel": "GizMjG_modelFieldLabel",
-			"credentialDotMissing": "GizMjG_credentialDotMissing",
-			"deleteDialog": "GizMjG_deleteDialog",
-			"deleteConfirm": "GizMjG_deleteConfirm",
-			"modelField": "GizMjG_modelField",
-			"candidateList": "GizMjG_candidateList",
-			"candidateLabel": "GizMjG_candidateLabel",
-			"customized": "GizMjG_customized",
-			"editorTitle": "GizMjG_editorTitle",
-			"addActions": "GizMjG_addActions",
-			"intro": "GizMjG_intro",
-			"hiddenLabel": "GizMjG_hiddenLabel",
-			"customizedSummary": "GizMjG_customizedSummary",
-			"section": "GizMjG_section",
-			"rowHead": "GizMjG_rowHead",
-			"iconButtonDanger": "GizMjG_iconButtonDanger",
-			"primaryButton": "GizMjG_primaryButton",
-			"iconButton": "GizMjG_iconButton",
-			"rowActions": "GizMjG_rowActions",
-			"rowTag": "GizMjG_rowTag",
-			"candidate": "GizMjG_candidate",
-			"setupCard": "GizMjG_setupCard",
-			"editorActions": "GizMjG_editorActions",
-			"modelEntry": "GizMjG_modelEntry",
 			"advancedHint": "GizMjG_advancedHint",
-			"modelList": "GizMjG_modelList",
-			"input": "GizMjG_input",
-			"customizedBody": "GizMjG_customizedBody",
-			"rowCard": "GizMjG_rowCard",
-			"error": "GizMjG_error",
-			"title": "GizMjG_title",
+			"modelEmpty": "GizMjG_modelEmpty",
 			"linkButton": "GizMjG_linkButton",
+			"candidateId": "GizMjG_candidateId",
+			"modelList": "GizMjG_modelList",
+			"hiddenLabel": "GizMjG_hiddenLabel",
+			"iconButtonDanger": "GizMjG_iconButtonDanger",
+			"section": "GizMjG_section",
+			"modelCatalogHeading": "GizMjG_modelCatalogHeading",
+			"modelAdvanced": "GizMjG_modelAdvanced",
+			"selectInput": "GizMjG_selectInput",
+			"rowCard": "GizMjG_rowCard",
+			"editorRoute": "GizMjG_editorRoute",
+			"editor": "GizMjG_editor",
+			"addCard": "GizMjG_addCard",
+			"modelFieldLabel": "GizMjG_modelFieldLabel",
+			"modelCatalog": "GizMjG_modelCatalog",
 			"modelCatalogMeta": "GizMjG_modelCatalogMeta",
-			"rows": "GizMjG_rows"
+			"addButton": "GizMjG_addButton",
+			"rowName": "GizMjG_rowName",
+			"dangerButton": "GizMjG_dangerButton",
+			"modelField": "GizMjG_modelField",
+			"addModelButton": "GizMjG_addModelButton",
+			"setupCard": "GizMjG_setupCard",
+			"rows": "GizMjG_rows",
+			"addActions": "GizMjG_addActions",
+			"field": "GizMjG_field",
+			"editorHeader": "GizMjG_editorHeader",
+			"title": "GizMjG_title",
+			"candidateList": "GizMjG_candidateList",
+			"primaryButton": "GizMjG_primaryButton",
+			"modelListHead": "GizMjG_modelListHead",
+			"customizedSummary": "GizMjG_customizedSummary",
+			"customizedBody": "GizMjG_customizedBody",
+			"credentialDotConfigured": "GizMjG_credentialDotConfigured",
+			"rowIdentity": "GizMjG_rowIdentity",
+			"iconButton": "GizMjG_iconButton",
+			"notice": "GizMjG_notice",
+			"rowTag": "GizMjG_rowTag",
+			"addBlock": "GizMjG_addBlock",
+			"credentialDot": "GizMjG_credentialDot",
+			"deleteConfirm": "GizMjG_deleteConfirm",
+			"customized": "GizMjG_customized",
+			"candidate": "GizMjG_candidate",
+			"fieldLabel": "GizMjG_fieldLabel",
+			"input": "GizMjG_input",
+			"credentialDotMissing": "GizMjG_credentialDotMissing",
+			"editorTitle": "GizMjG_editorTitle",
+			"fetchDialog": "GizMjG_fetchDialog",
+			"deleteDialog": "GizMjG_deleteDialog",
+			"modelEntry": "GizMjG_modelEntry"
 		};
 		//#endregion
 		//#region packages/client/ui-settings-models/src/client/EditorFooter.tsx
@@ -2070,7 +2070,7 @@ window.__ModuleLoader__.load({
 		}
 		//#endregion
 		//#region \0dsh-css:/Users/kambiu/worker/open/cocode/cocode-gui/packages/client/ui-settings-models/src/client/OnboardingModal.module.css.mjs
-		const css$2 = ".abevUq_dialog{width:min(600px,100%);padding:0}.abevUq_content{box-sizing:border-box;flex-direction:column;max-height:calc(100vh - 48px);padding:28px;display:flex;overflow-y:auto}.abevUq_title{color:var(--dsw-alias-label-primary);outline:none;margin:0;font-size:20px;font-weight:500;line-height:28px}.abevUq_body{margin-top:20px}@media (width<=560px){.abevUq_content{padding:24px}}";
+		const css$2 = ".abevUq_dialog{-webkit-app-region:no-drag;width:min(600px,100%);padding:0}.abevUq_content{box-sizing:border-box;flex-direction:column;max-height:calc(100vh - 48px);padding:28px;display:flex;overflow-y:auto}.abevUq_title{color:var(--dsw-alias-label-primary);outline:none;margin:0;font-size:20px;font-weight:500;line-height:28px}.abevUq_body{margin-top:20px}@media (width<=560px){.abevUq_content{padding:24px}}";
 		const tagId$2 = "@deepseek-ai/dsh-client-ui-settings-models/OnboardingModal.module.css";
 		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId$2) + "]") === null) {
 			const tag = document.createElement("style");
@@ -2080,9 +2080,9 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var OnboardingModal_module_css_default = {
-			"title": "abevUq_title",
 			"content": "abevUq_content",
 			"body": "abevUq_body",
+			"title": "abevUq_title",
 			"dialog": "abevUq_dialog"
 		};
 		//#endregion
@@ -2142,8 +2142,8 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var DeepSeekOnboardingDialog_module_css_default = {
-			"description": "n3rOEq_description",
-			"editor": "n3rOEq_editor"
+			"editor": "n3rOEq_editor",
+			"description": "n3rOEq_description"
 		};
 		//#endregion
 		//#region packages/client/ui-settings-models/src/client/DeepSeekOnboardingDialog.tsx
@@ -2233,10 +2233,10 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var WelcomeNotice_module_css_default = {
-			"copy": "YRBQ5q_copy",
-			"error": "YRBQ5q_error",
 			"actions": "YRBQ5q_actions",
-			"primary": "YRBQ5q_primary"
+			"primary": "YRBQ5q_primary",
+			"copy": "YRBQ5q_copy",
+			"error": "YRBQ5q_error"
 		};
 		//#endregion
 		//#region packages/client/ui-settings-models/src/client/WelcomeNotice.tsx

@@ -128,6 +128,33 @@ test("Agency client accepts only ck-prefixed inference keys", async () => {
 	}
 })
 
+test("Agency client trims a desktop key and preserves a safe API problem detail", async () => {
+	const originalFetch = globalThis.fetch
+	globalThis.fetch = (async () =>
+		new Response(JSON.stringify({ secret: " ck_live_secret ", id: "key-1" }), {
+			status: 201,
+			headers: { "content-type": "application/json" },
+		})) as typeof fetch
+	try {
+		assert.equal(await new AgencyClient("https://cocode.agency").createDesktopKey("identity-token"), "ck_live_secret")
+
+		globalThis.fetch = (async () =>
+			new Response(JSON.stringify({
+				code: "reauthentication_required",
+				detail: "Reauthenticate this browser session within ten minutes before creating a personal API key.",
+			}), {
+				status: 403,
+				headers: { "content-type": "application/json" },
+			})) as typeof fetch
+		await assert.rejects(
+			new AgencyClient("https://cocode.agency").createDesktopKey("identity-token"),
+			/Reauthenticate this browser session within ten minutes/,
+		)
+	} finally {
+		globalThis.fetch = originalFetch
+	}
+})
+
 test("Agency client never sends a non-ck value to the model catalog", async () => {
 	const originalFetch = globalThis.fetch
 	let called = false

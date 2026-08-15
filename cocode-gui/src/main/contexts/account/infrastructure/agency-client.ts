@@ -10,6 +10,21 @@ export class AgencyHttpError extends Error {
 	}
 }
 
+function problemDetail(value: unknown): string | undefined {
+	if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined
+	const record = value as Record<string, unknown>
+	for (const key of ["detail", "title", "code", "message", "error"]) {
+		const candidate = record[key]
+		if (typeof candidate !== "string" || candidate.trim() === "") continue
+		return candidate
+			.trim()
+			.replace(/ck_[A-Za-z0-9_-]+/g, "[redacted]")
+			.replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer [redacted]")
+			.slice(0, 200)
+	}
+	return undefined
+}
+
 export type TokenPair = {
 	readonly access_token: string
 	readonly refresh_token: string
@@ -199,14 +214,19 @@ export class AgencyClient {
 			token: accessToken,
 			body: { name: "Cocode Desktop", scopes: ["models:read", "inference:write"] },
 		})
+		const secret = response.value.secret?.trim()
 		if (
 			(response.status !== 201 && response.status !== 200) ||
-			typeof response.value.secret !== "string" ||
-			!/^ck_[A-Za-z0-9_-]+$/.test(response.value.secret)
+			typeof secret !== "string" ||
+			!/^ck_[A-Za-z0-9_-]+$/.test(secret)
 		) {
-			throw new AgencyHttpError("could not create a desktop API key", response.status)
+			const detail = problemDetail(response.value)
+			throw new AgencyHttpError(
+				`could not create a desktop API key (HTTP ${String(response.status)})${detail === undefined ? "" : `: ${detail}`}`,
+				response.status,
+			)
 		}
-		return response.value.secret
+		return secret
 	}
 
 	async models(apiKey: string): Promise<AgencyModel[]> {

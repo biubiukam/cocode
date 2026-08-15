@@ -28,7 +28,8 @@ window.__ModuleLoader__.load({
 				intro: "登录 Cocode 后即可使用账号可用的云模型，也不会改变已有默认模型。",
 				later: "稍后配置",
 				conflict: "本机已有同名 Provider 或凭证，请先在模型设置中处理冲突。",
-				cleanupPending: "本地账号已退出，Cocode Cloud 配置将在运行时恢复后继续清理。"
+				cleanupPending: "本地账号已退出，Cocode Cloud 配置将在运行时恢复后继续清理。",
+				reauthentication: "请在浏览器中重新认证 Cocode 账号（十分钟内完成），然后点击重试。"
 			},
 			en: {
 				signIn: "Sign in to Cocode",
@@ -42,7 +43,8 @@ window.__ModuleLoader__.load({
 				intro: "Sign in to use the cloud models available to your account without changing the existing default model.",
 				later: "Configure later",
 				conflict: "A provider or credential with the reserved Cocode name already exists. Resolve it in Models settings first.",
-				cleanupPending: "The local account is signed out. Cloud configuration cleanup will resume when the runtime is available."
+				cleanupPending: "The local account is signed out. Cloud configuration cleanup will resume when the runtime is available.",
+				reauthentication: "Reauthenticate your Cocode account in the browser within ten minutes, then retry."
 			}
 		};
 		function copy() {
@@ -167,6 +169,7 @@ window.__ModuleLoader__.load({
 			const t = copy();
 			if (snapshot.error?.code === "cloud-provider-conflict") return t.conflict;
 			if (snapshot.error?.code === "cleanup-pending") return t.cleanupPending;
+			if (snapshot.error?.code === "reauthentication-required") return t.reauthentication;
 			return snapshot.error?.message;
 		}
 		function AccountOnboarding({ complete, openSection, store }) {
@@ -234,7 +237,7 @@ window.__ModuleLoader__.load({
 		}
 		function AccountAction({ wide, store }) {
 			const snapshot = (0, react.useSyncExternalStore)(store.subscribe, store.getSnapshot, store.getSnapshot);
-			const canSignOut = snapshot.phase === "signed-in" || snapshot.phase === "provisioning" || snapshot.profile !== null;
+			const canSignOut = snapshot.phase === "signed-in" || snapshot.phase === "provisioning" || snapshot.error?.code === "cleanup-pending";
 			const t = copy();
 			const title = accountError(snapshot) ?? (canSignOut ? t.signOutTitle : t.signInTitle);
 			return (0, react.createElement)("button", {

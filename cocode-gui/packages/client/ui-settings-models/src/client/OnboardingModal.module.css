@@ -1,6 +1,7 @@
 .dialog {
   width: min(600px, 100%);
   padding: 0;
+  -webkit-app-region: no-drag;
 }
 
 .content {
