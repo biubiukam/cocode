@@ -9,6 +9,9 @@ HARNESS_DIR ?= $(firstword $(wildcard ../cocode-harness cocode-harness))
 help:
 	@echo "GUI (Electron):  make dev gui      → desktop client + Vite on :5273"
 	@echo "GUI (browser):   make dev gui-web  → http://localhost:5273"
+	@echo "GUI cache:       make dev gui reuses the OS cache directory"
+	@echo "                 DSH_FORCE_RESTAGE=1 make dev gui  → refresh runtime cache"
+	@echo "                 DSH_DISABLE_RUNTIME_CACHE=1 make dev gui  → isolated runtime"
 	@echo "TUI:             make dev tui       → terminal client (requires TTY)"
 	@echo "Harness:         make dev dsh        → http://127.0.0.1:3080"
 	@echo "Install GUI:     make install-gui"
