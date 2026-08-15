@@ -1,6 +1,10 @@
 import { Box, Text, useInput } from 'ink'
 import { useEffect, useRef, useState } from 'react'
 import type { TuiQuestionSnapshot, TuiAction } from '../../runtime/app.ts'
+import {
+  questionTabLabel,
+  type TuiQuestionTab,
+} from '../../runtime/question-coordinator.ts'
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
 import { theme } from '../theme.ts'
 import { isMouseInput, type TuiMousePointer } from '../mouse.ts'
@@ -35,6 +39,8 @@ export function QuestionPanel(props: {
   const customLines = custom.split('\n')
   const visibleCustomLines = customLines.slice(-3)
   const lastPointerId = useRef<number>()
+  const tabs = props.state.tabs ?? [fallbackTab(props.state)]
+  const prompt = questionPrompt(props.state.question, text(props.locale, 'questionUnavailable'))
 
   useEffect(() => {
     const selectedIndex = [...savedSelected][0]
@@ -50,7 +56,7 @@ export function QuestionPanel(props: {
     lastPointerId.current = pointer.id
     const optionHasDescription = options.map((option) => option.description !== undefined)
     const firstOptionRow =
-      props.panelStartRow + 6 + Number(props.state.question.detail !== undefined)
+      props.panelStartRow + 7 + Number(props.state.question.detail !== undefined)
     const optionIndex = questionOptionIndexAtRow({
       row: pointer.row,
       firstOptionRow,
@@ -172,32 +178,37 @@ export function QuestionPanel(props: {
       }
     >
       <Box flexDirection="row" gap={1}>
-        {Array.from({ length: props.state.total }, (_, index) => {
-          const position = index + 1
-          const active = position === props.state.position
+        {tabs.map((tab) => {
+          const active = tab.position === props.state.position
           return (
-            <Text key={position} color={active ? theme.text : theme.mute} inverse={active}>
-              ?{position}
+            <Text
+              key={`${tab.position}-${tab.label}`}
+              color={active ? theme.text : tab.answered ? theme.dim : theme.mute}
+              backgroundColor={active ? theme.brand : undefined}
+              bold={active}
+              wrap="truncate-end"
+            >
+              {active ? '▸ ' : tab.answered ? '✓ ' : '· '}
+              {tab.position}. {tab.label}
             </Text>
           )
         })}
-        <Text color={theme.dim} wrap="truncate-end">
-          {props.state.question.header ?? `${props.state.position}/${props.state.total}`}
-        </Text>
       </Box>
-      <Box flexDirection="row">
+      <Box flexDirection="row" marginTop={1}>
         <Text backgroundColor={theme.brand} color={theme.text} bold>
           {' ? '}
         </Text>
-        <Text color={theme.text} bold wrap="truncate-end">
-          {' '}{props.state.question.question}
-        </Text>
+        <Box flexDirection="column" marginLeft={1}>
+          <Text color={theme.text} bold wrap="truncate-end">
+            {prompt}
+          </Text>
+          {props.state.question.detail !== undefined ? (
+            <Text color={theme.dim} wrap="truncate-end">
+              {props.state.question.detail}
+            </Text>
+          ) : null}
+        </Box>
       </Box>
-      {props.state.question.detail !== undefined ? (
-        <Text color={theme.dim} wrap="truncate-end">
-          {props.state.question.detail}
-        </Text>
-      ) : null}
       {options.map((option, index) => {
         const active = focus === index
         const checked = multiSelect ? selected.has(index) : active
@@ -232,4 +243,25 @@ export function QuestionPanel(props: {
       </Box>
     </PanelFrame>
   )
+}
+
+function fallbackTab(state: TuiQuestionSnapshot): TuiQuestionTab {
+  return {
+    position: state.position,
+    label: questionTabLabel(state.question),
+    answered: state.answer !== undefined,
+  }
+}
+
+function questionPrompt(
+  question: TuiQuestionSnapshot['question'],
+  unavailableLabel: string,
+): string {
+  const value = question.question.trim()
+  if (value !== '' && value !== '?' && value !== '？') return value
+  const detail = question.detail?.trim()
+  if (detail !== undefined && detail !== '') return detail.split(/\r?\n/u, 1)[0] ?? detail
+  const header = question.header?.trim()
+  if (header !== undefined && header !== '' && header !== '?' && header !== '？') return header
+  return unavailableLabel
 }

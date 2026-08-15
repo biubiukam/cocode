@@ -18,9 +18,20 @@ describe('question coordinator', () => {
       sessionId: 's1',
       position: 1,
       total: 2,
+      tabs: [
+        { position: 1, label: 'Question first', answered: false },
+        { position: 2, label: 'Question second', answered: false },
+      ],
     })
     coordinator.answer(['a'], '  custom  ')
-    expect(coordinator.snapshot()).toMatchObject({ position: 2, answered: 1 })
+    expect(coordinator.snapshot()).toMatchObject({
+      position: 2,
+      answered: 1,
+      tabs: [
+        { position: 1, label: 'Question first', answered: true },
+        { position: 2, label: 'Question second', answered: false },
+      ],
+    })
     coordinator.answer(['b'])
     await expect(first).resolves.toEqual({
       answers: [

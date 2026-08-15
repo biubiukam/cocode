@@ -1621,7 +1621,7 @@ function questionPanelRows(state: NonNullable<TuiSnapshot['question']>): number 
     (rows, option) => rows + 1 + Number(option.description !== undefined),
     0,
   )
-  return 10 + Number(state.question.detail !== undefined) + optionRows
+  return 11 + Number(state.question.detail !== undefined) + optionRows
 }
 
 function overlayWindowSize(maxRows: number, itemCount: number, chromeRows: number): number {

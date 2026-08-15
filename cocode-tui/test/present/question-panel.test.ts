@@ -5,6 +5,88 @@ import { describe, expect, it, vi } from 'vitest'
 import { QuestionPanel } from '../../src/present/components/QuestionPanel.tsx'
 
 describe('QuestionPanel input', () => {
+  it('renders question tabs with real labels and a clear prompt', async () => {
+    const stdin = new InputStream()
+    const stdout = new CaptureStream(80, 20)
+    const app = render(
+      React.createElement(QuestionPanel, {
+        state: {
+          key: 'question-1',
+          sessionId: 'session-1',
+          position: 2,
+          total: 3,
+          answered: 1,
+          tabs: [
+            { position: 1, label: 'Workspace', answered: true },
+            { position: 2, label: 'Choose a model', answered: false },
+            { position: 3, label: 'Output format', answered: false },
+          ],
+          question: {
+            id: 'model',
+            question: 'Choose a model',
+            options: [{ label: 'Fast' }],
+          },
+        },
+        locale: 'en',
+        panelStartRow: 1,
+        dispatch: vi.fn(),
+      }),
+      {
+        stdin: stdin as unknown as NodeJS.ReadStream,
+        stdout: stdout as unknown as NodeJS.WriteStream,
+        patchConsole: false,
+        exitOnCtrlC: false,
+      },
+    )
+
+    await flush()
+    const output = stdout.output.replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, '')
+    expect(output).toContain('1. Workspace')
+    expect(output).toContain('2. Choose a model')
+    expect(output).toContain('3. Output format')
+    expect(output).toContain('Choose a model')
+    expect(output).not.toContain('?1')
+
+    app.unmount()
+    await flush()
+    app.cleanup()
+  })
+
+  it('uses a readable fallback when the question text is only a placeholder', async () => {
+    const stdin = new InputStream()
+    const stdout = new CaptureStream(80, 20)
+    const app = render(
+      React.createElement(QuestionPanel, {
+        state: {
+          key: 'question-1',
+          sessionId: 'session-1',
+          position: 1,
+          total: 1,
+          answered: 0,
+          question: { id: 'missing', question: '?', detail: 'Select a value' },
+        },
+        locale: 'en',
+        panelStartRow: 1,
+        dispatch: vi.fn(),
+      }),
+      {
+        stdin: stdin as unknown as NodeJS.ReadStream,
+        stdout: stdout as unknown as NodeJS.WriteStream,
+        patchConsole: false,
+        exitOnCtrlC: false,
+      },
+    )
+
+    await flush()
+    const output = stdout.output.replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, '')
+    expect(output).toContain('Select a value')
+    expect(output).not.toContain('Question text unavailable')
+
+    app.unmount()
+    await flush()
+    app.cleanup()
+  })
+
   it('submits the focused single option on Enter', async () => {
     const stdin = new InputStream()
     const stdout = new CaptureStream(80, 20)

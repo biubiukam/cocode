@@ -9,10 +9,17 @@ export type TuiQuestionSnapshot = {
   key: string
   sessionId: string
   question: TuiQuestionItem
+  tabs?: readonly TuiQuestionTab[]
   position: number
   total: number
   answered: number
   answer?: TuiQuestionAnswerItem
+}
+
+export type TuiQuestionTab = {
+  position: number
+  label: string
+  answered: boolean
 }
 
 type PendingQuestion = {
@@ -87,6 +94,11 @@ export function createQuestionCoordinator(options: { emit: () => void }): Questi
         key: `${pending.id}-${pending.index}`,
         sessionId: pending.request.sessionId,
         question,
+        tabs: pending.request.questions.map((item, index) => ({
+          position: index + 1,
+          label: questionTabLabel(item),
+          answered: hasAnswer(pending.answers[index]),
+        })),
         position: pending.index + 1,
         total: pending.request.questions.length,
         answered: pending.answers.filter(hasAnswer).length,
@@ -155,6 +167,15 @@ export function createQuestionCoordinator(options: { emit: () => void }): Questi
       options.emit()
     },
   }
+}
+
+export function questionTabLabel(question: TuiQuestionItem): string {
+  const source = [question.header, question.question, question.id]
+    .map((value) => value?.trim())
+    .find((value) => value !== undefined && value !== '' && value !== '?' && value !== '？')
+    ?? question.id
+  const firstLine = source.split(/\r?\n/u, 1)[0] ?? source
+  return firstLine.length > 24 ? `${firstLine.slice(0, 23)}…` : firstLine
 }
 
 function hasAnswer(answer: TuiQuestionAnswerItem | undefined): answer is TuiQuestionAnswerItem {

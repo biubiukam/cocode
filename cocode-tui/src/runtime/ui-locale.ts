@@ -86,6 +86,7 @@ type UiKey =
   | 'questionSelectHint'
   | 'questionStreaming'
   | 'questionReady'
+  | 'questionUnavailable'
   | 'rewindTitle'
   | 'rewindHint'
   | 'rewindArm'
@@ -308,6 +309,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     questionSelectHint: 'enter selects · tab opens custom answer',
     questionStreaming: 'question is streaming…',
     questionReady: 'question ready for interaction',
+    questionUnavailable: 'Question text unavailable',
     rewindTitle: 'Rewind conversation',
     rewindHint: '↑↓ select · enter review · esc close',
     rewindArm: 'Press Esc again to choose a rewind point.',
@@ -529,6 +531,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     questionSelectHint: '回车选择 · Tab 切换到其他答案',
     questionStreaming: '问题生成中…',
     questionReady: '问题已生成，等待交互',
+    questionUnavailable: '问题内容暂不可用',
     rewindTitle: '回滚会话',
     rewindHint: '↑↓ 选择 · 回车预览 · Esc 关闭',
     rewindArm: '再次按 Esc 选择回滚位置。',
