@@ -35,11 +35,6 @@ export function StatusLine(props: {
       : text(props.locale, 'telemetryCache', {
           value: formatMetric(telemetry.cacheHitRate),
         }),
-    telemetry.contextPercent === undefined
-      ? undefined
-      : text(props.locale, 'telemetryContext', {
-          value: formatMetric(telemetry.contextPercent),
-        }),
     telemetry.reasoningEffort === undefined
       ? undefined
       : text(props.locale, 'telemetryReasoning', { value: telemetry.reasoningEffort }),
@@ -49,15 +44,6 @@ export function StatusLine(props: {
           phase: telemetry.activity.phase,
           line: telemetry.activity.line,
         }),
-    hasContextSegments(telemetry)
-      ? text(props.locale, 'telemetrySegments', {
-          system: String(telemetry.contextSegments.system),
-          prompt: String(telemetry.contextSegments.prompt),
-          assistant: String(telemetry.contextSegments.assistant),
-          thinking: String(telemetry.contextSegments.thinking),
-          tools: String(telemetry.contextSegments.tools),
-        })
-      : undefined,
     props.status.todos.length > 0
       ? text(props.locale, 'todoProgress', {
           done: String(props.status.todos.filter((todo) => todo.status === 'completed').length),
@@ -130,10 +116,6 @@ export function StatusLine(props: {
 
 function formatMetric(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1)
-}
-
-function hasContextSegments(telemetry: TuiSnapshot['status']['telemetry']): boolean {
-  return Object.values(telemetry.contextSegments).some((value) => value > 0)
 }
 
 function Notice(props: { notice: NonNullable<TuiSnapshot['notice']> }) {
