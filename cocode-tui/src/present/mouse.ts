@@ -2,7 +2,7 @@
 
 export type TuiMouseEvent = {
   action: 'press' | 'release' | 'move'
-  button: 0 | 1 | 2 | 'wheel-up' | 'wheel-down'
+  button: 0 | 1 | 2 | 'none' | 'wheel-up' | 'wheel-down'
   x: number
   y: number
   shift: boolean
@@ -14,6 +14,15 @@ export type TuiMousePointer = {
   id: number
   row: number
   action: 'press' | 'move'
+}
+
+export function isMousePointerEvent(
+  event: Pick<TuiMouseEvent, 'action' | 'button'>,
+): boolean {
+  return (
+    (event.action === 'press' && event.button === 0) ||
+    (event.action === 'move' && (event.button === 0 || event.button === 'none'))
+  )
 }
 
 export function shouldEnableMouseTracking(props: {
@@ -95,6 +104,7 @@ export function enableMouseTracking(stream: { write(value: string): unknown }): 
 function buttonFor(code: number): TuiMouseEvent['button'] {
   const button = code & 3
   if (code & 64) return button === 0 ? 'wheel-up' : 'wheel-down'
+  if (button === 3) return 'none'
   if (button === 1) return 1
   if (button === 2) return 2
   return 0

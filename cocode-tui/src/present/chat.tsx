@@ -66,6 +66,10 @@ import { listWindowStart } from './list-window.ts'
 import { calculateChatLayout, CHAT_HEADER_ROWS } from './chat-layout.ts'
 import { composerHeaderLayout } from './composer-header.ts'
 import { Inspector, INSPECTOR_WIDTH } from './components/Inspector.tsx'
+import type { InspectorMouseInput } from './inspector-scroll.ts'
+import {
+  useInspectorResize,
+} from './inspector-resize.ts'
 import { ReviewPicker } from './components/ReviewPicker.tsx'
 import { ApprovalPanel } from './components/ApprovalPanel.tsx'
 import { QueuePicker } from './components/QueuePicker.tsx'
@@ -85,6 +89,7 @@ import {
 import {
   createMouseDecoder,
   enableMouseTracking,
+  isMousePointerEvent,
   isMouseInput,
   mouseWheelDelta,
   shouldEnableMouseTracking,
@@ -128,6 +133,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
   const [editorError, setEditorError] = useState<string | undefined>()
   const [questionMousePointer, setQuestionMousePointer] = useState<TuiMousePointer>()
   const [approvalMousePointer, setApprovalMousePointer] = useState<TuiMousePointer>()
+  const [inspectorMouseInput, setInspectorMouseInput] = useState<InspectorMouseInput>()
   const mouseClickId = useRef(0)
   const { stdout } = useStdout()
   const { isRawModeSupported, setRawMode } = useStdin()
@@ -252,9 +258,13 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     stdout.columns >= 120 ? CHECKLIST_STRIP_MAX_ITEMS : 2,
   )
   const wideInspector = stdout.columns >= 120
-  const mainColumns = wideInspector
-    ? Math.max(1, stdout.columns - INSPECTOR_WIDTH - 1)
-    : stdout.columns
+  const inspectorResize = useInspectorResize({
+    terminalColumns: stdout.columns,
+    visible: wideInspector,
+    defaultWidth: INSPECTOR_WIDTH,
+  })
+  const inspectorLayout = inspectorResize.layout
+  const mainColumns = wideInspector ? inspectorLayout.mainColumns : stdout.columns
   const layout = calculateChatLayout({
     viewportRows: stdout.rows,
     composerLines: snap.composer.text.split('\n').length,
@@ -338,7 +348,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
   const mouseTrackingActive = shouldEnableMouseTracking({
     supported: props.mouseSupported !== false,
     manualMode: false,
-    overlayOpen: false,
+    overlayOpen: wideInspector,
   })
   const selectableMessages = useMemo(
     () => selectableMessageKeys(displayNodes),
@@ -400,6 +410,18 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
   }
 
   const handleMouseEvent = (event: TuiMouseEvent): void => {
+    if (inspectorResize.handleMouseEvent(event)) return
+    const insideInspector = wideInspector && event.x >= inspectorLayout.startColumn
+    if (insideInspector) {
+      if (
+        event.button === 'wheel-up' ||
+        event.button === 'wheel-down' ||
+        (event.action === 'press' && event.button === 0)
+      ) {
+        setInspectorMouseInput({ id: mouseClickId.current++, event })
+      }
+      return
+    }
     const wheelDelta = mouseWheelDelta(event)
     if (wheelDelta !== undefined) {
       if (
@@ -452,7 +474,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     }
     if (modelOverlayOpen) return
     if (questionOpen || approvalOpen) {
-      if ((event.action === 'press' || event.action === 'move') && event.button === 0) {
+      if (isMousePointerEvent(event)) {
         const pointer = { id: mouseClickId.current++, row: hitRow, action: event.action }
         if (questionOpen) setQuestionMousePointer(pointer)
         else setApprovalMousePointer(pointer)
@@ -1582,7 +1604,14 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
         </Box>
       </Box>
       {wideInspector ? (
-        <Inspector snapshot={snap} locale={snap.locale} maxRows={stdout.rows} />
+        <Inspector
+          snapshot={snap}
+          locale={snap.locale}
+          maxRows={stdout.rows}
+          width={inspectorLayout.width}
+          resizing={inspectorResize.resizing}
+          mouseInput={inspectorMouseInput}
+        />
       ) : null}
     </Box>
   )

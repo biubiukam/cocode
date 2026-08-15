@@ -11,11 +11,12 @@ describe('terminal mouse support', () => {
   it('decodes SGR press, release, modifiers, and wheel events', () => {
     const events: unknown[] = []
     const decoder = createMouseDecoder((event) => events.push(event))
-    decoder.feed('\u001b[<0;12;8M\u001b[<20;4;3m\u001b[<64;10;11M')
+    decoder.feed('\u001b[<0;12;8M\u001b[<20;4;3m\u001b[<64;10;11M\u001b[<35;6;7M')
     expect(events).toEqual([
       { action: 'press', button: 0, x: 12, y: 8, shift: false, alt: false, ctrl: false },
       { action: 'release', button: 0, x: 4, y: 3, shift: true, alt: false, ctrl: true },
       { action: 'press', button: 'wheel-up', x: 10, y: 11, shift: false, alt: false, ctrl: false },
+      { action: 'move', button: 'none', x: 6, y: 7, shift: false, alt: false, ctrl: false },
     ])
   })
 
