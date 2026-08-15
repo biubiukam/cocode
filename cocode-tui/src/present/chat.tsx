@@ -91,6 +91,7 @@ import {
   enableMouseTracking,
   isMousePointerEvent,
   isMouseInput,
+  layoutRowFromMouseY,
   mouseWheelDelta,
   shouldEnableMouseTracking,
   type TuiMousePointer,
@@ -452,8 +453,9 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
       setFollowTranscript(wheelDelta < 0 && messageScrollOffset <= wheelRows)
       return
     }
-    const insidePopup = popupContains(popupBounds, event.x, event.y)
-    const hitRow = insidePopup ? event.y : -1
+    const pointerRow = layoutRowFromMouseY(event.y)
+    const insidePopup = popupContains(popupBounds, event.x, pointerRow)
+    const hitRow = insidePopup ? pointerRow : -1
     if (modelPickerOpen && snap.modelPicker !== undefined) {
       if (!insidePopup || event.button !== 0) return
       const items = visibleModelItems(snap.modelPicker)

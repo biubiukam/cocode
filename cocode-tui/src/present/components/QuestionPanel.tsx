@@ -193,8 +193,8 @@ export function QuestionPanel(props: {
         })}
       </Box>
       <Box flexDirection="row" marginTop={1}>
-        <Text backgroundColor={theme.brand} color={theme.text} bold>
-          {' ? '}
+        <Text color={theme.brand} bold>
+          {'▌'}
         </Text>
         <Box flexDirection="column" marginLeft={1}>
           <Text color={theme.text} bold wrap="truncate-end">

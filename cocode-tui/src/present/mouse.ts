@@ -25,6 +25,11 @@ export function isMousePointerEvent(
   )
 }
 
+/** Convert the terminal's 1-based mouse row to Ink's 0-based layout row. */
+export function layoutRowFromMouseY(y: number): number {
+  return Math.trunc(y) - 1
+}
+
 export function shouldEnableMouseTracking(props: {
   supported: boolean
   manualMode: boolean

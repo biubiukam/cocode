@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   createMouseDecoder,
   enableMouseTracking,
+  isMousePointerEvent,
   isMouseInput,
+  layoutRowFromMouseY,
   mouseWheelDelta,
   shouldEnableMouseTracking,
 } from '../../src/present/mouse.ts'
@@ -71,6 +73,18 @@ describe('terminal mouse support', () => {
     expect(mouseWheelDelta({ action: 'press', button: 'wheel-down' })).toBe(-1)
     expect(mouseWheelDelta({ action: 'release', button: 'wheel-up' })).toBeUndefined()
     expect(mouseWheelDelta({ action: 'press', button: 0 })).toBeUndefined()
+  })
+
+  it('accepts SGR hover moves with button none as pointer events', () => {
+    expect(isMousePointerEvent({ action: 'move', button: 'none' })).toBe(true)
+    expect(isMousePointerEvent({ action: 'press', button: 0 })).toBe(true)
+    expect(isMousePointerEvent({ action: 'move', button: 1 })).toBe(false)
+    expect(isMousePointerEvent({ action: 'release', button: 0 })).toBe(false)
+  })
+
+  it('converts terminal mouse rows to Ink layout rows', () => {
+    expect(layoutRowFromMouseY(1)).toBe(0)
+    expect(layoutRowFromMouseY(8)).toBe(7)
   })
 
   it('recognizes Ink input after it strips the leading escape byte', () => {

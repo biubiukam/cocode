@@ -46,6 +46,7 @@ describe('QuestionPanel input', () => {
     expect(output).toContain('3. Output format')
     expect(output).toContain('Choose a model')
     expect(output).not.toContain('?1')
+    expect(output).not.toContain(' ? ')
     expect(output).not.toContain('previous')
     expect(output).not.toContain('next')
 
