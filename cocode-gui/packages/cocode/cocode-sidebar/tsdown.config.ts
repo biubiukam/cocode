@@ -77,11 +77,23 @@ const CLIENT_EXTERNALS = [
  */
 const INLINE_SAFE = /^@deepseek-ai\/dsh-(host-apiproxy|session|llm|tools|brand)(\/|$)/
 
-/** Virtual-id wrapper keeping module CSS away from tsdown's own css pipeline. */
 const CSS_VIRTUAL_PREFIX = '\0dsh-css:'
 const CSS_VIRTUAL_SUFFIX = '.mjs'
 
 const REPOSITORY_ROOT = fileURLToPath(new URL('.', import.meta.url))
+
+/** Map a physical stylesheet to a package-relative virtual id (stable across machines). */
+function toCssVirtualId(absPath: string): string {
+  const repoRelative = relative(REPOSITORY_ROOT, absPath).split(sep).join('/')
+  const key = repoRelative.startsWith('..') ? absPath : repoRelative
+  return CSS_VIRTUAL_PREFIX + key + CSS_VIRTUAL_SUFFIX
+}
+
+/** Resolve a package-relative virtual id back to an absolute filesystem path. */
+function fromCssVirtualId(virtualId: string): string {
+  const key = virtualId.slice(CSS_VIRTUAL_PREFIX.length, -CSS_VIRTUAL_SUFFIX.length)
+  return key.startsWith('/') || /^[A-Za-z]:/.test(key) ? key : resolvePath(REPOSITORY_ROOT, key)
+}
 
 /** The style-injection prologue shared by module css and plain css loads. */
 function injectTag(pluginId: string, fileId: string, cssText: string): string {
@@ -256,11 +268,11 @@ function makeCssPlugin(pluginId: string): BuildPlugin {
       } else {
         abs = require.resolve(source)
       }
-      return CSS_VIRTUAL_PREFIX + abs + CSS_VIRTUAL_SUFFIX
+      return toCssVirtualId(abs)
     },
     async load(virtualId: string) {
       if (!virtualId.startsWith(CSS_VIRTUAL_PREFIX)) return null
-      const fileId = virtualId.slice(CSS_VIRTUAL_PREFIX.length, -CSS_VIRTUAL_SUFFIX.length)
+      const fileId = fromCssVirtualId(virtualId)
       this.addWatchFile(fileId)
       const source = await readFile(fileId)
       // CSS Modules (x.module.css) become hashed class maps; plain css

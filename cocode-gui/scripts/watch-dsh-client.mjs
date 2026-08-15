@@ -226,25 +226,29 @@ async function startWatcher(runtimeRoot) {
 	watcher.on("add", scheduleBuild)
 	watcher.on("change", scheduleBuild)
 	watcher.on("unlink", scheduleBuild)
+	const watcherReady = new Promise((resolve, reject) => {
+		watcher.once("ready", resolve)
+		watcher.once("error", reject)
+	})
 
 	let syncedPackages = 0
-	for (const clientPackage of packages) {
-		if (isClientBundleStale(clientPackage)) {
-			await rebuildClientPackage(clientPackage, runtimeRoot)
-			syncedPackages += Number(
-				existsSync(resolveRuntimeClientBundlePath(runtimeRoot, clientPackage.id)),
-			)
-		} else {
-			syncedPackages += Number(syncClientBundle(clientPackage, runtimeRoot))
-		}
+	const stalePackages = packages.filter((clientPackage) => isClientBundleStale(clientPackage))
+	const freshPackages = packages.filter((clientPackage) => !isClientBundleStale(clientPackage))
+	await Promise.all(
+		stalePackages.map((clientPackage) => rebuildClientPackage(clientPackage, runtimeRoot)),
+	)
+	for (const clientPackage of freshPackages) {
+		syncedPackages += Number(syncClientBundle(clientPackage, runtimeRoot))
+	}
+	for (const clientPackage of stalePackages) {
+		syncedPackages += Number(
+			existsSync(resolveRuntimeClientBundlePath(runtimeRoot, clientPackage.id)),
+		)
 	}
 	if (syncedPackages === 0) {
 		throw new Error("No staged DSH client bundles were found for HMR synchronization.")
 	}
-	await new Promise((resolve, reject) => {
-		watcher.once("ready", resolve)
-		watcher.once("error", reject)
-	})
+	await watcherReady
 	return { packages, watcher }
 }
 

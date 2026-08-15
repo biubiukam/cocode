@@ -29,7 +29,7 @@ gui-web:
 	cd cocode-gui && pnpm run dev:web
 
 tui:
-	@test -d cocode-tui/node_modules/react || $(MAKE) install-tui
+	@test -f cocode-tui/node_modules/.bin/tsx || $(MAKE) install-tui
 	cd cocode-tui && pnpm run dev
 
 dsh:

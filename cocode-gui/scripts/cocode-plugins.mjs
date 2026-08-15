@@ -45,7 +45,7 @@ export function discoverCocodePlugins(root = pluginsRoot) {
 
 export function buildCocodePlugins() {
 	for (const plugin of discoverCocodePlugins()) {
-		execFileSync("corepack", ["pnpm@10.34.5", "--filter", plugin.name, "build"], {
+		execFileSync("pnpm", ["--filter", plugin.name, "build"], {
 			cwd: repositoryRoot,
 			stdio: "inherit",
 		})
