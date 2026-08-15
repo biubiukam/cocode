@@ -1015,6 +1015,10 @@ class TuiAppImpl implements TuiApp {
       this.assembler.replaceWindow(result.seed)
       this.telemetry.reset()
       this.sessionState.reset()
+      for (const event of result.seed) {
+        this.telemetry.ingest(event)
+        this.sessionState.ingest(event)
+      }
       this.resetSubagentActivity()
       this.queuedPrompts.length = 0
       this.attachments = []

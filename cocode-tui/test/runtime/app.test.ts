@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type {
+  SessionEvent,
   TuiNotification,
   TuiQuestionAnswer,
   TuiQuestionRequest,
@@ -20,6 +21,7 @@ function fakeRuntime(): TuiRuntime & {
   cancels: { sessionId: string; keepInbox: boolean }[]
   opens: { sessionId: string; replaceSessionId?: string }[]
   rewinds: { sourceSessionId: string; messageSeq: number; replaceSessionId?: string }[]
+  rewindSeed?: SessionEvent[]
   askQuestion: (request: TuiQuestionRequest) => Promise<TuiQuestionAnswer>
   failStart?: Error
   cancelError?: Error
@@ -89,15 +91,17 @@ function fakeRuntime(): TuiRuntime & {
       })
       return {
         sessionId: 'rewound-session',
-        seedLength: 1,
-        seed: [
-          {
-            type: 'user/message',
-            seq: 2,
-            time: 2,
-            data: { id: 'u1', content: [{ type: 'text', text: 'retry this' }] },
-          },
-        ],
+        seedLength: runtime.rewindSeed?.length ?? 1,
+        seed:
+          runtime.rewindSeed ??
+          ([
+            {
+              type: 'user/message',
+              seq: 2,
+              time: 2,
+              data: { id: 'u1', content: [{ type: 'text', text: 'retry this' }] },
+            },
+          ] satisfies SessionEvent[]),
       }
     },
     async askQuestion(request) {
@@ -620,6 +624,95 @@ describe('TuiApp', () => {
     ])
     expect(app.snapshot().nodes).toMatchObject([{ kind: 'user', text: 'retry this' }])
     expect(app.snapshot().composer.text).toBe('retry latest')
+  })
+
+  it('rebuilds telemetry and durable status from the rewind seed', async () => {
+    const runtime = fakeRuntime()
+    runtime.rewindSeed = [
+      {
+        type: 'user/message',
+        seq: 1,
+        time: 1,
+        data: { id: 'seed-user', content: [{ type: 'text', text: 'keep this' }] },
+      },
+      {
+        type: 'request/context',
+        seq: 2,
+        time: 2,
+        data: { contextWindow: 1000 },
+      },
+      {
+        type: 'assistant/message',
+        seq: 3,
+        time: 3,
+        data: {
+          turn: 1,
+          step: 1,
+          message: { content: [{ type: 'text', text: 'seed answer' }] },
+          usage: { inputTokens: 120, outputTokens: 30 },
+        },
+      },
+      {
+        type: 'todo/write',
+        seq: 4,
+        time: 4,
+        data: { todos: [{ content: 'review the result', status: 'in_progress' }] },
+      },
+    ]
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+      capabilities: { ...P0_CAPABILITIES, rewind: true },
+    })
+    await app.start()
+    runtime.emit({
+      method: 'session.event',
+      params: {
+        sessionId: 's1',
+        event: {
+          type: 'user/message',
+          seq: 5,
+          time: 5,
+          data: { id: 'u1', content: [{ type: 'text', text: 'retry this' }] },
+        },
+      },
+    })
+    runtime.emit({
+      method: 'session.event',
+      params: {
+        sessionId: 's1',
+        event: {
+          type: 'user/message',
+          seq: 6,
+          time: 6,
+          data: { id: 'u2', content: [{ type: 'text', text: 'retry again' }] },
+        },
+      },
+    })
+    app.dispatch({ type: 'interruptOrQuit' })
+    app.dispatch({ type: 'interruptOrQuit' })
+    app.dispatch({ type: 'rewind.confirm' })
+    app.dispatch({ type: 'rewind.confirm' })
+
+    await expect.poll(() => app.snapshot().header.sessionId).toBe('rewound-session')
+    expect(app.snapshot().nodes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'user', text: 'keep this' }),
+        expect.objectContaining({
+          kind: 'assistant',
+          text: 'seed answer',
+          usage: { input: 120, output: 30 },
+        }),
+      ]),
+    )
+    expect(app.snapshot().status.tokens).toEqual({ input: 120, output: 30 })
+    expect(app.snapshot().status.telemetry.contextPercent).toBe(12)
+    expect(app.snapshot().status.todos).toEqual([
+      { content: 'review the result', status: 'in_progress' },
+    ])
   })
 
   it('reports a failed cancellation request without claiming completion', async () => {
