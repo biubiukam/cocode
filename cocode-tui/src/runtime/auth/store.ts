@@ -344,6 +344,10 @@ class AuthStoreImpl implements AuthStore {
         this.client,
       )
       this.ensureCurrent(operation)
+      // 浏览器批准之后剩下的步骤（拉账号、领 Key、写本地凭证）全自动，
+      // 但要离开 device 画面，否则用户会一直看着「等待确认」。
+      this.snap = { phase: 'busy', envLocked: false }
+      this.emit()
       let account: AccountRecord = {
         origin,
         accessToken: token.access_token,
