@@ -7252,6 +7252,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 					this.options.onEngaged?.(this);
 					this.notifier.markDirty();
 				}
+				if (this.openState === "open" && this.firstPromptPendingTurn) this.repairGap();
 				return result;
 			}
 			/**
@@ -7469,6 +7470,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 					case "session/subscribed":
 						this.subscribedLastSeq = frame.lastSeq;
 						if (this.queueMirror.reset()) this.notifier.markDirty();
+						if (this.openState === "open" && this.windowBehind(frame.lastSeq)) this.repairGap();
 						return;
 					case "approval/requested": {
 						const { type: _type, sessionId: _sid, ...payload } = frame;
@@ -7595,8 +7597,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 						return;
 					}
 					this.installWindow(result.value.events, result.value.hasMore, result.value.projections);
-					const tailSeq = this.windowTailSeq();
-					if (this.subscribedLastSeq !== null && tailSeq !== null && this.subscribedLastSeq > tailSeq) {
+					if (this.subscribedLastSeq !== null && this.windowBehind(this.subscribedLastSeq)) {
 						result = (await this.history({ maxMessages: 50 })).result;
 						if (generation !== this.openGeneration) return;
 						if (result.ok) this.installWindow(result.value.events, result.value.hasMore, result.value.projections);
@@ -7696,6 +7697,11 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			windowTailSeq() {
 				const tail = this.events[this.events.length - 1];
 				return tail === void 0 ? null : tail.seq;
+			}
+			/** True when the durable mux baseline is ahead of the local window, including an empty window. */
+			windowBehind(lastSeq) {
+				const tailSeq = this.windowTailSeq();
+				return tailSeq === null ? lastSeq >= 0 : lastSeq > tailSeq;
 			}
 			buildSnapshot() {
 				if (this.pendingCache === null || this.pendingCache.rev !== this.pendingRev) this.pendingCache = {

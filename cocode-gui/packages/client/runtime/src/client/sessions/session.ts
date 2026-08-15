@@ -258,6 +258,10 @@ export class Session implements SessionFace {
       this.options.onEngaged?.(this)
       this.notifier.markDirty()
     }
+    // HTTP prompt can return before mux delivers the turn. If the window still
+    // has no turn/start, pull history so a missed live stream cannot hide the
+    // accepted user message.
+    if (this.openState === 'open' && this.firstPromptPendingTurn) void this.repairGap()
     return result
   }
 
@@ -484,6 +488,10 @@ export class Session implements SessionFace {
         // stale mirror clears here — race-free against onConnected/resync
         // timing (clearing there could wipe a baseline that already landed).
         if (this.queueMirror.reset()) this.notifier.markDirty()
+        // Subscribe reports the durable tail but does not replay events. A
+        // prompt that landed before this frame would otherwise stay invisible
+        // if live session/event frames were missed while the window was cold.
+        if (this.openState === 'open' && this.windowBehind(frame.lastSeq)) void this.repairGap()
         return
       }
       case 'approval/requested': {
@@ -633,8 +641,8 @@ export class Session implements SessionFace {
       }
       this.installWindow(result.value.events, result.value.hasMore, result.value.projections)
       // Gap detection: baseline past the window tail and liveBuffer did not cover it -> pull the tail page once more.
-      const tailSeq = this.windowTailSeq()
-      if (this.subscribedLastSeq !== null && tailSeq !== null && this.subscribedLastSeq > tailSeq) {
+      // An empty window (tailSeq null) is also behind once subscribe has a real lastSeq.
+      if (this.subscribedLastSeq !== null && this.windowBehind(this.subscribedLastSeq)) {
         result = (await this.history({ maxMessages: PAGE_MESSAGES })).result
         if (generation !== this.openGeneration) return
         if (result.ok) this.installWindow(result.value.events, result.value.hasMore, result.value.projections)
@@ -734,6 +742,12 @@ export class Session implements SessionFace {
   private windowTailSeq(): number | null {
     const tail = this.events[this.events.length - 1]
     return tail === undefined ? null : tail.seq
+  }
+
+  /** True when the durable mux baseline is ahead of the local window, including an empty window. */
+  private windowBehind(lastSeq: number): boolean {
+    const tailSeq = this.windowTailSeq()
+    return tailSeq === null ? lastSeq >= 0 : lastSeq > tailSeq
   }
 
   private buildSnapshot(): ConversationSnapshot {
