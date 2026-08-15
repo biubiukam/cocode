@@ -171,6 +171,8 @@ DSH_CORDIS_CONFIG=companion/cordis.yml
 
 只有 harness 的 `skills/list` 返回真实目录后，TUI 才会启用 `/skills`。如果 composition 没有挂载 `@deepseek-ai/dsh-skill` 及其 provider（例如 `@deepseek-ai/dsh-skill-filesystem`），命令会保持隐藏；探测失败或目录为空不会被展示成可用能力。
 
+Companion 默认挂载 Cocode 自己的 `cocode-vision` 插件，并启用 `autoRead`。发送的 Harness `image` block 会先转换为视觉证据，再交给当前文本模型；同时保留原始附件引用，支持原生视觉模型继续读取。视觉 provider 有两种：`cocode` 使用 Cocode 服务，默认视觉模型为 `gpt-luna`；`user` 使用用户配置的 OpenAI-compatible endpoint。用户配置可以写入 `$COCODE_HOME/vision.yaml`（默认 `~/.cocode/vision.yaml`），可参考 [vision.yaml.example](./vision.yaml.example)。`COCODE_VISION_PROVIDER`、`COCODE_VISION_USER_MODEL` 等环境变量优先级更高。账号切换到 Cocode 后，插件会自动复用账号生成的 `COCODE_LLM_PROVIDERS.cocode-cloud` endpoint 和 credential reference，不使用 cloud model 列表的首项。凭证只填写引用名，实际值由 Harness credentials service 管理，不进入 session log 或 TUI 设置。
+
 `/doctor` 中的 `caps-configured` 表示 TUI 根据配置和本地实现预期的能力，`caps-runtime` 表示初始化后对真实 JSON-RPC runtime 的探测结果。两者不一致时，以运行时结果为准；`caps-errors` 会列出被禁用能力的原因。探测使用随机、不存在的 session id，不会创建或修改用户会话。
 
 交互式问卷要求 harness composition 挂载 user-questions service 和对应的 ask-user consumer。SDK server 会把 `question/ask` 转发给 TUI，并等待完整答案批次；未挂载该 service 时不会把终端注册为问卷 provider。

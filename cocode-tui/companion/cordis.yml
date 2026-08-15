@@ -49,9 +49,7 @@
 - id: cocode-vision
   name: '../packages/vision/src/index.ts'
   config:
-    autoRead: true
-    fallbackToNative: true
-    provider: !!js "process.env.COCODE_VISION_PROVIDER ?? 'cocode'"
+    provider: !!js 'process.env.COCODE_VISION_PROVIDER'
     user:
       endpoint: !!js 'process.env.COCODE_VISION_USER_ENDPOINT'
       model: !!js 'process.env.COCODE_VISION_USER_MODEL'
