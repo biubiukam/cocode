@@ -40,6 +40,7 @@ const views: Record<string, NodeView> = {
         node={node}
         verbose={verbose || options.expanded === true}
         locale={options.locale ?? 'en'}
+        maxColumns={options.maxColumns}
       />
     ) : null,
   notice: (node, verbose) => {

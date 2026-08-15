@@ -6,7 +6,12 @@ import type { UiLocale } from '../../runtime/ui-locale.ts'
 import { toolViewDetail } from '../../runtime/nodes/tool-view.ts'
 import { formatDiffSummary } from '../../runtime/diff-summary.ts'
 
-export function ToolCard(props: { node: ToolNode; verbose: boolean; locale: UiLocale }) {
+export function ToolCard(props: {
+  node: ToolNode
+  verbose: boolean
+  locale: UiLocale
+  maxColumns?: number
+}) {
   const { node, verbose } = props
   const mark = node.status === 'running' ? '◌' : node.status === 'error' ? '×' : '✓'
   const color =
@@ -28,7 +33,13 @@ export function ToolCard(props: { node: ToolNode; verbose: boolean; locale: UiLo
   const detail = toolViewDetail(node.view)
   const diffSummary = node.view?.kind === 'diff' ? node.view.summary : undefined
   return (
-    <Box flexDirection="column" marginTop={1} paddingLeft={3}>
+    <Box
+      flexDirection="column"
+      marginTop={1}
+      paddingLeft={3}
+      width={props.maxColumns}
+      minWidth={0}
+    >
       <Text color={color}>
         <Text color={theme.mute}>↳ </Text>
         {mark} <Text bold>{node.name}</Text> · {state}
