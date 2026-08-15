@@ -95,6 +95,14 @@ type UiKey =
   | 'editorUnavailable'
   | 'terminalTooSmall'
   | 'terminalResize'
+  | 'inspector'
+  | 'inspectorActivity'
+  | 'inspectorContext'
+  | 'inspectorFiles'
+  | 'inspectorSession'
+  | 'inspectorEmpty'
+  | 'inspectorGoal'
+  | 'inspectorTodos'
 
 const TEXT: Record<UiLocale, Record<UiKey, string>> = {
   en: {
@@ -190,6 +198,14 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     editorUnavailable: 'external editor unavailable',
     terminalTooSmall: 'terminal is too small',
     terminalResize: 'resize from {current} to at least {required} rows · esc quit',
+    inspector: 'inspector',
+    inspectorActivity: 'activity',
+    inspectorContext: 'context',
+    inspectorFiles: 'files',
+    inspectorSession: 'session',
+    inspectorEmpty: 'no active details',
+    inspectorGoal: 'goal',
+    inspectorTodos: 'todos',
   },
   zh: {
     session: '会话',
@@ -284,6 +300,14 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     editorUnavailable: '外部编辑器不可用',
     terminalTooSmall: '终端高度不足',
     terminalResize: '当前 {current} 行，至少需要 {required} 行 · Esc 退出',
+    inspector: '详情',
+    inspectorActivity: '活动',
+    inspectorContext: '上下文',
+    inspectorFiles: '文件',
+    inspectorSession: '会话',
+    inspectorEmpty: '暂无活动详情',
+    inspectorGoal: '目标',
+    inspectorTodos: '待办',
   },
 }
 

@@ -33,6 +33,7 @@ import { text } from '../runtime/ui-locale.ts'
 import { visibleResumeItems } from '../runtime/resume-picker.ts'
 import { editDraft } from '../runtime/external-editor.ts'
 import { calculateChatLayout } from './chat-layout.ts'
+import { Inspector, INSPECTOR_WIDTH } from './components/Inspector.tsx'
 
 export function Chat(props: { app: TuiApp }) {
   const { app } = props
@@ -119,6 +120,10 @@ export function Chat(props: { app: TuiApp }) {
           Number(snap.question.question.detail !== undefined),
   })
   const messageMaxRows = layout.messageRows
+  const wideInspector = stdout.columns >= 120
+  const mainColumns = wideInspector
+    ? Math.max(1, stdout.columns - INSPECTOR_WIDTH - 1)
+    : stdout.columns
   const selectableMessages = useMemo(
     () =>
       selectableMessageKeys(
@@ -547,66 +552,75 @@ export function Chat(props: { app: TuiApp }) {
   )
 
   return (
-    <Box flexDirection="column" height={stdout.rows}>
-      <Header
-        header={snap.header}
-        agent={snap.agent}
-        locale={snap.locale}
-        columns={stdout.columns}
-      />
-      <MessageList
-        nodes={snap.nodes}
-        verbose={snap.verbose}
-        maxRows={messageMaxRows}
-        selectedNodeId={messageSelectionActive ? selectedMessageId : undefined}
-        expandedNodeIds={expandedMessageIds}
-        locale={snap.locale}
-        maxColumns={stdout.columns}
-      />
-      <StatusLine
-        status={snap.status}
-        agent={snap.agent}
-        notice={snap.notice}
-        locale={snap.locale}
-      />
-      {editorBusy ? (
-        <Text color={theme.info} wrap="truncate-end">
-          {text(snap.locale, 'editorOpening')}
-        </Text>
-      ) : null}
-      {editorError !== undefined ? (
-        <Text color={theme.error} wrap="truncate-end">
-          {editorError}
-        </Text>
-      ) : null}
-      {layout.overlayRows > 0 ? (
-        <Box flexDirection="column" height={layout.overlayRows} overflowY="hidden">
-          {overlays}
-        </Box>
-      ) : null}
-      <Composer
-        composer={snap.composer}
-        locale={snap.locale}
-        maxRows={layout.composerRows}
-        maxColumns={stdout.columns}
-      />
-      <Box width="100%" marginTop={1} justifyContent="space-between">
-        {messageSelectionActive ? (
-          <Text color={theme.brand} wrap="truncate-end">
-            {text(snap.locale, 'messageMode')} · {text(snap.locale, 'messageModeHint')}
+    <Box flexDirection="row" height={stdout.rows}>
+      <Box
+        flexDirection="column"
+        height={stdout.rows}
+        width={wideInspector ? mainColumns : undefined}
+        minWidth={0}
+        flexGrow={wideInspector ? 0 : 1}
+      >
+        <Header
+          header={snap.header}
+          agent={snap.agent}
+          locale={snap.locale}
+          columns={mainColumns}
+        />
+        <MessageList
+          nodes={snap.nodes}
+          verbose={snap.verbose}
+          maxRows={messageMaxRows}
+          selectedNodeId={messageSelectionActive ? selectedMessageId : undefined}
+          expandedNodeIds={expandedMessageIds}
+          locale={snap.locale}
+          maxColumns={mainColumns}
+        />
+        <StatusLine
+          status={snap.status}
+          agent={snap.agent}
+          notice={snap.notice}
+          locale={snap.locale}
+        />
+        {editorBusy ? (
+          <Text color={theme.info} wrap="truncate-end">
+            {text(snap.locale, 'editorOpening')}
           </Text>
-        ) : (
-          <>
-            <Text color={theme.mute} wrap="truncate-end">
-              {text(snap.locale, 'footerHistory')} · {text(snap.locale, 'footerMessages')} ·{' '}
-              {text(snap.locale, 'footerDetails')} · {text(snap.locale, 'footerHelp')}
+        ) : null}
+        {editorError !== undefined ? (
+          <Text color={theme.error} wrap="truncate-end">
+            {editorError}
+          </Text>
+        ) : null}
+        {layout.overlayRows > 0 ? (
+          <Box flexDirection="column" height={layout.overlayRows} overflowY="hidden">
+            {overlays}
+          </Box>
+        ) : null}
+        <Composer
+          composer={snap.composer}
+          locale={snap.locale}
+          maxRows={layout.composerRows}
+          maxColumns={mainColumns}
+        />
+        <Box width="100%" marginTop={1} justifyContent="space-between">
+          {messageSelectionActive ? (
+            <Text color={theme.brand} wrap="truncate-end">
+              {text(snap.locale, 'messageMode')} · {text(snap.locale, 'messageModeHint')}
             </Text>
-            <Text color={theme.mute} wrap="truncate-end">
-              {text(snap.locale, 'footerQuit')} · {text(snap.locale, 'footerRedraw')}
-            </Text>
-          </>
-        )}
+          ) : (
+            <>
+              <Text color={theme.mute} wrap="truncate-end">
+                {text(snap.locale, 'footerHistory')} · {text(snap.locale, 'footerMessages')} ·{' '}
+                {text(snap.locale, 'footerDetails')} · {text(snap.locale, 'footerHelp')}
+              </Text>
+              <Text color={theme.mute} wrap="truncate-end">
+                {text(snap.locale, 'footerQuit')} · {text(snap.locale, 'footerRedraw')}
+              </Text>
+            </>
+          )}
+        </Box>
       </Box>
+      {wideInspector ? <Inspector snapshot={snap} locale={snap.locale} /> : null}
     </Box>
   )
 }
