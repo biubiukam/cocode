@@ -532,6 +532,9 @@ describe('TuiApp', () => {
 
   it('switches model through runtime restart and starts a new session', async () => {
     const runtime = fakeRuntime()
+    runtime.open = async () => {
+      throw new Error('session persistence is unavailable')
+    }
     const app = createTuiApp({
       runtime,
       cwd: '/tmp',
@@ -544,12 +547,66 @@ describe('TuiApp', () => {
     await expect.poll(() => app.snapshot().header.model).toBe('m2')
     expect(runtime.restarts).toEqual([{ provider: 'deepseek-official', model: 'm2' }])
     expect(app.snapshot().header.sessionId).not.toBe('s1')
+    expect(app.snapshot().notice?.message).toContain('persistence is unavailable')
     expect(app.snapshot().agent).toBe('idle')
+  })
+
+  it('keeps the current session when the restarted runtime supports durable session open', async () => {
+    const runtime = fakeRuntime()
+    runtime.getCapabilities = () => ({
+      source: 'runtime',
+      capabilities: {
+        cancel: true,
+        open: true,
+        fork: true,
+        rewind: true,
+        skills: false,
+        onRequest: false,
+        approval: false,
+        permissionMode: false,
+        planMode: false,
+        sessionList: false,
+        modelList: false,
+        promptMode: false,
+        queueMode: false,
+      },
+      errors: {},
+    })
+    const seed: SessionEvent[] = [
+      {
+        type: 'user/message',
+        seq: 1,
+        time: 1,
+        data: { content: [{ type: 'text', text: 'keep this context' }] },
+      },
+    ]
+    runtime.open = async (sessionId) => {
+      expect(sessionId).toBe('s1')
+      return { opened: true, seed, seedLength: seed.length }
+    }
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm1',
+      sessionId: 's1',
+    })
+    await app.start()
+    app.dispatch({ type: 'command', line: '/model m2' })
+
+    await expect.poll(() => app.snapshot().header.model).toBe('m2')
+    expect(app.snapshot().header.sessionId).toBe('s1')
+    expect(app.snapshot().nodes).toHaveLength(1)
+    expect(app.snapshot().nodes[0]?.text).toContain('keep this context')
+    expect(app.snapshot().notice?.message).toContain('current session continued')
   })
 
   it('restores the previous model when switching fails', async () => {
     const runtime = fakeRuntime()
     runtime.failRestartModels.add('m2')
+    runtime.open = async () => {
+      throw new Error('session persistence is unavailable')
+    }
     const app = createTuiApp({
       runtime,
       cwd: '/tmp',
@@ -566,8 +623,9 @@ describe('TuiApp', () => {
       { provider: 'deepseek-official', model: 'm1' },
     ])
     expect(app.snapshot().header.model).toBe('m1')
-    expect(app.snapshot().header.sessionId).toBe('s1')
-    expect(app.snapshot().notice?.message).toBe('模型切换失败，已恢复为 m1。')
+    expect(app.snapshot().header.sessionId).not.toBe('s1')
+    expect(app.snapshot().nodes).toHaveLength(0)
+    expect(app.snapshot().notice?.message).toContain('持久化不可用')
   })
 
   it('opens a model picker from /model and switches provider and model', async () => {
@@ -598,7 +656,7 @@ describe('TuiApp', () => {
     await expect.poll(() => app.snapshot().header.provider).toBe('p2')
     expect(runtime.restarts).toEqual([{ provider: 'p2', model: 'm2' }])
     expect(app.snapshot().header.model).toBe('m2')
-    expect(app.snapshot().header.sessionId).not.toBe('s1')
+    expect(app.snapshot().header.sessionId).toBe('s1')
   })
 
   it('opens the manual model input for /models when the runtime has no catalog', async () => {

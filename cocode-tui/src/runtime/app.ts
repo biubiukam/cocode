@@ -1771,17 +1771,15 @@ class TuiAppImpl implements TuiApp {
       this.model = model
       this.runtimeName = info.name
       this.refreshRuntimeCapabilities()
-      this.sessionId = createSessionId()
-      this.assembler.reset()
-      this.telemetry.reset()
-      this.sessionState.reset()
+      const resumed = await this.resumeSessionAfterRestart(this.sessionId)
+      if (!resumed) this.resetToFreshSession()
       await this.refreshSessionControls()
       await this.loadSkills()
       this.resetSubagentActivity()
       this.agent = 'idle'
       this.notice = {
         tone: 'info',
-        message: text(this.locale, 'modelChanged', { model }),
+        message: text(this.locale, resumed ? 'modelChanged' : 'modelChangedFresh', { model }),
       }
     } catch (error) {
       this.agent = 'dead'
@@ -1796,18 +1794,48 @@ class TuiAppImpl implements TuiApp {
         this.model = previous
         this.runtimeName = info.name
         this.refreshRuntimeCapabilities()
+        const resumed = await this.resumeSessionAfterRestart(this.sessionId)
+        if (!resumed) this.resetToFreshSession()
         await this.refreshSessionControls()
         await this.loadSkills()
         this.agent = 'idle'
         this.notice = {
           tone: 'error',
-          message: text(this.locale, 'modelRestored', { model: previous }),
+          message: text(
+            this.locale,
+            resumed ? 'modelRestored' : 'modelRestoredFresh',
+            { model: previous },
+          ),
         }
       } catch (restoreError) {
         this.notice = { tone: 'error', message: startErrorMessage(restoreError) }
       }
     }
     this.emit()
+  }
+
+  private async resumeSessionAfterRestart(sessionId: string): Promise<boolean> {
+    if (!this.capabilities.open || this.runtime.open === undefined) return false
+    try {
+      const opened = normalizeOpenResult(await this.runtime.open(sessionId))
+      if (!opened.opened) return false
+      if (opened.seed !== undefined) this.replaceSessionProjection(opened.seed)
+      this.sessionId = sessionId
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  private resetToFreshSession(): void {
+    this.sessionId = createSessionId()
+    this.assembler.reset()
+    this.telemetry.reset()
+    this.sessionState.reset()
+    this.sessionTitleOverride = undefined
+    this.pendingSkillInvocation = undefined
+    this.attachments = []
+    this.images = []
   }
 
   private async resumeSession(sessionId: string, path: string | undefined): Promise<void> {

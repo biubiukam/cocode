@@ -60,7 +60,9 @@ type UiKey =
   | 'modelBusy'
   | 'modelSwitching'
   | 'modelChanged'
+  | 'modelChangedFresh'
   | 'modelRestored'
+  | 'modelRestoredFresh'
   | 'modelSwitchTitle'
   | 'modelSwitchCurrent'
   | 'modelSwitchHint'
@@ -289,8 +291,10 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     modelUsage: 'Use /model <model-id>.',
     modelBusy: 'Turn in progress. Wait before changing model.',
     modelSwitching: 'Switching model to {model}…',
-    modelChanged: 'Model changed to {model}; new session started.',
+    modelChanged: 'Model changed to {model}; current session continued.',
+    modelChangedFresh: 'Model changed to {model}; new session started because persistence is unavailable.',
     modelRestored: 'Model switch failed; restored {model}.',
+    modelRestoredFresh: 'Model switch failed; restored {model} in a new session because persistence is unavailable.',
     modelSwitchTitle: 'Switch model',
     modelSwitchCurrent: 'current: {model}',
     modelSwitchHint: 'type a model id · enter apply · esc close',
@@ -518,8 +522,10 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     modelUsage: '使用 /model <model-id>。',
     modelBusy: '当前任务仍在运行，请等待任务结束后再切换模型。',
     modelSwitching: '正在切换模型到 {model}…',
-    modelChanged: '已切换到 {model}，并创建新会话。',
+    modelChanged: '已切换到 {model}，继续使用当前会话。',
+    modelChangedFresh: '已切换到 {model}，由于持久化不可用，已创建新会话。',
     modelRestored: '模型切换失败，已恢复为 {model}。',
+    modelRestoredFresh: '模型切换失败，已恢复为 {model}，但由于持久化不可用，已创建新会话。',
     modelSwitchTitle: '切换模型',
     modelSwitchCurrent: '当前：{model}',
     modelSwitchHint: '输入模型名称 · 回车应用 · Esc 关闭',
