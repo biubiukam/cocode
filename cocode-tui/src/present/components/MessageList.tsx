@@ -20,6 +20,10 @@ export function MessageList(props: {
     props.maxRows === undefined
       ? props.nodes
       : visibleTail(props.nodes, props.maxRows, props.verbose, props.expandedNodeIds)
+  const contentColumns =
+    props.maxColumns === undefined
+      ? undefined
+      : Math.max(1, props.maxColumns - (props.selectedNodeId !== undefined ? 2 : 0))
   return (
     <Box
       flexDirection="column"
@@ -40,7 +44,11 @@ export function MessageList(props: {
               {props.selectedNodeId !== undefined ? (
                 <Text color={selected ? theme.brand : theme.mute}>{selected ? '› ' : '  '}</Text>
               ) : null}
-              {renderNode(node, props.verbose, { expanded, locale: props.locale })}
+              {renderNode(node, props.verbose, {
+                expanded,
+                locale: props.locale,
+                maxColumns: contentColumns,
+              })}
             </Box>
           )
         })
