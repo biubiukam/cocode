@@ -122,6 +122,7 @@ import {
   createSessionTreePicker,
   moveSessionTreeSelection,
   selectedSessionTreeItem,
+  setSessionTreeActivity,
   setSessionTreeQuery,
   type SessionTreePickerItem,
   type SessionTreePickerState,
@@ -408,6 +409,7 @@ class TuiAppImpl implements TuiApp {
   private closePromise: Promise<void> | undefined
   private resumePicker: ResumePickerState | undefined
   private sessionTreePicker: SessionTreePickerState | undefined
+  private readonly sessionActivities = new Map<string, 'idle' | 'running'>()
   private sessionTitleOverride: string | undefined
   private rewindPicker: RewindPickerState | undefined
   private forkPicker: RewindPickerState | undefined
@@ -477,6 +479,7 @@ class TuiAppImpl implements TuiApp {
       this.runtimeName = info.name
       this.refreshRuntimeCapabilities()
       this.agent = 'idle'
+      this.sessionActivities.set(this.sessionId, 'idle')
       this.initError = undefined
       this.notice = undefined
       this.workspaceBranch = (await resolveWorkspaceInfo(this.cwd)).branch
@@ -1324,6 +1327,7 @@ class TuiAppImpl implements TuiApp {
       })),
       'rpc',
       this.sessionId,
+      this.sessionActivities,
     )
   }
 
@@ -1331,7 +1335,7 @@ class TuiAppImpl implements TuiApp {
     const root = this.diagnostics.sessionRoot
     if (root === undefined) return []
     const result = await listSessionSummaries({ root, cwd: this.cwd, limit: 50 })
-    return makeSessionTreeItems(result.sessions, 'jsonl', this.sessionId)
+    return makeSessionTreeItems(result.sessions, 'jsonl', this.sessionId, this.sessionActivities)
   }
 
   private async openSessionTreeItem(item: SessionTreePickerItem): Promise<void> {
@@ -2029,6 +2033,13 @@ class TuiAppImpl implements TuiApp {
   }
 
   private onNotification(notification: TuiNotification): void {
+    if (notification.method === 'session.status') {
+      const { sessionId, status } = notification.params
+      this.sessionActivities.set(sessionId, status)
+      if (this.sessionTreePicker !== undefined) {
+        this.sessionTreePicker = setSessionTreeActivity(this.sessionTreePicker, sessionId, status)
+      }
+    }
     handleNotification(notification, {
       sessionId: this.sessionId,
       ingest: (event) => {
@@ -2179,10 +2190,12 @@ function makeSessionTreeItems(
   }>,
   source: 'rpc' | 'jsonl',
   currentSessionId: string,
+  activities: ReadonlyMap<string, 'idle' | 'running'>,
 ): SessionTreePickerItem[] {
   const tree = buildSessionTree(sessions)
   return flattenSessionTree(tree, currentSessionId).map((row) => {
     const sourceSession = sessions.find((session) => session.id === row.session.id)
+    const activity = activities.get(row.session.id)
     return {
       ...row,
       source,
@@ -2190,6 +2203,7 @@ function makeSessionTreeItems(
         ? {}
         : { path: sourceSession.path }),
       ...(sourceSession?.updatedAt === undefined ? {} : { updatedAt: sourceSession.updatedAt }),
+      ...(activity === undefined ? {} : { activity }),
     }
   })
 }

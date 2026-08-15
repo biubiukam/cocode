@@ -37,6 +37,9 @@ export function SessionTreePicker(props: {
       <Text color={theme.dim} wrap="truncate-end">
         {text(props.locale, 'sessionTreeQuery', { query: props.state.query || '…' })}
       </Text>
+      <Text color={theme.dim} wrap="truncate-end">
+        {text(props.locale, 'sessionTreeLegend')}
+      </Text>
       {start > 0 ? <Text color={theme.mute}>↑ {start}</Text> : null}
       {visible.length === 0 ? (
         <Text color={theme.mute}>{text(props.locale, 'sessionTreeEmpty')}</Text>
@@ -45,7 +48,17 @@ export function SessionTreePicker(props: {
           const index = start + offset
           const active = index === props.state.selected
           const current = item.session.id === props.currentSessionId
-          const marker = item.orphaned ? '!' : item.current || current ? '✓' : ' '
+          const marker = item.orphaned
+            ? '!'
+            : item.current || current
+            ? '✓'
+            : item.activity === 'running'
+            ? '◉'
+            : item.activity === 'idle'
+            ? '·'
+            : ' '
+          const attachedActivity =
+            (item.current || current) && item.activity === 'running' ? ' ◉' : ''
           const indent = '  '.repeat(Math.min(item.depth, 8))
           const title =
             item.session.title ?? item.session.preview ?? text(props.locale, 'resumeNoSummary')
@@ -56,7 +69,7 @@ export function SessionTreePicker(props: {
               inverse={active}
               wrap="truncate-end"
             >
-              {active ? '›' : ' '} {marker} {indent}
+              {active ? '›' : ' '} {marker}{attachedActivity} {indent}
               {title} · {item.session.id.slice(0, 8)}{' '}
               <Text color={active ? theme.text : theme.dim}>
                 {formatTimestamp(item.updatedAt ?? item.session.createdAt, props.locale)}

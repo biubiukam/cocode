@@ -218,6 +218,7 @@ type UiKey =
   | 'sessionTreeEmpty'
   | 'sessionTreeTitle'
   | 'sessionTreeHint'
+  | 'sessionTreeLegend'
   | 'sessionTreeQuery'
   | 'sessionTreeLoading'
   | 'sessionTreeOpenFailed'
@@ -439,6 +440,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     sessionTreeEmpty: 'No runtime sessions found.',
     sessionTreeTitle: 'Sessions',
     sessionTreeHint: 'type to filter · ↑↓ select · enter open · esc close',
+    sessionTreeLegend: '✓ current · ◉ running · · idle',
     sessionTreeQuery: 'filter: {query}',
     sessionTreeLoading: 'Loading sessions…',
     sessionTreeOpenFailed: 'The runtime could not open this session.',
@@ -659,6 +661,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     sessionTreeEmpty: '没有找到运行时会话。',
     sessionTreeTitle: '会话列表',
     sessionTreeHint: '输入过滤 · ↑↓ 选择 · 回车打开 · Esc 关闭',
+    sessionTreeLegend: '✓ 当前 · ◉ 运行中 · · 空闲',
     sessionTreeQuery: '筛选：{query}',
     sessionTreeLoading: '正在加载会话列表……',
     sessionTreeOpenFailed: '运行时无法打开该会话。',
