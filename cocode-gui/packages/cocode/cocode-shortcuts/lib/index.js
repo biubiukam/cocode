@@ -50,13 +50,15 @@ function isTrustedApiRequest(request, trustedHosts) {
 //#endregion
 //#region src/wire.ts
 var ShortcutsRouteError = class extends Error {
+	code;
+	status;
 	constructor(code, message, status = 400) {
 		super(message);
 		this.code = code;
 		this.status = status;
 	}
 };
-const MAX_BODY_BYTES = 64 * 1024;
+const MAX_BODY_BYTES = 65536;
 async function readJsonBody(request) {
 	const chunks = [];
 	let total = 0;
@@ -107,17 +109,17 @@ function writeError(response, error) {
 //#region src/route.ts
 const SHORTCUTS_API_PREFIX = "/cocode/shortcuts/api";
 const COMMAND_ID = /^[A-Za-z0-9._:-]{1,128}$/;
-const RESERVED_COMMAND_IDS = new Set([
+const RESERVED_COMMAND_IDS = /* @__PURE__ */ new Set([
 	"__proto__",
 	"constructor",
 	"prototype"
 ]);
-const BINDING_KEYS = new Set([
+const BINDING_KEYS = /* @__PURE__ */ new Set([
 	"combo",
 	"scope",
 	"disabled"
 ]);
-const COMBO_KEYS = new Set([
+const COMBO_KEYS = /* @__PURE__ */ new Set([
 	"key",
 	"primary",
 	"alt",
@@ -239,8 +241,7 @@ function registerShortcutsRoute(ctx, getSettings) {
 				return;
 			}
 			const pathname = new URL(request.url ?? "/", "http://dsh.internal").pathname;
-			const prefix = SHORTCUTS_API_PREFIX + "/";
-			const method = pathname.startsWith(prefix) ? pathname.slice(22) : void 0;
+			const method = pathname.startsWith("/cocode/shortcuts/api/") ? pathname.slice(22) : void 0;
 			if (method === void 0 || method.includes("/")) {
 				writeError(response, new ShortcutsRouteError("not-found", "unknown shortcuts API method", 404));
 				return;

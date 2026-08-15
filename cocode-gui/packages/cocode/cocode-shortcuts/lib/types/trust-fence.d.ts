@@ -1,4 +1,3 @@
-/// <reference types="node" />
 import type { IncomingHttpHeaders } from "node:http";
 interface ApiTrustRequest {
     readonly headers: IncomingHttpHeaders;
