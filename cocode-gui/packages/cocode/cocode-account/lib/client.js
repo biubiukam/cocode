@@ -8,7 +8,7 @@ window.__ModuleLoader__.load({
 		let react_dom_client = require("react-dom/client");
 		let _deepseek_ai_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-primitives");
 		//#region \0dsh-css:packages/cocode/cocode-account/src/client/account.module.css.mjs
-		const css = ".Jlr38G_menuRoot{width:100%;display:flex}.Jlr38G_trigger{width:100%;min-width:0;height:48px;color:var(--dsw-alias-label-primary);cursor:pointer;font:inherit;text-align:left;transition-property:background-color,transform;transition-duration:.14s;transition-timing-function:var(--ds-ease-in-out);background:0 0;border:none;border-radius:14px;align-items:center;gap:10px;padding:6px 10px;display:flex}.Jlr38G_trigger:hover,.Jlr38G_trigger[aria-expanded=true]{background:var(--dsw-alias-interactive-bg-hover)}.Jlr38G_trigger:active:not(:disabled){transform:scale(.96)}.Jlr38G_trigger:focus-visible{outline:2px solid var(--dsw-alias-state-focus,currentColor);outline-offset:1px}.Jlr38G_trigger:disabled{cursor:wait;opacity:.65}.Jlr38G_avatar{border-radius:10px;flex:none;justify-content:center;align-items:center;width:32px;height:32px;font-size:13px;font-weight:600;line-height:1;display:inline-flex}.Jlr38G_accountAvatar{background:var(--dsw-alias-accent-fill,#2f7cf6);color:var(--dsw-alias-label-on-color,white)}.Jlr38G_providerAvatar{background:var(--dsw-alias-bg-layer-2);box-shadow:inset 0 0 0 1px var(--dsw-alias-border-l2);color:var(--dsw-alias-label-primary)}.Jlr38G_guestAvatar{box-shadow:inset 0 0 0 1px var(--dsw-alias-border-l2);color:var(--dsw-alias-label-secondary);background:0 0}.Jlr38G_copy{flex-direction:column;flex:1;gap:1px;min-width:0;display:flex}.Jlr38G_primary,.Jlr38G_secondary{text-overflow:ellipsis;white-space:nowrap;overflow:hidden}.Jlr38G_primary{color:var(--dsw-alias-label-primary);font-size:14px;font-weight:500;line-height:20px}.Jlr38G_secondary{color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:15px}.Jlr38G_chevron{color:var(--dsw-alias-label-tertiary);transition:transform .14s var(--ds-ease-in-out);flex:none}.Jlr38G_trigger[aria-expanded=true] .Jlr38G_chevron{transform:rotate(180deg)}.Jlr38G_trigger.Jlr38G_rail{border-radius:50%;width:36px;height:36px;padding:2px}.Jlr38G_rail .Jlr38G_avatar{border-radius:50%;width:32px;height:32px}@media (prefers-reduced-motion:reduce){.Jlr38G_trigger,.Jlr38G_chevron{transition:none}}";
+		const css = ".Jlr38G_menuRoot{border:1px solid var(--dsw-alias-border-inverted);background:var(--dsw-specific-menu);border-radius:16px;gap:2px;width:min(280px,100vw - 24px);min-width:260px;padding:8px;display:flex;overflow:hidden;box-shadow:0 18px 44px #00000057,0 2px 8px #0000002e}.Jlr38G_menuRoot [role=menuitem]{border-radius:10px;gap:10px;min-height:40px;padding:8px 10px;font-size:14px;line-height:20px}.Jlr38G_menuRoot [role=menuitem]:focus-visible{outline:2px solid var(--dsw-alias-state-focus,currentColor);outline-offset:-2px}.Jlr38G_menuRoot [role=separator]{background:var(--dsw-alias-border-l2);margin:7px 4px}.Jlr38G_menuGlyph{color:currentColor;flex:none;display:block}.Jlr38G_trigger{width:100%;min-width:0;height:48px;color:var(--dsw-alias-label-primary);cursor:pointer;font:inherit;text-align:left;transition-property:background-color,transform;transition-duration:.14s;transition-timing-function:var(--ds-ease-in-out);background:0 0;border:none;border-radius:14px;align-items:center;gap:10px;padding:6px 10px;display:flex}.Jlr38G_trigger:hover,.Jlr38G_trigger[aria-expanded=true]{background:var(--dsw-alias-interactive-bg-hover)}.Jlr38G_trigger:active:not(:disabled){transform:scale(.96)}.Jlr38G_trigger:focus-visible{outline:2px solid var(--dsw-alias-state-focus,currentColor);outline-offset:1px}.Jlr38G_trigger:disabled{cursor:wait;opacity:.65}.Jlr38G_avatar{border-radius:10px;flex:none;justify-content:center;align-items:center;width:32px;height:32px;font-size:13px;font-weight:600;line-height:1;display:inline-flex}.Jlr38G_accountAvatar{background:var(--dsw-alias-accent-fill,#2f7cf6);color:var(--dsw-alias-label-on-color,white)}.Jlr38G_providerAvatar{background:var(--dsw-alias-bg-layer-2);box-shadow:inset 0 0 0 1px var(--dsw-alias-border-l2);color:var(--dsw-alias-label-primary)}.Jlr38G_guestAvatar{box-shadow:inset 0 0 0 1px var(--dsw-alias-border-l2);color:var(--dsw-alias-label-secondary);background:0 0}.Jlr38G_copy{flex-direction:column;flex:1;gap:1px;min-width:0;display:flex}.Jlr38G_primary,.Jlr38G_secondary{text-overflow:ellipsis;white-space:nowrap;overflow:hidden}.Jlr38G_primary{color:var(--dsw-alias-label-primary);font-size:14px;font-weight:500;line-height:20px}.Jlr38G_secondary{color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:15px}.Jlr38G_chevron{color:var(--dsw-alias-label-tertiary);transition:transform .14s var(--ds-ease-in-out);flex:none}.Jlr38G_trigger[aria-expanded=true] .Jlr38G_chevron{transform:rotate(180deg)}.Jlr38G_trigger.Jlr38G_rail{border-radius:50%;width:36px;height:36px;padding:2px}.Jlr38G_rail .Jlr38G_avatar{border-radius:50%;width:32px;height:32px}.Jlr38G_panelOverlay{z-index:1200;background:#0000006b;place-items:center;padding:24px;display:grid;position:fixed;inset:0}.Jlr38G_panel{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-l1,#18181c);width:min(440px,100%);color:var(--dsw-alias-label-primary);border-radius:18px;padding:22px;box-shadow:0 24px 70px #00000057}.Jlr38G_panelHeader{justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:22px;display:flex}.Jlr38G_panelTitle{margin:0;font-size:18px;font-weight:600;line-height:24px}.Jlr38G_panelSubtitle,.Jlr38G_panelSecondary,.Jlr38G_panelHint{color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px;display:block}.Jlr38G_panelClose{width:32px;height:32px;color:var(--dsw-alias-label-secondary);cursor:pointer;background:0 0;border:0;border-radius:50%;padding:0;font-size:24px;line-height:1}.Jlr38G_panelClose:hover{background:var(--dsw-alias-interactive-bg-hover)}.Jlr38G_panelStack{flex-direction:column;gap:14px;display:flex}.Jlr38G_profileCard,.Jlr38G_planCard,.Jlr38G_usageCard{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);border-radius:14px;flex-direction:column;gap:4px;padding:16px;display:flex}.Jlr38G_profileCard{flex-direction:row;align-items:center;gap:12px}.Jlr38G_profileCopy{flex-direction:column;gap:2px;min-width:0;display:flex}.Jlr38G_panelPrimary,.Jlr38G_planName{font-size:15px;line-height:21px}.Jlr38G_factList{border-top:1px solid var(--dsw-alias-border-l2);flex-direction:column;display:flex}.Jlr38G_panelSectionTitle{color:var(--dsw-alias-label-secondary);margin-top:2px;font-size:12px;font-weight:600;line-height:18px}.Jlr38G_factRow{border-bottom:1px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-secondary);justify-content:space-between;align-items:center;gap:16px;padding:12px 0;font-size:13px;display:flex}.Jlr38G_factRow strong{color:var(--dsw-alias-label-primary);font-weight:500}.Jlr38G_panelEyebrow{color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:16px}.Jlr38G_usageGrid{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;display:grid}.Jlr38G_usageMetric{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);border-radius:12px;flex-direction:column;gap:9px;min-width:0;padding:13px 12px 12px;display:flex}.Jlr38G_usageMetricHeader{justify-content:space-between;align-items:baseline;gap:6px;display:flex}.Jlr38G_usageMetricLabel{min-width:0;color:var(--dsw-alias-label-secondary);font-size:12px;line-height:18px}.Jlr38G_usageMetricPercent{color:var(--dsw-alias-label-primary);flex:none;font-size:17px;line-height:22px}.Jlr38G_usageTrack{background:var(--dsw-alias-border-l2);border-radius:999px;height:5px;overflow:hidden}.Jlr38G_usageFill{border-radius:inherit;background:var(--dsw-alias-accent-fill,#2f7cf6);height:100%;transition:width .18s var(--ds-ease-in-out);display:block}@media (width<=460px){.Jlr38G_usageGrid{grid-template-columns:1fr}}.Jlr38G_panelIntro,.Jlr38G_panelHint{margin:0}.Jlr38G_panelAction{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);min-height:42px;color:var(--dsw-alias-label-primary);cursor:pointer;font:inherit;text-align:left;border-radius:10px;padding:0 13px}.Jlr38G_panelAction:hover{background:var(--dsw-alias-interactive-bg-hover)}@media (prefers-reduced-motion:reduce){.Jlr38G_trigger,.Jlr38G_chevron{transition:none}}";
 		const tagId = "cocode-account/account.module.css";
 		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId) + "]") === null) {
 			const tag = document.createElement("style");
@@ -18,17 +18,46 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var account_module_css_default = {
+			"panelSectionTitle": "Jlr38G_panelSectionTitle",
+			"panel": "Jlr38G_panel",
+			"panelTitle": "Jlr38G_panelTitle",
+			"planCard": "Jlr38G_planCard",
+			"usageFill": "Jlr38G_usageFill",
+			"profileCard": "Jlr38G_profileCard",
 			"guestAvatar": "Jlr38G_guestAvatar",
-			"trigger": "Jlr38G_trigger",
+			"panelSecondary": "Jlr38G_panelSecondary",
+			"usageGrid": "Jlr38G_usageGrid",
 			"avatar": "Jlr38G_avatar",
-			"chevron": "Jlr38G_chevron",
-			"accountAvatar": "Jlr38G_accountAvatar",
-			"rail": "Jlr38G_rail",
+			"usageCard": "Jlr38G_usageCard",
 			"copy": "Jlr38G_copy",
-			"menuRoot": "Jlr38G_menuRoot",
-			"secondary": "Jlr38G_secondary",
 			"primary": "Jlr38G_primary",
-			"providerAvatar": "Jlr38G_providerAvatar"
+			"trigger": "Jlr38G_trigger",
+			"usageMetricPercent": "Jlr38G_usageMetricPercent",
+			"usageMetricHeader": "Jlr38G_usageMetricHeader",
+			"menuGlyph": "Jlr38G_menuGlyph",
+			"panelHint": "Jlr38G_panelHint",
+			"accountAvatar": "Jlr38G_accountAvatar",
+			"secondary": "Jlr38G_secondary",
+			"providerAvatar": "Jlr38G_providerAvatar",
+			"panelPrimary": "Jlr38G_panelPrimary",
+			"usageMetric": "Jlr38G_usageMetric",
+			"rail": "Jlr38G_rail",
+			"planName": "Jlr38G_planName",
+			"factList": "Jlr38G_factList",
+			"usageTrack": "Jlr38G_usageTrack",
+			"menuRoot": "Jlr38G_menuRoot",
+			"panelClose": "Jlr38G_panelClose",
+			"panelEyebrow": "Jlr38G_panelEyebrow",
+			"panelHeader": "Jlr38G_panelHeader",
+			"panelSubtitle": "Jlr38G_panelSubtitle",
+			"usageMetricLabel": "Jlr38G_usageMetricLabel",
+			"panelOverlay": "Jlr38G_panelOverlay",
+			"panelStack": "Jlr38G_panelStack",
+			"factRow": "Jlr38G_factRow",
+			"panelIntro": "Jlr38G_panelIntro",
+			"panelAction": "Jlr38G_panelAction",
+			"profileCopy": "Jlr38G_profileCopy",
+			"chevron": "Jlr38G_chevron"
 		};
 		//#endregion
 		//#region src/client/index.tsx
@@ -56,10 +85,13 @@ window.__ModuleLoader__.load({
 				cleanupPending: "本地账号已退出，Cocode Cloud 配置将在运行时恢复后继续清理。",
 				reauthentication: "请在浏览器中重新认证 Cocode 账号（十分钟内完成），然后点击重试。",
 				account: "Cocode 账号",
+				accountPlan: "账户与计划",
+				planUsage: "套餐用量",
 				customProvider: "自定义 Provider",
 				noProvider: "登录或配置 Provider",
 				models: "模型与 Provider",
 				settings: "设置",
+				help: "帮助与反馈",
 				signOut: "退出登录",
 				providerId: "Provider ID："
 			},
@@ -78,10 +110,13 @@ window.__ModuleLoader__.load({
 				cleanupPending: "The local account is signed out. Cloud configuration cleanup will resume when the runtime is available.",
 				reauthentication: "Reauthenticate your Cocode account in the browser within ten minutes, then retry.",
 				account: "Cocode account",
+				accountPlan: "Account & plan",
+				planUsage: "Plan usage",
 				customProvider: "Custom provider",
 				noProvider: "Sign in or configure a provider",
 				models: "Models & providers",
 				settings: "Settings",
+				help: "Help & feedback",
 				signOut: "Sign out",
 				providerId: "Provider ID: "
 			}
@@ -327,41 +362,123 @@ window.__ModuleLoader__.load({
 		function initialOf(value) {
 			return [...value.trim()][0]?.toUpperCase() ?? "C";
 		}
+		const ACCOUNT_CENTER_URL = "https://cocode.agency/account";
+		function openAccountCenter() {
+			window.open(ACCOUNT_CENTER_URL, "_blank", "noopener,noreferrer");
+		}
+		function snapshotUsage(snapshot, key) {
+			return snapshot.usage?.[key];
+		}
+		function MenuGlyph({ kind }) {
+			const paths = {
+				account: (0, react.createElement)("path", { d: "M3 13.5c.7-1.9 2.5-3 5-3s4.3 1.1 5 3M8 8.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" }),
+				usage: (0, react.createElement)("path", { d: "M3 13V9.5M6.5 13V6.5M10 13V3M13.5 13V8M2 13.5h12" }),
+				settings: (0, react.createElement)("path", { d: "M8 1.75v2M8 12.25v2M1.75 8h2M12.25 8h2M3.58 3.58 5 5M11 11l1.42 1.42M12.42 3.58 11 5M5 11l-1.42 1.42" }),
+				help: (0, react.createElement)("path", { d: "M5.9 5.8a2.15 2.15 0 1 1 3.65 1.54c-.9.78-1.55 1.15-1.55 2.16M8 12.25v.1" }),
+				logout: (0, react.createElement)("path", { d: "M8.5 3H4.25A1.25 1.25 0 0 0 3 4.25v7.5A1.25 1.25 0 0 0 4.25 13H8.5M9 8h5M11.5 5.5 14 8l-2.5 2.5" })
+			};
+			return (0, react.createElement)("svg", {
+				className: account_module_css_default.menuGlyph,
+				viewBox: "0 0 16 16",
+				width: 16,
+				height: 16,
+				fill: "none",
+				stroke: "currentColor",
+				"stroke-width": 1.6,
+				"stroke-linecap": "round",
+				"stroke-linejoin": "round",
+				"aria-hidden": true
+			}, paths[kind]);
+		}
+		function AccountPanel({ kind, snapshot, provider, onClose }) {
+			const t = copy();
+			const title = kind === "usage" ? t.planUsage : t.help;
+			const usageMetric = (label, value) => {
+				const percentage = typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(100, Math.round(value))) : void 0;
+				return (0, react.createElement)("div", { className: account_module_css_default.usageMetric }, (0, react.createElement)("div", { className: account_module_css_default.usageMetricHeader }, (0, react.createElement)("span", { className: account_module_css_default.usageMetricLabel }, label), (0, react.createElement)("strong", { className: account_module_css_default.usageMetricPercent }, percentage === void 0 ? "—" : `${percentage}%`)), (0, react.createElement)("div", { className: account_module_css_default.usageTrack }, (0, react.createElement)("span", {
+					className: account_module_css_default.usageFill,
+					style: { width: `${percentage ?? 0}%` }
+				})), (0, react.createElement)("span", { className: account_module_css_default.panelSecondary }, percentage === void 0 ? "暂未同步" : "已使用"));
+			};
+			const body = kind === "usage" ? (0, react.createElement)("div", { className: account_module_css_default.panelStack }, (0, react.createElement)("div", { className: account_module_css_default.planCard }, (0, react.createElement)("span", { className: account_module_css_default.panelEyebrow }, "当前套餐"), (0, react.createElement)("strong", { className: account_module_css_default.planName }, "尚未同步"), (0, react.createElement)("span", { className: account_module_css_default.panelSecondary }, "套餐与用量将在账号服务同步后显示")), (0, react.createElement)("div", { className: account_module_css_default.usageGrid }, usageMetric("5 小时限额", snapshotUsage(snapshot, "fiveHour")), usageMetric("周限额", snapshotUsage(snapshot, "week")), usageMetric("月限额", snapshotUsage(snapshot, "month"))), (0, react.createElement)("p", { className: account_module_css_default.panelHint }, "百分比代表当前周期已使用额度。本地 Provider 的请求不会计入 Cocode Cloud 用量。")) : (0, react.createElement)("div", { className: account_module_css_default.panelStack }, (0, react.createElement)("p", { className: account_module_css_default.panelIntro }, "遇到问题时，可以先查看模型与 Provider 配置，再提交反馈。"), (0, react.createElement)("button", {
+				type: "button",
+				className: account_module_css_default.panelAction,
+				onClick: () => {
+					onClose();
+					requestSettings("models");
+				}
+			}, "打开模型与 Provider"), (0, react.createElement)("button", {
+				type: "button",
+				className: account_module_css_default.panelAction,
+				onClick: () => {
+					window.open("https://cocode.agency", "_blank", "noopener,noreferrer");
+				}
+			}, "访问 Cocode 文档"), (0, react.createElement)("button", {
+				type: "button",
+				className: account_module_css_default.panelAction,
+				onClick: () => {
+					window.open("mailto:support@cocode.agency?subject=Cocode%20反馈", "_blank");
+				}
+			}, "发送反馈邮件"), (0, react.createElement)("p", { className: account_module_css_default.panelHint }, provider === null ? "当前未配置 Provider。" : `当前 Provider：${provider.name}`));
+			return (0, react.createElement)("div", {
+				className: account_module_css_default.panelOverlay,
+				role: "presentation",
+				onMouseDown: (event) => {
+					if (event.target === event.currentTarget) onClose();
+				}
+			}, (0, react.createElement)("section", {
+				className: account_module_css_default.panel,
+				role: "dialog",
+				"aria-modal": "true",
+				"aria-label": title
+			}, (0, react.createElement)("header", { className: account_module_css_default.panelHeader }, (0, react.createElement)("div", null, (0, react.createElement)("h2", { className: account_module_css_default.panelTitle }, title), (0, react.createElement)("span", { className: account_module_css_default.panelSubtitle }, "Cocode")), (0, react.createElement)("button", {
+				type: "button",
+				className: account_module_css_default.panelClose,
+				onClick: onClose,
+				"aria-label": "关闭"
+			}, "×")), body));
+		}
 		function AccountAction({ wide, store, providers }) {
 			const snapshot = (0, react.useSyncExternalStore)(store.subscribe, store.getSnapshot, store.getSnapshot);
 			const provider = (0, react.useSyncExternalStore)(providers.subscribe, providers.getSnapshot, providers.getSnapshot);
 			const [open, setOpen] = (0, react.useState)(false);
+			const [panel, setPanel] = (0, react.useState)(null);
 			const signedIn = snapshot.phase === "signed-in" || snapshot.phase === "provisioning";
 			const t = copy();
 			const busy = snapshot.phase === "signing-in" || snapshot.phase === "provisioning";
 			const primary = signedIn ? snapshot.profile?.displayName ?? "Cocode" : provider?.name ?? labelOf(snapshot, true);
-			const secondary = signedIn ? t.account : provider === null ? t.noProvider : t.customProvider;
+			const secondary = signedIn ? null : provider === null ? t.noProvider : t.customProvider;
 			const title = accountError(snapshot) ?? primary;
 			const entries = signedIn ? [
 				{
-					type: "label",
-					id: "identity",
-					text: primary
+					id: "account",
+					label: t.accountPlan,
+					icon: (0, react.createElement)(MenuGlyph, { kind: "account" })
 				},
-				...snapshot.profile?.email === void 0 ? [] : [{
-					type: "label",
-					id: "email",
-					text: snapshot.profile.email
-				}],
+				{
+					id: "usage",
+					label: t.planUsage,
+					icon: (0, react.createElement)(MenuGlyph, { kind: "usage" })
+				},
 				{
 					type: "separator",
-					id: "identity-separator"
+					id: "account-separator"
 				},
 				{
 					id: "settings",
 					label: t.settings,
-					icon: (0, react.createElement)(_deepseek_ai_dsh_client_ui_primitives.IconSettingsOutline16, { size: 16 })
+					icon: (0, react.createElement)(MenuGlyph, { kind: "settings" })
+				},
+				{
+					id: "help",
+					label: t.help,
+					icon: (0, react.createElement)(MenuGlyph, { kind: "help" })
 				},
 				{
 					id: "sign-out",
 					label: t.signOut,
 					danger: true,
-					icon: (0, react.createElement)(_deepseek_ai_dsh_client_ui_primitives.IconUserOutline16, { size: 16 })
+					icon: (0, react.createElement)(MenuGlyph, { kind: "logout" })
 				}
 			] : provider === null ? [
 				{
@@ -377,7 +494,7 @@ window.__ModuleLoader__.load({
 				{
 					id: "models",
 					label: t.models,
-					icon: (0, react.createElement)(_deepseek_ai_dsh_client_ui_primitives.IconDataOutline16, { size: 16 })
+					icon: (0, react.createElement)(MenuGlyph, { kind: "usage" })
 				},
 				{
 					type: "separator",
@@ -386,7 +503,7 @@ window.__ModuleLoader__.load({
 				{
 					id: "settings",
 					label: t.settings,
-					icon: (0, react.createElement)(_deepseek_ai_dsh_client_ui_primitives.IconSettingsOutline16, { size: 16 })
+					icon: (0, react.createElement)(MenuGlyph, { kind: "settings" })
 				}
 			] : [
 				{
@@ -406,17 +523,22 @@ window.__ModuleLoader__.load({
 				{
 					id: "models",
 					label: t.models,
-					icon: (0, react.createElement)(_deepseek_ai_dsh_client_ui_primitives.IconDataOutline16, { size: 16 })
+					icon: (0, react.createElement)(MenuGlyph, { kind: "usage" })
+				},
+				{
+					id: "help",
+					label: t.help,
+					icon: (0, react.createElement)(MenuGlyph, { kind: "help" })
 				},
 				{
 					id: "sign-in",
 					label: t.signIn,
-					icon: (0, react.createElement)(_deepseek_ai_dsh_client_ui_primitives.IconUserOutline16, { size: 16 })
+					icon: (0, react.createElement)(MenuGlyph, { kind: "account" })
 				},
 				{
 					id: "settings",
 					label: t.settings,
-					icon: (0, react.createElement)(_deepseek_ai_dsh_client_ui_primitives.IconSettingsOutline16, { size: 16 })
+					icon: (0, react.createElement)(MenuGlyph, { kind: "settings" })
 				}
 			];
 			const select = (id) => {
@@ -425,6 +547,8 @@ window.__ModuleLoader__.load({
 				else if (id === "sign-out") store.deactivate();
 				else if (id === "models") requestSettings("models");
 				else if (id === "settings") requestSettings();
+				else if (id === "account") openAccountCenter();
+				else if (id === "usage" || id === "help") setPanel(id);
 			};
 			return (0, react.createElement)(_deepseek_ai_dsh_client_ui_primitives.Menu, {
 				open,
@@ -448,11 +572,16 @@ window.__ModuleLoader__.load({
 					onClick: () => {
 						setOpen((value) => !value);
 					}
-				}, (0, react.createElement)("span", { className: `${account_module_css_default.avatar} ${signedIn ? account_module_css_default.accountAvatar : provider === null ? account_module_css_default.guestAvatar : account_module_css_default.providerAvatar}` }, signedIn ? initialOf(primary) : provider === null ? (0, react.createElement)(_deepseek_ai_dsh_client_ui_primitives.IconUserOutline16, { size: 18 }) : (0, react.createElement)(_deepseek_ai_dsh_client_ui_primitives.IconApiOutline14, { size: 18 })), wide && (0, react.createElement)("span", { className: account_module_css_default.copy }, (0, react.createElement)("span", { className: account_module_css_default.primary }, primary), (0, react.createElement)("span", { className: account_module_css_default.secondary }, secondary)), wide && (0, react.createElement)(_deepseek_ai_dsh_client_ui_primitives.IconChevronUpOutline14, {
+				}, (0, react.createElement)("span", { className: `${account_module_css_default.avatar} ${signedIn ? account_module_css_default.accountAvatar : provider === null ? account_module_css_default.guestAvatar : account_module_css_default.providerAvatar}` }, signedIn ? initialOf(primary) : provider === null ? (0, react.createElement)(_deepseek_ai_dsh_client_ui_primitives.IconUserOutline16, { size: 18 }) : (0, react.createElement)(_deepseek_ai_dsh_client_ui_primitives.IconApiOutline14, { size: 18 })), wide && (0, react.createElement)("span", { className: account_module_css_default.copy }, (0, react.createElement)("span", { className: account_module_css_default.primary }, primary), secondary === null ? null : (0, react.createElement)("span", { className: account_module_css_default.secondary }, secondary)), wide && (0, react.createElement)(_deepseek_ai_dsh_client_ui_primitives.IconChevronUpOutline14, {
 					className: account_module_css_default.chevron,
 					size: 14
 				}))
-			});
+			}, panel === null ? null : (0, react.createElement)(AccountPanel, {
+				kind: panel,
+				snapshot,
+				provider,
+				onClose: () => setPanel(null)
+			}));
 		}
 		const inject = [
 			"slots",

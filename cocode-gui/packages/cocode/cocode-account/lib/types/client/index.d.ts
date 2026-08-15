@@ -9,6 +9,11 @@ type AccountSnapshot = {
         status: "absent" | "ready" | "conflict" | "error";
         providerId: "cocode-cloud";
     };
+    usage?: {
+        fiveHour?: number;
+        week?: number;
+        month?: number;
+    };
     error?: {
         code: string;
         message: string;
