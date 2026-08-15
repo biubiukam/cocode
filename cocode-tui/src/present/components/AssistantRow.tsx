@@ -16,7 +16,13 @@ export function AssistantRow(props: {
     props.maxColumns === undefined ? undefined : Math.max(1, props.maxColumns - 3)
   const reasoning = formatReasoning(node.reasoning, verbose, node.streaming)
   return (
-    <Box flexDirection="column" marginTop={1} paddingLeft={1}>
+    <Box
+      flexDirection="column"
+      marginTop={1}
+      paddingLeft={1}
+      width={props.maxColumns}
+      minWidth={0}
+    >
       <Text color={theme.info} bold>
         ● cocode{' '}
         <Text color={theme.mute}>
@@ -28,7 +34,12 @@ export function AssistantRow(props: {
             : 'answer'}
         </Text>
       </Text>
-      {reasoning !== undefined ? <Text color={theme.mute}> {reasoning}</Text> : null}
+      {reasoning !== undefined ? (
+        <Text color={theme.mute} wrap="wrap">
+          {' '}
+          {reasoning}
+        </Text>
+      ) : null}
       {node.text !== '' ? (
         <Box flexDirection="column" paddingLeft={2}>
           {node.streaming ? (
