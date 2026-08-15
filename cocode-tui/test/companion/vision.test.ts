@@ -26,7 +26,7 @@ function context(): RuntimeContext {
       if (name === 'credentials') {
         return {
           async resolve(ref: string) {
-            return ref === 'OPENAI_API_KEY' || ref === 'COCODE_CLOUD_API_KEY'
+            return ref === 'OPENAI_API_KEY' || ref === 'COCODE_CLOUD_API_KEY' || ref === 'CUSTOM_CLOUD_KEY'
               ? { value: 'secret-value' }
               : undefined
           },
@@ -55,7 +55,7 @@ describe('cocode vision bridge', () => {
     vi.stubGlobal('fetch', fetchMock)
     const service = createVisionService(context(), {
       provider: 'user',
-      user: { endpoint: 'https://vision.example/v1/chat/completions' },
+      user: { endpoint: 'https://vision.example/v1/chat/completions', model: 'gpt-4o-mini' },
     })
 
     await expect(service.prepareBlocks([
@@ -75,7 +75,10 @@ describe('cocode vision bridge', () => {
   it('reports configuration without exposing credential values', async () => {
     const service = createVisionService(context(), {
       provider: 'user',
-      user: { endpoint: 'https://user:secret@vision.example/v1?api_key=secret-query#token' },
+      user: {
+        endpoint: 'https://user:secret@vision.example/v1?api_key=secret-query#token',
+        model: 'gpt-4o-mini',
+      },
     })
     await expect(service.status()).resolves.toEqual({
       enabled: true,
@@ -103,6 +106,18 @@ describe('cocode vision bridge', () => {
       model: 'gpt-luna',
       endpoint: 'https://cocode.example/v1/chat/completions',
     })
+  })
+
+  it('reuses a custom credential reference from the account cloud route', async () => {
+    vi.stubEnv('COCODE_LLM_PROVIDERS', JSON.stringify({
+      'cocode-cloud': {
+        baseURL: 'https://cocode.example/v1',
+        apiKeyEnv: 'CUSTOM_CLOUD_KEY',
+      },
+    }))
+    const service = createVisionService(context(), { provider: 'cocode' })
+
+    await expect(service.status()).resolves.toMatchObject({ configured: true })
   })
 
   it('keeps the native image block when the bridge has no credential', async () => {

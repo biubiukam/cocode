@@ -49,7 +49,6 @@ export type CocodeVisionService = {
 }
 
 const DEFAULT_TIMEOUT_MS = 45_000
-const DEFAULT_USER_MODEL = 'gpt-4o-mini'
 const DEFAULT_COCODE_MODEL = 'gpt-luna'
 const DEFAULT_USER_CREDENTIAL = 'OPENAI_API_KEY'
 const DEFAULT_COCODE_CREDENTIAL = 'COCODE_CLOUD_API_KEY'
@@ -83,14 +82,14 @@ export function createVisionService(
           reason: 'automatic image reading is disabled',
         }
       }
-      if (target.endpoint === undefined) {
+      if (target.endpoint === undefined || target.model === '') {
         return {
           enabled: true,
           provider: config.provider,
           configured: false,
           model: target.model,
           endpoint: undefined,
-          reason: 'vision endpoint is not configured',
+          reason: target.endpoint === undefined ? 'vision endpoint is not configured' : 'vision model is not configured',
         }
       }
       const credential = await resolveCredential(ctx, target.credentialRef)
@@ -214,7 +213,7 @@ function resolveConfig(raw: VisionConfig): ResolvedVisionConfig {
   }
   const user = resolveTarget(raw.user, {
     endpoint: process.env.COCODE_VISION_USER_ENDPOINT,
-    model: process.env.COCODE_VISION_USER_MODEL ?? DEFAULT_USER_MODEL,
+    model: process.env.COCODE_VISION_USER_MODEL ?? '',
     credentialRef: process.env.COCODE_VISION_USER_CREDENTIAL_REF ?? DEFAULT_USER_CREDENTIAL,
   })
   const cocodeRoute = readCocodeRoute()
@@ -273,7 +272,7 @@ function appendChatCompletions(baseURL: string): string {
 }
 
 async function isConfigured(ctx: RuntimeContext, target: ResolvedEndpointConfig): Promise<boolean> {
-  if (target.endpoint === undefined) return false
+  if (target.endpoint === undefined || target.model === '') return false
   return (await resolveCredential(ctx, target.credentialRef)) !== undefined
 }
 

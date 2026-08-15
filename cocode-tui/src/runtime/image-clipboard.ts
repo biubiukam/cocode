@@ -79,6 +79,7 @@ export function clipboardImageCommands(platform: NodeJS.Platform): readonly Clip
     return IMAGE_MEDIA_TYPES.flatMap((mediaType) => [
       { command: 'wl-paste', args: ['--no-newline', '--type', mediaType], output: 'binary' as const, mediaType },
       { command: 'xclip', args: ['-selection', 'clipboard', '-t', mediaType, '-o'], output: 'binary' as const, mediaType },
+      { command: 'xsel', args: ['--clipboard', '--output'], output: 'binary' as const, mediaType },
     ])
   }
   return []

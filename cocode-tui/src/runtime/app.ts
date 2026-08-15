@@ -1900,6 +1900,7 @@ class TuiAppImpl implements TuiApp {
       this.images = []
       this.notice = { tone: 'info', message: text(this.locale, 'steerSending') }
       void this.promptWithAttachments(trimmed, attachments, 'steer', images).catch((error: unknown) => {
+        this.restoreFailedPrompt(trimmed, attachments, images)
         this.notice = { tone: 'error', message: errorMessage(error) }
         this.emit()
       })
@@ -1923,6 +1924,7 @@ class TuiAppImpl implements TuiApp {
     this.notice = undefined
     this.interruptArmed = false
     void this.promptWithAttachments(trimmed, attachments, 'normal', images).catch((error: unknown) => {
+      this.restoreFailedPrompt(trimmed, attachments, images)
       this.notice = { tone: 'error', message: errorMessage(error) }
       if (this.agent === 'running') this.agent = 'idle'
       this.emit()
@@ -1977,6 +1979,18 @@ class TuiAppImpl implements TuiApp {
         mode,
       ),
     )
+  }
+
+  private restoreFailedPrompt(
+    promptText: string,
+    attachments: readonly { path: string; token: string }[],
+    images: readonly DraftImage[],
+  ): void {
+    if (this.draft.text.trim() !== '' || this.attachments.length > 0 || this.images.length > 0) return
+    this.draft = insertDraft(createDraft(), promptText)
+    this.attachments = [...attachments]
+    this.images = [...images]
+    if (this.history.at(-1) === promptText) this.history.pop()
   }
 
   private queueCurrentPrompt(): void {
