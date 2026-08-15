@@ -136,11 +136,12 @@
 .chevron {
   flex: none;
   color: var(--dsw-alias-label-tertiary);
+  transform: translateY(1px);
   transition: transform 140ms var(--ds-ease-in-out);
 }
 
 .trigger[aria-expanded='true'] .chevron {
-  transform: rotate(180deg);
+  transform: translateY(1px) rotate(180deg);
 }
 
 .trigger.rail {
