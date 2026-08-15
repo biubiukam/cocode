@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -47,6 +47,9 @@ describe('resolveAuth', () => {
     const home = await tempHome()
     await patchCredential(home, 'COCODE_CLOUD_API_KEY', 'ck_live_x')
     await patchCloudRoute(home, 'https://cocode.agency', [{ id: 'cloud-1', name: 'Cloud' }])
+    await expect(readFile(join(home, 'settings.yaml'), 'utf8')).resolves.toContain(
+      'api: openai-completions',
+    )
     const result = await resolveAuth({
       home,
       env: {},

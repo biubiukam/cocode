@@ -501,11 +501,12 @@ export class AccountService {
 				(existingProvider.active && route === undefined && !managed))
 		)
 			throw new CloudProviderConflictError()
-		if (existingCredential?.configured === true && !hasManagedMetadata)
-			throw new CloudProviderConflictError(
-				"COCODE_CLOUD_API_KEY is already configured by another source",
-			)
+		// COCODE_CLOUD_API_KEY is a reserved product slot. If another client (for
+		// example TUI) left a value there, reconcile it to the current Agency
+		// account instead of stopping with a conflict. Other provider routes still
+		// fail closed above.
 		const oldKey = await this.cloudKey.read()
+		const hadExistingCredential = existingCredential?.configured === true && !hasManagedMetadata
 		this.stage = "cloud-key"
 		const key = await this.ensureCloudKey(state)
 		this.stage = "models"
@@ -554,7 +555,7 @@ export class AccountService {
 			this.publish(snapshot)
 			return snapshot
 		} catch (error) {
-			await this.rollbackProvision(oldRoute, oldKey, baseURL)
+			await this.rollbackProvision(oldRoute, oldKey, baseURL, hadExistingCredential)
 			throw error
 		}
 	}
@@ -563,6 +564,7 @@ export class AccountService {
 		oldRoute: Record<string, unknown> | undefined,
 		oldKey: string | undefined,
 		baseURL: string,
+		preserveExistingCredential = false,
 	): Promise<void> {
 		try {
 			const settings = await this.dsh.describeSettings()
@@ -589,8 +591,10 @@ export class AccountService {
 				}
 			}
 			try {
-				if (oldKey === undefined) await this.dsh.unsetCredential(CLOUD_CREDENTIAL)
-				else await this.dsh.setCredential(CLOUD_CREDENTIAL, oldKey)
+				if (oldKey === undefined) {
+					if (!preserveExistingCredential)
+						await this.dsh.unsetCredential(CLOUD_CREDENTIAL)
+				} else await this.dsh.setCredential(CLOUD_CREDENTIAL, oldKey)
 			} catch {
 				// A later hydrate or cleanup-pending pass can retry without touching a
 				// route that no longer matches the Cocode-managed shape.

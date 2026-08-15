@@ -207,6 +207,70 @@ test("an active reserved provider without a managed route is a conflict", async 
 	assert.deepEqual(createdKeys, [])
 })
 
+test("reconciles a pre-existing reserved cloud credential", async () => {
+	const identity = new MemoryVault(validIdentity())
+	const { client, createdKeys } = agency()
+	let route: Record<string, unknown> | undefined
+	const writes: string[] = []
+	const dsh = {
+		currentDefault: async () => ({ provider: "deepseek-official", model: "deepseek-v4-flash" }),
+		describeSettings: async () => ({
+			writable: true,
+			namespaces: [
+				{
+					ns: "llm-pi-ai",
+					revision: 1,
+					value:
+						route === undefined
+							? { providers: {} }
+							: { providers: { "cocode-cloud": route } },
+				},
+			],
+		}),
+		describeCredentials: async () => ({
+			COCODE_CLOUD_API_KEY: { configured: true, writable: true },
+		}),
+		providers: async (): Promise<ProviderView[]> =>
+			route === undefined
+				? []
+				: [
+						{
+							provider: "cocode-cloud",
+							displayName: "Cocode Cloud",
+							settingsNs: "llm-pi-ai",
+							settingsPath: ["providers", "cocode-cloud"],
+							active: true,
+						},
+				  ],
+		models: async (): Promise<ModelGroup[]> =>
+			route === undefined
+				? []
+				: [
+						{
+							id: "cocode-cloud",
+							name: "Cocode Cloud",
+							models: [{ id: "cloud-model", name: "Cloud Model" }],
+						},
+				  ],
+		mutateSettings: async (request: { ops: { op: "set" | "unset"; value?: unknown }[] }) => {
+			route = request.ops[0]?.value as Record<string, unknown>
+			writes.push("route:set")
+		},
+		setCredential: async () => {
+			writes.push("credential:set")
+		},
+		unsetCredential: async () => {
+			writes.push("credential:unset")
+		},
+	} as never
+
+	const snapshot = await new AccountService(dsh, client, dependencies(identity).deps).signIn()
+	assert.equal(snapshot.phase, "signed-in")
+	assert.equal(snapshot.cloud.status, "ready")
+	assert.deepEqual(createdKeys, ["ck_test"])
+	assert.deepEqual(writes, ["credential:set", "route:set"])
+})
+
 test("failed provider activation rolls back the managed route and credential", async () => {
 	const identity = new MemoryVault(validIdentity())
 	const { client, createdKeys } = agency()

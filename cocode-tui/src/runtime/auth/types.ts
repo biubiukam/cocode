@@ -29,7 +29,7 @@ export type CloudModel = { id: string; name: string }
 
 export type CloudProviderProfile = {
   displayName: string
-  api: 'openai-responses'
+  api: 'openai-completions'
   baseURL: string
   apiKeyEnv: typeof CLOUD_KEY_REF
   models: CloudModel[]

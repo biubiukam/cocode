@@ -241,7 +241,7 @@ function createCloudProvider(
 ): CloudProviderProfile {
   return {
     displayName: 'Cocode Cloud',
-    api: 'openai-responses',
+    api: 'openai-completions',
     baseURL: `${origin.replace(/\/$/, '')}/v1`,
     apiKeyEnv: CLOUD_KEY_REF,
     models: cloudModels?.length === 0 || cloudModels === undefined
