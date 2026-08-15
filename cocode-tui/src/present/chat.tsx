@@ -32,7 +32,10 @@ import { findFileMentionAtCursor } from '../runtime/file-mentions.ts'
 import { searchHistory } from '../runtime/history-search.ts'
 import { listWorkspaceEntries, rankFileMatches } from '../runtime/workspace-files.ts'
 import { moveMessageSelection, selectableMessageKeys } from './message-selection.ts'
-import { maxMessageScrollOffset, visibleMessageWindow } from './message-scroll.ts'
+import {
+  maxMessageScrollOffset,
+  scrollOffsetForMessage,
+} from './message-scroll.ts'
 import { focusConversationNodes } from '../runtime/focus.ts'
 import { text } from '../runtime/ui-locale.ts'
 import {
@@ -287,17 +290,8 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     overlayOpen: layout.overlayRows > 0,
   })
   const selectableMessages = useMemo(
-    () =>
-      selectableMessageKeys(
-        visibleMessageWindow(
-          displayNodes,
-          messageMaxRows,
-          snap.verbose,
-          expandedMessageIds,
-          messageScrollOffset,
-        ),
-      ),
-    [displayNodes, expandedMessageIds, messageMaxRows, messageScrollOffset, snap.verbose],
+    () => selectableMessageKeys(displayNodes),
+    [displayNodes],
   )
   const messageScrollMax = useMemo(
     () => maxMessageScrollOffset(displayNodes, messageMaxRows, snap.verbose, expandedMessageIds),
@@ -990,9 +984,24 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
         return
       }
       if (key.upArrow || key.downArrow) {
-        setSelectedMessageId((current) =>
-          moveMessageSelection(selectableMessages, current, key.upArrow ? -1 : 1),
+        const nextSelectedMessageId = moveMessageSelection(
+          selectableMessages,
+          selectedMessageId,
+          key.upArrow ? -1 : 1,
         )
+        if (nextSelectedMessageId !== null) {
+          setSelectedMessageId(nextSelectedMessageId)
+          setMessageScrollOffset(
+            scrollOffsetForMessage(
+              displayNodes,
+              messageMaxRows,
+              nextSelectedMessageId,
+              messageScrollOffset,
+              snap.verbose,
+              expandedMessageIds,
+            ),
+          )
+        }
         return
       }
       if (key.return && selectedMessageId !== null) {
@@ -1109,8 +1118,20 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
       }
       if (matched.id === 'messages.select') {
         if (selectableMessages.length === 0) return
+        const latestMessageId = selectableMessages[selectableMessages.length - 1]
+        if (latestMessageId === undefined) return
         setMessageSelectionActive(true)
-        setSelectedMessageId(selectableMessages[selectableMessages.length - 1] ?? null)
+        setSelectedMessageId(latestMessageId)
+        setMessageScrollOffset(
+          scrollOffsetForMessage(
+            displayNodes,
+            messageMaxRows,
+            latestMessageId,
+            messageScrollOffset,
+            snap.verbose,
+            expandedMessageIds,
+          ),
+        )
         return
       }
       if (matched.id === 'command.palette') {
