@@ -249,9 +249,9 @@ describe('TuiApp', () => {
       rewind: false,
       skills: true,
     })
-    expect(app.snapshot().runtimeInfo.capabilities.map((capability) => capability.name)).not.toContain(
-      'onRequest',
-    )
+    expect(
+      app.snapshot().runtimeInfo.capabilities.find((capability) => capability.name === 'onRequest'),
+    ).toEqual({ name: 'onRequest', enabled: false })
     expect(
       app.snapshot().runtimeInfo.capabilities.find((capability) => capability.name === 'skills'),
     ).toEqual({ name: 'skills', enabled: true })

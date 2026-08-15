@@ -215,7 +215,7 @@ export type TuiAction =
 
 export type { TuiCapabilities }
 
-type TuiDisplayedCapabilityName = Exclude<TuiRuntimeCapabilityName, 'onRequest'>
+type TuiDisplayedCapabilityName = TuiRuntimeCapabilityName
 
 export type TuiSnapshot = {
   header: {
@@ -2381,6 +2381,7 @@ function runtimeCapabilityEntries(
     'fork',
     'rewind',
     'skills',
+    'onRequest',
     'approval',
     'permissionMode',
     'planMode',
@@ -2395,6 +2396,8 @@ function runtimeCapabilityEntries(
     enabled:
       name === 'skills'
         ? effective.skills
+        : name === 'onRequest'
+        ? snapshot?.capabilities.onRequest === true
         : snapshot === undefined
         ? name === 'sessionList'
           ? effective.sessionList !== 'none'
