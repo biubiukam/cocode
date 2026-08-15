@@ -6,12 +6,21 @@ import { fileURLToPath } from 'node:url'
 const root = fileURLToPath(new URL('..', import.meta.url))
 const packageJson = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'))
 const failures = []
+const releaseFiles = [
+  'bin/cocode-tui.mjs',
+  'dist/cocode-tui.mjs',
+  'dist/companion-layout.mjs',
+  'dist/companion.mjs',
+  'dist/companion-runner.mjs',
+  'dist/companion.cordis.yml',
+]
 
 if (packageJson.private === true) failures.push('package.json must not be private')
 if (!packageJson.version) failures.push('package.json must declare a version')
 if (!packageJson.bin?.cocode) failures.push('package.json must expose the cocode bin')
+if (packageJson.bin?.['cocode-tui']) failures.push('package.json must not expose the cocode-tui compatibility bin')
 if (!packageJson.dependencies?.tsx) failures.push('package.json must include tsx for the Harness bridge')
-for (const file of ['bin/cocode-tui.mjs', 'dist/cocode-tui.mjs', 'dist/companion.mjs', 'dist/companion-runner.mjs', 'dist/companion.cordis.yml']) {
+for (const file of releaseFiles) {
   if (!existsSync(resolve(root, file))) failures.push(`missing release file: ${file}`)
 }
 
@@ -25,7 +34,7 @@ if (pack.status !== 0) {
   try {
     const manifest = JSON.parse(pack.stdout)[0]
     const names = new Set(manifest.files.map(({ path }) => path))
-    for (const file of ['bin/cocode-tui.mjs', 'dist/cocode-tui.mjs', 'dist/companion.mjs', 'dist/companion-runner.mjs', 'dist/companion.cordis.yml']) {
+    for (const file of releaseFiles) {
       if (!names.has(file)) failures.push(`release file is not included in npm pack: ${file}`)
     }
   } catch {
