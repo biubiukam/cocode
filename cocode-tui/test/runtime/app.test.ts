@@ -159,6 +159,42 @@ function fakeRuntime(): TuiRuntime & {
 }
 
 describe('TuiApp', () => {
+  it('notifies when a question needs attention', async () => {
+    const runtime = fakeRuntime()
+    const values: string[] = []
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+      terminalNotify: {
+        mode: 'osc777',
+        platform: 'darwin',
+        env: {},
+        write: (value) => values.push(value),
+      },
+    })
+    await app.start()
+
+    const answer = runtime.askQuestion({
+      sessionId: 's1',
+      questions: [{ id: 'choice', question: 'Choose?', options: [{ label: 'A' }] }],
+    })
+    const nextAnswer = runtime.askQuestion({
+      sessionId: 's1',
+      questions: [{ id: 'next', question: 'Next?', options: [{ label: 'B' }] }],
+    })
+
+    expect(values).toContain('\u001b]777;notify;Cocode;question ready for interaction\u0007')
+    expect(values).toHaveLength(1)
+    app.dispatch({ type: 'question.answer', selected: ['A'] })
+    await answer
+    expect(values).toHaveLength(2)
+    app.dispatch({ type: 'question.answer', selected: ['B'] })
+    await nextAnswer
+  })
+
   it('prevents starting a new session while the current turn is running', async () => {
     const runtime = fakeRuntime()
     const app = createTuiApp({

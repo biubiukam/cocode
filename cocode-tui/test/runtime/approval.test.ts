@@ -71,6 +71,35 @@ function approvalRuntime(): TuiRuntime & {
 }
 
 describe('TuiApp approval flow', () => {
+  it('notifies when an approval request needs attention', async () => {
+    const runtime = approvalRuntime()
+    const values: string[] = []
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'provider',
+      model: 'model',
+      sessionId: 'session',
+      terminalNotify: {
+        mode: 'osc777',
+        platform: 'darwin',
+        env: {},
+        write: (value) => values.push(value),
+      },
+    })
+    await app.start()
+
+    const answer = runtime.request({
+      sessionId: 'session',
+      toolName: 'write_file',
+      reason: 'modify source',
+    })
+
+    expect(values).toContain('\u001b]777;notify;Cocode;Approval required: write_file\u0007')
+    app.dispatch({ type: 'approval.cancel' })
+    await answer
+  })
+
   it('keeps approval focus outside the composer and returns allow-for-turn', async () => {
     const runtime = approvalRuntime()
     const app = createTuiApp({

@@ -369,6 +369,8 @@ export type TuiAppOptions = {
   terminalNotify?: {
     mode?: TerminalNotifyMode
     write?: (value: string) => void
+    platform?: NodeJS.Platform
+    env?: NodeJS.ProcessEnv
   }
   readClipboardImage?: () => Promise<TuiImageInput>
 }
@@ -469,7 +471,17 @@ class TuiAppImpl implements TuiApp {
       options.terminalNotify ?? (process.stdout.isTTY === true ? {} : { mode: 'off' })
     this.imageReader = options.readClipboardImage ?? (() => readClipboardImage())
     this.keymap = resolveKeymap()
-    this.questions = createQuestionCoordinator({ emit: () => this.emit() })
+    this.questions = createQuestionCoordinator({
+      emit: () => this.emit(),
+      onStart: () => {
+        if (this.questions.snapshot() === undefined) return
+        notifyTerminal({
+          ...this.terminalNotify,
+          title: 'Cocode',
+          body: text(this.locale, 'questionReady'),
+        })
+      },
+    })
   }
 
   async start(): Promise<void> {
@@ -1590,6 +1602,11 @@ class TuiAppImpl implements TuiApp {
     this.activeApproval = this.approvalQueue.shift()
     const active = this.activeApproval
     if (active !== undefined) {
+      notifyTerminal({
+        ...this.terminalNotify,
+        title: 'Cocode',
+        body: `${text(this.locale, 'approvalTitle')}: ${active.request.toolName}`,
+      })
       active.timeout = setTimeout(() => {
         if (this.activeApproval !== active) return
         this.activeApproval = undefined

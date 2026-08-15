@@ -50,7 +50,10 @@ export type QuestionCoordinator = {
  * time. The coordinator owns promise settlement and queue transitions; the
  * app only projects its snapshot and forwards user actions.
  */
-export function createQuestionCoordinator(options: { emit: () => void }): QuestionCoordinator {
+export function createQuestionCoordinator(options: {
+  emit: () => void
+  onStart?: () => void
+}): QuestionCoordinator {
   const queue: PendingQuestion[] = []
   let active: PendingQuestion | undefined
   let serial = 0
@@ -58,6 +61,7 @@ export function createQuestionCoordinator(options: { emit: () => void }): Questi
   const startNext = (): void => {
     if (active !== undefined || queue.length === 0) return
     active = queue.shift()
+    options.onStart?.()
     options.emit()
   }
 
