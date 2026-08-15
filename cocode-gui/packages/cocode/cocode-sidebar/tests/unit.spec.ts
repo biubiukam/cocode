@@ -214,7 +214,7 @@ describe('git parsing', () => {
 })
 
 describe('sidebar state', () => {
-  const state = (): SidebarState => makeDefaultState()
+  const state = (): SidebarState => makeDefaultState(400, true)
 
   it('opens tabs into the active pane and dedupes by id (safety net)', () => {
     let s = state()
@@ -427,6 +427,17 @@ describe('sidebar state', () => {
     s = closeTab(s, paneA.id, 't')
     expect(s.splits.kind).toBe('leaf')
     expect((s.splits as { id: string }).id).toBe(paneB.id)
+    expect(s.panelOpen).toBe(true)
+  })
+
+  it('closing the final tab collapses the right sidebar', () => {
+    let s = state()
+    const leaf = s.splits as { id: string; tabs: { id: string }[] }
+
+    s = closeTab(s, leaf.id, leaf.tabs[0]!.id)
+
+    expect(allLeaves(s.splits).flatMap(candidate => candidate.tabs)).toHaveLength(0)
+    expect(s.panelOpen).toBe(false)
   })
 
   it('resizes splits within the clamp range', () => {
@@ -1153,7 +1164,7 @@ describe('side card preferences', () => {
   it('falls back per-field when a stored field is malformed', async () => {
     expect(await loadPrefs(wire({ openByDefault: 'yes', defaultWidthPercent: 33, autoOpenSubagent: 'no', agentTerminalTools: 'yes' })))
       .toEqual({
-        openByDefault: true,
+        openByDefault: false,
         defaultWidthPercent: 33,
         autoOpenSubagent: true,
         autoOpenJobs: true,
@@ -1258,10 +1269,10 @@ describe('side card preferences', () => {
     expect(snapshot.sessionId).toBe('fresh-session')
     expect(snapshot.state?.panelOpen).toBe(false)
     expect(snapshot.state?.width).toBe(400)
-    // The default prefs keep the panel open.
-    const openStore = createSidebarStore()
-    openStore.setSession('another-fresh')
-    expect(openStore.getSnapshot().state?.panelOpen).toBe(true)
+    // Product defaults keep a fresh session collapsed.
+    const defaultStore = createSidebarStore()
+    defaultStore.setSession('another-fresh')
+    expect(defaultStore.getSnapshot().state?.panelOpen).toBe(false)
   })
 
   it('seeds a brand-new session COLLAPSED on narrow viewports (the panel is a full-screen drawer there)', () => {
@@ -1275,8 +1286,7 @@ describe('side card preferences', () => {
     }
     try {
       const store = createSidebarStore()
-      // Default prefs say openByDefault: true — the narrow viewport overrides
-      // it for the FIRST seeding only (a later user expansion persists).
+      // The product default is collapsed; narrow viewports must remain so.
       store.setSession('narrow-fresh')
       expect(store.getSnapshot().state?.panelOpen).toBe(false)
       // The width seeding still follows the window (clamped to the floor).
@@ -1310,7 +1320,8 @@ describe('side card preferences', () => {
   })
 
   it('makeDefaultState honors the open flag', () => {
-    expect(makeDefaultState().panelOpen).toBe(true)
+    expect(makeDefaultState().panelOpen).toBe(false)
+    expect(makeDefaultState(400, true).panelOpen).toBe(true)
     expect(makeDefaultState(400, false).panelOpen).toBe(false)
     expect(makeDefaultState(400, false).width).toBe(400)
     // The seedExplorer flag controls the default explorer tab.
@@ -1642,6 +1653,32 @@ describe('v0.12.0 store additions', () => {
     const g = globalThis as Record<string, unknown>
     delete g.window
     delete g.localStorage
+  })
+
+  it('starts the initial restored session collapsed without changing later sessions', () => {
+    const g = globalThis as Record<string, unknown>
+    const persisted = JSON.stringify(makeDefaultState(400, true))
+    g.localStorage = {
+      getItem: (key: string) => key.endsWith(':restored') || key.endsWith(':later') ? persisted : null,
+      setItem: () => {},
+    }
+
+    const store = createSidebarStore()
+    store.setSession('restored')
+    expect(store.getSnapshot().state?.panelOpen).toBe(false)
+
+    store.setSession('later')
+    expect(store.getSnapshot().state?.panelOpen).toBe(true)
+
+    store.setSession('restored')
+    expect(store.getSnapshot().state?.panelOpen).toBe(false)
+  })
+
+  it('still honors openByDefault for a genuinely new initial session', () => {
+    const store = createSidebarStore()
+    store.setPrefs({ ...store.getPrefs(), openByDefault: true })
+    store.setSession('fresh')
+    expect(store.getSnapshot().state?.panelOpen).toBe(true)
   })
 
 describe('store.reduceFor (targeted opens, v0.12.0)', () => {

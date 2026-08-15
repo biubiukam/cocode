@@ -471,7 +471,7 @@ describe('service.openTab auto-expand for content opens', () => {
   const setWidth = (width: number): void => {
     ;(g.window as { innerWidth: number }).innerWidth = width
   }
-  /** Collapse the right panel (the store defaults it open). */
+  /** Keep the right panel collapsed before exercising content auto-expand. */
   const collapseRightPanel = (store: ReturnType<typeof createSidebarStore>): void => {
     store.reduce(s => ({ ...s, panelOpen: false }))
   }
@@ -622,7 +622,7 @@ describe('state subscription (v0.12.0)', () => {
     const snapshot = service.getSnapshot()
     expect(snapshot.sessionId).toBe('s1')
     expect(snapshot.state).toBeDefined()
-    expect(snapshot.prefs.openByDefault).toBe(true)
+    expect(snapshot.prefs.openByDefault).toBe(false)
   })
 
   it('subscribeState fires on state changes but NOT on registry changes', () => {
