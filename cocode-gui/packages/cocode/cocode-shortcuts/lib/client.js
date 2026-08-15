@@ -22,7 +22,7 @@ window.__ModuleLoader__.load({
 			}
 			return to;
 		};
-		var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(isNodeMode || !mod || !mod.__esModule || !__hasOwnProp.call(mod, "default") ? __defProp(target, "default", {
+		var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", {
 			value: mod,
 			enumerable: true
 		}) : target, mod));
@@ -30,7 +30,7 @@ window.__ModuleLoader__.load({
 		let react = require("react");
 		let react_jsx_runtime = require("react/jsx-runtime");
 		//#region src/client/combo.ts
-		const MODIFIER_KEYS = /* @__PURE__ */ new Set([
+		const MODIFIER_KEYS = new Set([
 			"Alt",
 			"AltGraph",
 			"Control",
@@ -152,8 +152,6 @@ window.__ModuleLoader__.load({
 		const NEW_SESSION_COMMAND = "cocode.newSession";
 		/** Client-side command and keymap registry shared by Cocode feature plugins. */
 		var ShortcutRegistry = class {
-			ctx;
-			settings;
 			commandsById = /* @__PURE__ */ new Map();
 			order = [];
 			listeners = /* @__PURE__ */ new Set();
@@ -859,44 +857,6 @@ window.__ModuleLoader__.load({
 				}
 				Time2.template = template;
 			})(Time || (Time = {}));
-			0 && (module.exports = {
-				Binary,
-				Time,
-				arrayBufferToBase64,
-				arrayBufferToHex,
-				base64ToArrayBuffer,
-				camelCase,
-				camelize,
-				capitalize,
-				clone,
-				contain,
-				deduplicate,
-				deepEqual,
-				defineProperty,
-				difference,
-				filterKeys,
-				formatProperty,
-				hexToArrayBuffer,
-				hyphenate,
-				intersection,
-				is,
-				isNonNullable,
-				isNullable,
-				isPlainObject,
-				makeArray,
-				mapValues,
-				noop,
-				omit,
-				paramCase,
-				pick,
-				remove,
-				sanitize,
-				snakeCase,
-				trimSlash,
-				uncapitalize,
-				union,
-				valueMap
-			});
 		}));
 		//#endregion
 		//#region src/settings.ts
@@ -1538,7 +1498,6 @@ window.__ModuleLoader__.load({
 		//#endregion
 		//#region src/client/settings-api.ts
 		var ShortcutSettingsApiError = class extends Error {
-			code;
 			constructor(code, message) {
 				super(message);
 				this.code = code;
@@ -1623,7 +1582,6 @@ window.__ModuleLoader__.load({
 		}
 		/** Owns shortcut settings loading, revision-fenced writes, and memory fallback. */
 		var ShortcutSettingsController = class {
-			transport;
 			listeners = /* @__PURE__ */ new Set();
 			snapshot = {
 				value: structuredClone(DEFAULT_SHORTCUT_SETTINGS),

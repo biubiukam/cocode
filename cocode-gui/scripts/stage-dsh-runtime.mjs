@@ -6,9 +6,11 @@ import {
 	lstatSync,
 	mkdirSync,
 	mkdtempSync,
+	readFileSync,
 	readdirSync,
 	realpathSync,
 	rmSync,
+	writeFileSync,
 } from "node:fs"
 import os from "node:os"
 import path from "node:path"
@@ -70,6 +72,7 @@ function copyRuntime(source, target, sourceRoot) {
 	mkdirSync(target, { recursive: true })
 	cpSync(source, target, { recursive: true, dereference: true })
 	if (sourceRoot) copyWorkspaceFallback(sourceRoot, target)
+	aliasCocodeScopePackages(target)
 	restoreNodePtyHelper(target)
 	console.log(`Staged DSH runtime at ${target}`)
 }
@@ -117,13 +120,48 @@ function copyWorkspaceFallback(sourceRoot, target) {
 
 function copyWorkspacePackage(source, target, sourceRoot) {
 	const resolved = realpathSafe(source)
-	if (!resolved || !isWorkspacePath(resolved, sourceRoot) || existsSync(target)) return
+	if (!resolved || !isWorkspacePath(resolved, sourceRoot)) return
 	mkdirSync(path.dirname(target), { recursive: true })
 	cpSync(source, target, {
 		recursive: true,
 		dereference: true,
 		filter: (entry) => path.basename(entry) !== "node_modules",
 	})
+}
+
+/**
+ * Host packages import the product namespace (`@cocode/dsh-*`) while pnpm deploy
+ * still materializes upstream names (`@deepseek-ai/dsh-*`). Mirror deployed DSH
+ * packages under the Cocode scope so the sidecar can resolve those imports.
+ */
+function aliasCocodeScopePackages(target) {
+	const targetModules = path.join(target, "node_modules")
+	const sourceScope = path.join(targetModules, "@deepseek-ai")
+	const aliasScope = path.join(targetModules, "@cocode")
+	if (!existsSync(sourceScope)) return
+
+	mkdirSync(aliasScope, { recursive: true })
+	for (const packageName of readdirSync(sourceScope)) {
+		if (!packageName.startsWith("dsh-")) continue
+		const source = path.join(sourceScope, packageName)
+		if (!lstatSafe(source)?.isDirectory()) continue
+		const aliasTarget = path.join(aliasScope, packageName)
+		if (existsSync(aliasTarget)) continue
+
+		mkdirSync(aliasTarget, { recursive: true })
+		for (const entry of readdirSync(source)) {
+			if (entry === "node_modules") continue
+			const entrySource = path.join(source, entry)
+			const entryTarget = path.join(aliasTarget, entry)
+			if (entry === "package.json") {
+				const manifest = JSON.parse(readFileSync(entrySource, "utf8"))
+				manifest.name = `@cocode/${packageName}`
+				writeFileSync(entryTarget, `${JSON.stringify(manifest, null, 2)}\n`)
+				continue
+			}
+			cpSync(entrySource, entryTarget, { recursive: true, dereference: true })
+		}
+	}
 }
 
 function isWorkspacePath(candidate, sourceRoot) {
