@@ -37,13 +37,12 @@ describe('terminal mouse support', () => {
     ])
   })
 
-  it('enables app text selection when the terminal supports mouse tracking', () => {
+  it('keeps native text selection until mouse mode or a popup needs tracking', () => {
     expect(shouldEnableMouseTracking({
       supported: true,
       manualMode: false,
       overlayOpen: false,
-      textSelection: true,
-    })).toBe(true)
+    })).toBe(false)
     expect(shouldEnableMouseTracking({
       supported: true,
       manualMode: false,

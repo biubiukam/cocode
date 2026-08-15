@@ -41,15 +41,8 @@ import { listWorkspaceEntries, rankFileMatches } from '../runtime/workspace-file
 import { moveMessageSelection, selectableMessageKeys } from './message-selection.ts'
 import {
   maxMessageScrollOffset,
-  resolveMessageWindow,
   scrollOffsetForMessage,
 } from './message-scroll.ts'
-import {
-  pointForMouse,
-  selectedText,
-  type TextSelection,
-  visibleSelectableLines,
-} from './text-selection.ts'
 import { focusConversationNodes } from '../runtime/focus.ts'
 import { text } from '../runtime/ui-locale.ts'
 import {
@@ -131,8 +124,6 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
   const [editorError, setEditorError] = useState<string | undefined>()
   const [questionMousePointer, setQuestionMousePointer] = useState<TuiMousePointer>()
   const [approvalMousePointer, setApprovalMousePointer] = useState<TuiMousePointer>()
-  const [textSelection, setTextSelection] = useState<TextSelection>()
-  const [textSelectionDragging, setTextSelectionDragging] = useState(false)
   const mouseClickId = useRef(0)
   const [mouseMode, setMouseMode] = useState(false)
   const { stdout } = useStdout()
@@ -335,7 +326,6 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     supported: props.mouseSupported !== false,
     manualMode: mouseMode,
     overlayOpen: layout.overlayRows > 0,
-    textSelection: true,
   })
   const selectableMessages = useMemo(
     () => selectableMessageKeys(displayNodes),
@@ -352,31 +342,6 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
       ),
     [displayNodes, expandedMessageIds, messageContentColumns, messageMaxRows, snap.verbose],
   )
-  const selectableLines = useMemo(() => {
-    const window = resolveMessageWindow(
-      displayNodes,
-      messageMaxRows,
-      snap.verbose,
-      expandedMessageIds,
-      messageScrollOffset,
-      mainColumns,
-    )
-    return visibleSelectableLines(
-      window.nodes,
-      messageMaxRows,
-      window.hiddenRowsBefore,
-      snap.verbose,
-      expandedMessageIds,
-      mainColumns,
-    )
-  }, [
-    displayNodes,
-    expandedMessageIds,
-    mainColumns,
-    messageMaxRows,
-    messageScrollOffset,
-    snap.verbose,
-  ])
   useEffect(
     () =>
       app.subscribe(() => {
@@ -467,57 +432,6 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
       return
     }
     if (modelOverlayOpen) return
-    const messageStartRow = CHAT_HEADER_ROWS + 1
-    const messageEndRow = messageStartRow + messageMaxRows
-    const selectionPoint = pointForMouse(
-      event.y - messageStartRow,
-      event.x - 1,
-      messageMaxRows,
-      mainColumns,
-    )
-    if (textSelectionDragging) {
-      if (event.button !== 0) return
-      if (event.action === 'move') {
-        setTextSelection((current) =>
-          current === undefined ? undefined : { ...current, focus: selectionPoint },
-        )
-        return
-      }
-      if (event.action === 'release') {
-        const current = textSelection
-        setTextSelectionDragging(false)
-        if (current !== undefined) {
-          const next = { ...current, focus: selectionPoint }
-          setTextSelection(next)
-          const value = selectedText(selectableLines, next)
-          if (value !== '') app.dispatch({ type: 'copyText', text: value })
-        }
-        return
-      }
-      return
-    }
-    const canSelectText =
-      layout.overlayRows === 0 &&
-      !questionOpen &&
-      !approvalOpen &&
-      !reviewOpen &&
-      !messageSelectionActive &&
-      !messageActionMenuOpen &&
-      !commandPaletteOpen &&
-      !layout.tooSmall
-    if (
-      canSelectText &&
-      event.action === 'press' &&
-      event.button === 0 &&
-      event.x >= 1 &&
-      event.x <= mainColumns &&
-      event.y >= messageStartRow &&
-      event.y < messageEndRow
-    ) {
-      setTextSelection({ anchor: selectionPoint, focus: selectionPoint })
-      setTextSelectionDragging(true)
-      return
-    }
     if (questionOpen || approvalOpen) {
       if ((event.action === 'press' || event.action === 'move') && event.button === 0) {
         const pointer = { id: mouseClickId.current++, row: hitRow, action: event.action }
@@ -533,7 +447,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     ) return
     const isPress = event.action === 'press'
     const headerRows = CHAT_HEADER_ROWS
-    const messageStart = messageStartRow
+    const messageStart = headerRows + 1
     if (commandPaletteOpen) {
       const index = actionMenuItemIndexAtRow({
         row: hitRow,
@@ -891,19 +805,6 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
   useInput((input, key) => {
     if (editorBusy) return
     if (isMouseInput(input)) return
-    if (textSelection !== undefined) {
-      if (key.escape) {
-        setTextSelection(undefined)
-        setTextSelectionDragging(false)
-        return
-      }
-      if (key.ctrl && (input === 'c' || input === 'y')) {
-        const value = selectedText(selectableLines, textSelection)
-        if (value !== '') app.dispatch({ type: 'copyText', text: value })
-        return
-      }
-      setTextSelection(undefined)
-    }
     if (modelPickerOpen) {
       if (key.escape) {
         app.dispatch({ type: 'model.close' })
