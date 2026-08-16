@@ -126,7 +126,7 @@ test("forces ordinary client dependencies into the browser bundle", async () => 
 		tsconfigPath: path.resolve("tsconfig.base.client.json"),
 	})
 
-	assert.deepEqual(config.external, [
+	assert.deepEqual(config.deps?.neverBundle, [
 		"react",
 		"react/jsx-runtime",
 		"react-dom",
@@ -139,9 +139,9 @@ test("forces ordinary client dependencies into the browser bundle", async () => 
 		"@deepseek-ai/dsh-client-schema-form",
 		"@deepseek-ai/dsh-client-runtime/client",
 	])
-	assert.equal(config.noExternal?.("@tanstack/react-virtual"), true)
-	assert.equal(config.noExternal?.("diff"), true)
-	assert.equal(config.noExternal?.("react"), undefined)
+	assert.equal(config.deps?.alwaysBundle?.("@tanstack/react-virtual"), true)
+	assert.equal(config.deps?.alwaysBundle?.("diff"), true)
+	assert.equal(config.deps?.alwaysBundle?.("react"), false)
 	assert.equal(typeof config.alias?.["@tanstack/react-virtual"], "string")
 	assert.equal(typeof config.alias?.diff, "string")
 })
