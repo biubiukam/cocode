@@ -93,6 +93,39 @@ describe('listSessionSummaries', () => {
     }
   })
 
+  it('skips injected context when choosing the session preview', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'cocode-session-context-preview-'))
+    const cwd = '/work/project'
+    try {
+      await writeSession(
+        root,
+        'project',
+        's1',
+        `${JSON.stringify({ type: 'session', id: 's1', createdAt: 1, cwd })}\n${JSON.stringify({
+          type: 'user/message',
+          seq: 1,
+          time: 2,
+          data: {
+            content: [{ type: 'text', text: 'Current runtime context.' }],
+            source: { kind: 'plugin', plugin: '@deepseek-ai/dsh-system-prompt' },
+          },
+        })}\n${JSON.stringify({
+          type: 'user/message',
+          seq: 2,
+          time: 3,
+          data: {
+            content: [{ type: 'text', text: 'The actual user prompt' }],
+            source: { kind: 'user' },
+          },
+        })}\n`,
+      )
+      const result = await listSessionSummaries({ root, cwd })
+      expect(result.sessions[0]?.preview).toBe('The actual user prompt')
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('uses the latest sanitized session title for display metadata', async () => {
     const root = await mkdtemp(join(tmpdir(), 'cocode-session-title-'))
     const cwd = '/work/project'

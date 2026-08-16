@@ -4,13 +4,22 @@
 
 import type { SessionEvent } from '@cocode/tui-connection'
 import { asNumber, asString, blocksToText, isRecord, reasoningToText } from '../text.ts'
-import type { AssistantNode, NodeDefinition, NoticeNode, ToolNode, UserNode } from './types.ts'
+import type {
+  AssistantNode,
+  ContextNode,
+  ContextSection,
+  NodeDefinition,
+  NoticeNode,
+  ToolNode,
+  UserNode,
+} from './types.ts'
 import { NodeRegistry } from './registry.ts'
 import { inferToolView } from './tool-view.ts'
 import { parseDiffSummary } from '../diff-summary.ts'
 
 export function createBuiltinRegistry(): NodeRegistry {
   const registry = new NodeRegistry()
+  registry.register(contextDefinition)
   registry.register(userDefinition)
   registry.register(toolDefinition)
   registry.register(assistantDefinition)
@@ -23,6 +32,8 @@ const userDefinition: NodeDefinition<UserNode> = {
   match(event) {
     if (event.type !== 'user/message') return null
     const data = isRecord(event.data) ? event.data : {}
+    const source = isRecord(data.source) ? data.source : undefined
+    if (source !== undefined && source.kind !== 'user') return null
     const id = asString(data.id, String(event.seq))
     return { id, role: 'start' }
   },
@@ -45,6 +56,87 @@ const userDefinition: NodeDefinition<UserNode> = {
   buildViewNode(ctx) {
     return ctx.state
   },
+}
+
+const contextDefinition: NodeDefinition<ContextNode> = {
+  kind: 'context',
+  match(event) {
+    if (event.type !== 'user/message') return null
+    const data = isRecord(event.data) ? event.data : {}
+    const source = isRecord(data.source) ? data.source : undefined
+    // Older or foreign logs may omit source. Preserve their historical user
+    // presentation; every declared non-user producer is injected context.
+    if (source === undefined || source.kind === 'user') return null
+    return { id: asString(data.id, String(event.seq)), role: 'start' }
+  },
+  start(event) {
+    const data = isRecord(event.data) ? event.data : {}
+    const source = isRecord(data.source) ? data.source : {}
+    return {
+      kind: 'context',
+      id: asString(data.id, String(event.seq)),
+      seq: event.seq,
+      time: event.time,
+      text: blocksToText(data.content),
+      source: data.source,
+      provenance: contextProvenance(source),
+      form: optionalString(source.form),
+      sections: contextSections(source.sections),
+    }
+  },
+  update(state) {
+    return state
+  },
+  isComplete() {
+    return true
+  },
+  buildViewNode(ctx) {
+    return ctx.state
+  },
+}
+
+function contextProvenance(source: Record<string, unknown>): ContextNode['provenance'] {
+  const kind = optionalString(source.kind)
+  if (kind === 'session-reference') {
+    return { role: 'recall', label: joinedFields(source.references, 'label') ?? kind }
+  }
+  if (kind === 'agent-instructions') {
+    return { role: 'inject', label: joinedFields(source.changes, 'path') ?? kind }
+  }
+  if (kind === 'plugin') {
+    return { role: 'inject', label: optionalString(source.plugin) ?? kind }
+  }
+  if (kind === 'skill-invocation') {
+    return { role: 'inject', label: optionalString(source.name) ?? kind }
+  }
+  return { role: 'inject', ...(kind === undefined ? {} : { label: kind }) }
+}
+
+function joinedFields(value: unknown, field: string): string | undefined {
+  if (!Array.isArray(value)) return undefined
+  const values: string[] = []
+  for (const item of value) {
+    const record = isRecord(item) ? item : undefined
+    const entry = record === undefined ? undefined : optionalString(record[field])
+    if (entry !== undefined && !values.includes(entry)) values.push(entry)
+  }
+  return values.length === 0 ? undefined : values.join(', ')
+}
+
+function contextSections(value: unknown): ContextSection[] {
+  if (!Array.isArray(value)) return []
+  const sections: ContextSection[] = []
+  for (const item of value) {
+    const record = isRecord(item) ? item : undefined
+    const name = record === undefined ? undefined : optionalString(record.name)
+    const text = record === undefined ? undefined : optionalString(record.text)
+    if (name !== undefined && text !== undefined) sections.push({ name, text })
+  }
+  return sections
+}
+
+function optionalString(value: unknown): string | undefined {
+  return typeof value === 'string' && value !== '' ? value : undefined
 }
 
 const assistantDefinition: NodeDefinition<AssistantNode> = {

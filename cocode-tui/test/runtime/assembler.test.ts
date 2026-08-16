@@ -31,6 +31,41 @@ describe('Assembler', () => {
     })
   })
 
+  it('projects plugin-authored user/message into a context node', () => {
+    const a = assembler()
+    a.ingest(
+      ev('user/message', 2, {
+        id: 'context-1',
+        content: [{ type: 'text', text: 'Current runtime context.' }],
+        source: {
+          kind: 'plugin',
+          plugin: '@deepseek-ai/dsh-system-prompt',
+          form: 'snapshot',
+          sections: [
+            { name: 'sandbox:policy', text: 'danger-full-access' },
+            { name: 'approval:policy', text: 'never' },
+          ],
+        },
+      }),
+    )
+    expect(a.snapshot()).toEqual([
+      expect.objectContaining({
+        kind: 'context',
+        id: 'context-1',
+        text: 'Current runtime context.',
+        provenance: {
+          role: 'inject',
+          label: '@deepseek-ai/dsh-system-prompt',
+        },
+        form: 'snapshot',
+        sections: [
+          { name: 'sandbox:policy', text: 'danger-full-access' },
+          { name: 'approval:policy', text: 'never' },
+        ],
+      }),
+    ])
+  })
+
   it('merges assistant chunks then seals on message', () => {
     const a = assembler()
     a.ingest(

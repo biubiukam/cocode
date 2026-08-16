@@ -22,7 +22,7 @@ export type NodeDefinition<State = unknown> = {
   }): ConversationNode | null
 }
 
-export type ConversationNode = UserNode | AssistantNode | ToolNode | NoticeNode
+export type ConversationNode = UserNode | ContextNode | AssistantNode | ToolNode | NoticeNode
 
 export type UserNode = {
   kind: 'user'
@@ -30,6 +30,27 @@ export type UserNode = {
   seq: number
   time: number
   text: string
+}
+
+export type ContextSection = {
+  name: string
+  text: string
+}
+
+/** Model-facing context injected by the runtime rather than typed by the user. */
+export type ContextNode = {
+  kind: 'context'
+  id: string
+  seq: number
+  time: number
+  text: string
+  source: unknown
+  provenance: {
+    role: 'inject' | 'recall'
+    label?: string
+  }
+  form?: string
+  sections: readonly ContextSection[]
 }
 
 export type AssistantNode = {

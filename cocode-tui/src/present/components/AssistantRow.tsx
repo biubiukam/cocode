@@ -3,7 +3,7 @@ import type { AssistantNode } from '../../runtime/nodes/types.ts'
 import { Markdown, StreamingMarkdown } from './Markdown.tsx'
 import { formatReasoning } from '../text-format.ts'
 import { theme } from '../theme.ts'
-import { text, type UiLocale } from '../../runtime/ui-locale.ts'
+import type { UiLocale } from '../../runtime/ui-locale.ts'
 
 export function AssistantRow(props: {
   node: AssistantNode
@@ -24,15 +24,7 @@ export function AssistantRow(props: {
       minWidth={0}
     >
       <Text color={theme.info} bold>
-        ● cocode{' '}
-        <Text color={theme.mute}>
-          ·{' '}
-          {node.streaming
-            ? text(props.locale, 'agentRunning')
-            : props.locale === 'zh'
-            ? '回答'
-            : 'answer'}
-        </Text>
+        ● cocode
       </Text>
       {reasoning !== undefined ? (
         <Text color={theme.mute} wrap="wrap">

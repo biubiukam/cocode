@@ -21,11 +21,12 @@ export function MessageList(props: {
     props.maxColumns === undefined
       ? undefined
       : Math.max(1, props.maxColumns - (props.selectedNodeId !== undefined ? 2 : 0))
+  const visibleNodes = props.nodes.filter((node) => node.kind !== 'context' || props.verbose)
   const window =
     props.maxRows === undefined
-      ? { nodes: props.nodes, hiddenRowsBefore: 0 }
+      ? { nodes: visibleNodes, hiddenRowsBefore: 0 }
       : resolveMessageWindow(
-          props.nodes,
+          visibleNodes,
           props.maxRows,
           props.verbose,
           props.expandedNodeIds,

@@ -219,8 +219,9 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     [historyQuery, snap.history],
   )
   const displayNodes = useMemo(
-    () => focusConversationNodes(snap.nodes, snap.status.focusMode),
-    [snap.nodes, snap.status.focusMode],
+    () => focusConversationNodes(snap.nodes, snap.status.focusMode)
+      .filter((node) => node.kind !== 'context' || snap.verbose),
+    [snap.nodes, snap.status.focusMode, snap.verbose],
   )
   const selectedNode = useMemo(
     () => displayNodes.find((node) => nodeKey(node.kind, node.id) === selectedMessageId),

@@ -161,7 +161,11 @@ async function readSessionDisplay(
     for await (const line of lines) {
       const event = parseEvent(line)
       if (event !== undefined) updatedAt = event.time
-      if (event?.type === 'user/message' && preview === undefined) {
+      if (
+        event?.type === 'user/message' &&
+        preview === undefined &&
+        isUserAuthoredMessage(event.data)
+      ) {
         preview = previewText(userMessageText(event.data))
       }
       if (event?.type === 'session/title' && isRecord(event.data)) {
@@ -185,6 +189,14 @@ function userMessageText(data: unknown): string {
   if ('content' in data) return blocksToText(data.content)
   const message = isRecord(data.message) ? data.message : undefined
   return message === undefined ? '' : blocksToText(message.content)
+}
+
+function isUserAuthoredMessage(data: unknown): boolean {
+  if (!isRecord(data)) return false
+  const source = isRecord(data.source) ? data.source : undefined
+  // Source was absent in older logs, where user/message only represented user
+  // input. A declared producer must explicitly be the user to qualify now.
+  return source === undefined || source.kind === 'user'
 }
 
 function previewText(value: string): string | undefined {

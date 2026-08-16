@@ -5,6 +5,7 @@
 import type { ReactElement } from 'react'
 import type { ConversationNode } from '../runtime/nodes/types.ts'
 import { AssistantRow } from './components/AssistantRow.tsx'
+import { ContextRow } from './components/ContextRow.tsx'
 import { NoticeRow } from './components/NoticeRow.tsx'
 import { ToolCard } from './components/ToolCard.tsx'
 import { UserRow } from './components/UserRow.tsx'
@@ -25,6 +26,14 @@ export type NodeView = (
 const views: Record<string, NodeView> = {
   user: (node, _verbose, options) =>
     node.kind === 'user' ? <UserRow node={node} locale={options.locale ?? 'en'} /> : null,
+  context: (node, verbose, options) =>
+    node.kind === 'context' && verbose ? (
+      <ContextRow
+        node={node}
+        expanded={options.expanded === true}
+        locale={options.locale ?? 'en'}
+      />
+    ) : null,
   assistant: (node, verbose, options) =>
     node.kind === 'assistant' ? (
       <AssistantRow

@@ -88,6 +88,8 @@ export function readableNodeText(node: ConversationNode): string {
   switch (node.kind) {
     case 'user':
       return node.text
+    case 'context':
+      return node.text
     case 'assistant':
       return node.text !== '' ? node.text : node.reasoning
     case 'tool':
