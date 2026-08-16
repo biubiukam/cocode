@@ -356,6 +356,23 @@
   padding-left: 20px;
 }
 
+.heroWorkspaceArea {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.heroWorkspaceError {
+  max-width: min(var(--dsh-composer-card-max-width), calc(100vw - 64px));
+  padding-left: 20px;
+  color: var(--dsw-alias-state-error-primary);
+  font-size: 12px;
+  line-height: 18px;
+  overflow-wrap: anywhere;
+}
+
 .heroWorkspaceRow * {
   -webkit-app-region: no-drag;
 }

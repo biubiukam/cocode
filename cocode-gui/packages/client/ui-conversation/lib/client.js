@@ -2684,8 +2684,8 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var StatsLine_module_css_default = {
-			"root": "_6EnNXW_root",
-			"sep": "_6EnNXW_sep"
+			"sep": "_6EnNXW_sep",
+			"root": "_6EnNXW_root"
 		};
 		//#endregion
 		//#region packages/client/ui-conversation/src/client/chat/StatsLine.tsx
@@ -2874,23 +2874,23 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var ContextMeter_module_css_default = {
-			"header": "sECica_header",
 			"percent": "sECica_percent",
-			"trigger": "sECica_trigger",
-			"rows": "sECica_rows",
-			"root": "sECica_root",
-			"colorMessages": "sECica_colorMessages",
-			"colorTools": "sECica_colorTools",
-			"figures": "sECica_figures",
-			"bar": "sECica_bar",
-			"colorSystem": "sECica_colorSystem",
 			"track": "sECica_track",
-			"segment": "sECica_segment",
-			"fill": "sECica_fill",
-			"row": "sECica_row",
-			"swatch": "sECica_swatch",
 			"headline": "sECica_headline",
-			"panel": "sECica_panel"
+			"header": "sECica_header",
+			"row": "sECica_row",
+			"colorMessages": "sECica_colorMessages",
+			"colorSystem": "sECica_colorSystem",
+			"figures": "sECica_figures",
+			"root": "sECica_root",
+			"bar": "sECica_bar",
+			"colorTools": "sECica_colorTools",
+			"trigger": "sECica_trigger",
+			"swatch": "sECica_swatch",
+			"fill": "sECica_fill",
+			"rows": "sECica_rows",
+			"panel": "sECica_panel",
+			"segment": "sECica_segment"
 		};
 		//#endregion
 		//#region packages/client/ui-conversation/src/client/skeleton/ContextMeter.tsx
@@ -3062,11 +3062,11 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var PermissionSelect_module_css_default = {
-			"chevron": "Qcg4EW_chevron",
 			"trigger": "Qcg4EW_trigger",
+			"triggerLabel": "Qcg4EW_triggerLabel",
 			"chevronOpen": "Qcg4EW_chevronOpen",
 			"triggerIcon": "Qcg4EW_triggerIcon",
-			"triggerLabel": "Qcg4EW_triggerLabel"
+			"chevron": "Qcg4EW_chevron"
 		};
 		//#endregion
 		//#region packages/client/ui-conversation/src/client/skeleton/PermissionSelect.tsx
@@ -3270,37 +3270,37 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var InputBar_module_css_default = {
-			"input-pending": "x99sha_input-pending",
-			"chip": "x99sha_chip",
-			"hint": "x99sha_hint",
-			"add": "x99sha_add",
-			"row": "x99sha_row",
-			"select": "x99sha_select",
-			"retry": "x99sha_retry",
-			"cardWorkspaceTrigger": "x99sha_cardWorkspaceTrigger",
-			"hlToken": "x99sha_hlToken",
-			"chipLabel": "x99sha_chipLabel",
-			"hlSegment": "x99sha_hlSegment",
-			"attachments": "x99sha_attachments",
-			"primary": "x99sha_primary",
-			"hero": "x99sha_hero",
-			"noticeError": "x99sha_noticeError",
-			"chipInvalid": "x99sha_chipInvalid",
-			"scroll": "x99sha_scroll",
-			"backdrop": "x99sha_backdrop",
-			"modes": "x99sha_modes",
-			"root": "x99sha_root",
-			"card": "x99sha_card",
-			"mirror": "x99sha_mirror",
-			"textRef": "x99sha_textRef",
-			"accessory": "x99sha_accessory",
-			"tools": "x99sha_tools",
 			"pending": "x99sha_pending",
-			"overlayAnchor": "x99sha_overlayAnchor",
+			"trailing": "x99sha_trailing",
+			"root": "x99sha_root",
+			"select": "x99sha_select",
+			"input-pending": "x99sha_input-pending",
+			"cardWorkspaceTrigger": "x99sha_cardWorkspaceTrigger",
 			"notice": "x99sha_notice",
+			"noticeError": "x99sha_noticeError",
+			"overlayAnchor": "x99sha_overlayAnchor",
+			"chip": "x99sha_chip",
+			"textRef": "x99sha_textRef",
+			"chipInvalid": "x99sha_chipInvalid",
+			"attachments": "x99sha_attachments",
+			"retry": "x99sha_retry",
+			"hint": "x99sha_hint",
+			"row": "x99sha_row",
+			"primary": "x99sha_primary",
+			"hlToken": "x99sha_hlToken",
+			"accessory": "x99sha_accessory",
+			"modes": "x99sha_modes",
 			"input": "x99sha_input",
+			"hlSegment": "x99sha_hlSegment",
+			"scroll": "x99sha_scroll",
+			"card": "x99sha_card",
+			"backdrop": "x99sha_backdrop",
+			"chipLabel": "x99sha_chipLabel",
+			"mirror": "x99sha_mirror",
+			"hero": "x99sha_hero",
 			"grow": "x99sha_grow",
-			"trailing": "x99sha_trailing"
+			"tools": "x99sha_tools",
+			"add": "x99sha_add"
 		};
 		//#endregion
 		//#region packages/client/ui-conversation/src/client/skeleton/InputBar.tsx
@@ -3942,12 +3942,12 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var EnterBehaviorRow_module_css_default = {
-			"row": "t4lCEq_row",
-			"desc": "t4lCEq_desc",
 			"rowText": "t4lCEq_rowText",
+			"title": "t4lCEq_title",
+			"desc": "t4lCEq_desc",
+			"row": "t4lCEq_row",
 			"selector": "t4lCEq_selector",
-			"chevron": "t4lCEq_chevron",
-			"title": "t4lCEq_title"
+			"chevron": "t4lCEq_chevron"
 		};
 		//#endregion
 		//#region packages/client/ui-conversation/src/client/settings/EnterBehaviorRow.tsx
@@ -4020,33 +4020,33 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var MessageItem_module_css_default = {
-			"turnErrorDot": "_8cEDYq_turnErrorDot",
-			"retryText": "_8cEDYq_retryText",
+			"retryRow": "_8cEDYq_retryRow",
+			"turnErrorCode": "_8cEDYq_turnErrorCode",
+			"refChip": "_8cEDYq_refChip",
+			"retryDetails": "_8cEDYq_retryDetails",
 			"bubble": "_8cEDYq_bubble",
 			"turnErrorRow": "_8cEDYq_turnErrorRow",
-			"compactionLeading": "_8cEDYq_compactionLeading",
-			"userRow": "_8cEDYq_userRow",
-			"compactionTitle": "_8cEDYq_compactionTitle",
-			"compactionButton": "_8cEDYq_compactionButton",
-			"retry-shimmer": "_8cEDYq_retry-shimmer",
-			"retryDetails": "_8cEDYq_retryDetails",
-			"compactionSummary": "_8cEDYq_compactionSummary",
-			"compactionBody": "_8cEDYq_compactionBody",
-			"compactionContextIcon": "_8cEDYq_compactionContextIcon",
-			"compactionSep": "_8cEDYq_compactionSep",
-			"compactionDisclosureIcon": "_8cEDYq_compactionDisclosureIcon",
-			"retryDetailLabel": "_8cEDYq_retryDetailLabel",
-			"turnErrorTitle": "_8cEDYq_turnErrorTitle",
-			"turnErrorMessage": "_8cEDYq_turnErrorMessage",
 			"retrySummary": "_8cEDYq_retrySummary",
 			"maxTokensTitle": "_8cEDYq_maxTokensTitle",
-			"refChip": "_8cEDYq_refChip",
-			"userStack": "_8cEDYq_userStack",
+			"compactionButton": "_8cEDYq_compactionButton",
+			"userRow": "_8cEDYq_userRow",
 			"contextRow": "_8cEDYq_contextRow",
+			"compactionSummary": "_8cEDYq_compactionSummary",
+			"compactionContextIcon": "_8cEDYq_compactionContextIcon",
+			"compactionDisclosureIcon": "_8cEDYq_compactionDisclosureIcon",
+			"compactionBody": "_8cEDYq_compactionBody",
 			"compactionRow": "_8cEDYq_compactionRow",
+			"compactionTitle": "_8cEDYq_compactionTitle",
+			"compactionLeading": "_8cEDYq_compactionLeading",
+			"userStack": "_8cEDYq_userStack",
+			"compactionSep": "_8cEDYq_compactionSep",
+			"retryText": "_8cEDYq_retryText",
+			"retry-shimmer": "_8cEDYq_retry-shimmer",
+			"turnErrorDot": "_8cEDYq_turnErrorDot",
 			"turnErrorCopy": "_8cEDYq_turnErrorCopy",
-			"turnErrorCode": "_8cEDYq_turnErrorCode",
-			"retryRow": "_8cEDYq_retryRow"
+			"retryDetailLabel": "_8cEDYq_retryDetailLabel",
+			"turnErrorTitle": "_8cEDYq_turnErrorTitle",
+			"turnErrorMessage": "_8cEDYq_turnErrorMessage"
 		};
 		//#endregion
 		//#region packages/client/ui-conversation/src/client/chat/CompactionItem.tsx
@@ -4118,29 +4118,29 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var ContextBody_module_css_default = {
-			"section": "_75tAGG_section",
-			"catalogNotice": "_75tAGG_catalogNotice",
-			"entryName": "_75tAGG_entryName",
-			"entryDescription": "_75tAGG_entryDescription",
-			"recall": "_75tAGG_recall",
-			"recallLabel": "_75tAGG_recallLabel",
-			"entry": "_75tAGG_entry",
-			"fieldValue": "_75tAGG_fieldValue",
-			"fileAction": "_75tAGG_fileAction",
-			"fieldKey": "_75tAGG_fieldKey",
-			"fields": "_75tAGG_fields",
-			"sectionName": "_75tAGG_sectionName",
-			"entries": "_75tAGG_entries",
-			"sectionText": "_75tAGG_sectionText",
-			"recalls": "_75tAGG_recalls",
-			"files": "_75tAGG_files",
-			"recallCounts": "_75tAGG_recallCounts",
 			"sections": "_75tAGG_sections",
+			"catalogNotice": "_75tAGG_catalogNotice",
+			"sectionText": "_75tAGG_sectionText",
+			"fieldKey": "_75tAGG_fieldKey",
 			"file": "_75tAGG_file",
-			"text": "_75tAGG_text",
+			"entryDescription": "_75tAGG_entryDescription",
+			"fields": "_75tAGG_fields",
+			"entry": "_75tAGG_entry",
 			"filePath": "_75tAGG_filePath",
 			"relaySender": "_75tAGG_relaySender",
-			"field": "_75tAGG_field"
+			"section": "_75tAGG_section",
+			"recall": "_75tAGG_recall",
+			"recallLabel": "_75tAGG_recallLabel",
+			"entries": "_75tAGG_entries",
+			"field": "_75tAGG_field",
+			"fieldValue": "_75tAGG_fieldValue",
+			"recallCounts": "_75tAGG_recallCounts",
+			"sectionName": "_75tAGG_sectionName",
+			"text": "_75tAGG_text",
+			"fileAction": "_75tAGG_fileAction",
+			"files": "_75tAGG_files",
+			"recalls": "_75tAGG_recalls",
+			"entryName": "_75tAGG_entryName"
 		};
 		//#endregion
 		//#region packages/client/ui-conversation/src/client/chat/ContextBody.tsx
@@ -4675,12 +4675,12 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var ContextInjectionRow_module_css_default = {
-			"chevron": "lNUcIa_chevron",
-			"body": "lNUcIa_body",
 			"sep": "lNUcIa_sep",
-			"summary": "lNUcIa_summary",
+			"chevron": "lNUcIa_chevron",
+			"source": "lNUcIa_source",
 			"root": "lNUcIa_root",
-			"source": "lNUcIa_source"
+			"summary": "lNUcIa_summary",
+			"body": "lNUcIa_body"
 		};
 		//#endregion
 		//#region packages/client/ui-conversation/src/client/chat/ContextInjectionRow.tsx
@@ -4775,12 +4775,12 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var MessageIconActions_module_css_default = {
-			"actions": "iG2DDG_actions",
+			"visuallyHidden": "iG2DDG_visuallyHidden",
 			"timeStart": "iG2DDG_timeStart",
-			"runTimeDot": "iG2DDG_runTimeDot",
 			"timeEnd": "iG2DDG_timeEnd",
-			"action": "iG2DDG_action",
-			"visuallyHidden": "iG2DDG_visuallyHidden"
+			"actions": "iG2DDG_actions",
+			"runTimeDot": "iG2DDG_runTimeDot",
+			"action": "iG2DDG_action"
 		};
 		//#endregion
 		//#region packages/client/ui-conversation/src/client/chat/MessageIconActions.tsx
@@ -5173,19 +5173,19 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var ChatView_module_css_default = {
-			"root": "nx-IXW_root",
-			"older": "nx-IXW_older",
-			"turnStatus": "nx-IXW_turnStatus",
 			"scroll": "nx-IXW_scroll",
-			"hint": "nx-IXW_hint",
-			"flowItem": "nx-IXW_flowItem",
+			"older": "nx-IXW_older",
+			"column": "nx-IXW_column",
 			"callRow": "nx-IXW_callRow",
-			"openError": "nx-IXW_openError",
+			"root": "nx-IXW_root",
+			"turnStatus": "nx-IXW_turnStatus",
 			"turnStatusClock": "nx-IXW_turnStatusClock",
-			"toBottomSlot": "nx-IXW_toBottomSlot",
-			"toBottom": "nx-IXW_toBottom",
+			"hint": "nx-IXW_hint",
+			"openError": "nx-IXW_openError",
+			"flowItem": "nx-IXW_flowItem",
 			"dsh-turn-status-shimmer": "nx-IXW_dsh-turn-status-shimmer",
-			"column": "nx-IXW_column"
+			"toBottomSlot": "nx-IXW_toBottomSlot",
+			"toBottom": "nx-IXW_toBottom"
 		};
 		//#endregion
 		//#region packages/client/ui-conversation/src/client/chat/ChatNodeSeat.tsx
@@ -5662,15 +5662,15 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var ApprovalPanel_module_css_default = {
-			"actionRow": "_5Jd8KG_actionRow",
-			"strip": "_5Jd8KG_strip",
-			"dot": "_5Jd8KG_dot",
-			"headline": "_5Jd8KG_headline",
-			"card": "_5Jd8KG_card",
-			"body": "_5Jd8KG_body",
 			"command": "_5Jd8KG_command",
 			"reject": "_5Jd8KG_reject",
-			"root": "_5Jd8KG_root"
+			"root": "_5Jd8KG_root",
+			"body": "_5Jd8KG_body",
+			"card": "_5Jd8KG_card",
+			"headline": "_5Jd8KG_headline",
+			"strip": "_5Jd8KG_strip",
+			"actionRow": "_5Jd8KG_actionRow",
+			"dot": "_5Jd8KG_dot"
 		};
 		//#endregion
 		//#region packages/client/ui-conversation/src/client/skeleton/ApprovalPanel.tsx
@@ -5832,6 +5832,7 @@ window.__ModuleLoader__.load({
 			"hero.headline": "探索未至之境",
 			"hero.preview": "预览版",
 			"hero.chooseWorkspace": "选择工作区",
+			"workspace.selectFailed": "工作区切换失败：{message}",
 			"session.hierarchy": "会话层级",
 			"details.title": "详情",
 			"details.close": "关闭详情",
@@ -5997,6 +5998,7 @@ window.__ModuleLoader__.load({
 			"hero.headline": "Into the Unknown",
 			"hero.preview": "Preview",
 			"hero.chooseWorkspace": "Choose workspace",
+			"workspace.selectFailed": "Workspace switch failed: {message}",
 			"session.hierarchy": "Session hierarchy",
 			"details.title": "Details",
 			"details.close": "Close details",
@@ -6109,21 +6111,21 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var TodoPanel_module_css_default = {
-			"glyphProgress": "Y0ga7q_glyphProgress",
-			"item": "Y0ga7q_item",
-			"body": "Y0ga7q_body",
-			"glyph": "Y0ga7q_glyph",
-			"root": "Y0ga7q_root",
-			"list": "Y0ga7q_list",
-			"content": "Y0ga7q_content",
-			"chevron": "Y0ga7q_chevron",
-			"header": "Y0ga7q_header",
-			"glyphCompleted": "Y0ga7q_glyphCompleted",
-			"lead": "Y0ga7q_lead",
-			"progress": "Y0ga7q_progress",
-			"glyphPending": "Y0ga7q_glyphPending",
 			"todo-progress-spin": "Y0ga7q_todo-progress-spin",
-			"title": "Y0ga7q_title"
+			"item": "Y0ga7q_item",
+			"glyph": "Y0ga7q_glyph",
+			"glyphPending": "Y0ga7q_glyphPending",
+			"glyphCompleted": "Y0ga7q_glyphCompleted",
+			"title": "Y0ga7q_title",
+			"lead": "Y0ga7q_lead",
+			"root": "Y0ga7q_root",
+			"body": "Y0ga7q_body",
+			"progress": "Y0ga7q_progress",
+			"chevron": "Y0ga7q_chevron",
+			"list": "Y0ga7q_list",
+			"glyphProgress": "Y0ga7q_glyphProgress",
+			"header": "Y0ga7q_header",
+			"content": "Y0ga7q_content"
 		};
 		//#endregion
 		//#region packages/client/ui-conversation/src/client/skeleton/TodoPanel.tsx
@@ -6316,18 +6318,18 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var QueueDock_module_css_default = {
-			"dock": "vwpQMa_dock",
-			"editor": "vwpQMa_editor",
 			"header": "vwpQMa_header",
-			"row": "vwpQMa_row",
-			"preview": "vwpQMa_preview",
+			"editor": "vwpQMa_editor",
 			"actions": "vwpQMa_actions",
-			"action": "vwpQMa_action",
-			"list": "vwpQMa_list",
-			"panel": "vwpQMa_panel",
-			"lead": "vwpQMa_lead",
 			"chevron": "vwpQMa_chevron",
-			"count": "vwpQMa_count"
+			"action": "vwpQMa_action",
+			"preview": "vwpQMa_preview",
+			"lead": "vwpQMa_lead",
+			"list": "vwpQMa_list",
+			"count": "vwpQMa_count",
+			"row": "vwpQMa_row",
+			"panel": "vwpQMa_panel",
+			"dock": "vwpQMa_dock"
 		};
 		//#endregion
 		//#region packages/client/ui-conversation/src/client/queue/QueueDock.tsx
@@ -6585,23 +6587,23 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var HeroShell_module_css_default = {
-			"previewBadge": "D9EpuG_previewBadge",
-			"workspace": "D9EpuG_workspace",
-			"headlineText": "D9EpuG_headlineText",
-			"chevron": "D9EpuG_chevron",
-			"modalAction": "D9EpuG_modalAction",
-			"fishHitbox": "D9EpuG_fishHitbox",
-			"fish": "D9EpuG_fish",
-			"body": "D9EpuG_body",
-			"folder": "D9EpuG_folder",
-			"workspaceRow": "D9EpuG_workspaceRow",
-			"hero-fish-swim": "D9EpuG_hero-fish-swim",
-			"headline": "D9EpuG_headline",
-			"modalError": "D9EpuG_modalError",
-			"workspaceLabel": "D9EpuG_workspaceLabel",
 			"root": "D9EpuG_root",
+			"body": "D9EpuG_body",
+			"workspace": "D9EpuG_workspace",
+			"modalAction": "D9EpuG_modalAction",
+			"headlineText": "D9EpuG_headlineText",
+			"fish": "D9EpuG_fish",
+			"previewBadge": "D9EpuG_previewBadge",
+			"headline": "D9EpuG_headline",
+			"folder": "D9EpuG_folder",
+			"workspaceLabel": "D9EpuG_workspaceLabel",
+			"fishHitbox": "D9EpuG_fishHitbox",
+			"hero-fish-swim": "D9EpuG_hero-fish-swim",
+			"modalInput": "D9EpuG_modalInput",
+			"chevron": "D9EpuG_chevron",
 			"stack": "D9EpuG_stack",
-			"modalInput": "D9EpuG_modalInput"
+			"modalError": "D9EpuG_modalError",
+			"workspaceRow": "D9EpuG_workspaceRow"
 		};
 		//#endregion
 		//#region packages/client/ui-conversation/src/client/skeleton/EmptyHero.tsx
@@ -6741,7 +6743,7 @@ window.__ModuleLoader__.load({
 		}
 		//#endregion
 		//#region \0dsh-css:packages/client/ui-conversation/src/client/skeleton/ConversationRoot.module.css.mjs
-		const css$6 = ".UC6bGG_root{background:var(--dsw-alias-bg-base);--dsh-chat-content-width:748px;--dsh-composer-card-max-width:calc(var(--dsh-chat-content-width) + 32px);--dsh-composer-side-clearance:16px;--dsh-composer-dock-inset:8px;flex-direction:column;min-width:0;height:100%;display:flex}.UC6bGG_header{-webkit-app-region:drag;border-bottom:1px solid #0000;flex:none;padding:7px 28px 7px 20px;position:relative}.UC6bGG_header:after{content:\"\";z-index:0;background:var(--dsw-alias-border-l2);pointer-events:none;height:1px;position:absolute;bottom:1px;left:0;right:0}.UC6bGG_headerHidden{display:none}.UC6bGG_titleRow{align-items:center;gap:0;min-height:32px;display:flex}.UC6bGG_titleCluster{flex:1;align-items:center;gap:10px;min-width:0;display:flex}.UC6bGG_crumbs{white-space:nowrap;-webkit-app-region:no-drag;align-items:center;gap:4px;min-width:0;display:flex;overflow:hidden}.UC6bGG_crumbSeg{align-items:center;gap:4px;min-width:0;display:inline-flex}.UC6bGG_crumbSep{color:var(--dsw-alias-label-caption);font-size:14px;line-height:20px}.UC6bGG_crumb{max-width:220px;color:var(--dsw-alias-label-tertiary);text-overflow:ellipsis;white-space:nowrap;cursor:pointer;background:0 0;border:none;border-radius:12px;padding:4px 8px;font-size:14px;line-height:20px;overflow:hidden}.UC6bGG_crumb:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover)}.UC6bGG_crumbCurrent{color:var(--dsw-alias-label-primary);cursor:default;font-weight:500}.UC6bGG_headerActions{-webkit-app-region:no-drag;flex:none;align-items:center;gap:8px;display:flex}.UC6bGG_headerUtilities{-webkit-app-region:no-drag;flex:none;align-items:center;gap:8px;margin-left:20px;display:flex}.UC6bGG_headerUtilities:empty{display:none}.UC6bGG_tabs{z-index:1;gap:36px;margin-top:4px;padding-left:8px;display:flex;position:relative}.UC6bGG_tab{color:var(--dsw-alias-label-tertiary);cursor:pointer;-webkit-app-region:no-drag;background:0 0;border:none;padding:0 0 11px;font-size:13px;font-weight:500;line-height:16px;position:relative}.UC6bGG_tab:after{content:\"\";background:0 0;border-radius:2px;height:2px;position:absolute;bottom:1px;left:0;right:0}.UC6bGG_tabActive{color:var(--dsw-alias-state-business-primary)}.UC6bGG_tabActive:after{background:var(--dsw-alias-state-business-primary)}.UC6bGG_viewArea{flex-direction:column;flex:1;min-height:0;display:flex}.UC6bGG_composerStack{--dsh-composer-stack-gap:6px;gap:var(--dsh-composer-stack-gap);flex-direction:column;display:flex}.UC6bGG_composerSeat{--dsh-composer-text-max-height:336px;flex-direction:column;flex:none;display:flex}.UC6bGG_root[data-phase=active]{overflow:hidden}.UC6bGG_root[data-phase=active] .UC6bGG_header{flex:none}.UC6bGG_scrollBody{scrollbar-gutter:stable;flex-direction:column;flex:1;min-height:0;display:flex;overflow:hidden auto}.UC6bGG_root[data-phase=active] .UC6bGG_viewArea{flex:1 0 auto;min-height:auto}.UC6bGG_root[data-phase=active] .UC6bGG_composerSeat{z-index:7;background:linear-gradient(180deg, color-mix(in srgb, var(--dsw-alias-bg-base) 0%, transparent) 0px, var(--dsw-alias-bg-base) 36px);position:sticky;bottom:0}.UC6bGG_scrollBody:has([data-conversation-composer-overlay]){scrollbar-gutter:auto;position:relative;overflow:hidden auto}.UC6bGG_scrollBody:has([data-conversation-composer-overlay])>[data-slot=conversation\\.session]>.UC6bGG_viewArea{flex:1 1 0;min-height:0;overflow:hidden}.UC6bGG_scrollBody:has([data-conversation-composer-overlay])>.UC6bGG_composerSeat{right:var(--dsh-scrollbar-width);position:absolute;bottom:0;left:0}.UC6bGG_composerHero{width:min(calc(var(--dsh-composer-card-max-width) + 2 * var(--dsh-composer-side-clearance)), 100%);z-index:1;align-self:center;gap:8px;padding-bottom:32px;position:relative}.UC6bGG_heroGlow{z-index:-1;aspect-ratio:1051/468;pointer-events:none;width:135.438%;position:absolute;bottom:92px;left:50%;transform:translate(-50%,50%)}.UC6bGG_heroWorkspaceRow{align-items:center;gap:2px;min-width:0;margin-top:4px;padding-left:20px;display:flex}.UC6bGG_heroWorkspaceRow *{-webkit-app-region:no-drag}.UC6bGG_root[data-phase=hero] .UC6bGG_scrollBody{-webkit-app-region:drag;justify-content:center;overflow-y:auto}.UC6bGG_root[data-phase=settling] .UC6bGG_composerSeat{visibility:hidden}";
+		const css$6 = ".UC6bGG_root{background:var(--dsw-alias-bg-base);--dsh-chat-content-width:748px;--dsh-composer-card-max-width:calc(var(--dsh-chat-content-width) + 32px);--dsh-composer-side-clearance:16px;--dsh-composer-dock-inset:8px;flex-direction:column;min-width:0;height:100%;display:flex}.UC6bGG_header{-webkit-app-region:drag;border-bottom:1px solid #0000;flex:none;padding:7px 28px 7px 20px;position:relative}.UC6bGG_header:after{content:\"\";z-index:0;background:var(--dsw-alias-border-l2);pointer-events:none;height:1px;position:absolute;bottom:1px;left:0;right:0}.UC6bGG_headerHidden{display:none}.UC6bGG_titleRow{align-items:center;gap:0;min-height:32px;display:flex}.UC6bGG_titleCluster{flex:1;align-items:center;gap:10px;min-width:0;display:flex}.UC6bGG_crumbs{white-space:nowrap;-webkit-app-region:no-drag;align-items:center;gap:4px;min-width:0;display:flex;overflow:hidden}.UC6bGG_crumbSeg{align-items:center;gap:4px;min-width:0;display:inline-flex}.UC6bGG_crumbSep{color:var(--dsw-alias-label-caption);font-size:14px;line-height:20px}.UC6bGG_crumb{max-width:220px;color:var(--dsw-alias-label-tertiary);text-overflow:ellipsis;white-space:nowrap;cursor:pointer;background:0 0;border:none;border-radius:12px;padding:4px 8px;font-size:14px;line-height:20px;overflow:hidden}.UC6bGG_crumb:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover)}.UC6bGG_crumbCurrent{color:var(--dsw-alias-label-primary);cursor:default;font-weight:500}.UC6bGG_headerActions{-webkit-app-region:no-drag;flex:none;align-items:center;gap:8px;display:flex}.UC6bGG_headerUtilities{-webkit-app-region:no-drag;flex:none;align-items:center;gap:8px;margin-left:20px;display:flex}.UC6bGG_headerUtilities:empty{display:none}.UC6bGG_tabs{z-index:1;gap:36px;margin-top:4px;padding-left:8px;display:flex;position:relative}.UC6bGG_tab{color:var(--dsw-alias-label-tertiary);cursor:pointer;-webkit-app-region:no-drag;background:0 0;border:none;padding:0 0 11px;font-size:13px;font-weight:500;line-height:16px;position:relative}.UC6bGG_tab:after{content:\"\";background:0 0;border-radius:2px;height:2px;position:absolute;bottom:1px;left:0;right:0}.UC6bGG_tabActive{color:var(--dsw-alias-state-business-primary)}.UC6bGG_tabActive:after{background:var(--dsw-alias-state-business-primary)}.UC6bGG_viewArea{flex-direction:column;flex:1;min-height:0;display:flex}.UC6bGG_composerStack{--dsh-composer-stack-gap:6px;gap:var(--dsh-composer-stack-gap);flex-direction:column;display:flex}.UC6bGG_composerSeat{--dsh-composer-text-max-height:336px;flex-direction:column;flex:none;display:flex}.UC6bGG_root[data-phase=active]{overflow:hidden}.UC6bGG_root[data-phase=active] .UC6bGG_header{flex:none}.UC6bGG_scrollBody{scrollbar-gutter:stable;flex-direction:column;flex:1;min-height:0;display:flex;overflow:hidden auto}.UC6bGG_root[data-phase=active] .UC6bGG_viewArea{flex:1 0 auto;min-height:auto}.UC6bGG_root[data-phase=active] .UC6bGG_composerSeat{z-index:7;background:linear-gradient(180deg, color-mix(in srgb, var(--dsw-alias-bg-base) 0%, transparent) 0px, var(--dsw-alias-bg-base) 36px);position:sticky;bottom:0}.UC6bGG_scrollBody:has([data-conversation-composer-overlay]){scrollbar-gutter:auto;position:relative;overflow:hidden auto}.UC6bGG_scrollBody:has([data-conversation-composer-overlay])>[data-slot=conversation\\.session]>.UC6bGG_viewArea{flex:1 1 0;min-height:0;overflow:hidden}.UC6bGG_scrollBody:has([data-conversation-composer-overlay])>.UC6bGG_composerSeat{right:var(--dsh-scrollbar-width);position:absolute;bottom:0;left:0}.UC6bGG_composerHero{width:min(calc(var(--dsh-composer-card-max-width) + 2 * var(--dsh-composer-side-clearance)), 100%);z-index:1;align-self:center;gap:8px;padding-bottom:32px;position:relative}.UC6bGG_heroGlow{z-index:-1;aspect-ratio:1051/468;pointer-events:none;width:135.438%;position:absolute;bottom:92px;left:50%;transform:translate(-50%,50%)}.UC6bGG_heroWorkspaceRow{align-items:center;gap:2px;min-width:0;margin-top:4px;padding-left:20px;display:flex}.UC6bGG_heroWorkspaceArea{flex-direction:column;align-items:flex-start;gap:4px;min-width:0;display:flex}.UC6bGG_heroWorkspaceError{max-width:min(var(--dsh-composer-card-max-width), calc(100vw - 64px));color:var(--dsw-alias-state-error-primary);overflow-wrap:anywhere;padding-left:20px;font-size:12px;line-height:18px}.UC6bGG_heroWorkspaceRow *{-webkit-app-region:no-drag}.UC6bGG_root[data-phase=hero] .UC6bGG_scrollBody{-webkit-app-region:drag;justify-content:center;overflow-y:auto}.UC6bGG_root[data-phase=settling] .UC6bGG_composerSeat{visibility:hidden}";
 		const tagId$6 = "@deepseek-ai/dsh-client-ui-conversation/ConversationRoot.module.css";
 		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId$6) + "]") === null) {
 			const tag = document.createElement("style");
@@ -6752,30 +6754,37 @@ window.__ModuleLoader__.load({
 		}
 		var ConversationRoot_module_css_default = {
 			"composerStack": "UC6bGG_composerStack",
-			"tab": "UC6bGG_tab",
-			"crumbSeg": "UC6bGG_crumbSeg",
-			"crumbs": "UC6bGG_crumbs",
-			"headerActions": "UC6bGG_headerActions",
-			"crumb": "UC6bGG_crumb",
-			"scrollBody": "UC6bGG_scrollBody",
-			"titleCluster": "UC6bGG_titleCluster",
-			"viewArea": "UC6bGG_viewArea",
-			"composerSeat": "UC6bGG_composerSeat",
-			"composerHero": "UC6bGG_composerHero",
 			"headerHidden": "UC6bGG_headerHidden",
-			"heroWorkspaceRow": "UC6bGG_heroWorkspaceRow",
+			"composerSeat": "UC6bGG_composerSeat",
 			"headerUtilities": "UC6bGG_headerUtilities",
-			"crumbCurrent": "UC6bGG_crumbCurrent",
-			"root": "UC6bGG_root",
-			"titleRow": "UC6bGG_titleRow",
-			"tabActive": "UC6bGG_tabActive",
+			"crumb": "UC6bGG_crumb",
 			"heroGlow": "UC6bGG_heroGlow",
-			"header": "UC6bGG_header",
+			"heroWorkspaceRow": "UC6bGG_heroWorkspaceRow",
+			"tabActive": "UC6bGG_tabActive",
+			"composerHero": "UC6bGG_composerHero",
 			"tabs": "UC6bGG_tabs",
-			"crumbSep": "UC6bGG_crumbSep"
+			"heroWorkspaceArea": "UC6bGG_heroWorkspaceArea",
+			"crumbCurrent": "UC6bGG_crumbCurrent",
+			"scrollBody": "UC6bGG_scrollBody",
+			"titleRow": "UC6bGG_titleRow",
+			"heroWorkspaceError": "UC6bGG_heroWorkspaceError",
+			"titleCluster": "UC6bGG_titleCluster",
+			"header": "UC6bGG_header",
+			"headerActions": "UC6bGG_headerActions",
+			"tab": "UC6bGG_tab",
+			"viewArea": "UC6bGG_viewArea",
+			"crumbSep": "UC6bGG_crumbSep",
+			"crumbSeg": "UC6bGG_crumbSeg",
+			"root": "UC6bGG_root",
+			"crumbs": "UC6bGG_crumbs"
 		};
 		//#endregion
 		//#region packages/client/ui-conversation/src/client/skeleton/ConversationRoot.tsx
+		function workspaceSelectionError(reason) {
+			if (reason instanceof Error) return reason.message;
+			if (typeof reason === "string") return reason;
+			return String(reason);
+		}
 		function ConversationRoot({ sessionId, useSession, useSessions, useWorkspaces, useInput, useComposerBlock, renderSlot, renderSlotChain, selectWorkspace, t }) {
 			const openState = useSession((s) => s.openState);
 			const composerPhase = useSession((s) => s.composerPhase);
@@ -6787,7 +6796,7 @@ window.__ModuleLoader__.load({
 			const workspaces = useWorkspaces((s) => s);
 			const composerBlock = useComposerBlock((block) => block);
 			const [pickerOpen, setPickerOpen] = (0, react.useState)(false);
-			const [pendingWorkspaceId, setPendingWorkspaceId] = (0, react.useState)();
+			const [workspaceSelection, setWorkspaceSelection] = (0, react.useState)();
 			const pickerAnchor = (0, react.useRef)(null);
 			const seatObserver = (0, react.useRef)(null);
 			const seatResizeRef = (0, react.useCallback)((seat) => {
@@ -6801,52 +6810,61 @@ window.__ModuleLoader__.load({
 				seatObserver.current.observe(seat);
 			}, []);
 			const sessionWorkspace = sessionId === void 0 ? void 0 : workspaces.items.find((workspace) => workspace.sessionIds.includes(sessionId));
-			const pendingWorkspace = workspaces.items.find((workspace) => workspace.workspaceId === pendingWorkspaceId);
+			const pendingWorkspace = workspaces.items.find((workspace) => workspace.workspaceId === workspaceSelection?.workspaceId);
 			(0, react.useEffect)(() => {
-				if (pendingWorkspaceId === void 0) return;
-				if (sessionWorkspace?.workspaceId === pendingWorkspaceId || workspaces.phase === "ready" && pendingWorkspace === void 0) setPendingWorkspaceId(void 0);
-			}, [
-				pendingWorkspaceId,
-				sessionWorkspace?.workspaceId,
-				workspaces.phase,
-				pendingWorkspace
-			]);
+				if (workspaceSelection === void 0) return;
+				if (sessionWorkspace?.workspaceId === workspaceSelection.workspaceId) setWorkspaceSelection(void 0);
+			}, [workspaceSelection, sessionWorkspace?.workspaceId]);
 			const settling = sessionId !== void 0 && composerPhase === "blank" && openState === "loading" && summaryBlank !== true;
 			const hero = sessionId === void 0 || composerPhase === "blank" && (openState === "open" || summaryBlank === true);
 			const zone = session === void 0 || inputState === void 0 ? void 0 : {
 				session,
 				input: inputState
 			};
-			const chipTitle = pendingWorkspace?.title ?? (sessionId === void 0 ? void 0 : sessionWorkspace?.title ?? (workspaces.phase === "ready" || cwd === void 0 || cwd === "" ? void 0 : workspaceLabel(cwd)));
+			const chipTitle = pendingWorkspace?.title ?? workspaceSelection?.label ?? (sessionId === void 0 ? void 0 : sessionWorkspace?.title ?? (workspaces.phase === "ready" || cwd === void 0 || cwd === "" ? void 0 : workspaceLabel(cwd)));
 			const heroWorkspaceRow = /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-				className: ConversationRoot_module_css_default.heroWorkspaceRow,
-				children: [
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)(WorkspaceChip, {
-						buttonRef: pickerAnchor,
-						label: chipTitle,
-						menuOpen: pickerOpen,
-						onClick: () => {
-							setPickerOpen((open) => !open);
-						},
-						t
-					}),
-					renderSlot("conversation.hero.workspace", {
-						open: pickerOpen,
-						anchorRef: pickerAnchor,
-						selectedId: pendingWorkspaceId ?? sessionWorkspace?.workspaceId,
-						onPick: (workspaceId) => {
-							setPickerOpen(false);
-							setPendingWorkspaceId(workspaceId);
-							selectWorkspace(workspaceId).catch(() => {
-								setPendingWorkspaceId((current) => current === workspaceId ? void 0 : current);
-							});
-						},
-						onClose: () => {
-							setPickerOpen(false);
-						}
-					}),
-					renderSlot("conversation.hero.agentPreset", {})
-				]
+				className: ConversationRoot_module_css_default.heroWorkspaceArea,
+				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+					className: ConversationRoot_module_css_default.heroWorkspaceRow,
+					children: [
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)(WorkspaceChip, {
+							buttonRef: pickerAnchor,
+							label: chipTitle,
+							menuOpen: pickerOpen,
+							onClick: () => {
+								setPickerOpen((open) => !open);
+							},
+							t
+						}),
+						renderSlot("conversation.hero.workspace", {
+							open: pickerOpen,
+							anchorRef: pickerAnchor,
+							selectedId: workspaceSelection?.workspaceId ?? sessionWorkspace?.workspaceId,
+							onPick: (workspaceId) => {
+								setPickerOpen(false);
+								const picked = workspaces.items.find((workspace) => workspace.workspaceId === workspaceId);
+								setWorkspaceSelection({
+									workspaceId,
+									label: picked === void 0 ? workspaceId : picked.title || workspaceLabel(picked.path)
+								});
+								selectWorkspace(workspaceId).catch((reason) => {
+									setWorkspaceSelection((current) => current?.workspaceId === workspaceId ? {
+										...current,
+										error: workspaceSelectionError(reason)
+									} : current);
+								});
+							},
+							onClose: () => {
+								setPickerOpen(false);
+							}
+						}),
+						renderSlot("conversation.hero.agentPreset", {})
+					]
+				}), workspaceSelection?.error !== void 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+					className: ConversationRoot_module_css_default.heroWorkspaceError,
+					role: "alert",
+					children: t("workspace.selectFailed", { message: workspaceSelection.error })
+				})]
 			});
 			const inert = sessionId === void 0 || hero && chipTitle === void 0;
 			const inputBar = renderSlot("conversation.composer.bar", {
@@ -7031,15 +7049,15 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var DetailsPanel_module_css_default = {
+			"title": "Kyq1qG_title",
 			"body": "Kyq1qG_body",
-			"empty": "Kyq1qG_empty",
 			"root": "Kyq1qG_root",
 			"section": "Kyq1qG_section",
-			"close": "Kyq1qG_close",
-			"code": "Kyq1qG_code",
 			"header": "Kyq1qG_header",
-			"title": "Kyq1qG_title",
-			"sectionLabel": "Kyq1qG_sectionLabel"
+			"sectionLabel": "Kyq1qG_sectionLabel",
+			"code": "Kyq1qG_code",
+			"empty": "Kyq1qG_empty",
+			"close": "Kyq1qG_close"
 		};
 		//#endregion
 		//#region packages/client/ui-conversation/src/client/skeleton/DetailsPanel.tsx
@@ -8892,15 +8910,15 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var ReasoningRow_module_css_default = {
-			"thinkBody": "bhApbG_thinkBody",
-			"separator": "bhApbG_separator",
-			"leading": "bhApbG_leading",
-			"title": "bhApbG_title",
-			"summary": "bhApbG_summary",
-			"chevron": "bhApbG_chevron",
-			"root": "bhApbG_root",
 			"row": "bhApbG_row",
-			"dsh-reasoning-row-sweep": "bhApbG_dsh-reasoning-row-sweep"
+			"leading": "bhApbG_leading",
+			"root": "bhApbG_root",
+			"thinkBody": "bhApbG_thinkBody",
+			"dsh-reasoning-row-sweep": "bhApbG_dsh-reasoning-row-sweep",
+			"chevron": "bhApbG_chevron",
+			"title": "bhApbG_title",
+			"separator": "bhApbG_separator",
+			"summary": "bhApbG_summary"
 		};
 		//#endregion
 		//#region packages/client/ui-conversation/src/client/chat/ReasoningRow.tsx
@@ -8985,8 +9003,8 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var AssistantMarkdown_module_css_default = {
-			"body": "hjvXhW_body",
 			"root": "hjvXhW_root",
+			"body": "hjvXhW_body",
 			"stopped": "hjvXhW_stopped",
 			"actions": "hjvXhW_actions"
 		};
@@ -9101,15 +9119,15 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var GenericCommandCard_module_css_default = {
-			"root": "OLqr_W_root",
-			"summary": "OLqr_W_summary",
-			"body": "OLqr_W_body",
 			"leading": "OLqr_W_leading",
 			"title": "OLqr_W_title",
-			"separator": "OLqr_W_separator",
 			"dsh-command-row-sweep": "OLqr_W_dsh-command-row-sweep",
 			"row": "OLqr_W_row",
-			"chevron": "OLqr_W_chevron"
+			"chevron": "OLqr_W_chevron",
+			"separator": "OLqr_W_separator",
+			"summary": "OLqr_W_summary",
+			"root": "OLqr_W_root",
+			"body": "OLqr_W_body"
 		};
 		//#endregion
 		//#region packages/client/ui-conversation/src/client/chat/GenericCommandCard.tsx
