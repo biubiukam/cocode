@@ -1,4 +1,5 @@
 import type { TuiApp, TuiSnapshot } from '../runtime/app.ts'
+import type { CommandArgumentCompletion } from './command-completion.ts'
 
 /** Wrap a selection index while keeping empty menus at index zero. */
 export function moveSelection(index: number, delta: number, count: number): number {
@@ -81,6 +82,18 @@ export function dispatchComposerTab(app: TuiApp, snapshot: TuiSnapshot): boolean
     return true
   }
   return false
+}
+
+/** Keep argument completions editable when they still require user input. */
+export function dispatchCommandArgumentCompletion(
+  app: TuiApp,
+  item: CommandArgumentCompletion,
+): void {
+  if (item.insert.endsWith(' ')) {
+    app.dispatch({ type: 'setDraft', text: item.insert })
+    return
+  }
+  app.dispatch({ type: 'command', line: item.insert.trimEnd() })
 }
 
 type ComposerShortcutKey = {

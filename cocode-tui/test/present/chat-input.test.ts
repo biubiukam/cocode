@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { TuiApp, TuiSnapshot } from '../../src/runtime/app.ts'
 import {
   dispatchComposerShortcut,
+  dispatchCommandArgumentCompletion,
   dispatchComposerTab,
   dispatchHelpInput,
   dispatchKeyCommand,
@@ -71,6 +72,24 @@ describe('chat input helpers', () => {
     } as TuiSnapshot
     expect(dispatchComposerTab(app, snapshot)).toBe(false)
     expect(dispatch).not.toHaveBeenCalled()
+  })
+
+  it('keeps incomplete argument completions in the draft', () => {
+    const dispatch = vi.fn()
+    const app = { dispatch } as unknown as TuiApp
+
+    dispatchCommandArgumentCompletion(app, { insert: '/vision model ' })
+
+    expect(dispatch).toHaveBeenCalledWith({ type: 'setDraft', text: '/vision model ' })
+  })
+
+  it('executes complete argument completions', () => {
+    const dispatch = vi.fn()
+    const app = { dispatch } as unknown as TuiApp
+
+    dispatchCommandArgumentCompletion(app, { insert: '/vision status' })
+
+    expect(dispatch).toHaveBeenCalledWith({ type: 'command', line: '/vision status' })
   })
 
   it('routes composer selection shortcuts without stealing unselected Ctrl+C', () => {

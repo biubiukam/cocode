@@ -89,6 +89,7 @@ import {
 } from './components/ChecklistStrip.tsx'
 import {
   dispatchComposerShortcut,
+  dispatchCommandArgumentCompletion,
   dispatchComposerTab,
   dispatchHelpInput,
   dispatchKeyCommand,
@@ -619,7 +620,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
         setCommandArgumentIndex(index)
         if (isPress) {
           const item = commandArgumentState.items[index]
-          if (item !== undefined) app.dispatch({ type: 'command', line: item.insert.trimEnd() })
+          if (item !== undefined) dispatchCommandArgumentCompletion(app, item)
         }
       }
       return
@@ -1374,7 +1375,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
         const item = commandArgumentState.items[
           moveSelection(commandArgumentIndex, 0, commandArgumentState.items.length)
         ]
-        if (item !== undefined) app.dispatch({ type: 'command', line: item.insert.trimEnd() })
+        if (item !== undefined) dispatchCommandArgumentCompletion(app, item)
         return
       }
     }
