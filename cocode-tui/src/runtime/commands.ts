@@ -238,6 +238,14 @@ export function createBuiltinCommands(): CommandRegistry {
     },
   })
   registry.register({
+    name: 'permission',
+    summary: 'Choose a runtime permission preset',
+    summaryZh: '选择运行时权限 preset',
+    kind: 'local',
+    available: (caps) => caps.permissionMode,
+    run: (ctx) => ctx.dispatch({ type: 'permission.open' }),
+  })
+  registry.register({
     name: 'permissions',
     summary: 'Cycle runtime permission mode',
     summaryZh: '切换运行时权限模式',

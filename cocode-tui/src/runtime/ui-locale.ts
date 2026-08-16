@@ -36,6 +36,9 @@ type UiKey =
   | 'commandsHint'
   | 'commandsFilter'
   | 'commandsEmpty'
+  | 'commandArgumentsHint'
+  | 'commandArgumentsFilter'
+  | 'commandArgumentsEmpty'
   | 'help'
   | 'helpHint'
   | 'messageMode'
@@ -54,6 +57,11 @@ type UiKey =
   | 'footerQueueDraft'
   | 'footerRedraw'
   | 'footerModel'
+  | 'quitTitle'
+  | 'quitConfirm'
+  | 'quitCancel'
+  | 'quitHint'
+  | 'farewell'
   | 'agentIdle'
   | 'agentRunning'
   | 'agentThinking'
@@ -221,6 +229,11 @@ type UiKey =
   | 'approvalUnavailableValue'
   | 'permissionUnavailable'
   | 'permissionChanged'
+  | 'permissionTitle'
+  | 'permissionHint'
+  | 'permissionCurrent'
+  | 'permissionEmpty'
+  | 'permissionApplying'
   | 'planUnavailable'
   | 'planEnabled'
   | 'planDisabled'
@@ -260,6 +273,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     usageTotals: 'session total {input} in · {output} out',
     secret: 'secret',
     prompt: 'prompt',
+    runtimeContextDetail: 'press Enter to view details',
     locked: 'locked',
     send: 'enter to send',
     attached: 'attached',
@@ -279,9 +293,12 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     filesHint: 'tab / ↑↓ select',
     filesSearching: ' searching workspace…',
     commands: 'commands',
-    commandsHint: '↑↓ select · enter use · esc close',
+    commandsHint: '↑↓ select · tab complete · enter use · esc close',
     commandsFilter: 'type to filter',
     commandsEmpty: 'No matching commands',
+    commandArgumentsHint: '↑↓ select · tab complete · enter use · esc close',
+    commandArgumentsFilter: 'argument to complete',
+    commandArgumentsEmpty: 'No matching argument choices',
     help: 'help',
     helpHint: 'esc close',
     messageMode: 'message mode',
@@ -300,6 +317,11 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     footerQueueDraft: 'tab queue draft',
     footerRedraw: 'redraw: /redraw',
     footerModel: 'ctrl+l model',
+    quitTitle: 'Are you sure you want to quit?',
+    quitConfirm: 'Enter · Yep!',
+    quitCancel: 'Esc · Nope',
+    quitHint: '←→ switch · Enter confirm · Esc cancel · Ctrl+C twice exits',
+    farewell: 'Thanks for using Cocode!',
     agentIdle: 'ready',
     agentRunning: 'running',
     agentThinking: 'thinking…',
@@ -467,6 +489,11 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     approvalUnavailableValue: 'unavailable',
     permissionUnavailable: 'Permission modes are unavailable in this runtime.',
     permissionChanged: 'Permission mode: {mode}',
+    permissionTitle: 'Permission preset',
+    permissionHint: '↑↓ select · enter apply · esc close',
+    permissionCurrent: 'current: {mode}',
+    permissionEmpty: 'No permission presets are available.',
+    permissionApplying: 'Applying permission preset…',
     planUnavailable: 'Plan mode is unavailable in this runtime.',
     planEnabled: 'Plan mode enabled.',
     planDisabled: 'Plan mode disabled.',
@@ -505,6 +532,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     usageTotals: '会话累计输入 {input} · 输出 {output}',
     secret: '密钥',
     prompt: '输入',
+    runtimeContextDetail: '按回车查看详情',
     locked: '已锁定',
     send: '回车发送',
     attached: '已附加',
@@ -524,9 +552,12 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     filesHint: 'Tab / ↑↓ 选择',
     filesSearching: ' 正在搜索工作区…',
     commands: '命令',
-    commandsHint: '↑↓ 选择 · 回车使用 · Esc 关闭',
+    commandsHint: '↑↓ 选择 · Tab 补全 · 回车使用 · Esc 关闭',
     commandsFilter: '输入关键词筛选',
     commandsEmpty: '没有匹配的命令',
+    commandArgumentsHint: '↑↓ 选择 · Tab 补全 · 回车执行 · Esc 关闭',
+    commandArgumentsFilter: '输入参数进行补全',
+    commandArgumentsEmpty: '没有匹配的参数选项',
     help: '帮助',
     helpHint: 'Esc 关闭',
     messageMode: '消息模式',
@@ -545,6 +576,11 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     footerQueueDraft: '按 Tab 加入队列',
     footerRedraw: '重绘：/redraw',
     footerModel: 'Ctrl+L 模型',
+    quitTitle: '确定要退出吗？',
+    quitConfirm: '回车 · 确认',
+    quitCancel: 'Esc · 取消',
+    quitHint: '←→ 切换 · 回车确认 · Esc 取消 · 再按 Ctrl+C 直接退出',
+    farewell: '感谢使用 Cocode！',
     agentIdle: '就绪',
     agentRunning: '运行中',
     agentThinking: '思考中…',
@@ -712,6 +748,11 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     approvalUnavailableValue: '不可用',
     permissionUnavailable: '当前运行时不支持权限模式。',
     permissionChanged: '权限模式：{mode}',
+    permissionTitle: '权限 preset',
+    permissionHint: '↑↓ 选择 · 回车应用 · Esc 关闭',
+    permissionCurrent: '当前：{mode}',
+    permissionEmpty: '当前没有可用的权限 preset。',
+    permissionApplying: '正在应用权限 preset…',
     planUnavailable: '当前运行时不支持计划模式。',
     planEnabled: '已启用计划模式。',
     planDisabled: '已关闭计划模式。',

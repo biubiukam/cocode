@@ -8,6 +8,7 @@ export function handleInterrupt(options: {
   close: () => void
   setHelpOpen: (open: boolean) => void
   setArmed: (armed: boolean) => void
+  armQuit?: () => void
   notice: (message: string) => void
   emit: () => void
   cancel?: () => Promise<boolean>
@@ -72,7 +73,8 @@ export function handleInterrupt(options: {
   }
   if (!options.armed) {
     options.setArmed(true)
-    options.notice('Press again to quit.')
+    if (options.armQuit !== undefined) options.armQuit()
+    else options.notice('Press again to quit.')
     options.emit()
     return
   }

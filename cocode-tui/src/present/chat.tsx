@@ -29,6 +29,7 @@ import {
 import { SkillsPicker } from './components/SkillsPicker.tsx'
 import { PluginsPicker } from './components/PluginsPicker.tsx'
 import { CommandArgumentMenu } from './components/CommandArgumentMenu.tsx'
+import { PermissionPicker } from './components/PermissionPicker.tsx'
 import {
   noticeRows,
   StatusLine,
@@ -68,6 +69,7 @@ import {
 import { REWIND_WINDOW_SIZE } from '../runtime/rewind-picker.ts'
 import { SKILLS_WINDOW_SIZE, visibleSkills } from '../runtime/skills-picker.ts'
 import { PLUGIN_PICKER_WINDOW_SIZE, visiblePlugins } from '../runtime/plugin-picker.ts'
+import { PERMISSION_PICKER_WINDOW_SIZE } from '../runtime/permission-picker.ts'
 import { MODEL_PICKER_WINDOW_SIZE, visibleModelItems } from '../runtime/model-picker.ts'
 import { editDraft } from '../runtime/external-editor.ts'
 import { listWindowStart } from './list-window.ts'
@@ -82,6 +84,7 @@ import { ReviewPicker } from './components/ReviewPicker.tsx'
 import { ApprovalPanel } from './components/ApprovalPanel.tsx'
 import { QueuePicker } from './components/QueuePicker.tsx'
 import { ChecklistPanel } from './components/ChecklistPanel.tsx'
+import { QuitConfirmation } from './components/QuitConfirmation.tsx'
 import {
   ChecklistStrip,
   CHECKLIST_STRIP_MAX_ITEMS,
@@ -177,6 +180,8 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
   const modelPickerOpen = snap.modelPicker?.open === true
   const modelInputOpen = snap.modelInputOpen
   const modelOverlayOpen = modelPickerOpen || modelInputOpen
+  const quitConfirmationOpen = snap.quitConfirmation
+  const permissionOpen = snap.permissionPicker?.open === true
   const questionOpen = snap.question !== undefined
   const approvalOpen = snap.approval?.open === true
   const reviewOpen = snap.reviewPicker?.open === true
@@ -188,6 +193,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     !rewindOpen &&
     !skillsOpen &&
     !pluginOpen &&
+    !permissionOpen &&
     !resumeOpen &&
     !sessionTreeOpen &&
     !queueOpen &&
@@ -197,6 +203,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     !messageActionMenuOpen &&
     !modelOverlayOpen &&
     !snap.helpOpen &&
+    !quitConfirmationOpen &&
     !slashDismissed &&
     isSlashDraft(snap.composer.text)
   const commandArgumentOpen =
@@ -207,6 +214,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     !rewindOpen &&
     !skillsOpen &&
     !pluginOpen &&
+    !permissionOpen &&
     !resumeOpen &&
     !sessionTreeOpen &&
     !queueOpen &&
@@ -216,6 +224,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     !messageActionMenuOpen &&
     !modelOverlayOpen &&
     !snap.helpOpen &&
+    !quitConfirmationOpen &&
     !slashOpen &&
     !commandArgumentDismissed &&
     commandArgumentState !== undefined
@@ -231,6 +240,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     !rewindOpen &&
     !skillsOpen &&
     !pluginOpen &&
+    !permissionOpen &&
     !resumeOpen &&
     !sessionTreeOpen &&
     !queueOpen &&
@@ -240,6 +250,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     !messageActionMenuOpen &&
     !modelOverlayOpen &&
     !snap.helpOpen &&
+    !quitConfirmationOpen &&
     !slashOpen &&
     !commandArgumentOpen &&
     !fileDismissed &&
@@ -365,6 +376,8 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     pluginItems: pluginOpen && pluginState !== undefined ? visiblePlugins(pluginState).length : undefined,
     pluginSelected: pluginOpen ? pluginState?.selected : undefined,
     pluginStatus: pluginOpen && pluginState?.status !== undefined,
+    permissionItems: permissionOpen ? snap.permissionPicker?.modes.length : undefined,
+    permissionSelected: permissionOpen ? snap.permissionPicker?.selected : undefined,
       questionRows:
         snap.question === undefined
           ? undefined
@@ -376,6 +389,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     actionMenuItems: commandPaletteOpen ? 0 : actionMenuItems.length > 0 ? actionMenuItems.length : undefined,
     actionMenuQuery: commandPaletteOpen,
     modelSwitchRows: modelPickerOpen ? 14 : modelInputOpen ? 6 : undefined,
+    quitConfirmation: quitConfirmationOpen,
   })
   const messageMaxRows = layout.messageRows
   const statusRows = 2 + noticeRowCount + Number(hasStatusDetails(snap.status))
@@ -470,6 +484,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
   }
 
   const handleMouseEvent = (event: TuiMouseEvent): void => {
+    if (quitConfirmationOpen) return
     if (inspectorResize.handleMouseEvent(event)) return
     const insideInspector = wideInspector && event.x >= inspectorLayout.startColumn
     if (insideInspector) {
@@ -495,6 +510,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
         forkOpen ||
         skillsOpen ||
         pluginOpen ||
+        permissionOpen ||
         commandArgumentOpen ||
         resumeOpen ||
         sessionTreeOpen ||
@@ -532,6 +548,28 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
       if (index !== undefined) {
         app.dispatch({ type: 'model.move', delta: index - snap.modelPicker.selected })
         if (event.action === 'press') app.dispatch({ type: 'model.confirm' })
+      }
+      return
+    }
+    if (permissionOpen && snap.permissionPicker !== undefined) {
+      if (!insidePopup || event.button !== 0) return
+      const state = snap.permissionPicker
+      const windowSize = pickerWindowSize(
+        layout.overlayRows,
+        PERMISSION_PICKER_WINDOW_SIZE,
+        6,
+      )
+      const start = listWindowStart(state.selected, state.modes.length, windowSize)
+      const index = listItemIndexAtRow({
+        row: hitRow,
+        itemStartRow: popupStartRow + 3 + Number(start > 0),
+        itemCount: state.modes.length,
+        selectedIndex: state.selected,
+        windowSize,
+      })
+      if (index !== undefined) {
+        app.dispatch({ type: 'permission.move', delta: index - state.selected })
+        if (event.action === 'press') app.dispatch({ type: 'permission.confirm' })
       }
       return
     }
@@ -770,6 +808,21 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
       }
       return
     }
+    if (permissionOpen && snap.permissionPicker !== undefined) {
+      if (key.escape) {
+        app.dispatch({ type: 'permission.close' })
+        return
+      }
+      if (key.upArrow || key.downArrow) {
+        app.dispatch({ type: 'permission.move', delta: key.upArrow ? -1 : 1 })
+        return
+      }
+      if (key.return) {
+        app.dispatch({ type: 'permission.confirm' })
+        return
+      }
+      return
+    }
     if (rewindOpen && rewindState !== undefined) {
       const windowSize = pickerWindowSize(layout.overlayRows, REWIND_WINDOW_SIZE, 6)
       const start = listWindowStart(rewindState.selected, rewindState.items.length, windowSize)
@@ -950,6 +1003,15 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
   useInput((input, key) => {
     if (editorBusy) return
     if (isMouseInput(input)) return
+    if (quitConfirmationOpen) {
+      if (key.ctrl && input === 'c') app.dispatch({ type: 'interruptOrQuit' })
+      else if (key.return) app.dispatch({ type: 'quit.confirm' })
+      else if (key.escape) app.dispatch({ type: 'quit.cancel' })
+      else if (key.leftArrow || key.rightArrow) {
+        app.dispatch({ type: 'quit.move', delta: key.leftArrow ? -1 : 1 })
+      }
+      return
+    }
     if (pluginOpen && pluginState !== undefined) {
       if (key.escape) {
         app.dispatch({ type: 'plugins.close' })
@@ -995,6 +1057,21 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
       return
     }
     if (modelInputOpen) return
+    if (permissionOpen) {
+      if (key.escape) {
+        app.dispatch({ type: 'permission.close' })
+        return
+      }
+      if (key.upArrow || key.downArrow) {
+        app.dispatch({ type: 'permission.move', delta: key.upArrow ? -1 : 1 })
+        return
+      }
+      if (key.return) {
+        app.dispatch({ type: 'permission.confirm' })
+        return
+      }
+      return
+    }
     if (snap.helpOpen) {
       dispatchHelpInput(app, input, key)
       return
@@ -1047,6 +1124,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
       !forkOpen &&
       !skillsOpen &&
       !pluginOpen &&
+      !permissionOpen &&
       !resumeOpen &&
       !sessionTreeOpen &&
       !queueOpen &&
@@ -1540,7 +1618,14 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     )
   }
 
-  const overlays = (
+  const overlays = quitConfirmationOpen ? (
+    <QuitConfirmation
+      locale={snap.locale}
+      maxRows={layout.overlayRows}
+      maxColumns={mainColumns}
+      selection={snap.quitConfirmationSelection}
+    />
+  ) : (
     <>
       {slashOpen ? (
         <SlashMenu
@@ -1618,6 +1703,13 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
       ) : null}
       {pluginOpen && pluginState !== undefined ? (
         <PluginsPicker state={pluginState} locale={snap.locale} maxRows={layout.overlayRows} />
+      ) : null}
+      {permissionOpen && snap.permissionPicker !== undefined ? (
+        <PermissionPicker
+          state={snap.permissionPicker}
+          locale={snap.locale}
+          maxRows={layout.overlayRows}
+        />
       ) : null}
       {modelPickerOpen && snap.modelPicker !== undefined ? (
         <ModelPicker

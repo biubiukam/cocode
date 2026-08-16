@@ -4,6 +4,7 @@ import { RESUME_WINDOW_SIZE } from '../runtime/resume-picker.ts'
 import { REWIND_WINDOW_SIZE } from '../runtime/rewind-picker.ts'
 import { SKILLS_WINDOW_SIZE } from '../runtime/skills-picker.ts'
 import { PLUGIN_PICKER_WINDOW_SIZE } from '../runtime/plugin-picker.ts'
+import { PERMISSION_PICKER_WINDOW_SIZE } from '../runtime/permission-picker.ts'
 import { CHECKLIST_WINDOW_SIZE } from '../runtime/checklist.ts'
 import { listWindowStart } from './list-window.ts'
 
@@ -44,12 +45,15 @@ export type ChatLayoutInput = {
   pluginItems?: number
   pluginSelected?: number
   pluginStatus?: boolean
+  permissionItems?: number
+  permissionSelected?: number
   questionRows?: number
   approvalRows?: number
   reviewRows?: number
   actionMenuItems?: number
   actionMenuQuery?: boolean
   modelSwitchRows?: number
+  quitConfirmation?: boolean
 }
 
 export type ChatLayout = {
@@ -87,11 +91,13 @@ export function calculateChatLayout(input: ChatLayoutInput): ChatLayout {
     rewindRows(input.rewindItems, input.rewindSelected, input.rewindConfirming) +
     skillsRows(input.skillsItems, input.skillsSelected) +
     pluginRows(input.pluginItems, input.pluginSelected, input.pluginStatus) +
+    permissionRows(input.permissionItems, input.permissionSelected) +
     questionRows(input.questionRows) +
     questionRows(input.approvalRows) +
     reviewRows(input.reviewRows) +
     actionMenuRows(input.actionMenuItems, input.actionMenuQuery) +
-    modelSwitchRows(input.modelSwitchRows)
+    modelSwitchRows(input.modelSwitchRows) +
+    (input.quitConfirmation === true ? 7 : 0)
   const availableRows = Math.max(0, viewportRows - baseRows)
   const minimumOverlayRows = minimumOverlayHeight(input)
   const minimumRows =
@@ -155,6 +161,7 @@ function minimumOverlayHeight(input: ChatLayoutInput): number {
   if (input.rewindItems !== undefined) return MIN_REWIND_OVERLAY_ROWS
   if (input.skillsItems !== undefined) return MIN_OVERLAY_ROWS
   if (input.pluginItems !== undefined) return MIN_OVERLAY_ROWS
+  if (input.permissionItems !== undefined) return MIN_OVERLAY_ROWS
   if (input.questionRows !== undefined) return MIN_OVERLAY_ROWS
   if (input.approvalRows !== undefined) return MIN_OVERLAY_ROWS
   if (input.reviewRows !== undefined) return MIN_OVERLAY_ROWS
@@ -213,6 +220,15 @@ function pluginRows(items: number | undefined, selected = 0, status = false): nu
   const start = listWindowStart(selected, count, PLUGIN_PICKER_WINDOW_SIZE)
   const indicators = optionalRow(start > 0) + optionalRow(count - start - visible > 0)
   return visible + indicators + 6 + optionalRow(status)
+}
+
+function permissionRows(items: number | undefined, selected = 0): number {
+  if (items === undefined) return 0
+  const count = nonNegativeInteger(items)
+  const visible = Math.max(1, Math.min(count, PERMISSION_PICKER_WINDOW_SIZE))
+  const start = listWindowStart(selected, count, PERMISSION_PICKER_WINDOW_SIZE)
+  const indicators = optionalRow(start > 0) + optionalRow(count - start - visible > 0)
+  return visible + indicators + 6
 }
 
 function questionRows(rows: number | undefined): number {

@@ -104,6 +104,16 @@ import {
   type ModelPickerState,
 } from './model-picker.ts'
 import {
+  beginPermissionChange,
+  closePermissionPicker,
+  completePermissionChange,
+  createPermissionPicker,
+  failPermissionChange,
+  movePermissionSelection,
+  selectedPermissionMode,
+  type PermissionPickerState,
+} from './permission-picker.ts'
+import {
   logoutChannel,
   requestChannelSwitch,
   submitCapturedByok,
@@ -189,6 +199,9 @@ export type TuiAction =
   | { type: 'session.open' }
   | { type: 'file.open' }
   | { type: 'quit' }
+  | { type: 'quit.move'; delta: number }
+  | { type: 'quit.confirm' }
+  | { type: 'quit.cancel' }
   | { type: 'redraw' }
   | { type: 'resume.setQuery'; query: string }
   | { type: 'resume.move'; delta: number }
@@ -233,6 +246,10 @@ export type TuiAction =
   | { type: 'question.cancel' }
   | { type: 'approval.answer'; outcome: TuiApprovalAnswer['outcome'] }
   | { type: 'approval.cancel' }
+  | { type: 'permission.open' }
+  | { type: 'permission.move'; delta: number }
+  | { type: 'permission.close' }
+  | { type: 'permission.confirm' }
   | { type: 'permission.toggle' }
   | { type: 'plan.toggle' }
   | { type: 'queuePrompt' }
@@ -307,8 +324,14 @@ export type TuiSnapshot = {
     capabilities: readonly { name: TuiDisplayedCapabilityName; enabled: boolean }[]
   }
   notice?: { tone: 'info' | 'error'; message: string }
+  quitConfirmation: boolean
+  quitConfirmationSelection: 'confirm' | 'cancel'
   helpText: string
-  commands: readonly { name: string; summary: string }[]
+  commands: readonly {
+    name: string
+    summary: string
+    input?: { hint: string }
+  }[]
   resumePicker?: ResumePickerState
   sessionTreePicker?: SessionTreePickerState
   rewindPicker?: RewindPickerState
@@ -316,6 +339,7 @@ export type TuiSnapshot = {
   skillsPicker?: SkillsPickerState
   pluginPicker?: PluginPickerState
   modelPicker?: ModelPickerState
+  permissionPicker?: PermissionPickerState
   modelInputOpen: boolean
   skills: readonly SkillEntry[]
   question?: TuiQuestionSnapshot
@@ -447,6 +471,8 @@ class TuiAppImpl implements TuiApp {
   private notice: TuiSnapshot['notice']
   private runtimeFailureNotice: string | undefined
   private interruptArmed = false
+  private quitConfirmation = false
+  private quitConfirmationSelection: TuiSnapshot['quitConfirmationSelection'] = 'confirm'
   private exiting = false
   private runtimeName = ''
   private initError: string | undefined
@@ -475,6 +501,7 @@ class TuiAppImpl implements TuiApp {
   private skillsPicker: SkillsPickerState | undefined
   private pluginPicker: PluginPickerState | undefined
   private modelPicker: ModelPickerState | undefined
+  private permissionPicker: PermissionPickerState | undefined
   private modelInputOpen = false
   private skills: SkillEntry[] = []
   private remoteCommands: TuiCommandDescriptor[] = []
@@ -690,6 +717,8 @@ class TuiAppImpl implements TuiApp {
         ),
       },
       notice: this.notice,
+      quitConfirmation: this.quitConfirmation,
+      quitConfirmationSelection: this.quitConfirmationSelection,
       helpText: helpText(
         this.capabilities,
         this.commands,
@@ -700,6 +729,7 @@ class TuiAppImpl implements TuiApp {
       commands: this.visibleCommands().map((command) => ({
         name: command.name,
         summary: commandSummary(command, this.locale),
+        ...(command.input === undefined ? {} : { input: command.input }),
       })),
       resumePicker: this.resumePicker,
       sessionTreePicker: this.sessionTreePicker,
@@ -708,6 +738,7 @@ class TuiAppImpl implements TuiApp {
       skillsPicker: this.skillsPicker,
       pluginPicker: this.pluginPicker,
       modelPicker: this.modelPicker,
+      permissionPicker: this.permissionPicker,
       modelInputOpen: this.modelInputOpen,
       skills: this.skills,
       question: this.questions.snapshot(),
@@ -728,6 +759,15 @@ class TuiAppImpl implements TuiApp {
   }
 
   dispatch = (action: TuiAction): void => {
+    if (
+      action.type !== 'interruptOrQuit' &&
+      action.type !== 'quit.move' &&
+      action.type !== 'quit.confirm' &&
+      action.type !== 'quit.cancel'
+    ) {
+      this.quitConfirmation = false
+      this.quitConfirmationSelection = 'confirm'
+    }
     switch (action.type) {
       case 'setDraft':
         this.draft = replaceDraft(this.draft, action.text)
@@ -842,6 +882,19 @@ class TuiAppImpl implements TuiApp {
         return
       case 'quit':
         this.beginQuit()
+        return
+      case 'quit.move':
+        if (!this.quitConfirmation) return
+        this.quitConfirmationSelection = action.delta < 0 ? 'confirm' : 'cancel'
+        this.emit()
+        return
+      case 'quit.confirm':
+        if (!this.quitConfirmation) return
+        if (this.quitConfirmationSelection === 'confirm') this.beginQuit()
+        else this.cancelQuitConfirmation()
+        return
+      case 'quit.cancel':
+        this.cancelQuitConfirmation()
         return
       case 'redraw':
         this.emit()
@@ -1065,6 +1118,24 @@ class TuiAppImpl implements TuiApp {
       case 'approval.cancel':
         this.answerApproval('cancelled')
         return
+      case 'permission.open':
+        void this.openPermissionPicker()
+        return
+      case 'permission.move':
+        if (this.permissionPicker !== undefined) {
+          this.permissionPicker = movePermissionSelection(this.permissionPicker, action.delta)
+          this.emit()
+        }
+        return
+      case 'permission.close':
+        if (this.permissionPicker !== undefined) {
+          this.permissionPicker = closePermissionPicker(this.permissionPicker)
+          this.emit()
+        }
+        return
+      case 'permission.confirm':
+        void this.confirmPermissionPicker()
+        return
       case 'permission.toggle':
         void this.togglePermissionMode()
         return
@@ -1137,6 +1208,10 @@ class TuiAppImpl implements TuiApp {
   }
 
   private interruptOrQuit(): void {
+    if (this.quitConfirmation) {
+      this.beginQuit()
+      return
+    }
     handleInterrupt({
       helpOpen: this.helpOpen,
       agentRunning: this.agent === 'running',
@@ -1148,6 +1223,11 @@ class TuiAppImpl implements TuiApp {
       },
       setArmed: (armed) => {
         this.interruptArmed = armed
+      },
+      armQuit: () => {
+        this.quitConfirmation = true
+        this.quitConfirmationSelection = 'confirm'
+        this.notice = undefined
       },
       notice: (message) => {
         this.notice = { tone: 'info', message }
@@ -1971,6 +2051,66 @@ class TuiAppImpl implements TuiApp {
     this.emit()
   }
 
+  private async openPermissionPicker(): Promise<void> {
+    if (!this.capabilities.permissionMode || this.runtime.permissionMode === undefined) {
+      this.notice = { tone: 'info', message: text(this.locale, 'permissionUnavailable') }
+      this.emit()
+      return
+    }
+    if (this.agent === 'starting') {
+      this.notice = { tone: 'info', message: text(this.locale, 'sessionChanging') }
+      this.emit()
+      return
+    }
+    try {
+      const result = await this.runtime.permissionMode(this.sessionId)
+      this.permissionMode = result.mode
+      this.supportedPermissionModes = result.supportedModes
+      this.permissionPicker = createPermissionPicker(result.supportedModes, result.mode)
+      this.notice = undefined
+    } catch (error) {
+      this.notice = {
+        tone: 'error',
+        message: `${text(this.locale, 'permissionUnavailable')}: ${errorMessage(error)}`,
+      }
+    }
+    this.emit()
+  }
+
+  private async confirmPermissionPicker(): Promise<void> {
+    const picker = this.permissionPicker
+    if (picker === undefined || picker.pending !== undefined) return
+    const mode = selectedPermissionMode(picker)
+    if (mode === undefined || this.runtime.permissionMode === undefined) return
+    if (mode === picker.current) {
+      this.permissionPicker = closePermissionPicker(picker)
+      this.emit()
+      return
+    }
+    this.permissionPicker = beginPermissionChange(picker, mode)
+    this.emit()
+    try {
+      const result = await this.runtime.permissionMode(this.sessionId, mode)
+      this.permissionMode = result.mode
+      this.supportedPermissionModes =
+        result.supportedModes.length > 0 ? result.supportedModes : this.supportedPermissionModes
+      this.permissionPicker = closePermissionPicker(
+        completePermissionChange(this.permissionPicker ?? picker, result.mode),
+      )
+      this.notice = {
+        tone: 'info',
+        message: text(this.locale, 'permissionChanged', { mode: this.permissionMode }),
+      }
+    } catch (error) {
+      this.permissionPicker = failPermissionChange(this.permissionPicker ?? picker)
+      this.notice = {
+        tone: 'error',
+        message: `${text(this.locale, 'permissionUnavailable')}: ${errorMessage(error)}`,
+      }
+    }
+    this.emit()
+  }
+
   private async refreshPermissionMode(): Promise<void> {
     if (!this.capabilities.permissionMode || this.runtime.permissionMode === undefined) return
     try {
@@ -2686,6 +2826,7 @@ class TuiAppImpl implements TuiApp {
       .map((command) => ({
         name: command.name,
         summary: command.description,
+        ...(command.input === undefined ? {} : { input: command.input }),
         kind: 'prompt-text' as const,
         available: () => true,
         run: () => undefined,
@@ -2793,6 +2934,7 @@ class TuiAppImpl implements TuiApp {
   private resetSessionControls(): void {
     this.permissionMode = 'manual'
     this.supportedPermissionModes = ['manual']
+    this.permissionPicker = undefined
     this.planMode = false
     this.checklist = undefined
   }
@@ -2803,9 +2945,21 @@ class TuiAppImpl implements TuiApp {
 
   private beginQuit(): void {
     if (this.exiting) return
+    this.quitConfirmation = false
+    this.quitConfirmationSelection = 'confirm'
+    this.interruptArmed = false
     this.exiting = true
     this.emit()
     void this.close().catch(() => undefined)
+  }
+
+  private cancelQuitConfirmation(): void {
+    if (!this.quitConfirmation) return
+    this.quitConfirmation = false
+    this.quitConfirmationSelection = 'confirm'
+    this.interruptArmed = false
+    this.notice = undefined
+    this.emit()
   }
 
   private emit(): void {

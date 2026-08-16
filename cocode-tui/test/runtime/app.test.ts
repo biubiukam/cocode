@@ -661,6 +661,115 @@ describe('TuiApp', () => {
     ])
   })
 
+  it('opens an interactive permission preset picker', async () => {
+    const runtime = fakeRuntime() as TuiRuntime & {
+      permissionMode(
+        sessionId: string,
+        mode?: string,
+      ): Promise<{ mode: string; supportedModes: string[] }>
+    }
+    let currentMode = 'manual'
+    runtime.permissionMode = async (_sessionId, mode) => {
+      if (mode !== undefined) currentMode = mode
+      return { mode: currentMode, supportedModes: ['manual', 'workspace-write', 'allow-all'] }
+    }
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+      capabilities: { ...P0_CAPABILITIES, permissionMode: true },
+    })
+    await app.start()
+
+    expect(app.snapshot().commands).toContainEqual({
+      name: 'permissions',
+      summary: 'Cycle runtime permission mode',
+    })
+
+    app.dispatch({ type: 'command', line: '/permission' })
+    await expect.poll(() => app.snapshot().permissionPicker?.open).toBe(true)
+    expect(app.snapshot().permissionPicker).toMatchObject({
+      modes: ['manual', 'workspace-write', 'allow-all'],
+      current: 'manual',
+      selected: 0,
+    })
+    expect(runtime.executedCommands).toEqual([])
+
+    app.dispatch({ type: 'permission.move', delta: 1 })
+    expect(app.snapshot().permissionPicker?.selected).toBe(1)
+    app.dispatch({ type: 'permission.confirm' })
+    await expect.poll(() => app.snapshot().permissionPicker?.open).toBe(false)
+    expect(app.snapshot().status.permissionMode).toBe('workspace-write')
+    expect(app.snapshot().notice?.message).toContain('workspace-write')
+    expect(runtime.executedCommands).toEqual([])
+  })
+
+  it('keeps the remote permission command as a fallback without the local capability', async () => {
+    const runtime = fakeRuntime()
+    runtime.commands = [
+      {
+        name: 'permission',
+        description: 'Switch the permission preset',
+        input: { hint: '<preset>' },
+      },
+    ]
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+    })
+    await app.start()
+
+    expect(app.snapshot().commands).toContainEqual({
+      name: 'permission',
+      summary: 'Switch the permission preset',
+      input: { hint: '<preset>' },
+    })
+    app.dispatch({ type: 'command', line: '/permission' })
+    expect(app.snapshot().composer.text).toBe('/permission ')
+    expect(runtime.executedCommands).toEqual([])
+    app.dispatch({ type: 'submit', text: '/permission workspace-write' })
+    await expect.poll(() => runtime.executedCommands).toEqual([
+      { sessionId: 's1', line: '/permission workspace-write' },
+    ])
+  })
+
+  it('keeps the permission picker open when applying a preset fails', async () => {
+    const runtime = fakeRuntime() as TuiRuntime & {
+      permissionMode(
+        sessionId: string,
+        mode?: string,
+      ): Promise<{ mode: string; supportedModes: string[] }>
+    }
+    runtime.permissionMode = async (_sessionId, mode) => {
+      if (mode === 'allow-all') throw new Error('preset rejected')
+      return { mode: 'manual', supportedModes: ['manual', 'allow-all'] }
+    }
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+      capabilities: { ...P0_CAPABILITIES, permissionMode: true },
+    })
+    await app.start()
+
+    app.dispatch({ type: 'command', line: '/permission' })
+    await expect.poll(() => app.snapshot().permissionPicker?.open).toBe(true)
+    app.dispatch({ type: 'permission.move', delta: 1 })
+    app.dispatch({ type: 'permission.confirm' })
+
+    await expect.poll(() => app.snapshot().permissionPicker?.pending).toBeUndefined()
+    expect(app.snapshot().permissionPicker?.open).toBe(true)
+    expect(app.snapshot().notice).toMatchObject({ tone: 'error' })
+    expect(app.snapshot().notice?.message).toContain('preset rejected')
+  })
+
   it('keeps a skill draft while another turn is running', async () => {
     const runtime = fakeRuntime() as TuiRuntime & {
       listSkills(sessionId: string): Promise<{ name: string; description: string }[]>
@@ -1681,8 +1790,39 @@ describe('TuiApp', () => {
     await app.start()
     app.dispatch({ type: 'interruptOrQuit' })
     expect(app.snapshot().exiting).toBe(false)
-    expect(app.snapshot().notice?.message).toMatch(/Press again/)
+    expect(app.snapshot().quitConfirmation).toBe(true)
+    expect(app.snapshot().notice).toBeUndefined()
+    app.dispatch({ type: 'quit.cancel' })
+    expect(app.snapshot().quitConfirmation).toBe(false)
+    expect(app.snapshot().exiting).toBe(false)
     app.dispatch({ type: 'interruptOrQuit' })
+    expect(app.snapshot().quitConfirmation).toBe(true)
+    app.dispatch({ type: 'interruptOrQuit' })
+    expect(app.snapshot().exiting).toBe(true)
+  })
+
+  it('confirms an idle Ctrl+C quit through the confirmation action', async () => {
+    const app = createTuiApp({
+      runtime: fakeRuntime(),
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+    })
+    await app.start()
+
+    app.dispatch({ type: 'interruptOrQuit' })
+    expect(app.snapshot().quitConfirmation).toBe(true)
+    expect(app.snapshot().quitConfirmationSelection).toBe('confirm')
+    app.dispatch({ type: 'quit.move', delta: 1 })
+    expect(app.snapshot().quitConfirmationSelection).toBe('cancel')
+    app.dispatch({ type: 'quit.confirm' })
+    expect(app.snapshot().quitConfirmation).toBe(false)
+    expect(app.snapshot().exiting).toBe(false)
+
+    app.dispatch({ type: 'interruptOrQuit' })
+    app.dispatch({ type: 'quit.move', delta: -1 })
+    app.dispatch({ type: 'quit.confirm' })
     expect(app.snapshot().exiting).toBe(true)
   })
 

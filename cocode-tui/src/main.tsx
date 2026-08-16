@@ -25,8 +25,9 @@ import {
 import { AuthGate } from './present/auth-gate.tsx'
 import { Chat } from './present/chat.tsx'
 import { clearViewport, enterScreen, parseScreenMode } from './present/clear-screen.ts'
-import { resolveUiLocale } from './runtime/ui-locale.ts'
+import { resolveUiLocale, text } from './runtime/ui-locale.ts'
 import { detectTerminalEnvironment } from './runtime/platform.ts'
+import { terminalBrandMark } from './present/terminal-farewell.ts'
 
 loadDotenv(resolve(process.cwd(), '.env'))
 
@@ -118,6 +119,7 @@ async function main(): Promise<void> {
   clearViewport()
   const screen = render(<Chat app={app} mouseSupported={terminal.supportsMouse} />)
   let exitStarted = false
+  let appReady = false
   const finish = async (): Promise<void> => {
     if (exitStarted) return
     exitStarted = true
@@ -129,6 +131,11 @@ async function main(): Promise<void> {
     process.off('SIGHUP', onTerminate)
     await screen.unmount()
     leaveScreen()
+    if (appReady) {
+      process.stdout.write(
+        `\n${terminalBrandMark()}\n\n${text(app.snapshot().locale, 'farewell')}\n`,
+      )
+    }
     try {
       await releaseLiveInstance(resolved.dshHome)
       await app.close()
@@ -163,6 +170,7 @@ async function main(): Promise<void> {
     await finish()
     return
   }
+  appReady = true
   if (app.snapshot().exiting) await finish()
   else {
     await new Promise<void>(() => {
