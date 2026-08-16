@@ -2097,179 +2097,179 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var sidebar_module_css_default = {
-			"producedChip": "F5DBzq_producedChip",
-			"explorerCopied": "F5DBzq_explorerCopied",
-			"workbench": "F5DBzq_workbench",
-			"split": "F5DBzq_split",
-			"toggleButton": "F5DBzq_toggleButton",
-			"tabBarDrop": "F5DBzq_tabBarDrop",
-			"orphanedType": "F5DBzq_orphanedType",
-			"gitDiffCtx": "F5DBzq_gitDiffCtx",
+			"editorBinaryNotice": "F5DBzq_editorBinaryNotice",
 			"panel": "F5DBzq_panel",
-			"dropUp": "F5DBzq_dropUp",
-			"editorBinary": "F5DBzq_editorBinary",
-			"browserKeyboard": "F5DBzq_browserKeyboard",
-			"terminal": "F5DBzq_terminal",
-			"gitLink": "F5DBzq_gitLink",
-			"gitRowSelected": "F5DBzq_gitRowSelected",
-			"browserBar": "F5DBzq_browserBar",
-			"gitDiffHunk": "F5DBzq_gitDiffHunk",
-			"gitLogLine2": "F5DBzq_gitLogLine2",
-			"editorPdfDragShield": "F5DBzq_editorPdfDragShield",
-			"bottomPanelHidden": "F5DBzq_bottomPanelHidden",
-			"editorPptxButton": "F5DBzq_editorPptxButton",
-			"tabBarPlus": "F5DBzq_tabBarPlus",
-			"gitDiffDel": "F5DBzq_gitDiffDel",
-			"gitDiff": "F5DBzq_gitDiff",
-			"dividerCol": "F5DBzq_dividerCol",
-			"paneTab": "F5DBzq_paneTab",
-			"bottomClose": "F5DBzq_bottomClose",
-			"browserCanvas": "F5DBzq_browserCanvas",
-			"dsh-row-in": "F5DBzq_dsh-row-in",
-			"browserInput": "F5DBzq_browserInput",
-			"panelBody": "F5DBzq_panelBody",
-			"splitRow": "F5DBzq_splitRow",
-			"editorCm": "F5DBzq_editorCm",
-			"gitConfirmDesc": "F5DBzq_gitConfirmDesc",
-			"editorPdf": "F5DBzq_editorPdf",
-			"editorStatus": "F5DBzq_editorStatus",
-			"gitDiffAdd": "F5DBzq_gitDiffAdd",
-			"editorBanner": "F5DBzq_editorBanner",
-			"bottomPanel": "F5DBzq_bottomPanel",
-			"explorerError": "F5DBzq_explorerError",
-			"editorModeToggle": "F5DBzq_editorModeToggle",
+			"tabActive": "F5DBzq_tabActive",
+			"browserBlockedTitle": "F5DBzq_browserBlockedTitle",
+			"gitDiffExpand": "F5DBzq_gitDiffExpand",
+			"cornerHandle": "F5DBzq_cornerHandle",
+			"gitRowMain": "F5DBzq_gitRowMain",
+			"producedLabel": "F5DBzq_producedLabel",
+			"paneDrop": "F5DBzq_paneDrop",
 			"sandboxStatusOff": "F5DBzq_sandboxStatusOff",
-			"browserDialogCard": "F5DBzq_browserDialogCard",
-			"editorMd": "F5DBzq_editorMd",
+			"sandboxDot": "F5DBzq_sandboxDot",
+			"browserHint": "F5DBzq_browserHint",
+			"editorPdfStage": "F5DBzq_editorPdfStage",
+			"gitDiffLine": "F5DBzq_gitDiffLine",
+			"bottomClose": "F5DBzq_bottomClose",
 			"bottomResizeActive": "F5DBzq_bottomResizeActive",
+			"explorerRow": "F5DBzq_explorerRow",
+			"gitRowSelected": "F5DBzq_gitRowSelected",
+			"editorModeActive": "F5DBzq_editorModeActive",
+			"gitLogRow": "F5DBzq_gitLogRow",
+			"dropOverlay": "F5DBzq_dropOverlay",
+			"browserKeyboard": "F5DBzq_browserKeyboard",
+			"tabClose": "F5DBzq_tabClose",
+			"explorerEmpty": "F5DBzq_explorerEmpty",
+			"terminalWrap": "F5DBzq_terminalWrap",
+			"gitDiffHunkHeader": "F5DBzq_gitDiffHunkHeader",
+			"splitChild": "F5DBzq_splitChild",
+			"gitError": "F5DBzq_gitError",
+			"divider": "F5DBzq_divider",
+			"gitSection": "F5DBzq_gitSection",
+			"explorerHeader": "F5DBzq_explorerHeader",
+			"gitLogSubject": "F5DBzq_gitLogSubject",
+			"editorCmHidden": "F5DBzq_editorCmHidden",
 			"producedRow": "F5DBzq_producedRow",
-			"explorerName": "F5DBzq_explorerName",
-			"browserPermChip": "F5DBzq_browserPermChip",
-			"gitRow": "F5DBzq_gitRow",
-			"gitDiffFileTag": "F5DBzq_gitDiffFileTag",
+			"sandboxStatusOn": "F5DBzq_sandboxStatusOn",
+			"editorDocxZoomRange": "F5DBzq_editorDocxZoomRange",
+			"dropCenter": "F5DBzq_dropCenter",
 			"gitDiffCode": "F5DBzq_gitDiffCode",
+			"dsh-row-in": "F5DBzq_dsh-row-in",
+			"gitDiffFileTag": "F5DBzq_gitDiffFileTag",
+			"gitEmpty": "F5DBzq_gitEmpty",
+			"browserBlockedDesc": "F5DBzq_browserBlockedDesc",
+			"browserCanvas": "F5DBzq_browserCanvas",
+			"boundaryError": "F5DBzq_boundaryError",
+			"explorer": "F5DBzq_explorer",
+			"gitCommitInput": "F5DBzq_gitCommitInput",
+			"explorerBody": "F5DBzq_explorerBody",
+			"panelBody": "F5DBzq_panelBody",
+			"gitDiffCtx": "F5DBzq_gitDiffCtx",
+			"gitDiffDel": "F5DBzq_gitDiffDel",
+			"browserDialogCard": "F5DBzq_browserDialogCard",
+			"editorHeader": "F5DBzq_editorHeader",
+			"selectionPopup": "F5DBzq_selectionPopup",
+			"editorStatusError": "F5DBzq_editorStatusError",
+			"bottomPanel": "F5DBzq_bottomPanel",
+			"browserPerms": "F5DBzq_browserPerms",
 			"editorImageWrap": "F5DBzq_editorImageWrap",
 			"editorPdfToolbar": "F5DBzq_editorPdfToolbar",
-			"editorPdfFrame": "F5DBzq_editorPdfFrame",
-			"paneTabHidden": "F5DBzq_paneTabHidden",
-			"gitLogMeta": "F5DBzq_gitLogMeta",
-			"divider": "F5DBzq_divider",
-			"tabClose": "F5DBzq_tabClose",
-			"gitDiffMeta": "F5DBzq_gitDiffMeta",
-			"gitDiffFile": "F5DBzq_gitDiffFile",
-			"gitDiffNum": "F5DBzq_gitDiffNum",
-			"browserBlockedActions": "F5DBzq_browserBlockedActions",
-			"paneCard": "F5DBzq_paneCard",
-			"iconButton": "F5DBzq_iconButton",
-			"gitDiffExpand": "F5DBzq_gitDiffExpand",
-			"editorBinaryNotice": "F5DBzq_editorBinaryNotice",
-			"browser": "F5DBzq_browser",
-			"editorImage": "F5DBzq_editorImage",
-			"gitDiffMetaText": "F5DBzq_gitDiffMetaText",
-			"producedLabel": "F5DBzq_producedLabel",
-			"tabBar": "F5DBzq_tabBar",
-			"panelHidden": "F5DBzq_panelHidden",
-			"dividerActive": "F5DBzq_dividerActive",
-			"browserStart": "F5DBzq_browserStart",
-			"gitSectionHeader": "F5DBzq_gitSectionHeader",
-			"panelResizeActive": "F5DBzq_panelResizeActive",
-			"dropCenter": "F5DBzq_dropCenter",
-			"browserPreedit": "F5DBzq_browserPreedit",
-			"gitName": "F5DBzq_gitName",
-			"sandboxDot": "F5DBzq_sandboxDot",
-			"gitDiffHunkHeader": "F5DBzq_gitDiffHunkHeader",
-			"editorError": "F5DBzq_editorError",
-			"gitLogRef": "F5DBzq_gitLogRef",
-			"editorStatusError": "F5DBzq_editorStatusError",
-			"explorerRef": "F5DBzq_explorerRef",
-			"browserBlockedDesc": "F5DBzq_browserBlockedDesc",
-			"gitDiffFileOld": "F5DBzq_gitDiffFileOld",
-			"gitDiffTabTitle": "F5DBzq_gitDiffTabTitle",
-			"producedMore": "F5DBzq_producedMore",
-			"browserMessage": "F5DBzq_browserMessage",
-			"browserStage": "F5DBzq_browserStage",
-			"editorTitle": "F5DBzq_editorTitle",
-			"browserHint": "F5DBzq_browserHint",
-			"editorCmHidden": "F5DBzq_editorCmHidden",
-			"explorerDir": "F5DBzq_explorerDir",
-			"gitDiffFilePath": "F5DBzq_gitDiffFilePath",
-			"gitDiffLine": "F5DBzq_gitDiffLine",
-			"pane": "F5DBzq_pane",
-			"explorerRoot": "F5DBzq_explorerRoot",
-			"gitBadge": "F5DBzq_gitBadge",
-			"editorDocxZoomRange": "F5DBzq_editorDocxZoomRange",
-			"splitChild": "F5DBzq_splitChild",
-			"terminalWrap": "F5DBzq_terminalWrap",
-			"toggleCluster": "F5DBzq_toggleCluster",
-			"tab": "F5DBzq_tab",
-			"editorPlaceholder": "F5DBzq_editorPlaceholder",
-			"sandboxAction": "F5DBzq_sandboxAction",
-			"editorHtml": "F5DBzq_editorHtml",
-			"boundaryError": "F5DBzq_boundaryError",
-			"gitPlaceholder": "F5DBzq_gitPlaceholder",
-			"gitDiffTab": "F5DBzq_gitDiffTab",
-			"explorerHeader": "F5DBzq_explorerHeader",
-			"gitLogMore": "F5DBzq_gitLogMore",
-			"dropLeft": "F5DBzq_dropLeft",
-			"sandboxStatus": "F5DBzq_sandboxStatus",
-			"gitHeader": "F5DBzq_gitHeader",
-			"browserBlockedTitle": "F5DBzq_browserBlockedTitle",
-			"splitCol": "F5DBzq_splitCol",
-			"dropOverlay": "F5DBzq_dropOverlay",
-			"tabActive": "F5DBzq_tabActive",
-			"editor": "F5DBzq_editor",
-			"editorDownloadLink": "F5DBzq_editorDownloadLink",
-			"explorer": "F5DBzq_explorer",
-			"git": "F5DBzq_git",
-			"gitDiffHunkSection": "F5DBzq_gitDiffHunkSection",
-			"gitError": "F5DBzq_gitError",
-			"editorPdfFrameBlocked": "F5DBzq_editorPdfFrameBlocked",
-			"browserAgentBar": "F5DBzq_browserAgentBar",
-			"editorPdfStage": "F5DBzq_editorPdfStage",
-			"gitLogRow": "F5DBzq_gitLogRow",
-			"gitEmpty": "F5DBzq_gitEmpty",
+			"gitRow": "F5DBzq_gitRow",
+			"gitDiffAdd": "F5DBzq_gitDiffAdd",
+			"paneTab": "F5DBzq_paneTab",
+			"sandboxStatusText": "F5DBzq_sandboxStatusText",
 			"terminalBanner": "F5DBzq_terminalBanner",
-			"terminalRetry": "F5DBzq_terminalRetry",
-			"editorHeader": "F5DBzq_editorHeader",
-			"explorerBody": "F5DBzq_explorerBody",
-			"gitDiffTabHeader": "F5DBzq_gitDiffTabHeader",
-			"explorerHidden": "F5DBzq_explorerHidden",
-			"gitLogHash": "F5DBzq_gitLogHash",
+			"gitDiffMeta": "F5DBzq_gitDiffMeta",
+			"gitLogRef": "F5DBzq_gitLogRef",
+			"gitLogMore": "F5DBzq_gitLogMore",
+			"editorHtml": "F5DBzq_editorHtml",
+			"toggleCluster": "F5DBzq_toggleCluster",
 			"gitCommit": "F5DBzq_gitCommit",
-			"dividerRow": "F5DBzq_dividerRow",
-			"tabTitle": "F5DBzq_tabTitle",
-			"browserBlockedButton": "F5DBzq_browserBlockedButton",
-			"gitCommitButton": "F5DBzq_gitCommitButton",
+			"panelResizeActive": "F5DBzq_panelResizeActive",
+			"explorerRef": "F5DBzq_explorerRef",
+			"editorImage": "F5DBzq_editorImage",
+			"editorBanner": "F5DBzq_editorBanner",
+			"bottomResize": "F5DBzq_bottomResize",
+			"explorerRoot": "F5DBzq_explorerRoot",
+			"browserAgentBar": "F5DBzq_browserAgentBar",
+			"dividerActive": "F5DBzq_dividerActive",
+			"gitBranchSelect": "F5DBzq_gitBranchSelect",
+			"dirtyDot": "F5DBzq_dirtyDot",
 			"paneContent": "F5DBzq_paneContent",
+			"gitDiff": "F5DBzq_gitDiff",
+			"gitDiffTab": "F5DBzq_gitDiffTab",
+			"browserStage": "F5DBzq_browserStage",
+			"browserPreedit": "F5DBzq_browserPreedit",
+			"browserBar": "F5DBzq_browserBar",
+			"gitDiffTabTitle": "F5DBzq_gitDiffTabTitle",
+			"gitDiffMetaText": "F5DBzq_gitDiffMetaText",
+			"editorPdfDragShield": "F5DBzq_editorPdfDragShield",
+			"tabBarDrop": "F5DBzq_tabBarDrop",
+			"terminal": "F5DBzq_terminal",
+			"explorerHidden": "F5DBzq_explorerHidden",
+			"gitPlaceholder": "F5DBzq_gitPlaceholder",
+			"browserBlockedActions": "F5DBzq_browserBlockedActions",
+			"editorDownloadLink": "F5DBzq_editorDownloadLink",
 			"dropRight": "F5DBzq_dropRight",
-			"gitRowMain": "F5DBzq_gitRowMain",
-			"editorModeActive": "F5DBzq_editorModeActive",
-			"paneDrop": "F5DBzq_paneDrop",
-			"tabBadge": "F5DBzq_tabBadge",
+			"gitConfirmDesc": "F5DBzq_gitConfirmDesc",
+			"git": "F5DBzq_git",
+			"editorCm": "F5DBzq_editorCm",
+			"gitDiffFile": "F5DBzq_gitDiffFile",
+			"paneCard": "F5DBzq_paneCard",
+			"browserStart": "F5DBzq_browserStart",
+			"iconButton": "F5DBzq_iconButton",
+			"dropLeft": "F5DBzq_dropLeft",
+			"explorerCopied": "F5DBzq_explorerCopied",
 			"browserDialog": "F5DBzq_browserDialog",
 			"editorPdfDragShieldActive": "F5DBzq_editorPdfDragShieldActive",
-			"tabBoundaryError": "F5DBzq_tabBoundaryError",
-			"browserBlocked": "F5DBzq_browserBlocked",
-			"gitLogLine1": "F5DBzq_gitLogLine1",
-			"bottomResize": "F5DBzq_bottomResize",
-			"tabList": "F5DBzq_tabList",
-			"sandboxStatusOn": "F5DBzq_sandboxStatusOn",
-			"gitCommitInput": "F5DBzq_gitCommitInput",
-			"dirtyDot": "F5DBzq_dirtyDot",
-			"gitSection": "F5DBzq_gitSection",
-			"panelResize": "F5DBzq_panelResize",
-			"cornerHandle": "F5DBzq_cornerHandle",
-			"explorerEmpty": "F5DBzq_explorerEmpty",
-			"selectionPopup": "F5DBzq_selectionPopup",
-			"sandboxStatusText": "F5DBzq_sandboxStatusText",
-			"editorModeButton": "F5DBzq_editorModeButton",
+			"orphanedType": "F5DBzq_orphanedType",
 			"terminalBannerUrl": "F5DBzq_terminalBannerUrl",
-			"explorerRow": "F5DBzq_explorerRow",
-			"gitBranchSelect": "F5DBzq_gitBranchSelect",
+			"gitLogLine2": "F5DBzq_gitLogLine2",
+			"dividerRow": "F5DBzq_dividerRow",
+			"toggleButton": "F5DBzq_toggleButton",
+			"browserBlockedButton": "F5DBzq_browserBlockedButton",
+			"gitLogLine1": "F5DBzq_gitLogLine1",
+			"editorPdfFrameBlocked": "F5DBzq_editorPdfFrameBlocked",
+			"gitDiffTabHeader": "F5DBzq_gitDiffTabHeader",
+			"browser": "F5DBzq_browser",
+			"gitLogHash": "F5DBzq_gitLogHash",
+			"gitDiffFilePath": "F5DBzq_gitDiffFilePath",
 			"paneEmptyCards": "F5DBzq_paneEmptyCards",
-			"browserPerms": "F5DBzq_browserPerms",
+			"gitSectionHeader": "F5DBzq_gitSectionHeader",
+			"paneTabHidden": "F5DBzq_paneTabHidden",
+			"bottomPanelHidden": "F5DBzq_bottomPanelHidden",
+			"gitHeader": "F5DBzq_gitHeader",
 			"dropDown": "F5DBzq_dropDown",
-			"gitLogSubject": "F5DBzq_gitLogSubject"
+			"split": "F5DBzq_split",
+			"editorStatus": "F5DBzq_editorStatus",
+			"producedChip": "F5DBzq_producedChip",
+			"explorerDir": "F5DBzq_explorerDir",
+			"tabBar": "F5DBzq_tabBar",
+			"panelResize": "F5DBzq_panelResize",
+			"tabBarPlus": "F5DBzq_tabBarPlus",
+			"editorTitle": "F5DBzq_editorTitle",
+			"browserInput": "F5DBzq_browserInput",
+			"panelHidden": "F5DBzq_panelHidden",
+			"sandboxAction": "F5DBzq_sandboxAction",
+			"browserBlocked": "F5DBzq_browserBlocked",
+			"editorMd": "F5DBzq_editorMd",
+			"gitLogMeta": "F5DBzq_gitLogMeta",
+			"producedMore": "F5DBzq_producedMore",
+			"editorPptxButton": "F5DBzq_editorPptxButton",
+			"editorError": "F5DBzq_editorError",
+			"gitDiffFileOld": "F5DBzq_gitDiffFileOld",
+			"browserMessage": "F5DBzq_browserMessage",
+			"gitDiffNum": "F5DBzq_gitDiffNum",
+			"terminalRetry": "F5DBzq_terminalRetry",
+			"gitCommitButton": "F5DBzq_gitCommitButton",
+			"tabTitle": "F5DBzq_tabTitle",
+			"explorerName": "F5DBzq_explorerName",
+			"gitDiffHunk": "F5DBzq_gitDiffHunk",
+			"tabBadge": "F5DBzq_tabBadge",
+			"pane": "F5DBzq_pane",
+			"editorPlaceholder": "F5DBzq_editorPlaceholder",
+			"explorerError": "F5DBzq_explorerError",
+			"editorPdfFrame": "F5DBzq_editorPdfFrame",
+			"gitDiffHunkSection": "F5DBzq_gitDiffHunkSection",
+			"tabList": "F5DBzq_tabList",
+			"dropUp": "F5DBzq_dropUp",
+			"dividerCol": "F5DBzq_dividerCol",
+			"editorModeButton": "F5DBzq_editorModeButton",
+			"sandboxStatus": "F5DBzq_sandboxStatus",
+			"browserPermChip": "F5DBzq_browserPermChip",
+			"workbench": "F5DBzq_workbench",
+			"splitRow": "F5DBzq_splitRow",
+			"gitLink": "F5DBzq_gitLink",
+			"editorPdf": "F5DBzq_editorPdf",
+			"tabBoundaryError": "F5DBzq_tabBoundaryError",
+			"splitCol": "F5DBzq_splitCol",
+			"editorModeToggle": "F5DBzq_editorModeToggle",
+			"gitBadge": "F5DBzq_gitBadge",
+			"editorBinary": "F5DBzq_editorBinary",
+			"editor": "F5DBzq_editor",
+			"tab": "F5DBzq_tab",
+			"gitName": "F5DBzq_gitName"
 		};
 		//#endregion
 		//#region src/client/intercept.tsx
@@ -4716,57 +4716,57 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var SubagentView_module_css_default = {
-			"jobsKillArmed": "jg93Ua_jobsKillArmed",
-			"subagentRow": "jg93Ua_subagentRow",
-			"subagentRowLoading": "jg93Ua_subagentRowLoading",
-			"subagent": "jg93Ua_subagent",
-			"jobsPaneLabel": "jg93Ua_jobsPaneLabel",
-			"subagentError": "jg93Ua_subagentError",
-			"jobsRow": "jg93Ua_jobsRow",
-			"subagentChildren": "jg93Ua_subagentChildren",
-			"subagentRowDisabled": "jg93Ua_subagentRowDisabled",
-			"subagentCount": "jg93Ua_subagentCount",
-			"jobsRowSettled": "jg93Ua_jobsRowSettled",
-			"jobsKind": "jg93Ua_jobsKind",
-			"jobsLabel": "jg93Ua_jobsLabel",
-			"jobsPaneStatus": "jg93Ua_jobsPaneStatus",
-			"jobsPanePre": "jg93Ua_jobsPanePre",
-			"jobsPaneHint": "jg93Ua_jobsPaneHint",
-			"subagentDot": "jg93Ua_subagentDot",
-			"jobs": "jg93Ua_jobs",
-			"subagentLabel": "jg93Ua_subagentLabel",
-			"jobsRowSelected": "jg93Ua_jobsRowSelected",
-			"subagentSecondary": "jg93Ua_subagentSecondary",
-			"subagentHeader": "jg93Ua_subagentHeader",
 			"subagentRowActive": "jg93Ua_subagentRowActive",
-			"jobsKillError": "jg93Ua_jobsKillError",
-			"jobsPaneClose": "jg93Ua_jobsPaneClose",
-			"jobsPaneDot": "jg93Ua_jobsPaneDot",
-			"subagentNode": "jg93Ua_subagentNode",
-			"jobsHeader": "jg93Ua_jobsHeader",
-			"subagentRefresh": "jg93Ua_subagentRefresh",
-			"subagentLiveArgs": "jg93Ua_subagentLiveArgs",
-			"jobsCount": "jg93Ua_jobsCount",
-			"jobsSecondary": "jg93Ua_jobsSecondary",
-			"subagentContent": "jg93Ua_subagentContent",
+			"jobsLabel": "jg93Ua_jobsLabel",
+			"subagent": "jg93Ua_subagent",
 			"subagentBody": "jg93Ua_subagentBody",
-			"subagentLiveTool": "jg93Ua_subagentLiveTool",
-			"jobsKill": "jg93Ua_jobsKill",
-			"jobsContent": "jg93Ua_jobsContent",
-			"jobsList": "jg93Ua_jobsList",
-			"jobsTitle": "jg93Ua_jobsTitle",
-			"jobsRowMain": "jg93Ua_jobsRowMain",
+			"subagentEmpty": "jg93Ua_subagentEmpty",
+			"jobsKillArmed": "jg93Ua_jobsKillArmed",
+			"subagentRowDisabled": "jg93Ua_subagentRowDisabled",
 			"subagentErrorRetry": "jg93Ua_subagentErrorRetry",
-			"jobsDot": "jg93Ua_jobsDot",
-			"jobsLabelLine": "jg93Ua_jobsLabelLine",
-			"subagentEmptyHint": "jg93Ua_subagentEmptyHint",
-			"jobsPane": "jg93Ua_jobsPane",
-			"jobsPaneHeader": "jg93Ua_jobsPaneHeader",
-			"jobsPaneError": "jg93Ua_jobsPaneError",
-			"subagentLive": "jg93Ua_subagentLive",
-			"subagentTitle": "jg93Ua_subagentTitle",
+			"jobs": "jg93Ua_jobs",
 			"subagentLiveText": "jg93Ua_subagentLiveText",
-			"subagentEmpty": "jg93Ua_subagentEmpty"
+			"jobsPaneDot": "jg93Ua_jobsPaneDot",
+			"subagentRowLoading": "jg93Ua_subagentRowLoading",
+			"subagentHeader": "jg93Ua_subagentHeader",
+			"subagentDot": "jg93Ua_subagentDot",
+			"jobsTitle": "jg93Ua_jobsTitle",
+			"subagentLabel": "jg93Ua_subagentLabel",
+			"subagentError": "jg93Ua_subagentError",
+			"jobsCount": "jg93Ua_jobsCount",
+			"subagentLive": "jg93Ua_subagentLive",
+			"subagentChildren": "jg93Ua_subagentChildren",
+			"jobsDot": "jg93Ua_jobsDot",
+			"jobsKill": "jg93Ua_jobsKill",
+			"subagentCount": "jg93Ua_subagentCount",
+			"jobsKillError": "jg93Ua_jobsKillError",
+			"subagentContent": "jg93Ua_subagentContent",
+			"subagentSecondary": "jg93Ua_subagentSecondary",
+			"jobsRowSelected": "jg93Ua_jobsRowSelected",
+			"subagentNode": "jg93Ua_subagentNode",
+			"jobsPaneError": "jg93Ua_jobsPaneError",
+			"subagentLiveTool": "jg93Ua_subagentLiveTool",
+			"jobsPane": "jg93Ua_jobsPane",
+			"jobsSecondary": "jg93Ua_jobsSecondary",
+			"subagentLiveArgs": "jg93Ua_subagentLiveArgs",
+			"jobsRowMain": "jg93Ua_jobsRowMain",
+			"jobsContent": "jg93Ua_jobsContent",
+			"jobsPaneStatus": "jg93Ua_jobsPaneStatus",
+			"jobsPaneHint": "jg93Ua_jobsPaneHint",
+			"jobsHeader": "jg93Ua_jobsHeader",
+			"jobsPanePre": "jg93Ua_jobsPanePre",
+			"jobsKind": "jg93Ua_jobsKind",
+			"jobsPaneClose": "jg93Ua_jobsPaneClose",
+			"subagentRow": "jg93Ua_subagentRow",
+			"jobsRow": "jg93Ua_jobsRow",
+			"jobsPaneHeader": "jg93Ua_jobsPaneHeader",
+			"jobsPaneLabel": "jg93Ua_jobsPaneLabel",
+			"subagentTitle": "jg93Ua_subagentTitle",
+			"subagentRefresh": "jg93Ua_subagentRefresh",
+			"subagentEmptyHint": "jg93Ua_subagentEmptyHint",
+			"jobsRowSettled": "jg93Ua_jobsRowSettled",
+			"jobsLabelLine": "jg93Ua_jobsLabelLine",
+			"jobsList": "jg93Ua_jobsList"
 		};
 		//#endregion
 		//#region src/client/SubagentView.tsx
@@ -8331,54 +8331,54 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var SideCardSection_module_css_default = {
-			"title": "JTnrxq_title",
-			"pluginEntries": "JTnrxq_pluginEntries",
-			"pluginJumpBtn": "JTnrxq_pluginJumpBtn",
-			"pluginDesc": "JTnrxq_pluginDesc",
-			"pluginInstall": "JTnrxq_pluginInstall",
-			"cardCheck": "JTnrxq_cardCheck",
-			"pluginEntryHead": "JTnrxq_pluginEntryHead",
-			"typedInputNumber": "JTnrxq_typedInputNumber",
-			"pluginCopyBtn": "JTnrxq_pluginCopyBtn",
 			"pluginTopicBtn": "JTnrxq_pluginTopicBtn",
-			"popupRows": "JTnrxq_popupRows",
-			"count": "JTnrxq_count",
-			"section": "JTnrxq_section",
-			"suffix": "JTnrxq_suffix",
-			"switch": "JTnrxq_switch",
-			"switchTrack": "JTnrxq_switchTrack",
-			"popupDialog": "JTnrxq_popupDialog",
-			"done": "JTnrxq_done",
-			"pluginEntry": "JTnrxq_pluginEntry",
-			"row": "JTnrxq_row",
-			"pluginName": "JTnrxq_pluginName",
-			"rowText": "JTnrxq_rowText",
-			"control": "JTnrxq_control",
-			"switchInput": "JTnrxq_switchInput",
-			"cardTop": "JTnrxq_cardTop",
-			"cardOn": "JTnrxq_cardOn",
-			"typedInput": "JTnrxq_typedInput",
-			"groupHeading": "JTnrxq_groupHeading",
-			"cardGear": "JTnrxq_cardGear",
-			"card": "JTnrxq_card",
-			"group": "JTnrxq_group",
-			"cardWithGear": "JTnrxq_cardWithGear",
-			"popupRow": "JTnrxq_popupRow",
+			"cardDesc": "JTnrxq_cardDesc",
 			"grid": "JTnrxq_grid",
+			"pluginJumpBtn": "JTnrxq_pluginJumpBtn",
+			"done": "JTnrxq_done",
+			"pluginDesc": "JTnrxq_pluginDesc",
+			"cardTop": "JTnrxq_cardTop",
+			"pluginEmpty": "JTnrxq_pluginEmpty",
+			"intro": "JTnrxq_intro",
+			"group": "JTnrxq_group",
 			"pluginModal": "JTnrxq_pluginModal",
 			"pluginList": "JTnrxq_pluginList",
-			"percentInput": "JTnrxq_percentInput",
-			"desc": "JTnrxq_desc",
-			"intro": "JTnrxq_intro",
 			"cardMain": "JTnrxq_cardMain",
+			"popupDialog": "JTnrxq_popupDialog",
+			"pluginEntries": "JTnrxq_pluginEntries",
+			"pluginName": "JTnrxq_pluginName",
+			"pluginCopyBtn": "JTnrxq_pluginCopyBtn",
+			"title": "JTnrxq_title",
+			"switchTrack": "JTnrxq_switchTrack",
+			"pluginEntry": "JTnrxq_pluginEntry",
+			"pluginEntryActions": "JTnrxq_pluginEntryActions",
+			"section": "JTnrxq_section",
+			"cardOn": "JTnrxq_cardOn",
+			"typedInputNumber": "JTnrxq_typedInputNumber",
+			"pluginInstall": "JTnrxq_pluginInstall",
+			"popupRow": "JTnrxq_popupRow",
+			"count": "JTnrxq_count",
 			"switchThumb": "JTnrxq_switchThumb",
-			"cardTitle": "JTnrxq_cardTitle",
+			"pluginEntryHead": "JTnrxq_pluginEntryHead",
+			"cardCheck": "JTnrxq_cardCheck",
+			"switch": "JTnrxq_switch",
+			"switchInput": "JTnrxq_switchInput",
+			"cardGear": "JTnrxq_cardGear",
 			"addCard": "JTnrxq_addCard",
+			"cardWithGear": "JTnrxq_cardWithGear",
+			"cardTitle": "JTnrxq_cardTitle",
+			"row": "JTnrxq_row",
+			"groupHeading": "JTnrxq_groupHeading",
+			"card": "JTnrxq_card",
+			"desc": "JTnrxq_desc",
+			"percentInput": "JTnrxq_percentInput",
+			"control": "JTnrxq_control",
+			"typedInput": "JTnrxq_typedInput",
 			"cardIconChip": "JTnrxq_cardIconChip",
-			"cardDesc": "JTnrxq_cardDesc",
+			"suffix": "JTnrxq_suffix",
+			"popupRows": "JTnrxq_popupRows",
 			"error": "JTnrxq_error",
-			"pluginEmpty": "JTnrxq_pluginEmpty",
-			"pluginEntryActions": "JTnrxq_pluginEntryActions"
+			"rowText": "JTnrxq_rowText"
 		};
 		//#endregion
 		//#region src/client/add-plugin-modal.tsx
@@ -9231,6 +9231,186 @@ window.__ModuleLoader__.load({
 			});
 		}
 		//#endregion
+		//#region src/client/DiagnosticsSection.tsx
+		function DiagnosticsSection() {
+			const api = window.desktopApi?.diagnostics;
+			const [status, setStatus] = (0, react.useState)();
+			const [busy, setBusy] = (0, react.useState)(false);
+			const [message, setMessage] = (0, react.useState)();
+			const refresh = () => {
+				if (api === void 0) return;
+				api.getStatus().then(setStatus, (error) => setMessage(safeMessage(error)));
+			};
+			(0, react.useEffect)(() => {
+				if (api === void 0) return;
+				api.getStatus().then(setStatus, (error) => setMessage(safeMessage(error)));
+			}, [api]);
+			const run = (operation, success) => {
+				if (busy) return;
+				setBusy(true);
+				setMessage(void 0);
+				operation().then(() => setMessage(success), (error) => setMessage(safeMessage(error))).finally(() => {
+					setBusy(false);
+					refresh();
+				});
+			};
+			if (api === void 0) return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
+				style: styles.section,
+				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("h2", {
+					style: styles.title,
+					children: isChinese$1() ? "诊断" : "Diagnostics"
+				}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", { children: isChinese$1() ? "桌面诊断桥不可用。" : "Desktop diagnostics bridge is unavailable." })]
+			});
+			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
+				style: styles.section,
+				children: [
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("h2", {
+						style: styles.title,
+						children: isChinese$1() ? "诊断" : "Diagnostics"
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+						style: styles.description,
+						children: isChinese$1() ? "日志只保存在本机，默认不包含 Prompt、模型正文、工具参数或凭据。" : "Logs stay on this device and exclude prompts, model content, tool arguments, and credentials by default."
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+						style: styles.grid,
+						children: [
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Metric, {
+								label: isChinese$1() ? "应用日志" : "App logs",
+								value: formatBytes(status?.appLogBytes ?? 0)
+							}),
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Metric, {
+								label: isChinese$1() ? "Host 日志" : "Host logs",
+								value: formatBytes(status?.hostLogBytes ?? 0)
+							}),
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Metric, {
+								label: isChinese$1() ? "崩溃文件" : "Crash dumps",
+								value: String(status?.crashCount ?? 0)
+							}),
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Metric, {
+								label: isChinese$1() ? "丢弃记录" : "Dropped records",
+								value: String(status?.droppedRecordCount ?? 0)
+							})
+						]
+					}),
+					status?.temporaryDebugUntil !== void 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+						style: styles.notice,
+						children: isChinese$1() ? `Debug 日志开启至 ${status.temporaryDebugUntil}` : `Debug logging enabled until ${status.temporaryDebugUntil}`
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+						style: styles.actions,
+						children: [
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+								type: "button",
+								disabled: busy,
+								onClick: () => run(api.openLogFolder, isChinese$1() ? "已打开日志目录。" : "Log folder opened."),
+								children: isChinese$1() ? "打开日志目录" : "Open log folder"
+							}),
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+								type: "button",
+								disabled: busy,
+								onClick: () => run(async () => {
+									const result = await api.exportBundle();
+									if (!result.cancelled) setMessage(isChinese$1() ? `已导出 ${result.fileName ?? "诊断包"}。` : `Exported ${result.fileName ?? "diagnostics bundle"}.`);
+								}, isChinese$1() ? "导出已完成。" : "Export completed."),
+								children: isChinese$1() ? "导出诊断包" : "Export diagnostics"
+							}),
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+								type: "button",
+								disabled: busy,
+								onClick: () => {
+									if (window.confirm(isChinese$1() ? "清理本地日志？" : "Clear local logs?")) run(api.clearLogs, isChinese$1() ? "日志已清理。" : "Logs cleared.");
+								},
+								children: isChinese$1() ? "清理日志" : "Clear logs"
+							}),
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+								type: "button",
+								disabled: busy,
+								onClick: () => run(async () => {
+									await api.enableTemporaryDebug({ durationMinutes: 30 });
+								}, isChinese$1() ? "Debug 日志已临时开启 30 分钟。" : "Debug logging enabled for 30 minutes."),
+								children: isChinese$1() ? "开启 Debug（30 分钟）" : "Enable Debug (30 min)"
+							}),
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+								type: "button",
+								disabled: busy,
+								onClick: refresh,
+								children: isChinese$1() ? "刷新状态" : "Refresh status"
+							})
+						]
+					}),
+					message !== void 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+						role: "status",
+						style: styles.notice,
+						children: message
+					})
+				]
+			});
+		}
+		function Metric({ label, value }) {
+			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+				style: styles.metric,
+				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+					style: styles.metricLabel,
+					children: label
+				}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("strong", { children: value })]
+			});
+		}
+		function isChinese$1() {
+			return document.documentElement.lang.toLowerCase().startsWith("zh") || navigator.language.toLowerCase().startsWith("zh");
+		}
+		function formatBytes(value) {
+			if (value < 1024) return `${value} B`;
+			if (value < 1048576) return `${(value / 1024).toFixed(1)} KiB`;
+			return `${(value / 1048576).toFixed(1)} MiB`;
+		}
+		function safeMessage(error) {
+			return error instanceof Error ? error.message : String(error);
+		}
+		const styles = {
+			section: {
+				display: "grid",
+				gap: "12px",
+				maxWidth: "720px",
+				padding: "8px 0"
+			},
+			title: {
+				margin: 0,
+				fontSize: "18px"
+			},
+			description: {
+				margin: 0,
+				opacity: .72,
+				lineHeight: 1.5
+			},
+			grid: {
+				display: "grid",
+				gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+				gap: "8px"
+			},
+			metric: {
+				display: "grid",
+				gap: "4px",
+				padding: "10px",
+				border: "1px solid color-mix(in srgb, currentColor 14%, transparent)",
+				borderRadius: "8px"
+			},
+			metricLabel: {
+				fontSize: "12px",
+				opacity: .68
+			},
+			actions: {
+				display: "flex",
+				flexWrap: "wrap",
+				gap: "8px"
+			},
+			notice: {
+				margin: 0,
+				fontSize: "12px",
+				opacity: .8
+			}
+		};
+		//#endregion
 		//#region \0dsh-css:src/client/layout.css.mjs
 		const css = "/**\n * Layout push: when a panel is open it OCCUPIES the layout instead of\n * floating over it — the app shell (#root, the AppFrame three-column grid)\n * gives up space. Only the center column is flexible (1fr), so the right\n * panel's width squeeze (margin-right on #root) lands exactly on the\n * conversation output and the input bar, like a VSCode sidebar.\n *\n * The bottom panel squeezes ONLY the center column — it must not cover the\n * app's own left sidebar or the right panel. DSH 0.1.x wraps slot hosts in\n * [data-slot] containers, so the AppFrame grid lives one level deeper:\n * #root > div[data-slot=\"root\"] > div (the frame). Its grid items are\n * (frame > div:nth-child(1..3)): sidebarCol, centerCol, detailsCol, so the\n * vertical push lands on the center column alone. The fixed panels cover\n * the vacated strips, which looks seamless because #root's background is\n * the theme base.\n *\n * The sizes ride CSS variables updated by the Sidebar shell (0 while\n * collapsed); expand/collapse animates both the margins and the panel\n * slides on the same theme duration. Drags disable the transition so the\n * layout tracks the pointer.\n */\n#root {\n  margin-right: var(--dsh-sidebar-width, 0px);\n  transition: margin-right var(--ds-transition-duration-slow) var(--ds-ease-in-out);\n}\n\n/* The AppFrame's grid items are sidebarCol, centerCol, detailsCol (children\n   1-3 of #root > div[data-slot=\"root\"] > div) — nth-child(2) is the center\n   column. A stretched grid item shrinks by its margins, so the conversation\n   content (output + input bar) lifts without touching the sidebars. */\n#root > div[data-slot=\"root\"] > div > div:nth-child(2) {\n  margin-bottom: var(--dsh-sidebar-height, 0px);\n  transition: margin-bottom var(--ds-transition-duration-slow) var(--ds-ease-in-out);\n}\n\n/* When the sidebar is collapsed, the toggle cluster reclaims the top-right\n   corner. Push the DSH session header's right padding out so its right-aligned\n   utilities (the \"Session log\" download capsule) yield the corner instead of\n   hiding under the cluster. The header default right-pads 28px; the 2-button\n   cluster spans right 10→70px, so 78px clears it with an 8px gap. Anchor on\n   the header's slot host wrapper ([data-slot=\"conversation.session.header\"])\n   rather than a positional path: DSH 0.1.x nests the header several levels\n   under the center column. The Sidebar shell toggles the body attribute with\n   the panel open state. */\nbody[data-dsh-sidebar-collapsed] [data-slot=\"conversation.session.header\"] > header {\n  padding-right: 78px;\n}\n\nbody[data-dsh-sidebar-dragging] #root,\nbody[data-dsh-sidebar-dragging] #root > div[data-slot=\"root\"] > div > div:nth-child(2) {\n  transition: none;\n}\n\n@media (prefers-reduced-motion: reduce) {\n  #root,\n  #root > div[data-slot=\"root\"] > div > div:nth-child(2) {\n    transition: none;\n  }\n}\n";
 		const tagId = "cocode/cocode-sidebar/layout.css";
@@ -9262,6 +9442,9 @@ window.__ModuleLoader__.load({
 			"workspaces",
 			"locale"
 		];
+		function isChinese() {
+			return document.documentElement.lang.toLowerCase().startsWith("zh") || navigator.language.toLowerCase().startsWith("zh");
+		}
 		/**
 		* Error boundary over the sidebar tree (root scope): a render error in the
 		* sidebar SHELL itself must never blank the page silently — the shared
@@ -9383,6 +9566,12 @@ window.__ModuleLoader__.load({
 						service
 					})
 				}, SideCardSection));
+				ctx.slots.inject("settings.section", () => ctx.slots.register({
+					name: "settings.section",
+					id: "diagnostics",
+					order: 900,
+					label: () => isChinese() ? "诊断" : "Diagnostics"
+				}, DiagnosticsSection));
 			} catch (error) {
 				fail("load", error);
 			}

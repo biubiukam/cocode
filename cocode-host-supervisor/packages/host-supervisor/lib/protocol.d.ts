@@ -40,6 +40,7 @@ export interface HostDescriptor {
 export interface HostLease {
     leaseId: string;
     expiresAt: string;
+    logDirectory: string;
     descriptor: HostDescriptor;
     renew(): Promise<void>;
     release(): Promise<void>;

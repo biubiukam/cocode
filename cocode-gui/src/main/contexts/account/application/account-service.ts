@@ -20,6 +20,7 @@ import { listenForCallback as createCallbackListener } from "../infrastructure/c
 import { CleanupPendingStore, type CleanupPendingState } from "../infrastructure/cleanup-pending"
 import { SecureVault } from "../infrastructure/secure-vault"
 import { SharedAccountStore } from "../infrastructure/shared-account-store"
+import type { DesktopLogger } from "../../../shared/logging/desktop-logger"
 
 const CLOUD_PROVIDER = "cocode-cloud"
 const CLOUD_NAMESPACE = "llm-pi-ai"
@@ -242,6 +243,7 @@ export class AccountService {
 		private readonly dsh: AccountDshPort,
 		agency: AccountAgency = new AgencyClient(),
 		dependencies: Partial<AccountServiceDependencies> = {},
+		private readonly logger?: DesktopLogger,
 	) {
 		this.agency = agency
 		this.identity = dependencies.identity ?? new SharedAccountStore()
@@ -941,10 +943,14 @@ export class AccountService {
 
 	private logFailure(operation: string, error: unknown): void {
 		const detail = safeError(error, "account-operation-failed")
-		console.error("[cocode-account]", operation, {
-			stage: this.stage ?? "unknown",
-			code: detail.code,
-			message: detail.message,
+		this.logger?.log("error", "account.operation.failed", {
+			outcome: "failure",
+			error,
+			attributes: {
+				operation,
+				stage: this.stage ?? "unknown",
+				code: detail.code,
+			},
 		})
 	}
 }

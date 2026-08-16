@@ -22,6 +22,7 @@ import { registerLinkInterception } from './link-intercept.ts'
 import { registerImeGuard } from './ime-guard.ts'
 import { loadPrefs } from './prefs.ts'
 import { SideCardSection } from './SideCardSection.tsx'
+import { DiagnosticsSection } from './DiagnosticsSection.tsx'
 import { api } from './api.ts'
 import { LOCALE_NS, attachLocale, t, zh, en } from './locales.ts'
 import css from './sidebar.module.css'
@@ -30,6 +31,10 @@ import './layout.css'
 /** Services required before mounting (provided by the client runtime; the
  *  locale service backs the sidebar's copy — see locales.ts). */
 export const inject = ['slots', 'sessions', 'connection', 'workspaces', 'locale']
+
+function isChinese(): boolean {
+  return document.documentElement.lang.toLowerCase().startsWith('zh') || navigator.language.toLowerCase().startsWith('zh')
+}
 
 /**
  * Error boundary over the sidebar tree (root scope): a render error in the
@@ -206,6 +211,13 @@ export function apply(ctx: Context): void {
       label: () => t('settingsNav'),
       inject: () => ({ store: sidebarStore, service }),
     }, SideCardSection))
+
+    ctx.slots.inject('settings.section', () => ctx.slots.register({
+      name: 'settings.section',
+      id: 'diagnostics',
+      order: 900,
+      label: () => isChinese() ? '诊断' : 'Diagnostics',
+    }, DiagnosticsSection))
   } catch (error) {
     fail('load', error)
   }

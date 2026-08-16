@@ -8,7 +8,10 @@ const SESSION_FILE = /^session\.jsonl(?:\.zstd)?$/
  * Keep one broken session from preventing the whole GUI from starting.
  * Files are moved, never deleted, so recovery remains possible.
  */
-export function quarantineCorruptDshSessions(home: string): string[] {
+export function quarantineCorruptDshSessions(
+	home: string,
+	onQuarantined?: (file: string, destination: string) => void,
+): string[] {
 	const corrupted: string[] = []
 	for (const file of findSessionFiles(path.join(home, "sessions"))) {
 		try {
@@ -26,11 +29,15 @@ export function quarantineCorruptDshSessions(home: string): string[] {
 	)
 	const moved: string[] = []
 	for (const file of corrupted) {
-		const destination = uniqueDestination(recoveryRoot, path.basename(path.dirname(file)), path.basename(file))
+		const destination = uniqueDestination(
+			recoveryRoot,
+			path.basename(path.dirname(file)),
+			path.basename(file),
+		)
 		mkdirSync(path.dirname(destination), { recursive: true, mode: 0o700 })
 		renameSync(file, destination)
 		moved.push(destination)
-		console.warn(`[dsh] quarantined corrupt session ${path.basename(path.dirname(file))} -> ${destination}`)
+		onQuarantined?.(file, destination)
 	}
 	return moved
 }
@@ -38,7 +45,11 @@ export function quarantineCorruptDshSessions(home: string): string[] {
 function findSessionFiles(root: string): string[] {
 	const files: string[] = []
 	let entries
-	try { entries = readdirSync(root, { withFileTypes: true }) } catch { return files }
+	try {
+		entries = readdirSync(root, { withFileTypes: true })
+	} catch {
+		return files
+	}
 	for (const entry of entries) {
 		const entryPath = path.join(root, entry.name)
 		if (entry.isDirectory()) files.push(...findSessionFiles(entryPath))
@@ -65,20 +76,29 @@ function isCorruptSession(file: string): boolean {
 	return false
 }
 
-function storedRecordLength(record: any): number | undefined {
-	if (record && typeof record === "object" && typeof record.seq === "number") return 1
+function storedRecordLength(record: unknown): number | undefined {
+	if (
+		record &&
+		typeof record === "object" &&
+		typeof (record as { seq?: unknown }).seq === "number"
+	)
+		return 1
 	if (!record || typeof record !== "object") return undefined
-	if (record.type === "text-chunks" || record.type === "reasoning-chunks") {
-		return Array.isArray(record.data?.texts) ? record.data.texts.length : undefined
+	const value = record as { type?: unknown; data?: { texts?: unknown; args?: unknown } }
+	if (value.type === "text-chunks" || value.type === "reasoning-chunks") {
+		return Array.isArray(value.data?.texts) ? value.data.texts.length : undefined
 	}
-	if (record.type === "tool-call-chunks") {
-		return Array.isArray(record.data?.args) ? record.data.args.length : undefined
+	if (value.type === "tool-call-chunks") {
+		return Array.isArray(value.data?.args) ? value.data.args.length : undefined
 	}
 	return undefined
 }
 
 function isCorruptionError(error: unknown): boolean {
-	return error instanceof Error && /corrupt session log|Zstandard session log|empty or header-less/i.test(error.message)
+	return (
+		error instanceof Error &&
+		/corrupt session log|Zstandard session log|empty or header-less/i.test(error.message)
+	)
 }
 
 function uniqueDestination(root: string, sessionDir: string, filename: string): string {
@@ -92,5 +112,10 @@ function uniqueDestination(root: string, sessionDir: string, filename: string): 
 }
 
 function exists(file: string): boolean {
-	try { statSync(file); return true } catch { return false }
+	try {
+		statSync(file)
+		return true
+	} catch {
+		return false
+	}
 }

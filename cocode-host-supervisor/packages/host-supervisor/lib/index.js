@@ -207,6 +207,7 @@ var LocalHostSupervisorClient = class {
     return {
       leaseId: result.leaseId,
       expiresAt: result.expiresAt,
+      logDirectory: join2(directory, "logs", "host"),
       descriptor: result.descriptor,
       renew,
       release: async () => {

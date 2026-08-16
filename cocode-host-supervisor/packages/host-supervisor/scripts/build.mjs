@@ -30,6 +30,12 @@ await build({
   entryPoints: [join(packageRoot, 'src/bin.ts')],
   outfile: join(lib, 'bin.js'),
   bundle: true,
+  // Keep Pino as a normal runtime dependency. Its package intentionally uses
+  // Node's dynamic require path for platform helpers; bundling it into an ESM
+  // file makes esbuild emit a runtime-incompatible `__require` shim. The
+  // staging step materializes the Supervisor dependency closure, so the
+  // external import remains self-contained in packaged Desktop builds.
+  external: ['pino'],
   format: 'esm',
   platform: 'node',
   target: 'node22',

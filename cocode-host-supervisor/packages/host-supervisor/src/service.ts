@@ -7,6 +7,7 @@ import { endpointFor, descriptorPath, leaseDirectory, lockPath, scopePath } from
 import { listenLineServer } from './ipc.js'
 import { canonicalizeScope, HOST_PROTOCOL_REVISION, hostKey, isHostDescriptorCompatible, leaseId as makeLeaseId, LEASE_TTL_MS, SUPERVISOR_BUILD_REVISION, SUPERVISOR_PROTOCOL_REVISION, type AcquireHostRequest, type HostDescriptor, type HostScope } from './protocol.js'
 import { prepareRuntimeSlot } from './runtime.js'
+import { HostLogger } from './logging.js'
 
 type LeaseRecord = { leaseId: string; clientKind: string; pid: number; createdAt: string; expiresAt: string }
 type AcquireRequest = AcquireHostRequest & { clientPid?: number }
@@ -15,9 +16,17 @@ type HostProcess = { child: ReturnType<typeof spawn> | null; descriptor: HostDes
 export async function runSupervisorService(stateDirectory: string): Promise<void> {
   mkdirSync(stateDirectory, { recursive: true, mode: 0o700 })
   const scope = JSON.parse(readFileSync(scopePath(stateDirectory), 'utf8')) as HostScope
-  const service = new SupervisorService(stateDirectory, scope)
-  await service.start()
-  await service.wait()
+  const logger = new HostLogger({ stateDirectory })
+  const service = new SupervisorService(stateDirectory, scope, logger)
+  try {
+    await service.start()
+    await service.wait()
+  } catch (error) {
+    logger.log('fatal', 'supervisor.failed', { error: error instanceof Error ? error.message : String(error) })
+    throw error
+  } finally {
+    logger.close()
+  }
 }
 
 class SupervisorService {
@@ -29,9 +38,10 @@ class SupervisorService {
   private hadHost = false
   private lockOwned = false
 
-  constructor(private readonly directory: string, private readonly scope: HostScope) {}
+  constructor(private readonly directory: string, private readonly scope: HostScope, private readonly logger: HostLogger) {}
 
   async start(): Promise<void> {
+    this.logger.log('info', 'supervisor.start', { pid: process.pid })
     mkdirSync(leaseDirectory(this.directory), { recursive: true, mode: 0o700 })
     this.acquireLock()
     this.loadLeases()
@@ -99,6 +109,7 @@ class SupervisorService {
 
   private async acquire(request: AcquireRequest): Promise<{ leaseId: string; expiresAt: string; descriptor: HostDescriptor }> {
     this.cleanupLeases()
+    this.logger.log('debug', 'host.lease.acquire.started', { clientKind: request.clientKind, hostKey: hostKey(this.scope), requiredServices: request.requiredServices.join(',') })
     const requestedScope = canonicalizeScope(request.scope)
     if (JSON.stringify(requestedScope) !== JSON.stringify(this.scope)) {
       throw new Error('Host scope does not match this Supervisor scope')
@@ -121,6 +132,7 @@ class SupervisorService {
     this.leases.set(id, record)
     this.persistLease(record)
     if (this.host?.idleTimer) { clearTimeout(this.host.idleTimer); delete this.host.idleTimer }
+    this.logger.log('info', 'host.lease.acquired', { clientKind: request.clientKind, leaseId: shortId(id), leaseCount: this.leases.size })
     return { leaseId: id, expiresAt, descriptor: this.host!.descriptor }
   }
 
@@ -132,30 +144,70 @@ class SupervisorService {
     mkdirSync(workspace, { recursive: true })
     const args = this.scope.profile === 'web' ? ['web'] : ['--profile', this.scope.profile]
     args.push('--patch', slot.patch, '--port', '0')
+    this.logger.log('info', 'dsh.host.spawn.started', { profile: this.scope.profile, runtimeChannel: this.scope.runtimeChannel })
     const child = spawn(process.execPath, [slot.entry, ...args], {
       cwd: workspace,
       env: { ...process.env, DSH_HOME: this.scope.dshHome, COCODE_DSH_PROFILE: this.scope.profile },
       stdio: ['ignore', 'pipe', 'pipe'],
     })
-    child.once('exit', () => {
-      if (this.host?.child !== child) return
-      this.host = null
-      rmSync(descriptorPath(this.directory), { force: true })
-    })
-    let output = ''
+    const startupBuffer = new RingBuffer(256 * 1024)
+    const streamBuffers = { stdout: '', stderr: '' }
+    let readyObserved = false
+    const consume = (stream: 'stdout' | 'stderr', chunk: Buffer | string): void => {
+      const value = chunk.toString()
+      startupBuffer.push(value)
+      streamBuffers[stream] += value
+      const lines = streamBuffers[stream].split(/\r?\n/)
+      streamBuffers[stream] = lines.pop() ?? ''
+      for (const line of lines) if (line.length > 0) this.logger.hostLine(stream, line)
+      if (Buffer.byteLength(streamBuffers[stream], 'utf8') > 32 * 1024) {
+        this.logger.hostLine(stream, `${streamBuffers[stream].slice(0, 32 * 1024)} [truncated]`)
+        streamBuffers[stream] = ''
+      }
+    }
+    const flushPartialLines = (): void => {
+      for (const stream of ['stdout', 'stderr'] as const) {
+        const line = streamBuffers[stream]
+        if (line.length > 0) this.logger.hostLine(stream, line)
+        streamBuffers[stream] = ''
+      }
+    }
+    const rejectStartup = (reject: (error: Error) => void, error: Error): void => {
+      if (readyObserved) return
+      readyObserved = true
+      reject(error)
+    }
     const ready = new Promise<string>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error(`DSH Host startup timed out.\n${output}`)), 60_000)
+      const timer = setTimeout(() => rejectStartup(reject, new Error(`DSH Host startup timed out.\n${startupBuffer.value}`)), 60_000)
       const inspect = (chunk: Buffer | string) => {
-        output += chunk.toString()
-        const match = output.match(/dsh web: (http:\/\/127\.0\.0\.1:\d+)/)
-        if (match?.[1]) { clearTimeout(timer); resolve(match[1]) }
+        consume('stdout', chunk)
+        const match = startupBuffer.value.match(/dsh web: (http:\/\/127\.0\.0\.1:\d+)/)
+        if (match?.[1] && !readyObserved) { readyObserved = true; clearTimeout(timer); resolve(match[1]) }
       }
       child.stdout?.on('data', inspect)
-      child.stderr?.on('data', (chunk) => { output += chunk.toString() })
-      child.once('error', (error) => { clearTimeout(timer); reject(error) })
-      child.once('exit', (code) => { if (code !== null) { clearTimeout(timer); reject(new Error(`DSH Host exited before ready: ${String(code)}\n${output}`)) } })
+      child.stderr?.on('data', (chunk) => consume('stderr', chunk))
+      child.once('error', (error) => {
+        clearTimeout(timer)
+        this.logger.log('error', 'dsh.host.spawn.failed', { errorCode: String((error as NodeJS.ErrnoException).code ?? 'unknown') })
+        rejectStartup(reject, error instanceof Error ? error : new Error(String(error)))
+      })
+      child.once('exit', (code, signal) => {
+        flushPartialLines()
+        clearTimeout(timer)
+        this.logger.log('error', readyObserved ? 'dsh.host.exit' : 'dsh.host.exit.before-ready', {
+          exitCode: code ?? -1,
+          signal: signal ?? 'none',
+          hostPid: child.pid ?? -1,
+        })
+        if (!readyObserved) rejectStartup(reject, new Error(`DSH Host exited before ready: ${String(code ?? signal ?? 'unknown')}\n${startupBuffer.value}`))
+        if (this.host?.child === child) {
+          this.host = null
+          rmSync(descriptorPath(this.directory), { force: true })
+        }
+      })
     })
     const webUrl = await ready
+    startupBuffer.clear()
     await waitHttp(webUrl)
     await waitJsonRpc(jsonRpcEndpoint)
     const runtimeVersion = slot.version
@@ -181,17 +233,19 @@ class SupervisorService {
     this.host = { child, descriptor }
     this.hadHost = true
     this.writeDescriptor(descriptor)
+    this.logger.log('info', 'dsh.host.ready', { hostPid: child.pid ?? -1, endpoint: webUrl })
   }
 
   private async status(): Promise<HostDescriptor | null> { return this.host?.descriptor ?? this.readDescriptor() }
-  private renew(id: string): { expiresAt: string } { const record = this.leases.get(id); if (!record) throw new Error('unknown lease'); record.expiresAt = new Date(Date.now() + LEASE_TTL_MS).toISOString(); this.persistLease(record); return { expiresAt: record.expiresAt } }
-  private async release(id: string): Promise<Record<string, never>> { this.leases.delete(id); rmSync(join(leaseDirectory(this.directory), `${id}.json`), { force: true }); if (this.leases.size === 0 && this.host) this.armIdleShutdown(); return {} }
-  private armIdleShutdown(): void { if (!this.host || this.host.idleTimer) return; this.host.idleTimer = setTimeout(() => { void this.stopHost() }, Number(process.env.COCODE_HOST_IDLE_TIMEOUT_MS ?? 20_000)); this.host.idleTimer.unref?.() }
+  private renew(id: string): { expiresAt: string } { const record = this.leases.get(id); if (!record) throw new Error('unknown lease'); record.expiresAt = new Date(Date.now() + LEASE_TTL_MS).toISOString(); this.persistLease(record); this.logger.log('debug', 'host.lease.renewed', { leaseId: shortId(id) }); return { expiresAt: record.expiresAt } }
+  private async release(id: string): Promise<Record<string, never>> { const existed = this.leases.delete(id); rmSync(join(leaseDirectory(this.directory), `${id}.json`), { force: true }); this.logger.log(existed ? 'info' : 'warn', existed ? 'host.lease.released' : 'host.lease.release.unknown', { leaseId: shortId(id), leaseCount: this.leases.size }); if (this.leases.size === 0 && this.host) this.armIdleShutdown(); return {} }
+  private armIdleShutdown(): void { if (!this.host || this.host.idleTimer) return; const timeoutMs = Number(process.env.COCODE_HOST_IDLE_TIMEOUT_MS ?? 20_000); this.logger.log('info', 'dsh.host.idle-shutdown.armed', { timeoutMs }); this.host.idleTimer = setTimeout(() => { void this.stopHost() }, timeoutMs); this.host.idleTimer.unref?.() }
   private async stopHost(): Promise<void> {
     const host = this.host
     if (!host) return
     this.host = null
     const pid = host.child?.pid ?? host.descriptor.hostPid
+    this.logger.log('info', 'dsh.host.stop.started', { hostPid: pid })
     if (pid > 0 && isProcessAlive(pid)) {
       try {
         if (host.child !== null) host.child.kill('SIGTERM')
@@ -203,8 +257,9 @@ class SupervisorService {
       }
     }
     rmSync(descriptorPath(this.directory), { force: true })
+    this.logger.log('info', 'dsh.host.stop.completed', { hostPid: pid })
   }
-  private cleanupLeases(): void { const now = Date.now(); for (const record of this.leases.values()) if (Date.parse(record.expiresAt) <= now) { this.leases.delete(record.leaseId); rmSync(join(leaseDirectory(this.directory), `${record.leaseId}.json`), { force: true }) } }
+  private cleanupLeases(): void { const now = Date.now(); for (const record of this.leases.values()) if (Date.parse(record.expiresAt) <= now) { this.leases.delete(record.leaseId); rmSync(join(leaseDirectory(this.directory), `${record.leaseId}.json`), { force: true }); this.logger.log('warn', 'host.lease.expired', { leaseId: shortId(record.leaseId), clientKind: record.clientKind }) } }
   private loadLeases(): void { for (const file of readdirSync(leaseDirectory(this.directory), { withFileTypes: true })) { if (!file.name.endsWith('.json')) continue; try { const record = JSON.parse(readFileSync(join(leaseDirectory(this.directory), file.name), 'utf8')) as LeaseRecord; if (Date.parse(record.expiresAt) > Date.now()) this.leases.set(record.leaseId, record) } catch { rmSync(join(leaseDirectory(this.directory), file.name), { force: true }) } } }
   private persistLease(record: LeaseRecord): void { writeFileSync(join(leaseDirectory(this.directory), `${record.leaseId}.json`), JSON.stringify(record) + '\n', { mode: 0o600 }) }
   private writeDescriptor(descriptor: HostDescriptor): void { const temp = `${descriptorPath(this.directory)}.${process.pid}.tmp`; writeFileSync(temp, JSON.stringify(descriptor, null, 2) + '\n', { mode: 0o600 }); renameSync(temp, descriptorPath(this.directory)) }
@@ -265,6 +320,25 @@ class SupervisorService {
     this.hadHost = true
     if (this.leases.size === 0) this.armIdleShutdown()
   }
+}
+
+function shortId(value: string): string { return value.slice(0, 8) }
+
+class RingBuffer {
+  private buffer = Buffer.alloc(0)
+
+  constructor(private readonly maxBytes: number) {}
+
+  push(value: string): void {
+    const incoming = Buffer.from(value)
+    this.buffer = Buffer.concat([this.buffer, incoming])
+    if (this.buffer.byteLength <= this.maxBytes) return
+    this.buffer = this.buffer.subarray(-this.maxBytes)
+  }
+
+  get value(): string { return this.buffer.toString('utf8') }
+
+  clear(): void { this.buffer = Buffer.alloc(0) }
 }
 
 async function waitHttp(url: string): Promise<void> { const deadline = Date.now() + 30_000; while (Date.now() < deadline) { try { const response = await fetch(url); if (response.ok) return } catch {} await new Promise((resolve) => setTimeout(resolve, 100)) } throw new Error(`DSH Web service did not become ready at ${url}`) }

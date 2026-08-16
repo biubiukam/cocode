@@ -46,6 +46,7 @@ export class LocalHostSupervisorClient implements HostSupervisorClient {
     return {
       leaseId: result.leaseId,
       expiresAt: result.expiresAt,
+      logDirectory: join(directory, 'logs', 'host'),
       descriptor: result.descriptor,
       renew,
       release: async () => {

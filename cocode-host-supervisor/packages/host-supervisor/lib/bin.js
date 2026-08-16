@@ -1,8 +1,8 @@
 // packages/host-supervisor/src/service.ts
 import net2 from "node:net";
-import { closeSync, mkdirSync as mkdirSync2, openSync, readFileSync as readFileSync2, readdirSync as readdirSync2, rmSync as rmSync2, writeFileSync as writeFileSync2, renameSync } from "node:fs";
+import { closeSync as closeSync2, mkdirSync as mkdirSync3, openSync as openSync2, readFileSync as readFileSync2, readdirSync as readdirSync3, rmSync as rmSync2, writeFileSync as writeFileSync2, renameSync as renameSync2 } from "node:fs";
 import { spawn } from "node:child_process";
-import { join as join3 } from "node:path";
+import { join as join4 } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // packages/host-supervisor/src/paths.ts
@@ -341,21 +341,246 @@ function resolvePackageRoot(require2, packageName) {
   throw new Error(`package root not found for ${packageName}`);
 }
 
+// packages/host-supervisor/src/logging.ts
+import { createReadStream, createWriteStream, existsSync as existsSync2, mkdirSync as mkdirSync2, openSync, readdirSync as readdirSync2, statSync, unlinkSync, closeSync, writeSync, renameSync, fsyncSync } from "node:fs";
+import { randomUUID as randomUUID2 } from "node:crypto";
+import { createGzip } from "node:zlib";
+import { pipeline } from "node:stream/promises";
+import { join as join3 } from "node:path";
+import pino from "pino";
+import { Writable } from "node:stream";
+var MAX_BYTES = 20 * 1024 * 1024;
+var MAX_FILES = 5;
+var MAX_TOTAL_BYTES = 100 * 1024 * 1024;
+var HostFileSink = class extends Writable {
+  directory;
+  currentPath;
+  fd = null;
+  bytes = 0;
+  openedDate = "";
+  available = true;
+  constructor(directory) {
+    super();
+    this.directory = directory;
+    this.currentPath = join3(directory, "current.jsonl");
+    try {
+      mkdirSync2(directory, { recursive: true, mode: 448 });
+      this.open();
+      this.prune();
+    } catch (error) {
+      this.available = false;
+      try {
+        process.stderr.write(`[cocode-host-log] ${String(error)}
+`);
+      } catch {
+      }
+    }
+  }
+  _write(chunk, _encoding, callback) {
+    if (!this.available) {
+      callback();
+      return;
+    }
+    try {
+      const value = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      this.rotateIfNeeded(value.length);
+      if (this.fd === null) this.open();
+      writeSync(this.fd, value);
+      this.bytes += value.length;
+      callback();
+    } catch (error) {
+      this.available = false;
+      try {
+        process.stderr.write(`[cocode-host-log] ${String(error)}
+`);
+      } catch {
+      }
+      callback();
+    }
+  }
+  flush() {
+    if (!this.available || this.fd === null) return;
+    try {
+      fsyncSync(this.fd);
+    } catch (error) {
+      this.available = false;
+      try {
+        process.stderr.write(`[cocode-host-log] ${String(error)}
+`);
+      } catch {
+      }
+    }
+  }
+  close() {
+    if (this.fd === null) return;
+    try {
+      fsyncSync(this.fd);
+    } catch {
+    }
+    closeSync(this.fd);
+    this.fd = null;
+  }
+  open() {
+    mkdirSync2(this.directory, { recursive: true, mode: 448 });
+    this.fd = openSync(this.currentPath, "a", 384);
+    const existing = existsSync2(this.currentPath) ? statSync(this.currentPath) : void 0;
+    this.bytes = existing?.size ?? 0;
+    this.openedDate = existing === void 0 || existing.size === 0 ? (/* @__PURE__ */ new Date()).toISOString().slice(0, 10) : new Date(existing.mtimeMs).toISOString().slice(0, 10);
+  }
+  rotateIfNeeded(incomingBytes) {
+    const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+    if (this.bytes === 0 || this.bytes + incomingBytes <= MAX_BYTES && this.openedDate === today) return;
+    this.close();
+    const stamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
+    const rotated = join3(this.directory, `host-${stamp}.jsonl`);
+    if (!renameCurrent(this.currentPath, rotated)) {
+      try {
+        this.open();
+      } catch {
+        this.available = false;
+      }
+      return;
+    }
+    try {
+      this.open();
+    } catch {
+      this.available = false;
+      return;
+    }
+    void this.compress(rotated);
+    this.prune();
+  }
+  async compress(file) {
+    const compressed = `${file}.gz`;
+    try {
+      await pipeline(createReadStream(file), createGzip({ level: 6 }), createWriteStream(compressed, { mode: 384 }));
+      unlinkSync(file);
+    } catch {
+      try {
+        unlinkSync(compressed);
+      } catch {
+      }
+    }
+  }
+  prune() {
+    const files = readdirSync2(this.directory).filter((file) => file.startsWith("host-") && (file.endsWith(".jsonl") || file.endsWith(".jsonl.gz"))).map((file) => ({ file, stat: statSync(join3(this.directory, file)) })).sort((a, b) => b.stat.mtimeMs - a.stat.mtimeMs);
+    let total = files.reduce((sum, entry) => sum + entry.stat.size, 0);
+    const now = Date.now();
+    for (const [index, entry] of files.entries()) {
+      const expired = now - entry.stat.mtimeMs > 7 * 24 * 60 * 60 * 1e3;
+      if (!expired && index < MAX_FILES && total <= MAX_TOTAL_BYTES) continue;
+      try {
+        unlinkSync(join3(this.directory, entry.file));
+        total -= entry.stat.size;
+      } catch {
+      }
+    }
+  }
+};
+var HostLogger = class {
+  logDirectory;
+  sink;
+  logger;
+  appRunId = randomUUID2();
+  constructor(options) {
+    this.logDirectory = join3(options.stateDirectory, "logs", "host");
+    this.sink = new HostFileSink(this.logDirectory);
+    this.logger = pino({
+      base: null,
+      level: "info",
+      timestamp: false,
+      formatters: { level: (label) => ({ severityText: label.toUpperCase() }) },
+      mixin: () => ({
+        timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+        serviceName: "cocode-host-supervisor",
+        serviceVersion: options.runtimeVersion ?? "unknown",
+        appRunId: this.appRunId
+      })
+    }, this.sink);
+  }
+  log(level, eventName, attributes) {
+    const method = this.logger[level];
+    method.call(this.logger, {
+      eventName: safeText(eventName, 128),
+      processType: "supervisor",
+      component: "host-supervisor",
+      ...attributes === void 0 ? {} : { attributes: sanitizeAttributes(attributes) }
+    });
+  }
+  hostLine(stream, line) {
+    const safe = sanitizeHostLine(line);
+    this.logger.info({
+      eventName: stream === "stderr" ? "dsh.host.stderr" : "dsh.host.stdout",
+      processType: "dsh-host",
+      component: "dsh-host",
+      attributes: { stream, line: safe.text, truncated: safe.truncated }
+    });
+  }
+  flush() {
+    try {
+      this.logger.flush();
+    } catch {
+    }
+    this.sink.flush();
+  }
+  close() {
+    this.flush();
+    this.sink.close();
+  }
+};
+function renameCurrent(current, rotated) {
+  try {
+    renameSync(current, rotated);
+    return true;
+  } catch {
+    return false;
+  }
+}
+function safeText(value, maxLength) {
+  return value.replace(/[\r\n]/g, " ").replaceAll(String.fromCharCode(0), " ").slice(0, maxLength);
+}
+function sanitizeAttributes(attributes) {
+  const sensitive = /(?:authorization|cookie|password|passwd|secret|token|api[-_]?key|credential|oauth|prompt|completion|response|body|headers?|args?|output|clipboard|env)/i;
+  const result = {};
+  for (const [key, value] of Object.entries(attributes).slice(0, 64)) {
+    result[key] = sensitive.test(key) ? "[REDACTED]" : typeof value === "string" ? redactText(value) : value;
+  }
+  return result;
+}
+function sanitizeHostLine(value) {
+  const redacted = redactText(value);
+  const text = redacted.slice(0, 32768);
+  return { text, truncated: redacted.length > text.length };
+}
+function redactText(value) {
+  return safeText(value, 65536).replace(/((?:https?|wss?):\/\/[^\s?#]+)(?:\?[^\s#]*)?(?:#[^\s]*)?/gi, "$1").replace(/("(?:prompt|content|arguments|tool(?:_name)?|output|token|secret|password|api[-_]?key)"\s*:\s*)"[^"]*"/gi, '$1"[REDACTED]"').replace(/\b(?:prompt|content|arguments|tool(?:_name)?|output|token|secret|password|api[-_]?key)\s*[:=]\s*[^\s,;]+/gi, "[REDACTED]").replace(/\b(?:Bearer\s+)?(?:sk-|token[-_ ]?|password\s*[=:])[^\s,;]+/gi, "[REDACTED]");
+}
+
 // packages/host-supervisor/src/service.ts
 async function runSupervisorService(stateDirectory) {
-  mkdirSync2(stateDirectory, { recursive: true, mode: 448 });
+  mkdirSync3(stateDirectory, { recursive: true, mode: 448 });
   const scope = JSON.parse(readFileSync2(scopePath(stateDirectory), "utf8"));
-  const service = new SupervisorService(stateDirectory, scope);
-  await service.start();
-  await service.wait();
+  const logger = new HostLogger({ stateDirectory });
+  const service = new SupervisorService(stateDirectory, scope, logger);
+  try {
+    await service.start();
+    await service.wait();
+  } catch (error) {
+    logger.log("fatal", "supervisor.failed", { error: error instanceof Error ? error.message : String(error) });
+    throw error;
+  } finally {
+    logger.close();
+  }
 }
 var SupervisorService = class {
-  constructor(directory, scope) {
+  constructor(directory, scope, logger) {
     this.directory = directory;
     this.scope = scope;
+    this.logger = logger;
   }
   directory;
   scope;
+  logger;
   get endpoint() {
     return endpointFor(this.directory);
   }
@@ -366,7 +591,8 @@ var SupervisorService = class {
   hadHost = false;
   lockOwned = false;
   async start() {
-    mkdirSync2(leaseDirectory(this.directory), { recursive: true, mode: 448 });
+    this.logger.log("info", "supervisor.start", { pid: process.pid });
+    mkdirSync3(leaseDirectory(this.directory), { recursive: true, mode: 448 });
     this.acquireLock();
     this.loadLeases();
     this.server = net2.createServer((socket) => this.accept(socket));
@@ -447,6 +673,7 @@ var SupervisorService = class {
   }
   async acquire(request) {
     this.cleanupLeases();
+    this.logger.log("debug", "host.lease.acquire.started", { clientKind: request.clientKind, hostKey: hostKey(this.scope), requiredServices: request.requiredServices.join(",") });
     const requestedScope = canonicalizeScope(request.scope);
     if (JSON.stringify(requestedScope) !== JSON.stringify(this.scope)) {
       throw new Error("Host scope does not match this Supervisor scope");
@@ -470,55 +697,87 @@ var SupervisorService = class {
       clearTimeout(this.host.idleTimer);
       delete this.host.idleTimer;
     }
+    this.logger.log("info", "host.lease.acquired", { clientKind: request.clientKind, leaseId: shortId(id), leaseCount: this.leases.size });
     return { leaseId: id, expiresAt, descriptor: this.host.descriptor };
   }
   async startHost(request) {
-    const jsonRpcEndpoint = process.platform === "win32" ? `\\\\.\\pipe\\cocode-dsh-jsonrpc-${hostKey(this.scope)}` : join3(this.directory, "dsh-jsonrpc.sock");
+    const jsonRpcEndpoint = process.platform === "win32" ? `\\\\.\\pipe\\cocode-dsh-jsonrpc-${hostKey(this.scope)}` : join4(this.directory, "dsh-jsonrpc.sock");
     const pluginPath = fileURLToPath(new URL("./host-jsonrpc-plugin.js", import.meta.url));
     const slot = prepareRuntimeSlot(this.scope, jsonRpcEndpoint, pluginPath);
-    const workspace = join3(this.scope.dshHome, "workspaces", "default");
-    mkdirSync2(workspace, { recursive: true });
+    const workspace = join4(this.scope.dshHome, "workspaces", "default");
+    mkdirSync3(workspace, { recursive: true });
     const args2 = this.scope.profile === "web" ? ["web"] : ["--profile", this.scope.profile];
     args2.push("--patch", slot.patch, "--port", "0");
+    this.logger.log("info", "dsh.host.spawn.started", { profile: this.scope.profile, runtimeChannel: this.scope.runtimeChannel });
     const child = spawn(process.execPath, [slot.entry, ...args2], {
       cwd: workspace,
       env: { ...process.env, DSH_HOME: this.scope.dshHome, COCODE_DSH_PROFILE: this.scope.profile },
       stdio: ["ignore", "pipe", "pipe"]
     });
-    child.once("exit", () => {
-      if (this.host?.child !== child) return;
-      this.host = null;
-      rmSync2(descriptorPath(this.directory), { force: true });
-    });
-    let output = "";
+    const startupBuffer = new RingBuffer(256 * 1024);
+    const streamBuffers = { stdout: "", stderr: "" };
+    let readyObserved = false;
+    const consume = (stream, chunk) => {
+      const value = chunk.toString();
+      startupBuffer.push(value);
+      streamBuffers[stream] += value;
+      const lines = streamBuffers[stream].split(/\r?\n/);
+      streamBuffers[stream] = lines.pop() ?? "";
+      for (const line of lines) if (line.length > 0) this.logger.hostLine(stream, line);
+      if (Buffer.byteLength(streamBuffers[stream], "utf8") > 32 * 1024) {
+        this.logger.hostLine(stream, `${streamBuffers[stream].slice(0, 32 * 1024)} [truncated]`);
+        streamBuffers[stream] = "";
+      }
+    };
+    const flushPartialLines = () => {
+      for (const stream of ["stdout", "stderr"]) {
+        const line = streamBuffers[stream];
+        if (line.length > 0) this.logger.hostLine(stream, line);
+        streamBuffers[stream] = "";
+      }
+    };
+    const rejectStartup = (reject, error) => {
+      if (readyObserved) return;
+      readyObserved = true;
+      reject(error);
+    };
     const ready = new Promise((resolve5, reject) => {
-      const timer = setTimeout(() => reject(new Error(`DSH Host startup timed out.
-${output}`)), 6e4);
+      const timer = setTimeout(() => rejectStartup(reject, new Error(`DSH Host startup timed out.
+${startupBuffer.value}`)), 6e4);
       const inspect = (chunk) => {
-        output += chunk.toString();
-        const match = output.match(/dsh web: (http:\/\/127\.0\.0\.1:\d+)/);
-        if (match?.[1]) {
+        consume("stdout", chunk);
+        const match = startupBuffer.value.match(/dsh web: (http:\/\/127\.0\.0\.1:\d+)/);
+        if (match?.[1] && !readyObserved) {
+          readyObserved = true;
           clearTimeout(timer);
           resolve5(match[1]);
         }
       };
       child.stdout?.on("data", inspect);
-      child.stderr?.on("data", (chunk) => {
-        output += chunk.toString();
-      });
+      child.stderr?.on("data", (chunk) => consume("stderr", chunk));
       child.once("error", (error) => {
         clearTimeout(timer);
-        reject(error);
+        this.logger.log("error", "dsh.host.spawn.failed", { errorCode: String(error.code ?? "unknown") });
+        rejectStartup(reject, error instanceof Error ? error : new Error(String(error)));
       });
-      child.once("exit", (code) => {
-        if (code !== null) {
-          clearTimeout(timer);
-          reject(new Error(`DSH Host exited before ready: ${String(code)}
-${output}`));
+      child.once("exit", (code, signal) => {
+        flushPartialLines();
+        clearTimeout(timer);
+        this.logger.log("error", readyObserved ? "dsh.host.exit" : "dsh.host.exit.before-ready", {
+          exitCode: code ?? -1,
+          signal: signal ?? "none",
+          hostPid: child.pid ?? -1
+        });
+        if (!readyObserved) rejectStartup(reject, new Error(`DSH Host exited before ready: ${String(code ?? signal ?? "unknown")}
+${startupBuffer.value}`));
+        if (this.host?.child === child) {
+          this.host = null;
+          rmSync2(descriptorPath(this.directory), { force: true });
         }
       });
     });
     const webUrl = await ready;
+    startupBuffer.clear();
     await waitHttp(webUrl);
     await waitJsonRpc(jsonRpcEndpoint);
     const runtimeVersion = slot.version;
@@ -544,6 +803,7 @@ ${output}`));
     this.host = { child, descriptor };
     this.hadHost = true;
     this.writeDescriptor(descriptor);
+    this.logger.log("info", "dsh.host.ready", { hostPid: child.pid ?? -1, endpoint: webUrl });
   }
   async status() {
     return this.host?.descriptor ?? this.readDescriptor();
@@ -553,19 +813,23 @@ ${output}`));
     if (!record) throw new Error("unknown lease");
     record.expiresAt = new Date(Date.now() + LEASE_TTL_MS).toISOString();
     this.persistLease(record);
+    this.logger.log("debug", "host.lease.renewed", { leaseId: shortId(id) });
     return { expiresAt: record.expiresAt };
   }
   async release(id) {
-    this.leases.delete(id);
-    rmSync2(join3(leaseDirectory(this.directory), `${id}.json`), { force: true });
+    const existed = this.leases.delete(id);
+    rmSync2(join4(leaseDirectory(this.directory), `${id}.json`), { force: true });
+    this.logger.log(existed ? "info" : "warn", existed ? "host.lease.released" : "host.lease.release.unknown", { leaseId: shortId(id), leaseCount: this.leases.size });
     if (this.leases.size === 0 && this.host) this.armIdleShutdown();
     return {};
   }
   armIdleShutdown() {
     if (!this.host || this.host.idleTimer) return;
+    const timeoutMs = Number(process.env.COCODE_HOST_IDLE_TIMEOUT_MS ?? 2e4);
+    this.logger.log("info", "dsh.host.idle-shutdown.armed", { timeoutMs });
     this.host.idleTimer = setTimeout(() => {
       void this.stopHost();
-    }, Number(process.env.COCODE_HOST_IDLE_TIMEOUT_MS ?? 2e4));
+    }, timeoutMs);
     this.host.idleTimer.unref?.();
   }
   async stopHost() {
@@ -573,6 +837,7 @@ ${output}`));
     if (!host) return;
     this.host = null;
     const pid = host.child?.pid ?? host.descriptor.hostPid;
+    this.logger.log("info", "dsh.host.stop.started", { hostPid: pid });
     if (pid > 0 && isProcessAlive(pid)) {
       try {
         if (host.child !== null) host.child.kill("SIGTERM");
@@ -588,32 +853,34 @@ ${output}`));
       }
     }
     rmSync2(descriptorPath(this.directory), { force: true });
+    this.logger.log("info", "dsh.host.stop.completed", { hostPid: pid });
   }
   cleanupLeases() {
     const now = Date.now();
     for (const record of this.leases.values()) if (Date.parse(record.expiresAt) <= now) {
       this.leases.delete(record.leaseId);
-      rmSync2(join3(leaseDirectory(this.directory), `${record.leaseId}.json`), { force: true });
+      rmSync2(join4(leaseDirectory(this.directory), `${record.leaseId}.json`), { force: true });
+      this.logger.log("warn", "host.lease.expired", { leaseId: shortId(record.leaseId), clientKind: record.clientKind });
     }
   }
   loadLeases() {
-    for (const file of readdirSync2(leaseDirectory(this.directory), { withFileTypes: true })) {
+    for (const file of readdirSync3(leaseDirectory(this.directory), { withFileTypes: true })) {
       if (!file.name.endsWith(".json")) continue;
       try {
-        const record = JSON.parse(readFileSync2(join3(leaseDirectory(this.directory), file.name), "utf8"));
+        const record = JSON.parse(readFileSync2(join4(leaseDirectory(this.directory), file.name), "utf8"));
         if (Date.parse(record.expiresAt) > Date.now()) this.leases.set(record.leaseId, record);
       } catch {
-        rmSync2(join3(leaseDirectory(this.directory), file.name), { force: true });
+        rmSync2(join4(leaseDirectory(this.directory), file.name), { force: true });
       }
     }
   }
   persistLease(record) {
-    writeFileSync2(join3(leaseDirectory(this.directory), `${record.leaseId}.json`), JSON.stringify(record) + "\n", { mode: 384 });
+    writeFileSync2(join4(leaseDirectory(this.directory), `${record.leaseId}.json`), JSON.stringify(record) + "\n", { mode: 384 });
   }
   writeDescriptor(descriptor) {
     const temp = `${descriptorPath(this.directory)}.${process.pid}.tmp`;
     writeFileSync2(temp, JSON.stringify(descriptor, null, 2) + "\n", { mode: 384 });
-    renameSync(temp, descriptorPath(this.directory));
+    renameSync2(temp, descriptorPath(this.directory));
   }
   readDescriptor() {
     try {
@@ -636,11 +903,11 @@ ${output}`));
   acquireLock() {
     for (; ; ) {
       try {
-        const fd = openSync(lockPath(this.directory), "wx", 384);
+        const fd = openSync2(lockPath(this.directory), "wx", 384);
         try {
           writeFileSync2(fd, JSON.stringify({ pid: process.pid, startedAt: (/* @__PURE__ */ new Date()).toISOString() }) + "\n");
         } finally {
-          closeSync(fd);
+          closeSync2(fd);
         }
         this.lockOwned = true;
         return;
@@ -673,6 +940,28 @@ ${output}`));
     this.host = { child: null, descriptor };
     this.hadHost = true;
     if (this.leases.size === 0) this.armIdleShutdown();
+  }
+};
+function shortId(value) {
+  return value.slice(0, 8);
+}
+var RingBuffer = class {
+  constructor(maxBytes) {
+    this.maxBytes = maxBytes;
+  }
+  maxBytes;
+  buffer = Buffer.alloc(0);
+  push(value) {
+    const incoming = Buffer.from(value);
+    this.buffer = Buffer.concat([this.buffer, incoming]);
+    if (this.buffer.byteLength <= this.maxBytes) return;
+    this.buffer = this.buffer.subarray(-this.maxBytes);
+  }
+  get value() {
+    return this.buffer.toString("utf8");
+  }
+  clear() {
+    this.buffer = Buffer.alloc(0);
   }
 };
 async function waitHttp(url) {
@@ -740,9 +1029,9 @@ import { homedir as homedir3 } from "node:os";
 import { resolve as resolve4 } from "node:path";
 
 // packages/host-supervisor/src/client.ts
-import { existsSync as existsSync3, mkdirSync as mkdirSync3, readdirSync as readdirSync3, writeFileSync as writeFileSync3 } from "node:fs";
+import { existsSync as existsSync4, mkdirSync as mkdirSync4, readdirSync as readdirSync4, writeFileSync as writeFileSync3 } from "node:fs";
 import { spawn as spawn2 } from "node:child_process";
-import { join as join4 } from "node:path";
+import { join as join5 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 var LocalHostSupervisorClient = class {
   constructor(options = {}) {
@@ -753,7 +1042,7 @@ var LocalHostSupervisorClient = class {
   async acquire(request) {
     const scope = canonicalizeScope(request.scope);
     const directory = scopeDirectory(scope);
-    mkdirSync3(directory, { recursive: true, mode: 448 });
+    mkdirSync4(directory, { recursive: true, mode: 448 });
     writeFileSync3(scopePath(directory), JSON.stringify(scope) + "\n", { mode: 384 });
     const peer = await this.connectOrStart(directory);
     let result;
@@ -781,6 +1070,7 @@ var LocalHostSupervisorClient = class {
     return {
       leaseId: result.leaseId,
       expiresAt: result.expiresAt,
+      logDirectory: join5(directory, "logs", "host"),
       descriptor: result.descriptor,
       renew,
       release: async () => {
@@ -812,11 +1102,11 @@ var LocalHostSupervisorClient = class {
       return;
     }
     const home = supervisorHome();
-    if (!existsSync3(home)) throw new Error(`unknown lease: ${leaseId2}`);
-    for (const entry of readdirSync3(home, { withFileTypes: true, encoding: "utf8" })) {
+    if (!existsSync4(home)) throw new Error(`unknown lease: ${leaseId2}`);
+    for (const entry of readdirSync4(home, { withFileTypes: true, encoding: "utf8" })) {
       if (!entry.isDirectory()) continue;
-      const directory = join4(home, entry.name);
-      if (!existsSync3(join4(leaseDirectory(directory), `${leaseId2}.json`))) continue;
+      const directory = join5(home, entry.name);
+      if (!existsSync4(join5(leaseDirectory(directory), `${leaseId2}.json`))) continue;
       try {
         const peer = await openLineConnection(endpointFor(directory));
         await peer.request("release", { leaseId: leaseId2 }).catch(() => void 0);

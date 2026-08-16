@@ -1,3 +1,5 @@
+import type { RendererLogger } from "../../shared/logging/renderer-logger"
+
 const TRANSPORT_PATCH_MARKER = "__DSH_DESKTOP_TRANSPORT__"
 
 interface DesktopTransportState {
@@ -11,7 +13,7 @@ interface DesktopTransportWindow extends Window {
 	[TRANSPORT_PATCH_MARKER]?: DesktopTransportState
 }
 
-export function installDshTransport(runtimeOrigin: string): void {
+export function installDshTransport(runtimeOrigin: string, logger?: RendererLogger): void {
 	const target = window as DesktopTransportWindow
 	const current = target[TRANSPORT_PATCH_MARKER]
 	if (current?.origin === runtimeOrigin) return
@@ -72,14 +74,51 @@ export function installDshTransport(runtimeOrigin: string): void {
 
 	class DshWebSocket extends PreviousWebSocket {
 		public constructor(url: string | URL, protocols?: string | string[]) {
-			super(rewriteDshWebSocketUrl(url, currentOrigin, currentHref, runtimeOrigin), protocols)
+			const rewritten = rewriteDshWebSocketUrl(url, currentOrigin, currentHref, runtimeOrigin)
+			const started = performance.now()
+			super(rewritten, protocols)
+			const path = safePath(rewritten)
+			this.addEventListener("open", () =>
+				logger?.log("info", "renderer.websocket.connected", {
+					component: "dsh-transport",
+					durationMs: performance.now() - started,
+					attributes: { path },
+				}),
+			)
+			this.addEventListener("close", (event) =>
+				logger?.log("warn", "renderer.websocket.disconnected", {
+					component: "dsh-transport",
+					durationMs: performance.now() - started,
+					attributes: { path, code: event.code, reason: safeText(event.reason) },
+				}),
+			)
+			this.addEventListener("error", () =>
+				logger?.warn("renderer.websocket.error", {
+					component: "dsh-transport",
+					attributes: { path },
+				}),
+			)
 		}
 	}
 	window.WebSocket = DshWebSocket
 
 	class DshEventSource extends PreviousEventSource {
 		public constructor(url: string | URL, eventSourceInitDict?: EventSourceInit) {
-			super(rewriteEventSourceUrl(url, currentOrigin, runtimeOrigin), eventSourceInitDict)
+			const rewritten = rewriteEventSourceUrl(url, currentOrigin, runtimeOrigin)
+			super(rewritten, eventSourceInitDict)
+			const path = safePath(rewritten)
+			this.addEventListener("open", () =>
+				logger?.info("renderer.event-source.connected", {
+					component: "dsh-transport",
+					path,
+				}),
+			)
+			this.addEventListener("error", () =>
+				logger?.warn("renderer.event-source.error", {
+					component: "dsh-transport",
+					attributes: { path },
+				}),
+			)
 		}
 	}
 	window.EventSource = DshEventSource
@@ -159,4 +198,19 @@ function isDshDesktopWebSocketPath(pathname: string): boolean {
 
 function abortReason(signal: AbortSignal): unknown {
 	return signal.reason ?? new DOMException("The operation was aborted.", "AbortError")
+}
+
+function safePath(value: string): string {
+	try {
+		return new URL(value).pathname.slice(0, 256)
+	} catch {
+		return "<invalid-path>"
+	}
+}
+
+function safeText(value: string): string {
+	return value
+		.replace(/[\r\n]/g, " ")
+		.replaceAll(String.fromCharCode(0), " ")
+		.slice(0, 128)
 }

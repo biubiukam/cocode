@@ -5,13 +5,17 @@ import {
 	registerDatabaseIpc,
 	unregisterDatabaseIpc,
 } from "../contexts/database/presentation/ipc/register-database-ipc"
+import type { DesktopLogger } from "../shared/logging/desktop-logger"
 
 export interface DatabaseModule {
 	initialize(): void
 	dispose(): void
 }
 
-export function createDatabaseModule(homeDirectory: string): DatabaseModule {
+export function createDatabaseModule(
+	homeDirectory: string,
+	logger?: DesktopLogger,
+): DatabaseModule {
 	const provider = new BetterSqliteDatabaseRepositoryProvider(
 		new DatabasePathResolver(homeDirectory),
 	)
@@ -20,7 +24,7 @@ export function createDatabaseModule(homeDirectory: string): DatabaseModule {
 	return {
 		initialize(): void {
 			provider.getGlobalRepository()
-			registerDatabaseIpc(service)
+			registerDatabaseIpc(service, logger)
 		},
 		dispose(): void {
 			unregisterDatabaseIpc()

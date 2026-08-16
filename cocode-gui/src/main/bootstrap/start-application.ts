@@ -20,12 +20,22 @@ import {
 	registerShortcutsIpc,
 	unregisterShortcutsIpc,
 } from "../contexts/shortcuts/presentation/ipc/register-shortcuts-ipc"
+import {
+	registerDiagnosticsIpc,
+	unregisterDiagnosticsIpc,
+} from "../contexts/diagnostics/presentation/ipc/register-diagnostics-ipc"
+import { createDesktopObservability } from "../shared/observability/desktop-observability"
+import { registerElectronObservers } from "../shared/observability/register-electron-observers"
 
 export const startApplication = (): void => {
 	if (started) {
 		app.quit()
 		return
 	}
+
+	const observability = createDesktopObservability()
+	const unregisterElectronObservers = registerElectronObservers(observability.logger)
+	registerDiagnosticsIpc(observability.diagnostics, observability.logger)
 
 	let databaseModule: DatabaseModule | null = null
 	let dshRuntime: DshRuntimeProcess | null = null
@@ -35,45 +45,82 @@ export const startApplication = (): void => {
 	let dshUrl: string | null = null
 
 	registerApplicationLifecycle({
+		logger: observability.logger,
 		createWindow: () => {
 			if (!dshUrl) throw new Error("DSH runtime URL was not available after startup.")
-			mainWindow = createMainWindow(dshUrl)
+			observability.logger.log("info", "window.create.started")
+			mainWindow = createMainWindow(dshUrl, observability.logger)
 			mainWindow.once("closed", () => {
+				observability.logger.log("info", "window.closed")
 				mainWindow = null
 			})
 		},
 		onReady: async () => {
-			databaseModule = createDatabaseModule(app.getPath("home"))
-			databaseModule.initialize()
-			dshRuntime = new DshRuntimeProcess()
-			registerDshRuntimeIpc(dshRuntime)
+			observability.logger.log("info", "app.ready.started")
+			databaseModule = createDatabaseModule(app.getPath("home"), observability.logger)
+			try {
+				databaseModule.initialize()
+				observability.logger.log("info", "database.opened")
+			} catch (error) {
+				observability.logger.log("error", "database.open.failed", { error })
+				throw error
+			}
+			dshRuntime = new DshRuntimeProcess(observability.logger)
+			registerDshRuntimeIpc(dshRuntime, observability.logger)
 			dshUrl = await dshRuntime.start()
+			observability.diagnostics.setHostLogDirectory(dshRuntime.hostLogDirectory)
+			observability.logger.log("info", "dsh.host.ready", {
+				attributes: { endpoint: redactEndpoint(dshUrl) },
+			})
 			account = new AccountService(
 				new DshCloudConfigPort(dshRuntime),
 				new AgencyClient(undefined, {
 					allowOriginOverride: !app.isPackaged,
 					allowLocalHttp: !app.isPackaged,
 				}),
+				{},
+				observability.logger,
 			)
-			registerAccountIpc(account)
-			void account.hydrate()
+			registerAccountIpc(account, observability.logger)
+			void account.hydrate().then(
+				() => observability.logger.log("info", "account.hydrate.completed"),
+				(error) => observability.logger.log("warn", "account.hydrate.failed", { error }),
+			)
 			shortcuts = new ShortcutService(() => mainWindow)
-			registerShortcutsIpc(shortcuts)
+			registerShortcutsIpc(shortcuts, observability.logger)
+			observability.logger.log("info", "app.ready.completed")
 		},
 		onBeforeQuit: async () => {
-			unregisterShortcutsIpc()
-			shortcuts?.dispose()
-			shortcuts = null
-			mainWindow = null
-			unregisterAccountIpc()
-			account?.dispose()
-			account = null
-			unregisterDshRuntimeIpc()
-			databaseModule?.dispose()
-			databaseModule = null
-			await dshRuntime?.stop()
-			dshRuntime = null
-			dshUrl = null
+			observability.logger.log("info", "app.shutdown.started")
+			try {
+				unregisterDiagnosticsIpc()
+				unregisterShortcutsIpc()
+				shortcuts?.dispose()
+				shortcuts = null
+				mainWindow = null
+				unregisterAccountIpc()
+				account?.dispose()
+				account = null
+				unregisterDshRuntimeIpc()
+				databaseModule?.dispose()
+				observability.logger.log("info", "database.closed")
+				databaseModule = null
+				await dshRuntime?.stop()
+				dshRuntime = null
+				dshUrl = null
+			} finally {
+				unregisterElectronObservers()
+				observability.dispose()
+			}
 		},
 	})
+}
+
+function redactEndpoint(value: string): string {
+	try {
+		const url = new URL(value)
+		return `${url.origin}${url.pathname}`
+	} catch {
+		return "<invalid-endpoint>"
+	}
 }

@@ -1,15 +1,18 @@
 import { app, BrowserWindow } from "electron"
+import type { DesktopLogger } from "../../shared/logging/desktop-logger"
 
 export interface ApplicationLifecycleOptions {
 	readonly createWindow: () => void
 	readonly onReady?: () => void | Promise<void>
 	readonly onBeforeQuit?: () => void | Promise<void>
+	readonly logger?: DesktopLogger
 }
 
 export const registerApplicationLifecycle = ({
 	createWindow,
 	onReady,
 	onBeforeQuit,
+	logger,
 }: ApplicationLifecycleOptions): void => {
 	let quitting = false
 	let applicationReady = false
@@ -21,7 +24,7 @@ export const registerApplicationLifecycle = ({
 				applicationReady = true
 				createWindow()
 			} catch (error) {
-				console.error("Failed to start the desktop application:", error)
+				logger?.log("fatal", "app.ready.failed", { error })
 				app.quit()
 			}
 		})()
@@ -34,7 +37,7 @@ export const registerApplicationLifecycle = ({
 		void Promise.resolve(onBeforeQuit?.()).then(
 			() => app.quit(),
 			(error) => {
-				console.error("Failed to stop the desktop application cleanly:", error)
+				logger?.log("fatal", "app.shutdown.failed", { error })
 				app.exit(1)
 			},
 		)

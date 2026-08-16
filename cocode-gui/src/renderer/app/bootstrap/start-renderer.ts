@@ -4,18 +4,24 @@ import { createDshBundleLoader } from "./dsh-bundle-loader"
 import { selectDshBootEntries } from "./dsh-boot-entries"
 import { installDshTransport } from "./dsh-transport"
 import { resolveLocalDshClientBundleUrl } from "./local-dsh-client-bundles"
+import { RendererLogger } from "../../shared/logging/renderer-logger"
+
+const logger = new RendererLogger()
 
 export async function startRenderer(element: HTMLElement): Promise<void> {
+	logger.info("renderer.start.started", { component: "renderer" })
 	try {
 		if (window.desktopApi?.dsh === undefined) {
-			throw new Error("Electron preload bridge is unavailable. Start the GUI with `pnpm run dev` instead of opening the Renderer Vite page directly.")
+			throw new Error(
+				"Electron preload bridge is unavailable. Start the GUI with `pnpm run dev` instead of opening the Renderer Vite page directly.",
+			)
 		}
 		const bootstrap = await window.desktopApi.dsh.getBootstrap()
 		applyInitialTheme(bootstrap.themePreference)
 		markThemeReady()
 		const runtimeOrigin = new URL(bootstrap.origin).origin
 		window.__DSH_DESKTOP_RUNTIME_ORIGIN__ = runtimeOrigin
-		installDshTransport(runtimeOrigin)
+		installDshTransport(runtimeOrigin, logger)
 		const bootEntries = selectDshBootEntries(
 			bootstrap.boot.entries,
 			window.location.protocol === "file:",
@@ -33,9 +39,10 @@ export async function startRenderer(element: HTMLElement): Promise<void> {
 		await new AppWebEntry(element, {
 			loadBundle: createDshBundleLoader(),
 		}).run()
+		logger.info("renderer.start.completed", { component: "renderer" })
 	} catch (error) {
 		markThemeReady()
-		console.error("Failed to start the DeepSeek Harness Web UI:", error)
+		logger.error("renderer.start.failed", error, { component: "renderer" })
 		element.replaceChildren(createFailureView(error))
 	}
 }

@@ -10,12 +10,9 @@ import { parseDshRuntimeBootstrap } from "../../../../contracts/schemas/dsh-runt
 import { extractDshBootManifest, extractDshThemePreference } from "./dsh-runtime-bootstrap"
 import { assertRequiredCocodeWebEndpoints } from "./dsh-runtime-health"
 import { resolveDshHome } from "./dsh-home"
-import {
-	createHostSupervisorClient,
-	type HostLease,
-	type HostScope,
-} from "@cocode/host-supervisor"
+import { createHostSupervisorClient, type HostLease, type HostScope } from "@cocode/host-supervisor"
 import { quarantineCorruptDshSessions } from "./dsh-session-recovery"
+import type { DesktopLogger } from "../../../shared/logging/desktop-logger"
 
 const FORWARDED_REQUEST_HEADERS = new Set(["accept", "content-type", "if-none-match", "range"])
 
@@ -26,10 +23,24 @@ const FORWARDED_REQUEST_HEADERS = new Set(["accept", "content-type", "if-none-ma
 export class DshRuntimeProcess {
 	private lease: HostLease | null = null
 	private runtimeUrl: string | null = null
+	private hostLogDirectoryValue: string | undefined
+
+	public constructor(private readonly logger?: DesktopLogger) {}
+
+	public get hostLogDirectory(): string | undefined {
+		return this.hostLogDirectoryValue
+	}
 
 	public async start(): Promise<string> {
 		if (this.lease !== null) throw new Error("DSH Host lease is already active.")
-		quarantineCorruptDshSessions(resolveDshHome())
+		quarantineCorruptDshSessions(resolveDshHome(), (file, destination) => {
+			this.logger?.log("warn", "dsh.session.quarantined", {
+				attributes: {
+					sessionDirectory: path.basename(path.dirname(file)),
+					destinationDirectory: path.basename(path.dirname(destination)),
+				},
+			})
+		})
 		const scope: HostScope = {
 			dshHome: resolveDshHome(),
 			profile: process.env.DSH_PROFILE?.trim() || "web",
@@ -57,6 +68,7 @@ export class DshRuntimeProcess {
 		}
 		this.lease = lease
 		this.runtimeUrl = endpoint.endpoint
+		this.hostLogDirectoryValue = lease.logDirectory
 		return endpoint.endpoint
 	}
 
@@ -109,6 +121,7 @@ export class DshRuntimeProcess {
 		const lease = this.lease
 		this.lease = null
 		this.runtimeUrl = null
+		this.hostLogDirectoryValue = undefined
 		await lease?.release().catch(() => undefined)
 	}
 
