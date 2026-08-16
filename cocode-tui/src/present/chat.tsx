@@ -80,6 +80,7 @@ import {
   checklistStripRows,
 } from './components/ChecklistStrip.tsx'
 import {
+  dispatchComposerShortcut,
   dispatchComposerTab,
   dispatchHelpInput,
   dispatchKeyCommand,
@@ -1278,6 +1279,12 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     )
 
     if (matched !== undefined) {
+      if (
+        matched.id === 'session.interruptOrQuit' &&
+        dispatchComposerShortcut(app, snap, input, key)
+      ) {
+        return
+      }
       if (matched.emptyOnly === true && snap.composer.text !== '') return
       if (matched.id === 'editor.open') {
         openExternalEditor()
@@ -1314,12 +1321,15 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
       dispatchKeyCommand(app, matched.id, snap.composer.text)
       return
     }
+    if (dispatchComposerShortcut(app, snap, input, key)) {
+      return
+    }
     if (key.leftArrow) {
-      app.dispatch({ type: 'moveCursor', delta: -1 })
+      app.dispatch({ type: 'moveCursor', delta: -1, extendSelection: key.shift })
       return
     }
     if (key.rightArrow) {
-      app.dispatch({ type: 'moveCursor', delta: 1 })
+      app.dispatch({ type: 'moveCursor', delta: 1, extendSelection: key.shift })
       return
     }
     if (key.backspace || key.delete) {

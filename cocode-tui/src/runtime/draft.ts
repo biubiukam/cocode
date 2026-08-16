@@ -5,6 +5,12 @@
 export type DraftState = {
   text: string
   cursor: number
+  selectionAnchor?: number
+}
+
+export type DraftSelection = {
+  start: number
+  end: number
 }
 
 export function createDraft(text = '', cursor = text.length): DraftState {
@@ -18,6 +24,10 @@ export function replaceDraft(_state: DraftState, text: string, cursor = text.len
 export function insertDraft(state: DraftState, input: string): DraftState {
   const text = filterPrintableInput(input)
   if (text === '') return normalizeDraft(state)
+  const selection = selectedDraftRange(state)
+  if (selection !== undefined) {
+    return replaceDraftRange(state, selection.start, selection.end, text)
+  }
   const cursor = clampCursor(state.cursor, state.text.length)
   return {
     text: state.text.slice(0, cursor) + text + state.text.slice(cursor),
@@ -41,20 +51,67 @@ export function insertNewline(state: DraftState): DraftState {
   return insertDraft(state, '\n')
 }
 
-export function moveDraftCursor(state: DraftState, delta: number): DraftState {
+export function moveDraftCursor(
+  state: DraftState,
+  delta: number,
+  extendSelection = false,
+): DraftState {
+  const cursor = clampCursor(state.cursor, state.text.length)
+  if (!extendSelection) {
+    const selection = selectedDraftRange(state)
+    if (selection !== undefined) {
+      return createDraft(state.text, delta < 0 ? selection.start : selection.end)
+    }
+    return createDraft(state.text, cursor + Math.trunc(delta))
+  }
+  const selectionAnchor = clampCursor(state.selectionAnchor ?? cursor, state.text.length)
+  const nextCursor = clampCursor(cursor + Math.trunc(delta), state.text.length)
   return {
     text: state.text,
-    cursor: clampCursor(state.cursor + Math.trunc(delta), state.text.length),
+    cursor: nextCursor,
+    ...(nextCursor === selectionAnchor ? {} : { selectionAnchor }),
   }
 }
 
 export function backspaceDraft(state: DraftState): DraftState {
+  const selection = selectedDraftRange(state)
+  if (selection !== undefined) {
+    return replaceDraftRange(state, selection.start, selection.end, '')
+  }
   const cursor = clampCursor(state.cursor, state.text.length)
   if (cursor === 0) return { text: state.text, cursor }
   return {
     text: state.text.slice(0, cursor - 1) + state.text.slice(cursor),
     cursor: cursor - 1,
   }
+}
+
+export function selectAllDraft(state: DraftState): DraftState {
+  if (state.text === '') return createDraft()
+  return { text: state.text, cursor: state.text.length, selectionAnchor: 0 }
+}
+
+export function selectedDraftRange(state: DraftState): DraftSelection | undefined {
+  if (state.selectionAnchor === undefined) return undefined
+  const cursor = clampCursor(state.cursor, state.text.length)
+  const anchor = clampCursor(state.selectionAnchor, state.text.length)
+  if (cursor === anchor) return undefined
+  return {
+    start: Math.min(cursor, anchor),
+    end: Math.max(cursor, anchor),
+  }
+}
+
+export function selectedDraftText(state: DraftState): string {
+  const selection = selectedDraftRange(state)
+  return selection === undefined ? '' : state.text.slice(selection.start, selection.end)
+}
+
+export function deleteDraftSelection(state: DraftState): DraftState {
+  const selection = selectedDraftRange(state)
+  return selection === undefined
+    ? normalizeDraft(state)
+    : replaceDraftRange(state, selection.start, selection.end, '')
 }
 
 export function filterPrintableInput(input: string): string {
@@ -67,9 +124,14 @@ export function filterPrintableInput(input: string): string {
 }
 
 function normalizeDraft(state: DraftState): DraftState {
+  const cursor = clampCursor(state.cursor, state.text.length)
+  const selectionAnchor = state.selectionAnchor === undefined
+    ? undefined
+    : clampCursor(state.selectionAnchor, state.text.length)
   return {
     text: state.text,
-    cursor: clampCursor(state.cursor, state.text.length),
+    cursor,
+    ...(selectionAnchor === undefined || selectionAnchor === cursor ? {} : { selectionAnchor }),
   }
 }
 

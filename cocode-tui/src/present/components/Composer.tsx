@@ -37,7 +37,7 @@ export function Composer(props: {
   const rows = empty
     ? []
     : visibleComposerRows(
-        renderComposerRows(composer.text, composer.cursor),
+        renderComposerRows(composer.text, composer.cursor, composer.selection),
         props.maxRows ?? 6,
       ).map((row) => clipComposerRow(row, Math.max(1, (props.maxColumns ?? 80) - 6)))
   return (
@@ -101,16 +101,18 @@ export function Composer(props: {
               <Text color={composer.disabled ? theme.mute : theme.brand}>
                 {index === 0 ? '> ' : '  '}
               </Text>
-              <Text color={composer.disabled ? theme.mute : theme.text}>{row.before}</Text>
-              {row.cursor === undefined ? null : (
+              {row.spans.map((span, spanIndex) => (
                 <Text
-                  inverse={!composer.disabled}
+                  key={`${spanIndex}:${span.text}`}
+                  inverse={!composer.disabled && span.cursor === true}
                   color={composer.disabled ? theme.mute : theme.text}
+                  backgroundColor={
+                    !composer.disabled && span.selected === true ? theme.border : undefined
+                  }
                 >
-                  {row.cursor}
+                  {span.text}
                 </Text>
-              )}
-              <Text color={composer.disabled ? theme.mute : theme.text}>{row.after}</Text>
+              ))}
             </Box>
           ))
         )}

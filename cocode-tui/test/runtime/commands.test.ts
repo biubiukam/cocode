@@ -82,6 +82,9 @@ describe('commands', () => {
     expect(helpText(capabilities, createBuiltinCommands(), 'zh')).toContain(
       'Ctrl+N 新会话 · Ctrl+S 会话 · Ctrl+Y 权限',
     )
+    expect(helpText(capabilities, createBuiltinCommands(), 'zh')).toContain(
+      'Ctrl/Meta+A 全选 · Ctrl/Meta+C 复制选中 · Ctrl/Meta+X 剪切（Command 需终端转发）',
+    )
   })
 
   it('shows configured shortcut labels in help', () => {

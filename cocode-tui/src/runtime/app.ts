@@ -32,10 +32,14 @@ import type { ConversationNode } from './nodes/types.ts'
 import {
   backspaceDraft,
   createDraft,
+  deleteDraftSelection,
   insertDraft,
   moveDraftCursor,
   replaceDraftRange,
   replaceDraft,
+  selectAllDraft,
+  selectedDraftRange,
+  selectedDraftText,
   type DraftState,
 } from './draft.ts'
 import { buildPromptBlocks, loadFileContext } from './file-context.ts'
@@ -151,7 +155,10 @@ export type TuiAction =
   | { type: 'setDraft'; text: string }
   | { type: 'insertDraft'; text: string }
   | { type: 'deleteBackward' }
-  | { type: 'moveCursor'; delta: number }
+  | { type: 'moveCursor'; delta: number; extendSelection?: boolean }
+  | { type: 'selectAllDraft' }
+  | { type: 'copyDraftSelection' }
+  | { type: 'cutDraftSelection' }
   | { type: 'attachFile'; start: number; end: number; path: string }
   | { type: 'historyPrev' }
   | { type: 'historyNext' }
@@ -239,6 +246,7 @@ export type TuiSnapshot = {
   composer: {
     text: string
     cursor: number
+    selection?: { start: number; end: number }
     placeholder: string
     disabled: boolean
     mask?: boolean
@@ -585,6 +593,7 @@ class TuiAppImpl implements TuiApp {
       composer: {
         text: this.capturingByok ? '*'.repeat(this.draft.text.length) : this.draft.text,
         cursor: this.draft.cursor,
+        selection: selectedDraftRange(this.draft),
         placeholder: this.capturingByok
           ? '粘贴 API Key，回车确认'
           : composerPlaceholder(this.agent, this.locale),
@@ -713,9 +722,31 @@ class TuiAppImpl implements TuiApp {
         this.emit()
         return
       case 'moveCursor':
-        this.draft = moveDraftCursor(this.draft, action.delta)
+        this.draft = moveDraftCursor(this.draft, action.delta, action.extendSelection)
         this.emit()
         return
+      case 'selectAllDraft':
+        this.draft = selectAllDraft(this.draft)
+        this.emit()
+        return
+      case 'copyDraftSelection': {
+        if (this.capturingByok) return
+        const value = selectedDraftText(this.draft)
+        if (value !== '') this.copyText(value)
+        return
+      }
+      case 'cutDraftSelection': {
+        const value = selectedDraftText(this.draft)
+        if (value === '') return
+        if (!this.capturingByok) this.copyText(value)
+        this.draft = deleteDraftSelection(this.draft)
+        this.pendingSkillInvocation = undefined
+        this.interruptArmed = false
+        this.pruneAttachments()
+        this.pruneImages()
+        this.emit()
+        return
+      }
       case 'attachFile': {
         const token = formatFileMention(action.path)
         this.draft = replaceDraftRange(this.draft, action.start, action.end, `${token} `)

@@ -1759,6 +1759,22 @@ describe('TuiApp', () => {
     expect(app.snapshot().composer).toMatchObject({ text: 'ac', cursor: 1 })
   })
 
+  it('selects and replaces draft text through app actions', async () => {
+    const app = createTuiApp({
+      runtime: fakeRuntime(),
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+    })
+    await app.start()
+    app.dispatch({ type: 'setDraft', text: 'hello' })
+    app.dispatch({ type: 'selectAllDraft' })
+    expect(app.snapshot().composer.selection).toEqual({ start: 0, end: 5 })
+    app.dispatch({ type: 'insertDraft', text: 'hi' })
+    expect(app.snapshot().composer).toMatchObject({ text: 'hi', cursor: 2 })
+    expect(app.snapshot().composer.selection).toBeUndefined()
+  })
+
   it('appends selected file content when submitting a prompt', async () => {
     const cwd = await mkdtemp(join(tmpdir(), 'cocode-app-context-'))
     try {
