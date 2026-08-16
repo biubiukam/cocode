@@ -63,7 +63,7 @@ out/
 
 # Cocode package build artifacts
 /cocode-host-supervisor/packages/host-supervisor/lib/
-/cocode-host-supervisor/runtime/plugins/*/lib/
+/cocode-host-supervisor/runtime/
 /cocode-gui/packages/**/lib/
 
 # Vite / local overrides
