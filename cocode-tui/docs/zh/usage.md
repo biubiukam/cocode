@@ -67,6 +67,7 @@ TTY，可以用于安装脚本和故障排查。
 - `Ctrl+R` 打开历史搜索；输入文字过滤最近消息，使用 `↑` `↓` 选择，回车回填到输入区，`Esc` 关闭。
 - `Ctrl+G` 使用 `$VISUAL` 或 `$EDITOR` 打开临时 Markdown 草稿；退出编辑器后内容回填到输入区。编辑器退出码非 0、草稿不是 UTF-8 或超过 256 KiB 时会显示错误。
 - `Ctrl+V` 从系统剪贴板读取 PNG、JPEG、WebP 或 GIF 图片，也可以执行 `/paste-image`。图片先保留在本地草稿中，发送时才写入 Host attachment store；删除输入区中的 `[Image: ...]` 标记会移除对应草稿图片。单张图片上限为 5 MiB，一条输入最多 20 张。部分终端会占用 `Ctrl+V`，此时使用 `/paste-image`。
+- `/vision` 查看或修改视觉理解配置；支持 `/vision provider cocode|user`、`/vision model <model-id>`、`/vision endpoint <url>`、`/vision credential <ref>`、`/vision enable` 和 `/vision disable`。配置会写入 `vision.yaml` 并立即对后续图片生效，真实 API Key 不会写入文件。
 - `Shift+↑` 进入消息选择模式；使用 `↑` `↓` 移动，回车展开或收起当前消息，`Esc` 退出。
 - 窄屏布局不开启鼠标追踪。终端宽度达到 120 列时，Inspector 会启用鼠标以支持调整宽度和面板交互，部分终端的原生拖动选择可能受影响。模型、命令、问题和消息操作仍可使用键盘；命令菜单使用 `Ctrl+P` 打开，消息操作可通过 `Shift+↑` 进入消息选择模式后按 `m` 打开。
 - 在消息选择模式按 `c` 可复制当前消息；也可以使用 `/copy` 复制最近一条 assistant 回复。复制依次尝试 macOS `pbcopy`、Windows `clip.exe`，以及 Linux 的 `wl-copy`、`xclip`、`xsel`；命令不可用时只显示提示，不影响会话。
@@ -129,6 +130,7 @@ TTY，可以用于安装脚本和故障排查。
 | `/lang zh` / `/lang en`        | 切换中英文界面                                                       |
 | `/model`                      | 打开模型选择器                                                         |
 | `/models`                     | 打开模型选择器                                                         |
+| `/vision`                     | 查看或修改视觉 provider、模型和配置                                   |
 | `/redraw`                     | 在不清除会话内容的情况下重绘界面                                     |
 | `/model <model-id>`            | 直接切换当前 provider 下的模型；支持持久会话时保留当前 session        |
 | `/thinking`                    | 切换 thinking 和完整工具详情显示                                     |

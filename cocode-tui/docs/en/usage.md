@@ -77,6 +77,7 @@ Inside `tmux` or `screen`, the TUI automatically uses inline rendering and suppr
 - `Ctrl+R` opens history search; type to filter recent messages, use `↑` `↓` to select, Enter to restore the draft, and `Esc` to close.
 - `Ctrl+G` opens the draft in `$VISUAL` or `$EDITOR`; the edited Markdown is restored to the composer when the editor exits. Non-zero exits, invalid UTF-8, and drafts over 256 KiB are reported as errors.
 - `Ctrl+V` reads a PNG, JPEG, WebP, or GIF from the system clipboard; `/paste-image` provides the same action when a terminal reserves that key. Images remain local drafts until send, and deleting their `[Image: ...]` marker removes them. The limit is 5 MiB per image and 20 images per prompt.
+- `/vision` shows or changes visual understanding settings. Use `/vision provider cocode|user`, `/vision model <model-id>`, `/vision endpoint <url>`, `/vision credential <ref>`, `/vision enable`, or `/vision disable`. Changes are persisted to `vision.yaml` and apply to subsequent images immediately; actual API keys are never written to the file.
 - `Shift+↑` enters message selection; use `↑` `↓` to move, Enter to expand or collapse the current message, and `Esc` to exit.
 - Mouse tracking stays off in narrow layouts. At 120 columns or wider, the Inspector enables mouse tracking for resize and panel interaction, which can affect native drag-selection in some terminals. Models, commands, questions, and message actions remain keyboard accessible; open the command menu with `Ctrl+P`, or press `Shift+↑` and then `m` for message actions.
 - Press `c` in message selection to copy the current node, or use `/copy` to copy the latest assistant reply. The TUI tries macOS `pbcopy`, Windows `clip.exe`, then Linux `wl-copy`, `xclip`, and `xsel`; an unavailable command produces a notice without interrupting the session.
@@ -139,6 +140,7 @@ Type `/` to open the command menu. Keep typing to filter by prefix. `Tab` or arr
 | `/lang zh` / `/lang en`        | Switch between Chinese and English UI                                                             |
 | `/model`                      | Open the model picker                                                                             |
 | `/models`                     | Open the model picker                                                                             |
+| `/vision`                     | Show or change the vision provider, model, and settings                                           |
 | `/redraw`                     | Redraw the terminal without clearing the session                                                    |
 | `/model <model-id>`            | Switch the current provider's model; preserve the session when durable reopen is supported       |
 | `/thinking`                    | Toggle detailed thinking and full tool output                                                     |
