@@ -1,4 +1,14 @@
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
@@ -58,9 +68,17 @@ await build({
 
 const runtimeRoot = join(packageRoot, '..', '..', 'runtime')
 mkdirSync(runtimeRoot, { recursive: true })
+const runtimePluginRoot = join(runtimeRoot, 'plugins')
+const runtimePluginStage = join(runtimeRoot, `.plugins-build-${process.pid}`)
+const runtimePluginBackup = join(runtimeRoot, `.plugins-backup-${process.pid}`)
 const pluginSourceRoot = resolve(packageRoot, '../../../cocode-gui/packages/cocode')
+const includeGuiPlugins = process.argv.includes('--include-gui-plugins')
 const plugins = []
-if (existsSync(pluginSourceRoot)) {
+const guiPlugins = []
+if (includeGuiPlugins) {
+  if (!existsSync(pluginSourceRoot)) {
+    throw new Error(`Missing Cocode GUI plugin source: ${pluginSourceRoot}`)
+  }
   for (const entry of readdirSync(pluginSourceRoot, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue
     const source = join(pluginSourceRoot, entry.name)
@@ -69,23 +87,7 @@ if (existsSync(pluginSourceRoot)) {
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
     if (!manifest.name || manifest.private !== true || !manifest.cocode) continue
     assertBuiltRuntimePlugin(source, manifest.name)
-    const target = join(runtimeRoot, 'plugins', manifest.name)
-    rmSync(target, { recursive: true, force: true })
-    mkdirSync(target, { recursive: true })
-    for (const item of ['lib', 'cordis.patch.yml', 'LICENSE', 'README.md', 'README_EN.md']) {
-      const from = join(source, item)
-      if (existsSync(from)) cpSync(from, join(target, item), { recursive: true, dereference: true })
-    }
-    writeFileSync(join(target, 'package.json'), JSON.stringify({
-      name: manifest.name,
-      version: manifest.version,
-      type: manifest.type ?? 'module',
-      main: manifest.main ?? 'lib/index.js',
-      exports: manifest.exports,
-      dsh: manifest.dsh,
-      dependencies: Object.fromEntries((manifest.cocode.runtimeDependencies ?? []).map((name) => [name, manifest.dependencies?.[name] ?? '*'])),
-    }, null, 2) + '\n')
-    plugins.push(manifest.name)
+    guiPlugins.push({ source, manifest })
   }
 }
 
@@ -94,7 +96,32 @@ if (!existsSync(join(visionSourceRoot, 'src', 'index.ts'))) {
   throw new Error(`Missing Cocode vision plugin source: ${visionSourceRoot}`)
 }
 const visionManifest = JSON.parse(readFileSync(join(visionSourceRoot, 'package.json'), 'utf8'))
-const visionTarget = join(runtimeRoot, 'plugins', 'cocode-vision')
+
+rmSync(runtimePluginStage, { recursive: true, force: true })
+rmSync(runtimePluginBackup, { recursive: true, force: true })
+mkdirSync(runtimePluginStage, { recursive: true })
+
+for (const { source, manifest } of guiPlugins) {
+  const target = join(runtimePluginStage, manifest.name)
+  rmSync(target, { recursive: true, force: true })
+  mkdirSync(target, { recursive: true })
+  for (const item of ['lib', 'cordis.patch.yml', 'LICENSE', 'README.md', 'README_EN.md']) {
+    const from = join(source, item)
+    if (existsSync(from)) cpSync(from, join(target, item), { recursive: true, dereference: true })
+  }
+  writeFileSync(join(target, 'package.json'), JSON.stringify({
+    name: manifest.name,
+    version: manifest.version,
+    type: manifest.type ?? 'module',
+    main: manifest.main ?? 'lib/index.js',
+    exports: manifest.exports,
+    dsh: manifest.dsh,
+    dependencies: Object.fromEntries((manifest.cocode.runtimeDependencies ?? []).map((name) => [name, manifest.dependencies?.[name] ?? '*'])),
+  }, null, 2) + '\n')
+  plugins.push(manifest.name)
+}
+
+const visionTarget = join(runtimePluginStage, 'cocode-vision')
 rmSync(visionTarget, { recursive: true, force: true })
 mkdirSync(join(visionTarget, 'lib'), { recursive: true })
 await build({
@@ -118,7 +145,12 @@ writeFileSync(join(visionTarget, 'package.json'), JSON.stringify({
 }, null, 2) + '\n')
 plugins.push('cocode-vision')
 
-writeFileSync(join(runtimeRoot, 'plugins.json'), JSON.stringify({ plugins }, null, 2) + '\n')
+const stagedManifest = join(runtimeRoot, `.plugins-${process.pid}.json`)
+writeFileSync(stagedManifest, JSON.stringify({ plugins }, null, 2) + '\n')
+if (existsSync(runtimePluginRoot)) renameSync(runtimePluginRoot, runtimePluginBackup)
+renameSync(runtimePluginStage, runtimePluginRoot)
+renameSync(stagedManifest, join(runtimeRoot, 'plugins.json'))
+rmSync(runtimePluginBackup, { recursive: true, force: true })
 
 const bin = join(packageRoot, 'bin')
 mkdirSync(bin, { recursive: true })
