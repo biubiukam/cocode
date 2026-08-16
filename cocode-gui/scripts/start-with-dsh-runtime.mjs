@@ -129,7 +129,9 @@ async function acquireDevLock(lockPath) {
 				continue
 			}
 			if (!isCocodeDevProcess(previous.pid)) {
-				throw new Error(`Cocode GUI lock is held by an unrelated process (pid=${previous.pid}).`)
+				throw new Error(
+					`Cocode GUI lock is held by an unrelated process (pid=${previous.pid}).`,
+				)
 			}
 			console.log(`[cocode] stopping previous GUI dev instance (pid=${previous.pid})`)
 			await stopProcess(previous.pid)
@@ -141,14 +143,23 @@ async function acquireDevLock(lockPath) {
 
 function readLock(lockPath) {
 	try {
-		const [pidText, cwd] = readFileSync(lockPath, "utf8").trim().split(/\s*\n\s*/)
+		const [pidText, cwd] = readFileSync(lockPath, "utf8")
+			.trim()
+			.split(/\s*\n\s*/)
 		const pid = Number(pidText)
 		return Number.isInteger(pid) && pid > 0 ? { pid, cwd } : undefined
-	} catch { return undefined }
+	} catch {
+		return undefined
+	}
 }
 
 function isProcessAlive(pid) {
-	try { process.kill(pid, 0); return true } catch (error) { return error?.code === "EPERM" }
+	try {
+		process.kill(pid, 0)
+		return true
+	} catch (error) {
+		return error?.code === "EPERM"
+	}
 }
 
 function isCocodeDevProcess(pid) {
@@ -203,7 +214,9 @@ function resolveProcessCwd(pid) {
 }
 
 async function stopProcess(pid, force = false) {
-	try { process.kill(pid, "SIGTERM") } catch (error) {
+	try {
+		process.kill(pid, "SIGTERM")
+	} catch (error) {
 		if (error?.code === "ESRCH") return
 		throw error
 	}
@@ -335,6 +348,7 @@ function pluginFingerprintEntries(root) {
 				fileSignature(path.join(pluginRoot, "package.json")),
 				fileSignature(path.join(pluginRoot, "tsconfig.build.json")),
 				fileSignature(path.join(pluginRoot, "tsdown.config.ts")),
+				fileSignature(path.join(pluginRoot, "lib", "index.js")),
 				directorySignature(path.join(pluginRoot, "src"), new Set(["client"])),
 			]
 		})

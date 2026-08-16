@@ -1,11 +1,15 @@
 /**
- * Sandbox-contract tests for the two built-in web surfaces (HTML preview
- * iframe and the browser tab iframe). The iframe sandbox — opaque origin,
- * no allow-same-origin, no top-navigation — is the PRIMARY security
- * boundary of both features; these tests pin the exact attribute so a
- * refactor cannot silently widen it. The side card settings can drop the
- * sandbox per-feature (warned); those paths render the warning bar and no
- * sandbox attribute.
+ * Contract tests for the two built-in web surfaces.
+ *
+ * The HTML preview frames untrusted workspace files, so its iframe sandbox —
+ * opaque origin, no allow-same-origin, no top-navigation — is the PRIMARY
+ * security boundary; the tests pin the exact attribute so a refactor cannot
+ * silently widen it.
+ *
+ * The browser tab is the opposite construction: the page runs in a Chromium
+ * outside the GUI and reaches the panel as a screencast, so the assertions
+ * there guard the surface that replaced the iframe (canvas, IME textarea,
+ * engine install prompt, native dialogs).
  */
 import { describe, expect, it, beforeEach } from 'vitest'
 import { renderToString } from 'react-dom/server'
@@ -13,7 +17,7 @@ import { createElement } from 'react'
 import './browser-globals.ts'
 import type { Context } from '../src/context-types.ts'
 import { TextEditor, HTML_IFRAME_SANDBOX } from '../src/client/TextEditor.tsx'
-import { BrowserView, BrowserEmbedBlocked, BROWSER_IFRAME_SANDBOX } from '../src/client/BrowserView.tsx'
+import { BrowserView, BrowserDialogPrompt, BrowserEnginePrompt } from '../src/client/BrowserView.tsx'
 import { createSidebarStore } from '../src/client/state.ts'
 import type { FileViewerProps } from '../src/client/service.ts'
 
@@ -109,7 +113,7 @@ describe('HTML preview iframe sandbox', () => {
   })
 })
 
-describe('browser tab iframe sandbox', () => {
+describe('browser tab surface', () => {
   function tabProps(store: ReturnType<typeof createSidebarStore>, path?: string) {
     return {
       ctx: CTX,
@@ -120,68 +124,76 @@ describe('browser tab iframe sandbox', () => {
     }
   }
 
-  it('renders the start page before any navigation (no iframe, no auto-load)', () => {
+  it('renders the page as a canvas, never an iframe (the whole point of the rewrite)', () => {
+    const store = createSidebarStore()
+    const html = renderToString(createElement(BrowserView, tabProps(store, 'https://example.com/')))
+    expect(html).not.toContain('<iframe')
+    expect(html).toContain('<canvas')
+  })
+
+  it('shows the start hint until the host reports a page state', () => {
     const store = createSidebarStore()
     const html = renderToString(createElement(BrowserView, tabProps(store)))
-    expect(html).not.toContain('<iframe')
     expect(html).toContain('输入网址开始浏览')
   })
 
-  it('sandboxes the iframe without same-origin / top-navigation', () => {
+  it('layers a focusable textarea over the canvas so an IME and the clipboard work', () => {
     const store = createSidebarStore()
     const html = renderToString(createElement(BrowserView, tabProps(store, 'https://example.com/')))
-    const iframe = /<iframe[^>]*>/.exec(html)?.[0]
-    expect(iframe).toBeDefined()
-    expect(iframe).toContain(`sandbox="${BROWSER_IFRAME_SANDBOX}"`)
-    expect(BROWSER_IFRAME_SANDBOX).not.toContain('allow-same-origin')
-    expect(BROWSER_IFRAME_SANDBOX).not.toContain('allow-top-navigation')
-    expect(iframe).toContain('src="https://example.com/"')
-    expect(iframe).toContain('referrerPolicy="no-referrer"')
-    expect(iframe).toContain('allow=""')
+    expect(html).toContain('<textarea')
+    expect(html).toContain('aria-label="网页键盘输入"')
   })
 
-  it('renders the live sandbox status row with the temporary unlock action', () => {
+  it('disables the system-browser action until a page is loaded', () => {
     const store = createSidebarStore()
-    const html = renderToString(createElement(BrowserView, tabProps(store, 'https://example.com/')))
-    expect(html).toContain('沙箱模式：已启用')
-    expect(html).toContain('临时解锁（不安全）')
-  })
-
-  it('offers the open-in-browser action once a URL is loaded (disabled before navigation)', () => {
-    const store = createSidebarStore()
-    // No URL yet: the external-open action is disabled.
-    const start = renderToString(createElement(BrowserView, tabProps(store)))
-    expect(start).toContain('aria-label="在浏览器中打开"')
-    expect(start).toContain('title="在浏览器中打开" disabled=""')
-    // With a URL: enabled.
-    const loaded = renderToString(createElement(BrowserView, tabProps(store, 'https://example.com/')))
-    expect(loaded).toContain('aria-label="在浏览器中打开"')
-    expect(loaded).not.toContain('title="在浏览器中打开" disabled=""')
-  })
-
-  it('drops the sandbox attribute with the red warning when the setting is on (no restore action — the global setting owns it)', () => {
-    const store = createSidebarStore()
-    store.setPrefs({ ...store.getPrefs(), browserNoSandbox: true })
-    const html = renderToString(createElement(BrowserView, tabProps(store, 'https://example.com/')))
-    const iframe = /<iframe[^>]*>/.exec(html)?.[0]
-    expect(iframe).toBeDefined()
-    expect(iframe).not.toContain('sandbox=')
-    expect(html).toContain('沙箱已关闭')
-    expect(html).not.toContain('临时解锁（不安全）')
-    expect(html).not.toContain('恢复沙箱')
+    const html = renderToString(createElement(BrowserView, tabProps(store)))
+    expect(html).toContain('aria-label="在系统浏览器中打开"')
+    expect(html).toContain('title="在系统浏览器中打开" disabled=""')
   })
 })
 
-describe('browser embed-refusal panel', () => {
-  it('explains the refusal with the host, the reason, and both actions', () => {
-    const html = renderToString(createElement(BrowserEmbedBlocked, {
-      url: 'https://arxiv.org/abs/2401.10001',
-      onOpenInBrowser: () => {},
-      onLoadAnyway: () => {},
+describe('browser engine prompt', () => {
+  it('explains the one-time Chromium download instead of spinning silently', () => {
+    const html = renderToString(createElement(BrowserEnginePrompt, { status: { state: 'missing' } }))
+    expect(html).toContain('需要下载浏览器内核')
+    expect(html).toContain('下载并启用')
+  })
+
+  it('surfaces an install failure verbatim', () => {
+    const html = renderToString(createElement(BrowserEnginePrompt, {
+      status: { state: 'error', message: 'ENOSPC: no space left on device' },
     }))
-    expect(html).toContain('arxiv.org 拒绝了嵌入请求')
-    expect(html).toContain('X-Frame-Options / frame-ancestors')
-    expect(html).toContain('在浏览器中打开')
-    expect(html).toContain('仍然加载')
+    expect(html).toContain('浏览器内核不可用')
+    expect(html).toContain('ENOSPC: no space left on device')
+  })
+})
+
+describe('browser dialog prompt', () => {
+  it('renders a confirm with both answers', () => {
+    const html = renderToString(createElement(BrowserDialogPrompt, {
+      dialog: { kind: 'confirm', message: 'Delete this item?' },
+      onAnswer: () => {},
+    }))
+    expect(html).toContain('Delete this item?')
+    expect(html).toContain('确定')
+    expect(html).toContain('取消')
+  })
+
+  it('renders an alert with only the acknowledge action (there is nothing to dismiss)', () => {
+    const html = renderToString(createElement(BrowserDialogPrompt, {
+      dialog: { kind: 'alert', message: 'Saved.' },
+      onAnswer: () => {},
+    }))
+    expect(html).toContain('Saved.')
+    expect(html).not.toContain('取消')
+  })
+
+  it('offers an input seeded with the default for a prompt', () => {
+    const html = renderToString(createElement(BrowserDialogPrompt, {
+      dialog: { kind: 'prompt', message: 'Your name?', defaultValue: 'ada' },
+      onAnswer: () => {},
+    }))
+    expect(html).toContain('Your name?')
+    expect(html).toContain('value="ada"')
   })
 })

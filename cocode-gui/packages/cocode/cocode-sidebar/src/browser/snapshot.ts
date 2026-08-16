@@ -109,8 +109,8 @@ export async function buildSnapshot(cdp: CdpSession, options: SnapshotOptions): 
 
   const selected = applyBudget(candidates, options.maxNodes)
   const refs = new Map<string, number>()
-  const nodes: BrowserNode[] = selected.map((candidate, index) => {
-    const ref = `e${String(index + 1)}`
+  const nodes: BrowserNode[] = selected.map((candidate) => {
+    const ref = `e${String(candidate.backendId)}`
     refs.set(ref, candidate.backendId)
     return { ...candidate.node, ref }
   })

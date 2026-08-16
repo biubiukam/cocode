@@ -4,7 +4,7 @@
  * the same {@link BetterSidebarService} external plugins use — eating its
  * own dogfood. The terminal descriptor owns its quota (`TERMINAL_LIMIT`)
  * and mints `terminal:<n>` ids through `createTab`; the browser mints
- * `browser:<n>` the same way (no quota).
+ * `browser:<n>` the same way and owns the same per-session quota.
  */
 import { IconBranchOutline16, IconCodeOutline16, IconFolderOpen16, IconThinkOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { Context } from '../../context-types.ts'
@@ -52,11 +52,21 @@ interface TerminalViewProps {
 /** How many UI-owned terminals may be open at once (agent-owned ones are uncapped). */
 export const TERMINAL_LIMIT = 3
 
+/** How many browser tabs one conversation may hold (matches the host cap). */
+export const BROWSER_LIMIT = 3
+
 /** Count UI-owned terminals (agent:` tabs excluded — they are the model's). */
 function uiTerminalCount(state: SidebarState): number {
   return allLeaves(state.splits)
     .flatMap(leaf => leaf.tabs)
     .filter(tab => tab.type === 'terminal' && !isAgentTabId(tab.id)).length
+}
+
+function uiBrowserCount(state: SidebarState): number {
+  return allLeaves(state.splits)
+    .concat(allLeaves(state.bottomSplits))
+    .flatMap(leaf => leaf.tabs)
+    .filter(tab => tab.type === 'browser').length
 }
 
 /** The 7 built-in tab descriptors. */
@@ -187,28 +197,40 @@ export function builtinTabs(ctx: Context): readonly TabDescriptor[] {
       title: () => t('browser'),
       icon: (size: number) => <IconGlobeOutline16 size={size} />,
       order: 50,
-      // Declarative settings: the sandbox escape hatch and the link
-      // takeover render under this tab's row in the Side card settings
-      // page (the sandbox one is warned on).
+      // Declarative settings: granting the agent the browser tools, and the
+      // link takeover, render under this tab's row in the Side card settings
+      // page (the agent one is warned on).
+      available: (_ctx, _scope, state) => uiBrowserCount(state) < BROWSER_LIMIT,
       settings: {
         toggles: [{
-          key: 'browserNoSandbox',
-          title: () => t('settingsBrowserSandboxTitle'),
-          desc: () => t('settingsBrowserSandboxDesc'),
+          key: 'agentBrowserTools',
+          title: () => t('settingsBrowserToolsTitle'),
+          desc: () => t('settingsBrowserToolsDesc'),
+        }, {
+          key: 'agentBrowserIsolated',
+          title: () => t('settingsBrowserIsolatedTitle'),
+          desc: () => t('settingsBrowserIsolatedDesc'),
+        }, {
+          key: 'browserHeaded',
+          title: () => t('settingsBrowserHeadedTitle'),
+          desc: () => t('settingsBrowserHeadedDesc'),
         }, {
           key: 'browserInterceptLinks',
           title: () => t('settingsBrowserLinksTitle'),
           desc: () => t('settingsBrowserLinksDesc'),
         }],
       },
-      createTab: (state) => ({
-        tab: {
-          id: `browser:${state.nextBrowser}`,
-          type: 'browser',
-          title: t('browser'),
-        },
-        patch: { nextBrowser: state.nextBrowser + 1 },
-      }),
+      createTab: (state) => {
+        if (uiBrowserCount(state) >= BROWSER_LIMIT) return null
+        return {
+          tab: {
+            id: `browser:${state.nextBrowser}`,
+            type: 'browser',
+            title: t('browser'),
+          },
+          patch: { nextBrowser: state.nextBrowser + 1 },
+        }
+      },
       component: (props) => <BrowserView {...props} />,
     },
     {

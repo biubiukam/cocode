@@ -1167,7 +1167,9 @@ describe('side card preferences', () => {
         interceptOpenPath: true,
         htmlViewerNoSandbox: false,
         htmlViewerDefaultUnsafe: false,
-        browserNoSandbox: false,
+        agentBrowserTools: false,
+        agentBrowserIsolated: false,
+        browserHeaded: false,
         browserInterceptLinks: true,
         tabsEnabled: {},
         viewersEnabled: {},
@@ -1189,7 +1191,9 @@ describe('side card preferences', () => {
         interceptOpenPath: true,
         htmlViewerNoSandbox: false,
         htmlViewerDefaultUnsafe: false,
-        browserNoSandbox: false,
+        agentBrowserTools: false,
+        agentBrowserIsolated: false,
+        browserHeaded: false,
         browserInterceptLinks: true,
         tabsEnabled: {},
         viewersEnabled: {},
@@ -1211,7 +1215,9 @@ describe('side card preferences', () => {
         interceptOpenPath: true,
         htmlViewerNoSandbox: false,
         htmlViewerDefaultUnsafe: false,
-        browserNoSandbox: false,
+        agentBrowserTools: false,
+        agentBrowserIsolated: false,
+        browserHeaded: false,
         browserInterceptLinks: true,
         tabsEnabled: {},
         viewersEnabled: {},
@@ -1276,9 +1282,9 @@ describe('side card preferences', () => {
     const store = createSidebarStore()
     // Node environment: no window → the width falls back to PANEL_DEFAULT,
     // while the open flag still follows the preference.
-    store.setPrefs({ openByDefault: false, defaultWidthPercent: 45, autoOpenSubagent: true, autoOpenJobs: true, agentTerminalTools: false, bottomPanelAutoTerminal: true, terminalFontFamily: '', terminalFontSize: 13, interceptOpenPath: true, htmlViewerNoSandbox: false, htmlViewerDefaultUnsafe: false, browserNoSandbox: false, browserInterceptLinks: true, tabsEnabled: {}, viewersEnabled: {}, pluginSettings: {} })
+    store.setPrefs({ openByDefault: false, defaultWidthPercent: 45, autoOpenSubagent: true, autoOpenJobs: true, agentTerminalTools: false, bottomPanelAutoTerminal: true, terminalFontFamily: '', terminalFontSize: 13, interceptOpenPath: true, htmlViewerNoSandbox: false, htmlViewerDefaultUnsafe: false, agentBrowserTools: false, agentBrowserIsolated: false, browserHeaded: false, browserInterceptLinks: true, tabsEnabled: {}, viewersEnabled: {}, pluginSettings: {} })
     store.setSession('fresh-session')
-    expect(store.getPrefs()).toEqual({ openByDefault: false, defaultWidthPercent: 45, autoOpenSubagent: true, autoOpenJobs: true, agentTerminalTools: false, bottomPanelAutoTerminal: true, terminalFontFamily: '', terminalFontSize: 13, interceptOpenPath: true, htmlViewerNoSandbox: false, htmlViewerDefaultUnsafe: false, browserNoSandbox: false, browserInterceptLinks: true, tabsEnabled: {}, viewersEnabled: {}, pluginSettings: {} })
+    expect(store.getPrefs()).toEqual({ openByDefault: false, defaultWidthPercent: 45, autoOpenSubagent: true, autoOpenJobs: true, agentTerminalTools: false, bottomPanelAutoTerminal: true, terminalFontFamily: '', terminalFontSize: 13, interceptOpenPath: true, htmlViewerNoSandbox: false, htmlViewerDefaultUnsafe: false, agentBrowserTools: false, agentBrowserIsolated: false, browserHeaded: false, browserInterceptLinks: true, tabsEnabled: {}, viewersEnabled: {}, pluginSettings: {} })
     const snapshot = store.getSnapshot()
     expect(snapshot.sessionId).toBe('fresh-session')
     expect(snapshot.state?.panelOpen).toBe(false)
@@ -1313,7 +1319,7 @@ describe('side card preferences', () => {
 
   it('skips the default explorer tab when the explorer type is disabled', () => {
     const store = createSidebarStore()
-    store.setPrefs({ openByDefault: true, defaultWidthPercent: 30, autoOpenSubagent: true, autoOpenJobs: true, agentTerminalTools: false, bottomPanelAutoTerminal: true, terminalFontFamily: '', terminalFontSize: 13, interceptOpenPath: true, htmlViewerNoSandbox: false, htmlViewerDefaultUnsafe: false, browserNoSandbox: false, browserInterceptLinks: true, tabsEnabled: { explorer: false }, viewersEnabled: {}, pluginSettings: {} })
+    store.setPrefs({ openByDefault: true, defaultWidthPercent: 30, autoOpenSubagent: true, autoOpenJobs: true, agentTerminalTools: false, bottomPanelAutoTerminal: true, terminalFontFamily: '', terminalFontSize: 13, interceptOpenPath: true, htmlViewerNoSandbox: false, htmlViewerDefaultUnsafe: false, agentBrowserTools: false, agentBrowserIsolated: false, browserHeaded: false, browserInterceptLinks: true, tabsEnabled: { explorer: false }, viewersEnabled: {}, pluginSettings: {} })
     store.setSession('no-explorer')
     const state = store.getSnapshot().state!
     const tabs = allLeaves(state.splits).flatMap(leaf => leaf.tabs)
@@ -1321,7 +1327,7 @@ describe('side card preferences', () => {
     expect(state.splits.kind).toBe('leaf')
     // Re-enabling seeds the explorer tab again.
     const openStore = createSidebarStore()
-    openStore.setPrefs({ openByDefault: true, defaultWidthPercent: 30, autoOpenSubagent: true, autoOpenJobs: true, agentTerminalTools: false, bottomPanelAutoTerminal: true, terminalFontFamily: '', terminalFontSize: 13, interceptOpenPath: true, htmlViewerNoSandbox: false, htmlViewerDefaultUnsafe: false, browserNoSandbox: false, browserInterceptLinks: true, tabsEnabled: {}, viewersEnabled: {}, pluginSettings: {} })
+    openStore.setPrefs({ openByDefault: true, defaultWidthPercent: 30, autoOpenSubagent: true, autoOpenJobs: true, agentTerminalTools: false, bottomPanelAutoTerminal: true, terminalFontFamily: '', terminalFontSize: 13, interceptOpenPath: true, htmlViewerNoSandbox: false, htmlViewerDefaultUnsafe: false, agentBrowserTools: false, agentBrowserIsolated: false, browserHeaded: false, browserInterceptLinks: true, tabsEnabled: {}, viewersEnabled: {}, pluginSettings: {} })
     openStore.setSession('with-explorer')
     const openTabs = allLeaves(openStore.getSnapshot().state!.splits).flatMap(leaf => leaf.tabs)
     expect(openTabs.map(tab => tab.type)).toEqual(['explorer'])

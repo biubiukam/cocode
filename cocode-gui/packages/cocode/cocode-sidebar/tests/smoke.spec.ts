@@ -63,7 +63,12 @@ describe('host plugin smoke', () => {
     }
     apply(ctx as never)
     expect(routes.map(route => route.path)).toEqual(['/sidebar/api', '/sidebar/bundle', '/sidebar/file', '/sidebar/html'])
-    expect(upgrades.map(route => route.path)).toEqual(['/sidebar/ws/terminal', '/sidebar/ws/agent-terminals'])
+    expect(upgrades.map(route => route.path)).toEqual([
+      '/sidebar/ws/terminal',
+      '/sidebar/ws/agent-terminals',
+      '/sidebar/ws/browser',
+      '/sidebar/ws/browser-tabs',
+    ])
     // Teardown runs without throwing (pty manager has nothing open).
     for (const cleanup of effects) cleanup()
   })
@@ -524,7 +529,9 @@ describe('side card settings routes', () => {
         interceptOpenPath: true,
         htmlViewerNoSandbox: false,
         htmlViewerDefaultUnsafe: false,
-        browserNoSandbox: false,
+        agentBrowserTools: false,
+        agentBrowserIsolated: false,
+        browserHeaded: false,
         browserInterceptLinks: true,
         // The enable-switch maps default to {} (everything on).
         tabsEnabled: {},
@@ -562,66 +569,31 @@ describe('side card settings routes', () => {
     expect(result.ok).toBe(false)
     expect(result.error?.message).toMatch(/plain object/)
   })
-  /** Fake fetch responses shaped like what the route consumes. */
-  const respond = (status: number, headers: Record<string, string>): Response =>
-    ({ status, url: 'https://site.example/', headers: new Headers(headers) }) as unknown as Response
-
-  it('reports X-Frame-Options and frame-ancestors from the target headers', async () => {
+  it('reports the browser engine readiness as a state the panel can render', async () => {
     const route = mountWithSettings(undefined)
-    vi.stubGlobal('fetch', vi.fn(async () => respond(200, {
-      'x-frame-options': 'SAMEORIGIN',
-      'content-security-policy': "default-src 'self'; frame-ancestors 'none'",
-    })))
-    try {
-      const result = await invoke(route, 'browser.probe', { url: 'https://arxiv.org/' })
-      expect(result.ok).toBe(true)
-      expect(result.value).toEqual({
-        reachable: true,
-        url: 'https://site.example/',
-        status: 200,
-        xFrameOptions: 'SAMEORIGIN',
-        frameAncestors: ["'none'"],
-      })
-    } finally {
-      vi.unstubAllGlobals()
-    }
+    const result = await invoke(route, 'browser.engine', {})
+    expect(result.ok).toBe(true)
+    // Whether Chromium happens to be installed on the machine running the
+    // suite is not the contract; that the answer is one of the states the
+    // first-run panel knows how to render is.
+    const status = result.value as { state: string }
+    expect(['ready', 'missing', 'installing', 'error']).toContain(status.state)
   })
 
-  it('retries a 405 HEAD as GET', async () => {
+  it('answers browser.close for a tab that was never opened instead of failing', async () => {
     const route = mountWithSettings(undefined)
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(respond(405, {}))
-      .mockResolvedValueOnce(respond(200, {}))
-    vi.stubGlobal('fetch', fetchMock)
-    try {
-      const result = await invoke(route, 'browser.probe', { url: 'https://example.com/' })
-      expect(result.ok).toBe(true)
-      expect(fetchMock).toHaveBeenCalledTimes(2)
-      expect(result.value).toMatchObject({ reachable: true, status: 200 })
-    } finally {
-      vi.unstubAllGlobals()
-    }
+    // The client releases the page when a tab closes, including tabs whose
+    // socket never came up — that release must be a no-op, not an error.
+    const result = await invoke(route, 'browser.close', { sessionId: 's1', tabId: 'browser:1' })
+    expect(result.ok).toBe(true)
+    expect(result.value).toEqual({ closed: false })
   })
 
-  it('reports an unreachable target as reachable:false', async () => {
+  it('rejects a browser.close without a tab id', async () => {
     const route = mountWithSettings(undefined)
-    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('ENOTFOUND') }))
-    try {
-      const result = await invoke(route, 'browser.probe', { url: 'https://example.com/' })
-      expect(result.ok).toBe(true)
-      expect(result.value).toEqual({ reachable: false })
-    } finally {
-      vi.unstubAllGlobals()
-    }
-  })
-
-  it('refuses non-http(s) and loopback URLs', async () => {
-    const route = mountWithSettings(undefined)
-    for (const url of ['javascript:alert(1)', 'file:///etc/passwd', 'http://127.0.0.1:8080/', 'http://localhost/']) {
-      const result = await invoke(route, 'browser.probe', { url })
-      expect(result.ok, url).toBe(false)
-      expect(result.error?.code, url).toBe('bad-request')
-    }
+    const result = await invoke(route, 'browser.close', { sessionId: 's1' })
+    expect(result.ok).toBe(false)
+    expect(result.error?.code).toBe('bad-request')
   })
 })
 

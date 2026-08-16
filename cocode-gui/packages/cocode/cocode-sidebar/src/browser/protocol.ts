@@ -36,6 +36,8 @@ export interface BrowserTabState {
   canGoForward: boolean
   /** Who currently drives the page (an agent lease shows a badge in the UI). */
   owner: BrowserOwner
+  /** Persistent profile this page is using (shared vs agent-isolated). */
+  profile: string
 }
 
 /** Exclusive driver of one tab. A human input event always preempts an agent. */
@@ -111,8 +113,29 @@ export type BrowserClientFrame =
   | { t: 'copy' }
   /** Answer the pending native dialog. */
   | { t: 'dialog'; accept: boolean; text?: string }
+  /**
+   * Start or stop watching this page. A hidden sidebar tab keeps the page
+   * alive but drops the screencast — encoding JPEG of a page nobody can see
+   * is the single largest idle cost of the feature.
+   */
+  | { t: 'watch'; on: boolean }
+  /** Cancel the in-flight download, if any. */
+  | { t: 'download-cancel' }
+  /** Grant or deny one permission for the current origin. */
+  | { t: 'permission'; name: string; grant: boolean }
   /** Release the page (the user closed the tab). */
   | { t: 'close' }
+
+/** Tab id prefix of a page the model opened. */
+export const AGENT_BROWSER_PREFIX = 'browser:agent-'
+
+/** Tab id prefix of a popup the page opened (OAuth, window.open). */
+export const POPUP_BROWSER_PREFIX = 'browser:popup-'
+
+/** Tabs the sidebar must reconcile from the host list (agent + popup). */
+export function isReconciledBrowserTabId(tabId: string): boolean {
+  return tabId.startsWith(AGENT_BROWSER_PREFIX) || tabId.startsWith(POPUP_BROWSER_PREFIX)
+}
 
 // ── Host → client frames (JSON text; JPEG rides the binary channel) ─────────
 
@@ -169,10 +192,14 @@ export interface BrowserSnapshot {
   title: string
   viewport: { width: number; height: number; deviceScaleFactor: number }
   focusedRef?: string
-  nodes: readonly BrowserNode[]
+  nodes: BrowserNode[]
   truncation?: BrowserTruncation
-  /** Present only when the caller asked for one. */
-  screenshot?: { mediaType: 'image/jpeg'; base64: string }
+  /** File-backed screenshot; never inline base64 (that would bloat the session log). */
+  screenshot?: { id: string; mediaType: 'image/jpeg' }
+  /** Cross-origin iframes this snapshot did not flatten. */
+  unexpandedFrames?: Array<{ url: string }>
+  /** True when `nodes` is a delta against the previous snapshot, not the full tree. */
+  delta?: boolean
   /** A native dialog is blocking the page; act({kind:'dialog'}) to clear it. */
   pendingDialog?: BrowserDialog
 }
@@ -181,7 +208,7 @@ export interface BrowserSnapshot {
 export type BrowserAction =
   | { kind: 'click'; ref: string; button?: 'left' | 'right'; modifiers?: readonly BrowserModifier[] }
   | { kind: 'hover'; ref: string }
-  | { kind: 'type'; ref: string; text: string; clear?: boolean; submit?: boolean }
+  | { kind: 'type'; ref: string; text: string; clear?: boolean; submit?: boolean; sensitive?: boolean }
   | { kind: 'press'; key: string; ref?: string }
   | { kind: 'scroll'; direction: 'up' | 'down'; amount?: number; ref?: string }
   | { kind: 'select'; ref: string; values: readonly string[] }
@@ -205,6 +232,8 @@ export const BROWSER_ERRORS = {
   engineNotReady: 'BROWSER_ENGINE_NOT_READY',
   unknownTab: 'BROWSER_UNKNOWN_TAB',
   blocked: 'BROWSER_NAVIGATION_BLOCKED',
+  confirmation: 'BROWSER_CONFIRMATION_REQUIRED',
+  unavailable: 'BROWSER_CAPABILITY_UNAVAILABLE',
 } as const
 
 /** Machine-readable browser failure identity. */

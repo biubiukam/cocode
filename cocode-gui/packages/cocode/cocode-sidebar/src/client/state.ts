@@ -9,6 +9,7 @@
  * divides the space row- or column-wise with fractional sizes. All tree
  * operations are pure functions over the node, unit-tested in tests/state.spec.ts.
  */
+import { isReconciledBrowserTabId } from '../browser/protocol.ts'
 import { SIDEBAR_PREFS_DEFAULTS, type SidebarPrefs } from '../prefs-shared.ts'
 import { isNarrowWidth } from './breakpoints.ts'
 
@@ -729,6 +730,47 @@ export function reconcileAgentTerminals(
       title: terminal.title,
     }
     next = openTabInActivePane(next, tab)
+  }
+  return next
+}
+
+/** Whether a tab id belongs to a browser page the model opened. */
+export function isAgentBrowserTabId(tabId: string): boolean {
+  return isReconciledBrowserTabId(tabId)
+}
+
+/**
+ * Mirror the host's live list of host-opened browser pages into tabs: pages
+ * the model opened, and popups (`window.open` / OAuth) the current page
+ * opened. User-created `browser:N` tabs stay client-owned — reconciling
+ * those would delete a fresh tab the moment it was created.
+ * @param state - the current per-session sidebar state.
+ * @param agentTabs - the live host-opened browser tabs from the host.
+ * @returns the next state (or the same reference when nothing changed).
+ */
+export function reconcileAgentBrowserTabs(
+  state: SidebarState,
+  agentTabs: ReadonlyArray<{ tabId: string; title: string; url: string }>,
+): SidebarState {
+  const existingTabs = allLeaves(state.splits).concat(allLeaves(state.bottomSplits)).flatMap(leaf => leaf.tabs)
+  const existing = existingTabs.filter(tab => isReconciledBrowserTabId(tab.id))
+  const serverIds = new Set(agentTabs.map(tab => tab.tabId))
+  const toAdd = agentTabs.filter(tab => !existing.some(open => open.id === tab.tabId))
+  const toRemove = existing.filter(tab => !serverIds.has(tab.id))
+  if (toAdd.length === 0 && toRemove.length === 0) return state
+  let splits = state.splits
+  for (const tab of toRemove) {
+    const leaf = leafWithTab(splits, tab.id)
+    if (leaf !== undefined) splits = closeTab({ ...state, splits }, leaf.id, tab.id).splits
+  }
+  let next: SidebarState = { ...state, splits }
+  for (const tab of toAdd) {
+    next = openTabInActivePane(next, {
+      id: tab.tabId,
+      type: 'browser',
+      title: tab.title === '' ? tab.url : tab.title,
+      path: tab.url === '' ? undefined : tab.url,
+    })
   }
   return next
 }

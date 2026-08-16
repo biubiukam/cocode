@@ -953,12 +953,120 @@
   background: var(--dsw-alias-state-warn-tertiary);
 }
 
-.browserFrame {
+/* The live page: a canvas painted from the host's screencast, with an
+   invisible textarea layered on top to own the caret (IME + clipboard). */
+.browserStage {
+  position: relative;
   flex: 1;
   min-height: 0;
-  width: 100%;
-  border: none;
+  overflow: hidden;
   background: var(--dsw-alias-bg-base);
+}
+
+.browserCanvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* The screencast is sized to this element, so any residual mismatch during
+     a resize should letterbox rather than distort the page. */
+  object-fit: contain;
+}
+
+.browserKeyboard {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  resize: none;
+  opacity: 0;
+  /* The canvas underneath owns the pointer; focus is handed here on mousedown. */
+  pointer-events: none;
+  caret-color: transparent;
+}
+
+.browserKeyboard:focus {
+  outline: none;
+}
+
+.browserHint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  text-align: center;
+  font: var(--dsw-font-xs-13);
+  color: var(--dsw-alias-label-tertiary);
+  pointer-events: none;
+}
+
+/* Shown while the model is driving the page, so a click the user did not
+   make is never mysterious. */
+.browserAgentBar {
+  flex: none;
+  padding: 4px 12px;
+  font: var(--dsw-font-xxxs-11);
+  color: var(--dsw-alias-state-business-primary);
+  background: var(--dsw-alias-state-business-tertiary);
+}
+
+.browserPreedit {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 2;
+  max-width: calc(100% - 24px);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font: var(--dsw-font-xs-13);
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-elevated);
+  pointer-events: none;
+}
+
+.browserPerms {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 12px;
+}
+
+.browserPermChip {
+  border: 0;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font: var(--dsw-font-xxxs-11);
+  color: var(--dsw-alias-label-secondary);
+  background: var(--dsw-alias-fill-tertiary);
+  cursor: pointer;
+}
+
+/* A native alert/confirm/prompt blocks the remote renderer, so it blocks
+   this surface too rather than failing silently. */
+.browserDialog {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgb(0 0 0 / 32%);
+}
+
+.browserDialogCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 320px;
+  padding: 16px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 10px;
+  background: var(--dsw-alias-bg-layer-1);
 }
 
 .browserStart {

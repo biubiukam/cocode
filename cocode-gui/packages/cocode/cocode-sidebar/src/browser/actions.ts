@@ -15,7 +15,7 @@
 import { stat } from 'node:fs/promises'
 import type { Page } from 'playwright-core'
 import { BROWSER_ERRORS, BrowserError, type BrowserAction, type BrowserDialog, type BrowserModifier } from './protocol.ts'
-import { centerOf, quadToRect, type BoxModelResponse, type CdpSession, type Rect, type ResolveNodeResponse } from './cdp.ts'
+import { centerOf, quadToRect, type BoxModelResponse, type CdpSession, type DescribeNodeResponse, type Rect, type ResolveNodeResponse } from './cdp.ts'
 
 /** CDP modifier bits. */
 const MODIFIER_BITS: Record<BrowserModifier, number> = { Alt: 1, Control: 2, Meta: 4, Shift: 8 }
@@ -56,6 +56,8 @@ export interface ActionContext {
   answerDialog(accept: boolean, text?: string): Promise<void>
   /** Timeout applied to a single action, in milliseconds. */
   timeoutMs: number
+  /** Aborted when a human takes the page over mid-action. */
+  signal?: AbortSignal
 }
 
 /**
@@ -72,7 +74,7 @@ export async function dispatchAction(context: ActionContext, action: BrowserActi
       'a native dialog is blocking the page; answer it with act({kind:"dialog"}) first',
     )
   }
-  return await withTimeout(context.timeoutMs, action.kind, runAction(context, action))
+  return await withTimeout(context.timeoutMs, action.kind, runAction(context, action), context.signal)
 }
 
 async function runAction(context: ActionContext, action: BrowserAction): Promise<string> {
@@ -144,6 +146,12 @@ async function typeAction(
   action: Extract<BrowserAction, { kind: 'type' }>,
 ): Promise<string> {
   const backendNodeId = context.resolveRef(action.ref)
+  if (action.sensitive !== true && await isCredentialField(context, backendNodeId)) {
+    throw new BrowserError(
+      BROWSER_ERRORS.blocked,
+      'the agent cannot fill login or password fields; the user must type credentials',
+    )
+  }
   await scrollIntoView(context, backendNodeId)
   await context.cdp.send('DOM.focus', { backendNodeId })
   if (action.clear === true) await callOnNode(context, backendNodeId, CLEAR_FIELD)
@@ -364,8 +372,20 @@ async function viewportCenter(context: ActionContext): Promise<{ x: number; y: n
 }
 
 /** Bound one action so a hung page surfaces a timeout rather than a stuck turn. */
-async function withTimeout<T>(timeoutMs: number, kind: string, work: Promise<T>): Promise<T> {
+async function withTimeout<T>(
+  timeoutMs: number,
+  kind: string,
+  work: Promise<T>,
+  signal?: AbortSignal,
+): Promise<T> {
+  if (signal?.aborted) {
+    throw new BrowserError(BROWSER_ERRORS.leaseRevoked, 'the user took over the page; the action was cancelled')
+  }
   let timer: ReturnType<typeof setTimeout> | undefined
+  const onAbort = (): void => {
+    if (timer !== undefined) clearTimeout(timer)
+  }
+  signal?.addEventListener('abort', onAbort, { once: true })
   try {
     return await Promise.race([
       work,
@@ -374,11 +394,33 @@ async function withTimeout<T>(timeoutMs: number, kind: string, work: Promise<T>)
           () => { reject(new BrowserError(BROWSER_ERRORS.timeout, `the ${kind} action did not settle within ${String(timeoutMs)}ms`)) },
           timeoutMs,
         )
+        signal?.addEventListener('abort', () => {
+          reject(new BrowserError(BROWSER_ERRORS.leaseRevoked, 'the user took over the page; the action was cancelled'))
+        }, { once: true })
       }),
     ])
   } finally {
     if (timer !== undefined) clearTimeout(timer)
+    signal?.removeEventListener('abort', onAbort)
   }
+}
+
+/** Password / username fields the agent must not fill. */
+async function isCredentialField(context: ActionContext, backendNodeId: number): Promise<boolean> {
+  const described = await context.cdp.send('DOM.describeNode', { backendNodeId }) as DescribeNodeResponse
+  const attrs = attributesOf(described.node.attributes ?? [])
+  const type = (attrs.type ?? '').toLowerCase()
+  const autocomplete = (attrs.autocomplete ?? '').toLowerCase()
+  const name = `${attrs.name ?? ''} ${attrs.id ?? ''} ${attrs.placeholder ?? ''}`.toLowerCase()
+  if (type === 'password') return true
+  if (autocomplete.includes('password') || autocomplete === 'username') return true
+  return /\b(password|passwd|username)\b/.test(name)
+}
+
+function attributesOf(flat: string[]): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (let i = 0; i + 1 < flat.length; i += 2) out[flat[i]!] = flat[i + 1]!
+  return out
 }
 
 /** Compose a CDP modifier bitmask from the action's modifier list. */

@@ -7,13 +7,18 @@
  * the user watches every click the model makes land, live, in the panel.
  */
 import { randomUUID } from 'node:crypto'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import type { Dialog, Download, Page } from 'playwright-core'
 import { buildSnapshot } from './snapshot.ts'
 import { dispatchAction } from './actions.ts'
+import { dshHome } from './engine.ts'
 import { normalizeBrowserUrl } from './url.ts'
 import {
+  AGENT_BROWSER_PREFIX,
   BROWSER_ERRORS,
   BrowserError,
+  POPUP_BROWSER_PREFIX,
   type BrowserAction,
   type BrowserDialog,
   type BrowserFrameHeader,
@@ -37,6 +42,9 @@ const ACTION_TIMEOUT_MS = 15_000
 
 /** Node budget of one snapshot. */
 const SNAPSHOT_NODES = 600
+
+/** Quiet period after an action before the page is considered observable. */
+const SETTLE_MS = 150
 
 /** Everything a viewport or a tool needs to observe about one tab. */
 export interface BrowserTabSummary {
@@ -70,6 +78,14 @@ export interface BrowserTabOptions {
   agentOwned: boolean
   /** Called whenever this tab's summary changes, so the registry can push. */
   onChange: () => void
+  /** Persistent profile this page belongs to. */
+  profile: string
+  /** A `window.open` / OAuth popup — keep it as a real page, never absorb. */
+  onPopup?: (page: Page) => void
+  /** The underlying page closed itself (popup finished, crash, target.close). */
+  onClosed?: () => void
+  /** Grant a permission on this tab's profile for the current origin. */
+  grantPermission?: (origin: string, name: string) => Promise<void>
 }
 
 /** A single browsing context the sidebar renders and the agent drives. */
@@ -77,16 +93,23 @@ export class BrowserTab {
   readonly tabId: string
   readonly sessionId: string
   readonly agentOwned: boolean
+  readonly profile: string
   private readonly page: Page
   private readonly cdp: CdpSession
   private readonly selfOrigin?: string
   private readonly onChange: () => void
+  private readonly onPopup?: (page: Page) => void
+  private readonly onClosed?: () => void
+  private readonly grantPermission?: (origin: string, name: string) => Promise<void>
   private readonly listeners = new Set<TabListener>()
 
   private loading = false
   private ownerRole: BrowserOwner = 'human'
   private agentBadgeTimer: ReturnType<typeof setTimeout> | undefined
   private pending: { dialog: BrowserDialog; handle: Dialog } | null = null
+  private download: Download | null = null
+  private acting: AbortController | null = null
+  private lastNodes: BrowserSnapshot['nodes'] | null = null
 
   /** Backend node ids the newest snapshot handed out, cleared on navigation. */
   private refs = new Map<string, number>()
@@ -102,10 +125,14 @@ export class BrowserTab {
     this.tabId = options.tabId
     this.sessionId = options.sessionId
     this.agentOwned = options.agentOwned
+    this.profile = options.profile
     this.page = options.page
     this.cdp = options.cdp
     this.selfOrigin = options.selfOrigin
     this.onChange = options.onChange
+    this.onPopup = options.onPopup
+    this.onClosed = options.onClosed
+    this.grantPermission = options.grantPermission
     this.wirePageEvents()
   }
 
@@ -113,15 +140,36 @@ export class BrowserTab {
   static async create(options: Omit<BrowserTabOptions, 'page' | 'cdp'> & {
     newPage: () => Promise<Page>
     attach: (page: Page) => Promise<CdpSession>
+    /** UA to claim instead of Chromium's own (drops the headless marker). */
+    userAgent?: string
   }): Promise<BrowserTab> {
-    const page = await options.newPage()
-    const cdp = await options.attach(page)
+    return await BrowserTab.fromPage({ ...options, page: await options.newPage() })
+  }
+
+  /**
+   * Wrap an already-open page (a `window.open` popup, an OAuth window).
+   * Closing it would break the opener's callback; absorbing it into the
+   * parent tab would lose `window.opener` and the login handshake.
+   */
+  static async fromPage(options: Omit<BrowserTabOptions, 'cdp'> & {
+    attach: (page: Page) => Promise<CdpSession>
+    userAgent?: string
+  }): Promise<BrowserTab> {
+    const cdp = await options.attach(options.page)
     await Promise.all([
       cdp.send('DOM.enable'),
       cdp.send('Runtime.enable'),
       cdp.send('Accessibility.enable'),
     ])
-    return new BrowserTab({ ...options, page, cdp })
+    // The override has to go through CDP rather than the context option: it
+    // must rewrite `navigator.userAgent` too, not just the request header,
+    // or the page's own scripts still see a headless browser.
+    if (options.userAgent !== undefined) {
+      await cdp.send('Emulation.setUserAgentOverride', { userAgent: options.userAgent }).catch(() => {
+        // An older build without the override still browses fine.
+      })
+    }
+    return new BrowserTab({ ...options, cdp })
   }
 
   // ── Observation ───────────────────────────────────────────────────────────
@@ -152,26 +200,52 @@ export class BrowserTab {
       canGoBack: history !== undefined && history.currentIndex > 0,
       canGoForward: history !== undefined && history.currentIndex < history.entries.length - 1,
       owner: this.ownerRole,
+      profile: this.profile,
     }
   }
 
   /** Build one model-facing observation of the page. */
-  async snapshot(options: { screenshot: boolean }): Promise<BrowserSnapshot> {
+  async snapshot(options: { screenshot: boolean; incremental?: boolean }): Promise<BrowserSnapshot> {
     const built = await buildSnapshot(this.cdp, { maxNodes: SNAPSHOT_NODES })
     this.refs = built.refs
     const screenshot = options.screenshot ? await this.captureJpeg() : undefined
-    return {
+    const frames: Array<{ url: string }> = []
+    for (const frame of this.page.frames()) {
+      if (frame === this.page.mainFrame() || frame.url() === '' || frame.url() === 'about:blank') continue
+      frames.push({ url: frame.url() })
+    }
+    const full: BrowserSnapshot = {
       ...built.snapshot,
       tabId: this.tabId,
       generation: this.generation,
       screenshot,
       pendingDialog: this.pending?.dialog,
+      unexpandedFrames: frames.length > 0 ? frames : undefined,
     }
+    if (options.incremental !== true || this.lastNodes === null) {
+      this.lastNodes = full.nodes
+      return full
+    }
+    const changed = diffNodes(this.lastNodes, full.nodes)
+    this.lastNodes = full.nodes
+    // A delta that is most of the tree is more expensive to read than a full one.
+    if (changed.length > full.nodes.length * 0.6) return full
+    return { ...full, nodes: changed, delta: true }
   }
 
-  private async captureJpeg(): Promise<{ mediaType: 'image/jpeg'; base64: string } | undefined> {
+  /** Accessible name of a ref from the last snapshot the model read. */
+  nameOf(ref: string): string | undefined {
+    return this.lastNodes?.find(node => node.ref === ref)?.name
+  }
+
+  private async captureJpeg(): Promise<{ id: string; mediaType: 'image/jpeg' } | undefined> {
     const buffer = await this.page.screenshot({ type: 'jpeg', quality: FRAME_QUALITY }).catch(() => undefined)
-    return buffer === undefined ? undefined : { mediaType: 'image/jpeg', base64: buffer.toString('base64') }
+    if (buffer === undefined) return undefined
+    const id = randomUUID()
+    const dir = join(dshHome(), 'browsers', 'attachments')
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, `${id}.jpg`), buffer)
+    return { id, mediaType: 'image/jpeg' }
   }
 
   // ── Navigation ────────────────────────────────────────────────────────────
@@ -216,15 +290,36 @@ export class BrowserTab {
 
   /** Run one model action, marking the tab agent-driven while it lands. */
   async act(action: BrowserAction): Promise<string> {
+    this.acting?.abort()
+    const lease = new AbortController()
+    this.acting = lease
     this.markAgent()
-    return await dispatchAction(this.actionContext(), action)
+    try {
+      return await dispatchAction(this.actionContext(lease.signal), action)
+    } finally {
+      if (this.acting === lease) this.acting = null
+    }
   }
 
-  private actionContext() {
+  /**
+   * Let the page react before it is observed. A click that starts a
+   * navigation or opens a menu needs a beat: snapshotting the instant the
+   * event dispatches would hand the model the OLD page and cost it a wasted
+   * turn discovering that.
+   */
+  async settle(): Promise<void> {
+    await this.page.waitForLoadState('domcontentloaded', { timeout: 5_000 }).catch(() => {
+      // A page that never reaches DOMContentLoaded is still worth observing.
+    })
+    await new Promise(resolve => setTimeout(resolve, SETTLE_MS))
+  }
+
+  private actionContext(signal?: AbortSignal) {
     return {
       cdp: this.cdp,
       page: this.page,
       timeoutMs: ACTION_TIMEOUT_MS,
+      signal,
       resolveRef: (ref: string): number => {
         const backendNodeId = this.refs.get(ref)
         if (backendNodeId === undefined) {
@@ -256,9 +351,34 @@ export class BrowserTab {
 
   // ── Human input ───────────────────────────────────────────────────────────
 
+  /** Cancel the in-flight download, if any. */
+  async cancelDownload(): Promise<void> {
+    await this.download?.cancel().catch(() => { /* already finished */ })
+    this.download = null
+  }
+
+  /** Grant or deny one permission for the current origin. */
+  async setPermission(name: string, grant: boolean): Promise<void> {
+    if (!grant || this.grantPermission === undefined) return
+    let origin: string
+    try {
+      origin = new URL(this.page.url()).origin
+    } catch {
+      return
+    }
+    await this.grantPermission(origin, name)
+  }
+
   /** Forward one raw CDP input command from the viewport. */
   async input(method: 'Input.dispatchMouseEvent' | 'Input.dispatchKeyEvent' | 'Input.insertText', params: Record<string, unknown>): Promise<void> {
     this.markHuman()
+    // Hover/move/wheel must not retire refs — they do not change the page
+    // the model observed. Clicks, keys and inserted text do.
+    const type = typeof params.type === 'string' ? params.type : method
+    if (method === 'Input.insertText' || type === 'mousePressed' || type === 'keyDown' || type === 'rawKeyDown') {
+      this.generation += 1
+      this.refs.clear()
+    }
     await this.cdp.send(method, params).catch(() => {
       // Input against a navigating page is routinely refused; dropping the
       // event is correct — the user will simply press again.
@@ -388,24 +508,17 @@ export class BrowserTab {
       this.emit(listener => { listener.dialog(this.pending?.dialog ?? null) })
     })
     this.page.on('download', (download: Download) => { void this.saveDownload(download) })
-    // A popup would be an invisible second page nobody can see or close, so
-    // it is folded into this tab: the user follows the link in place, which
-    // is also what the model's single-viewport mental model expects.
-    this.page.on('popup', (popup: Page) => { void this.absorbPopup(popup) })
-    this.page.on('close', () => { this.emit(listener => { listener.error('BROWSER_PAGE_CLOSED', 'the page was closed') }) })
-  }
-
-  private async absorbPopup(popup: Page): Promise<void> {
-    const url = popup.url()
-    await popup.close().catch(() => { /* the popup closed itself */ })
-    if (url !== '' && url !== 'about:blank') {
-      await this.open(url).catch((error: unknown) => {
-        this.emit(listener => { listener.error(BROWSER_ERRORS.blocked, error instanceof Error ? error.message : String(error)) })
-      })
-    }
+    // OAuth and `window.open` need the popup to stay a live page with its
+    // own opener relationship. Folding it into this tab would break login.
+    this.page.on('popup', (popup: Page) => { this.onPopup?.(popup) })
+    this.page.on('close', () => {
+      this.emit(listener => { listener.error('BROWSER_PAGE_CLOSED', 'the page was closed') })
+      this.onClosed?.()
+    })
   }
 
   private async saveDownload(download: Download): Promise<void> {
+    this.download = download
     const path = await download.path().catch(() => undefined)
     if (path === undefined) return
     this.emit(listener => { listener.download(download.suggestedFilename(), path) })
@@ -426,6 +539,10 @@ export class BrowserTab {
 
   /** A human event always wins the badge back from the model, immediately. */
   private markHuman(): void {
+    if (this.acting !== null) {
+      this.acting.abort()
+      this.acting = null
+    }
     if (this.agentBadgeTimer !== undefined) clearTimeout(this.agentBadgeTimer)
     this.agentBadgeTimer = undefined
     if (this.ownerRole === 'human') return
@@ -454,15 +571,39 @@ export class BrowserTab {
 
 /** Mint an id for a tab the model opened (distinct from the UI's `browser:N`). */
 export function agentTabId(): string {
-  return `browser:agent-${randomUUID().slice(0, 8)}`
+  return `${AGENT_BROWSER_PREFIX}${randomUUID().slice(0, 8)}`
+}
+
+/** Mint an id for a `window.open` popup the page itself created. */
+export function popupTabId(): string {
+  return `${POPUP_BROWSER_PREFIX}${randomUUID().slice(0, 8)}`
 }
 
 /** Whether a tab id was minted for the model (drives the sidebar reconcile). */
 export function isAgentBrowserTabId(tabId: string): boolean {
-  return tabId.startsWith('browser:agent-')
+  return tabId.startsWith(AGENT_BROWSER_PREFIX)
 }
 
 /** Keep a viewport dimension inside what Chromium will accept. */
 function clampDimension(value: number): number {
   return Math.min(4096, Math.max(200, Math.round(value)))
+}
+
+/** Nodes that appeared or changed since the last snapshot. */
+function diffNodes(
+  previous: BrowserSnapshot['nodes'],
+  next: BrowserSnapshot['nodes'],
+): BrowserSnapshot['nodes'] {
+  const prior = new Map(previous.map(node => [node.ref, node]))
+  return next.filter(node => {
+    const old = prior.get(node.ref)
+    return old === undefined
+      || old.role !== node.role
+      || old.name !== node.name
+      || old.value !== node.value
+      || old.checked !== node.checked
+      || old.selected !== node.selected
+      || old.expanded !== node.expanded
+      || old.disabled !== node.disabled
+  })
 }

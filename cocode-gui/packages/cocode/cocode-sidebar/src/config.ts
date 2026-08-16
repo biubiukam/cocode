@@ -42,6 +42,16 @@ export interface SidebarConfig {
   terminalsPerSession?: number
   /** How long a disconnected terminal process survives awaiting a reconnect. */
   reconnectGraceMs?: number
+  /** Live browser pages one conversation may hold open. */
+  browserTabsPerSession?: number
+  /** Chromium profile name; one persistent cookie jar and login state per name. */
+  browserProfile?: string
+  /**
+   * Run Chromium with a visible window instead of headless. The sidebar still
+   * renders the screencast; this is the escape hatch for sites that refuse
+   * headless traffic outright.
+   */
+  browserHeaded?: boolean
 }
 
 /** Schemastery schema for the plugin configuration. */
@@ -51,6 +61,9 @@ export const Config: z<SidebarConfig> = z.object({
   listLimit: z.number().step(1).min(1).default(1000),
   terminalsPerSession: z.number().step(1).min(1).default(3),
   reconnectGraceMs: z.number().step(1).min(0).default(30_000),
+  browserTabsPerSession: z.number().step(1).min(1).default(3),
+  browserProfile: z.string().default('default'),
+  browserHeaded: z.boolean().default(false),
 })
 
 /** Fully defaulted sidebar host settings. */
@@ -60,6 +73,9 @@ export interface ResolvedSidebarConfig {
   listLimit: number
   terminalsPerSession: number
   reconnectGraceMs: number
+  browserTabsPerSession: number
+  browserProfile: string
+  browserHeaded: boolean
 }
 
 /**
@@ -75,6 +91,9 @@ export function resolveSidebarConfig(config: SidebarConfig | undefined): Resolve
     listLimit: config?.listLimit ?? 1000,
     terminalsPerSession: config?.terminalsPerSession ?? 3,
     reconnectGraceMs: config?.reconnectGraceMs ?? 30_000,
+    browserTabsPerSession: config?.browserTabsPerSession ?? 3,
+    browserProfile: config?.browserProfile ?? 'default',
+    browserHeaded: config?.browserHeaded ?? false,
   }
 }
 
@@ -93,7 +112,9 @@ export const PrefsSchema: z<SidebarPrefs> = z.object({
   interceptOpenPath: z.boolean().default(true),
   htmlViewerNoSandbox: z.boolean().default(false),
   htmlViewerDefaultUnsafe: z.boolean().default(false),
-  browserNoSandbox: z.boolean().default(false),
+  agentBrowserTools: z.boolean().default(false),
+  agentBrowserIsolated: z.boolean().default(false),
+  browserHeaded: z.boolean().default(false),
   browserInterceptLinks: z.boolean().default(true),
   // Per-feature enable switches are OPEN maps (any tab/viewer id, built-in or
   // external): an absent key means enabled, so old documents resolve to {}

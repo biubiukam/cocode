@@ -1,13 +1,12 @@
 /**
- * The live sandbox status row of the two built-in web surfaces (HTML
- * preview and the browser tab): a green "sandbox on" state with a one-tap
- * TEMPORARY unlock, or a RED "sandbox off" state (global setting or the
- * temporary unlock) with a restore action.
+ * The live sandbox status row of the HTML preview: a green "sandbox on"
+ * state with a one-tap TEMPORARY unlock, or a RED "sandbox off" state
+ * (global setting or the temporary unlock) with a restore action.
  *
  * The temporary unlock is component state only — it never writes the
- * global side card setting (`htmlViewerNoSandbox` / `browserNoSandbox`);
- * it lasts until the surface unmounts (tab switch / file switch) or the
- * user restores the sandbox from the row. When the global setting already
+ * global side card setting (`htmlViewerNoSandbox`); it lasts until the
+ * surface unmounts (tab switch / file switch) or the user restores the
+ * sandbox from the row. When the global setting already
  * drops the sandbox, no unlock/restore action is offered (changing the
  * global setting is the settings page's job) — the red warning stands.
  */

@@ -20,8 +20,9 @@ import { join } from 'node:path'
 import type { BrowserContext } from 'playwright-core'
 import type { BrowserEngineStatus } from './protocol.ts'
 
-/** Chromium's own UA with the automation marker removed. */
-const HEADLESS_MARKER = /HeadlessChrome/g
+/** The token headless Chromium puts in its UA, and what it is rewritten to. */
+const HEADLESS_MARKER = 'HeadlessChrome'
+const HEADED_MARKER = 'Chrome'
 
 /**
  * Launch flags that keep an automated profile behaving like a normal browser.
@@ -75,19 +76,36 @@ export interface BrowserEngineOptions {
  */
 export class BrowserEngine {
   private state: BrowserEngineStatus = { state: 'missing' }
-  private contextPromise: Promise<BrowserContext> | null = null
+  private readonly contexts = new Map<string, Promise<BrowserContext>>()
   private installPromise: Promise<void> | null = null
   private readonly watchers = new Set<(status: BrowserEngineStatus) => void>()
+  private userAgentOverride: string | undefined
+  private headed: boolean
 
   constructor(private readonly options: BrowserEngineOptions) {
     // PLAYWRIGHT_BROWSERS_PATH is read when playwright-core builds its
     // registry, so it must be set before the first dynamic import below.
     process.env.PLAYWRIGHT_BROWSERS_PATH ??= enginesDir()
+    this.headed = options.headed
+  }
+
+  /** Switch headed mode. Takes effect on the next context launch. */
+  setHeaded(headed: boolean): void {
+    this.headed = headed
   }
 
   /** Current engine readiness (cheap; safe to call per request). */
   get status(): BrowserEngineStatus {
     return this.state
+  }
+
+  /**
+   * The UA every page should claim, or undefined to keep Chromium's own.
+   * Known only after the context launches, which is why each tab applies it
+   * itself instead of it being a launch option.
+   */
+  get userAgent(): string | undefined {
+    return this.userAgentOverride
   }
 
   /** Subscribe to readiness transitions; returns the disposer. */
@@ -189,57 +207,67 @@ export class BrowserEngine {
    * and exactly why §credential-inheritance in the RFC is a deliberate
    * product decision rather than an accident.
    */
-  async context(): Promise<BrowserContext> {
-    this.contextPromise ??= this.launch().catch((error: unknown) => {
-      this.contextPromise = null
+  async context(profile = this.options.profile): Promise<BrowserContext> {
+    const existing = this.contexts.get(profile)
+    if (existing !== undefined) return await existing
+    const launched = this.launch(profile).catch((error: unknown) => {
+      this.contexts.delete(profile)
       throw error
     })
-    return await this.contextPromise
+    this.contexts.set(profile, launched)
+    return await launched
   }
 
-  private async launch(): Promise<BrowserContext> {
+  /** Grant one permission for an origin on a named profile. */
+  async grantPermission(profile: string, origin: string, permission: string): Promise<void> {
+    const context = await this.context(profile)
+    await context.grantPermissions([permission], { origin })
+  }
+
+  private async launch(profile: string): Promise<BrowserContext> {
     await this.install()
     const { chromium } = await import('playwright-core')
-    const dir = profileDir(this.options.profile)
+    const dir = profileDir(profile)
     mkdirSync(dir, { recursive: true })
-    mkdirSync(downloadsDir(this.options.profile), { recursive: true })
+    mkdirSync(downloadsDir(profile), { recursive: true })
     const context = await chromium.launchPersistentContext(dir, {
-      headless: !this.options.headed,
+      headless: !this.headed,
       args: LAUNCH_ARGS,
       acceptDownloads: true,
-      downloadsPath: downloadsDir(this.options.profile),
+      downloadsPath: downloadsDir(profile),
       viewport: { width: 1280, height: 800 },
       // Every capability a page may ask for starts denied; the UI grants
       // them one at a time.
       permissions: [],
     })
-    const agent = await stripHeadlessMarker(context)
-    if (agent !== undefined) await context.setExtraHTTPHeaders({ 'user-agent': agent })
-    context.once('close', () => { this.contextPromise = null })
+    this.userAgentOverride = await headedUserAgent(context)
+    context.once('close', () => { this.contexts.delete(profile) })
     return context
   }
 
-  /** Close Chromium and forget the context (idempotent). */
+  /** Close Chromium and forget every context (idempotent). */
   async dispose(): Promise<void> {
-    const pending = this.contextPromise
-    this.contextPromise = null
-    if (pending === null) return
-    await pending.then(
-      async (context) => { await context.close() },
-      () => { /* the launch already failed; nothing to close */ },
-    )
+    const pending = [...this.contexts.values()]
+    this.contexts.clear()
+    await Promise.all(pending.map(async (promise) => {
+      await promise.then(
+        async (context) => { await context.close() },
+        () => { /* the launch already failed; nothing to close */ },
+      )
+    }))
   }
 }
 
 /**
- * Read Chromium's own UA and drop the `HeadlessChrome` token. Returning
- * undefined leaves the default in place rather than guessing a version.
+ * Read Chromium's own UA and drop the `HeadlessChrome` token, which is the
+ * single loudest automation signal a site sees. Returning undefined leaves
+ * the default in place rather than guessing a version string.
  */
-async function stripHeadlessMarker(context: BrowserContext): Promise<string | undefined> {
+async function headedUserAgent(context: BrowserContext): Promise<string | undefined> {
   const probe = await context.newPage()
   try {
     const agent = await probe.evaluate(() => navigator.userAgent)
-    return HEADLESS_MARKER.test(agent) ? agent.replace(HEADLESS_MARKER, 'Chrome') : undefined
+    return agent.includes(HEADLESS_MARKER) ? agent.replace(HEADLESS_MARKER, HEADED_MARKER) : undefined
   } catch {
     return undefined
   } finally {

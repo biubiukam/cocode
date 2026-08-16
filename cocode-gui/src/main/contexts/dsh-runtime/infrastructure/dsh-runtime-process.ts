@@ -43,7 +43,13 @@ export class DshRuntimeProcess {
 			[entry, "web", "--patch", desktopPatch, "--port", "0"],
 			{
 				cwd: workspace,
-				env: { ...process.env, DSH_HOME: home },
+				env: {
+					...process.env,
+					DSH_HOME: home,
+					PLAYWRIGHT_BROWSERS_PATH:
+						process.env.PLAYWRIGHT_BROWSERS_PATH ??
+						path.join(home, "browsers", "engines"),
+				},
 				execArgv: ["--expose-internals"],
 				serviceName: "DeepSeek DSH",
 				allowLoadingUnsignedLibraries: true,
