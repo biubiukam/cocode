@@ -6,14 +6,11 @@
 
 Requires Node.js 22.19.x or Node.js 24 and later.
 
-The release package contains the terminal client and Cocode companion plugin.
-The Harness model, tool, and session runtime is built separately:
+The release package contains the terminal client. The shared Supervisor pulls
+the versioned `@deepseek-ai/dsh` runtime from npm and starts or discovers one
+Host per profile:
 
 ```sh
-cd /path/to/cocode-harness
-pnpm install --frozen-lockfile
-pnpm run build
-
 cd /path/to/cocode-tui
 pnpm run build
 npm pack
@@ -22,19 +19,16 @@ npm install --global ./cocode-tui-0.1.0.tgz
 
 After publication, install it directly with `npm install --global @cocode/tui`.
 
-Point the CLI at the built runtime and verify the installation:
+Verify the Supervisor, Host descriptor, JSON-RPC service, and lease lifecycle:
 
 ```sh
-export COCODE_HARNESS_ROOT=/path/to/cocode-harness
 cocode --doctor
 cocode
 ```
 
-`COCODE_HARNESS_ROOT` must point to a built Harness checkout containing
-`packages/examples/jsonrpc-demo/src/runner.ts` (or its built runner) and
-`examples/package.json`.
 The CLI uses the current directory as the Agent workspace. Set `COCODE_HOME` to
-isolate credentials, or `DSH_SESSION_ROOT` to move session files.
+isolate credentials, `DSH_HOME`/`DSH_PROFILE` to select the shared Host scope, or
+`DSH_SESSION_ROOT` to move session files.
 
 The first launch opens the authentication gate. Choose a DeepSeek API key or
 sign in to Cocode. Later launches reuse the local configuration. The `cocode`
@@ -43,15 +37,11 @@ are suitable for installation scripts and troubleshooting.
 
 ## Before launch
 
-Prepare a sibling `cocode-harness` clone, then set `cocode-tui/.env`:
-
-```dotenv
-COCODE_HARNESS_CMD=node
-COCODE_HARNESS_ARGS=--import,tsx/esm,scripts/companion-runner.mjs
-DSH_CORDIS_CONFIG=companion/cordis.yml
-```
-
-Both `scripts/companion-runner.mjs` and `companion/cordis.yml` belong to `cocode-tui`. The runner only calls the sibling Harness generic boot entry and uses the sibling Harness as the bare-module resolution base. The companion is the sole stdio JSON-RPC owner, so the official `sdk-jsonrpc-server` is not loaded. The plugin source does not need to be copied into `cocode-harness`, and no Harness source is modified.
+No Desktop installation or sibling runtime checkout is required. The first TUI
+or Desktop client for a scope starts the Supervisor and DSH Host; later clients
+acquire another lease and connect to the existing Host. Configure `DSH_HOME`,
+`DSH_PROFILE`, or `COCODE_HOST_CONFIG_FINGERPRINT` only when the default shared
+scope is not appropriate.
 
 The local sibling-Harness composition is currently verified on macOS. Windows, Linux, and real terminal key combinations still require separate acceptance as described in [platform notes](./platforms.md); automated tests are not a substitute for a real TTY check.
 

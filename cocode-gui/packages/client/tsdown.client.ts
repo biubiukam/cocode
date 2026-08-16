@@ -79,20 +79,20 @@ const RUNTIME_STORE_EXEMPTION = '@deepseek-ai/dsh-client-runtime/client'
 export const CLIENT_EXTERNALS: readonly string[] = [...PLATFORM_MODULES, RUNTIME_STORE_EXEMPTION]
 
 const REPOSITORY_ROOT = fileURLToPath(new URL('../..', import.meta.url))
-const DSH_SOURCE_ROOT = process.env.DSH_SOURCE_ROOT ?? resolvePath(REPOSITORY_ROOT, '../cocode-harness')
-const DSH_SOURCE_REQUIRE = createRequire(resolvePath(DSH_SOURCE_ROOT, 'package.json'))
 const GUI_REQUIRE = createRequire(resolvePath(REPOSITORY_ROOT, 'package.json'))
+const SUPERVISOR_REQUIRE = createRequire(
+  GUI_REQUIRE.resolve('@cocode/host-supervisor/package.json'),
+)
 
 function resolveDevDependency(specifier: string): string | undefined {
-	for (const resolver of [GUI_REQUIRE, DSH_SOURCE_REQUIRE]) {
+	for (const resolver of [GUI_REQUIRE, SUPERVISOR_REQUIRE]) {
 		try {
 			return resolver.resolve(specifier)
 		} catch {
 			// try the next resolver root
 		}
 	}
-	const hoisted = resolvePath(DSH_SOURCE_ROOT, 'node_modules/.pnpm/node_modules', specifier)
-	return existsSync(resolvePath(hoisted, 'package.json')) ? hoisted : undefined
+	return undefined
 }
 
 const DEV_DEPENDENCY_ALIASES = Object.fromEntries(

@@ -98,8 +98,8 @@ export type TuiSessionOpenResult = {
 }
 
 export type TuiLaunch = {
-  command: string
-  args: string[]
+  command?: string
+  args?: string[]
   cwd?: string
   env?: NodeJS.ProcessEnv
 }

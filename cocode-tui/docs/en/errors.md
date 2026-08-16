@@ -45,12 +45,12 @@ Sign-in, device authorization, credentials, and the agency origin.
 
 ## RUNTIME
 
-jsonrpc child process start, stop, and unclassified failures.
+Shared Host JSON-RPC startup, stop, and unclassified failures.
 
 | Code                  | When it happens                              | Message                                                                                        |
 | --------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `RUNTIME_INIT_FAILED` | `initialize` failed                          | Initialize failed. Build sibling cocode-harness, set COCODE_HARNESS_ARGS, then /exit. {detail} |
-| `RUNTIME_STOPPED`     | Child process exited or the transport closed | Runtime stopped: {detail}.                                                                     |
+| `RUNTIME_INIT_FAILED` | `initialize` failed                          | Initialize failed. Check the shared DSH Host and Supervisor, then /exit. {detail}              |
+| `RUNTIME_STOPPED`     | Host connection closed or the transport closed | Runtime stopped: {detail}.                                                                     |
 | `RUNTIME_UNKNOWN`     | A non-`TuiError` failure reached the UI      | Unexpected error: {detail}.                                                                    |
 
 ## COMMAND
@@ -75,10 +75,13 @@ Local session directory and export.
 
 Launch configuration.
 
-| Code                           | When it happens                              | Message                                            |
-| ------------------------------ | -------------------------------------------- | -------------------------------------------------- |
-| `CONFIG_HARNESS_ARGS_REQUIRED` | `COCODE_HARNESS_ARGS` is unset               | COCODE_HARNESS_ARGS is required. See .env.example. |
-| `CONFIG_PROVIDER_REF`          | Provider `apiKeyEnv` is not a legal env name | Invalid credential ref for provider {provider}.    |
+No runtime command or sibling checkout is required. The TUI discovers the
+shared Supervisor from `DSH_HOME`, `DSH_PROFILE`, and the optional Host
+fingerprint environment variables.
+
+| Code                  | When it happens                              | Message                                         |
+| --------------------- | -------------------------------------------- | ----------------------------------------------- |
+| `CONFIG_PROVIDER_REF` | Provider `apiKeyEnv` is not a legal env name | Invalid credential ref for provider {provider}. |
 
 ## IO
 

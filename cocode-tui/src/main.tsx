@@ -40,11 +40,6 @@ if (process.stdin.isTTY !== true || process.stdout.isTTY !== true) {
 
 async function main(): Promise<void> {
   const launch = parseLaunchFromEnv()
-  if ('code' in launch) {
-    process.stderr.write(`${formatError(launch.code)}\n`)
-    process.exitCode = 1
-    return
-  }
 
   const leaveScreen = enterScreen(parseScreenMode(process.env.COCODE_TUI_SCREEN))
   process.once('exit', () => leaveScreen())
@@ -104,8 +99,8 @@ async function main(): Promise<void> {
     capabilities: { ...P0_CAPABILITIES, sessionList },
     diagnostics: {
       tty: process.stdin.isTTY === true && process.stdout.isTTY === true,
-      launchConfigured: nonempty(process.env.COCODE_HARNESS_CMD),
-      argsConfigured: nonempty(process.env.COCODE_HARNESS_ARGS),
+      launchConfigured: true,
+      argsConfigured: true,
       sessionRoot: sessionRoot.path,
     },
     locale: resolveUiLocale(process.env),
@@ -247,8 +242,4 @@ async function directoryExists(path: string): Promise<boolean> {
   } catch {
     return false
   }
-}
-
-function nonempty(value: string | undefined): boolean {
-  return value?.trim() !== undefined && value.trim() !== ''
 }

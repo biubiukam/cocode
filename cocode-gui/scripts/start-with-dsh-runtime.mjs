@@ -5,6 +5,7 @@ import path from "node:path"
 
 const configuredRuntimeRoot = process.env.DSH_RUNTIME_ROOT
 const runtimeRoot = configuredRuntimeRoot ?? mkdtempSync(path.join(os.tmpdir(), "dsh-desktop-dev-"))
+const supervisorEntry = path.resolve("../cocode-host-supervisor/packages/host-supervisor/lib/bin.js")
 const stageScript = path.resolve("scripts/stage-dsh-runtime.mjs")
 const clientWatcherScript = path.resolve("scripts/watch-dsh-client.mjs")
 let clientWatcher
@@ -35,7 +36,12 @@ try {
 	electron = spawn("pnpm", ["exec", "electron-forge", "start"], {
 		stdio: "inherit",
 		cwd: process.cwd(),
-		env: { ...process.env, DSH_RUNTIME_ROOT: runtimeRoot },
+		env: {
+			...process.env,
+			DSH_RUNTIME_ROOT: runtimeRoot,
+			COCODE_SUPERVISOR_SERVICE_ENTRY: supervisorEntry,
+			COCODE_NODE_EXECUTABLE: process.execPath,
+		},
 	})
 
 	const forwardSignal = (signal) => {

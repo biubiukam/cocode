@@ -1,6 +1,14 @@
-/**
- * HarnessClient adapter. Do not wrap DeepSeekHarness.run().
- */
+/** Shared Host JSON-RPC adapter. The TUI never launches a DSH subprocess. */
+
+import {
+  connectJsonRpc,
+  createHostSupervisorClient,
+  type HostLease,
+  type HostScope,
+  type JsonRpcPeer,
+} from '@cocode/host-supervisor'
+import { homedir } from 'node:os'
+import { resolve } from 'node:path'
 
 import type {
   TuiCapabilitySnapshot,
@@ -21,8 +29,7 @@ import type {
 } from './types.ts'
 import { fallbackCapabilitySnapshot, probeRuntimeCapabilities } from './capability.ts'
 
-type SdkClient = typeof import('@deepseek-ai/dsh-sdk-client')
-type HarnessClient = InstanceType<SdkClient['HarnessClient']>
+type HarnessClient = JsonRpcPeer
 
 export function createTuiRuntime(launch: TuiLaunch): TuiRuntime {
   return new SdkTuiRuntime(launch)
@@ -30,12 +37,13 @@ export function createTuiRuntime(launch: TuiLaunch): TuiRuntime {
 
 class SdkTuiRuntime implements TuiRuntime {
   private client: HarnessClient | undefined
+  private lease: HostLease | undefined
   private launch: TuiLaunch
   private wire: 'unknown' | 'companion' | 'legacy' = 'unknown'
   private readonly handlers = new Set<(n: TuiNotification) => void>()
   private readonly closeHandlers = new Set<(error?: string) => void>()
-  private pump: Promise<void> | undefined
-  private subscription: { close(): void } | undefined
+  private unsubscribe: (() => void) | undefined
+  private unsubscribeClose: (() => void) | undefined
   private closing = false
   private questionHandler: ((request: TuiQuestionRequest) => Promise<TuiQuestionAnswer>) | undefined
   private approvalHandler: ((request: TuiApprovalRequest) => Promise<TuiApprovalAnswer>) | undefined
@@ -50,23 +58,29 @@ class SdkTuiRuntime implements TuiRuntime {
     version: string
     capabilities?: import('./types.ts').TuiRuntimeAdvertisement
   }> {
-    const { HarnessClient } = await import('@deepseek-ai/dsh-sdk-client')
-    const client = new HarnessClient({
-      command: this.launch.command,
-      args: this.launch.args,
-      cwd: this.launch.cwd,
-      env: this.launch.env,
-    })
-    this.client = client
     this.closing = false
     this.wire = 'unknown'
     this.capabilitySnapshot = fallbackCapabilitySnapshot()
     try {
-      client.start()
-      const sub = client.subscribe()
-      this.subscription = sub
-      this.pump = this.readLoop(sub)
-      const result = await client.initialize(init)
+      const lease = await createHostSupervisorClient().acquire({
+        scope: resolveHostScope(this.launch),
+        clientKind: 'standalone-tui',
+        requiredServices: ['jsonrpc'],
+        minProtocolRevision: '1.0',
+      })
+      this.lease = lease
+      const endpoint = lease.descriptor.services.find((service) => service.service === 'jsonrpc')
+      if (endpoint === undefined) throw new Error('shared Host did not advertise its JSON-RPC service')
+      const client = await connectJsonRpc(endpoint)
+      this.client = client
+      this.unsubscribe = client.subscribe((notification) => {
+        void this.handleNotification(notification.method, notification.params)
+      })
+      this.unsubscribeClose = client.onClose((error) => {
+        if (this.closing) return
+        for (const handler of this.closeHandlers) handler(error)
+      })
+      const result = await client.request<{ serverInfo: { name: string; version: string } }>('initialize', init as unknown as Record<string, unknown>)
       const advertised = await this.negotiateWire(client)
       return {
         ...result.serverInfo,
@@ -90,7 +104,8 @@ class SdkTuiRuntime implements TuiRuntime {
     await this.close()
     this.closing = false
     this.client = undefined
-    this.pump = undefined
+    this.lease = undefined
+    this.unsubscribe = undefined
     const previousLaunch = this.launch
     if (env !== undefined) {
       const sessionRoot = this.launch.env?.DSH_SESSION_ROOT
@@ -315,10 +330,14 @@ class SdkTuiRuntime implements TuiRuntime {
 
   async close(): Promise<void> {
     this.closing = true
-    this.subscription?.close()
-    this.subscription = undefined
-    await this.client?.close()
-    await this.pump?.catch(() => undefined)
+    this.unsubscribe?.()
+    this.unsubscribe = undefined
+    this.unsubscribeClose?.()
+    this.unsubscribeClose = undefined
+    this.client?.close()
+    this.client = undefined
+    await this.lease?.release().catch(() => undefined)
+    this.lease = undefined
   }
 
   private requireClient(): HarnessClient {
@@ -363,7 +382,7 @@ class SdkTuiRuntime implements TuiRuntime {
       if (!isUnsupportedCompanionError(error)) throw error
       this.wire = 'legacy'
       const request = (method: string, params: object, timeoutMs?: number) =>
-        client.request(method, params, timeoutMs)
+        client.request(method, params as Record<string, unknown>, timeoutMs)
       const advertised = undefined
       this.capabilitySnapshot = await probeRuntimeCapabilities(
         { request },
@@ -383,31 +402,18 @@ class SdkTuiRuntime implements TuiRuntime {
     )
   }
 
-  private async readLoop(
-    sub: AsyncIterable<{ method: string; params: Record<string, unknown> }>,
-  ): Promise<void> {
-    let errorMessage: string | undefined
-    try {
-      for await (const notification of sub) {
-        if (notification.method === 'cocode/question/request') {
-          void this.respondToQuestion(notification.params)
-          continue
-        }
-        if (notification.method === 'cocode/approval/request') {
-          void this.respondToApproval(notification.params)
-          continue
-        }
-        const mapped = mapNotification(notification)
-        if (mapped === undefined) continue
-        for (const handler of this.handlers) handler(mapped)
-      }
-    } catch (error) {
-      errorMessage = error instanceof Error ? error.message : String(error)
-    } finally {
-      if (!this.closing) {
-        for (const handler of this.closeHandlers) handler(errorMessage)
-      }
+  private async handleNotification(method: string, params: Record<string, unknown>): Promise<void> {
+    if (method === 'cocode/question/request') {
+      await this.respondToQuestion(params)
+      return
     }
+    if (method === 'cocode/approval/request') {
+      await this.respondToApproval(params)
+      return
+    }
+    const mapped = mapNotification({ method, params })
+    if (mapped === undefined) return
+    for (const handler of this.handlers) handler(mapped)
   }
 
   private async respondToQuestion(params: Record<string, unknown>): Promise<void> {
@@ -445,6 +451,19 @@ class SdkTuiRuntime implements TuiRuntime {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function resolveHostScope(launch: TuiLaunch): HostScope {
+  const env = launch.env ?? process.env
+  const configuredHome = env.DSH_HOME?.trim()
+  return {
+    dshHome: resolve(configuredHome || `${homedir()}/.dsh`),
+    profile: env.DSH_PROFILE?.trim() || 'web',
+    hostConfigFingerprint: env.COCODE_HOST_CONFIG_FINGERPRINT?.trim() || 'cocode-web-jsonrpc-v1',
+    runtimeChannel: env.COCODE_RUNTIME_CHANNEL === 'preview' || env.COCODE_RUNTIME_CHANNEL === 'dev'
+      ? env.COCODE_RUNTIME_CHANNEL
+      : 'stable',
+  }
 }
 
 type CompanionCapabilities = {

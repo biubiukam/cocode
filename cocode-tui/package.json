@@ -28,16 +28,12 @@
   "files": [
     "bin",
     "dist/cocode-tui.mjs",
-    "dist/companion-layout.mjs",
-    "dist/companion-runner.mjs",
-    "dist/companion.cordis.yml",
-    "dist/companion.mjs",
+    "dist/cocode-tui.meta.json",
     "docs",
-    "README.md",
-    "scripts/companion-layout.mjs",
-    "scripts/companion-runner.mjs"
+    "README.md"
   ],
   "dependencies": {
+    "@cocode/host-supervisor": "link:../cocode-host-supervisor",
     "tsx": "^4.20.5"
   },
   "devDependencies": {

@@ -3,6 +3,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { dirname, resolve } from 'node:path'
+import { homedir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -17,7 +18,7 @@ if (args.includes('--help') || args.includes('-h')) {
   process.stdout.write('Options:\n')
   process.stdout.write('  --help, -h       Show this help\n')
   process.stdout.write('  --version, -v    Show the installed version\n')
-  process.stdout.write('  --doctor         Check the local Harness runtime and configuration\n')
+  process.stdout.write('  --doctor         Check the shared DSH Host and Supervisor\n')
   process.exit(0)
 }
 
@@ -27,23 +28,7 @@ if (args.includes('--version') || args.includes('-v')) {
 }
 
 if (args.includes('--doctor')) {
-  const harnessRoot = process.env.COCODE_HARNESS_ROOT?.trim()
-  const runner = resolve(packageRoot, 'dist', 'companion-runner.mjs')
-  const harnessReady =
-    harnessRoot !== undefined &&
-    harnessRoot !== '' &&
-    (existsSync(resolve(harnessRoot, 'packages/examples/jsonrpc-demo/lib/runner.js')) ||
-      existsSync(resolve(harnessRoot, 'packages/examples/jsonrpc-demo/src/runner.ts'))) &&
-    existsSync(resolve(harnessRoot, 'examples/package.json'))
-  const checks = [
-    ['package', true],
-    ['built TUI', existsSync(resolve(packageRoot, 'dist', 'cocode-tui.mjs'))],
-    ['companion runner', existsSync(runner)],
-    ['COCODE_HARNESS_ROOT', harnessRoot !== undefined && harnessRoot !== ''],
-    ['Harness runtime', harnessReady],
-  ]
-  for (const [label, ok] of checks) process.stdout.write(`${ok ? 'ok' : 'missing'} ${label}\n`)
-  process.exit(checks.every(([, ok]) => ok) ? 0 : 1)
+  await runDoctor()
 }
 
 const entry = resolve(packageRoot, 'dist', 'cocode-tui.mjs')
@@ -52,24 +37,9 @@ if (!existsSync(entry)) {
   process.exit(1)
 }
 
-const env = { ...process.env }
-if (env.COCODE_HARNESS_CMD?.trim() === undefined || env.COCODE_HARNESS_CMD.trim() === '') {
-  env.COCODE_HARNESS_CMD = process.execPath
-}
-if (env.COCODE_HARNESS_ARGS?.trim() === undefined || env.COCODE_HARNESS_ARGS.trim() === '') {
-  env.COCODE_HARNESS_ARGS = [
-    '--import',
-    'tsx/esm',
-    resolve(packageRoot, 'dist', 'companion-runner.mjs'),
-  ].join(',')
-}
-if (env.COCODE_HARNESS_CWD?.trim() === undefined || env.COCODE_HARNESS_CWD.trim() === '') {
-  env.COCODE_HARNESS_CWD = process.cwd()
-}
-
 const result = spawnSync(process.execPath, [entry, ...args], {
   cwd: process.cwd(),
-  env,
+  env: process.env,
   stdio: 'inherit',
 })
 
@@ -78,3 +48,51 @@ if (result.error) {
   process.exit(1)
 }
 process.exit(result.status ?? 1)
+
+async function runDoctor() {
+  const { createHostSupervisorClient } = await import('@cocode/host-supervisor')
+  const home = process.env.DSH_HOME?.trim() || resolve(homedir(), '.dsh')
+  const profile = process.env.DSH_PROFILE?.trim() || 'web'
+  const scope = {
+    dshHome: home,
+    profile,
+    hostConfigFingerprint: process.env.COCODE_HOST_CONFIG_FINGERPRINT?.trim() || 'cocode-web-jsonrpc-v1',
+    runtimeChannel: process.env.COCODE_RUNTIME_CHANNEL === 'preview' || process.env.COCODE_RUNTIME_CHANNEL === 'dev'
+      ? process.env.COCODE_RUNTIME_CHANNEL
+      : 'stable',
+  }
+  const checks = [
+    ['package', true],
+    ['built TUI', existsSync(resolve(packageRoot, 'dist', 'cocode-tui.mjs'))],
+    ['DSH_HOME', home !== ''],
+    ['profile', profile !== ''],
+  ]
+  let lease
+  try {
+    lease = await createHostSupervisorClient().acquire({
+      scope,
+      clientKind: 'standalone-tui',
+      requiredServices: ['jsonrpc'],
+      minProtocolRevision: '1.0',
+    })
+    const descriptor = lease.descriptor
+    checks.push(
+      ['supervisor IPC', true],
+      ['Host descriptor', descriptor.schemaVersion === 1],
+      ['Supervisor protocol', descriptor.supervisorProtocolRevision.startsWith('1.')],
+      ['JSON-RPC service', descriptor.services.some((service) => service.service === 'jsonrpc')],
+      ['Host protocol', descriptor.hostProtocolRevision.startsWith('1.')],
+      ['capabilities', ['session', 'event', 'workspace'].every((capability) => descriptor.capabilities.includes(capability))],
+      ['DSH_HOME/profile', descriptor.dshHome === scope.dshHome && descriptor.profile === scope.profile],
+      ['runtime version', descriptor.runtimeVersion !== ''],
+      ['lease create/release', true],
+    )
+  } catch (error) {
+    checks.push(['supervisor IPC', false], ['Host descriptor', false], ['JSON-RPC service', false])
+    process.stderr.write(`doctor: ${error instanceof Error ? error.message : String(error)}\n`)
+  } finally {
+    await lease?.release().catch(() => undefined)
+  }
+  for (const [label, ok] of checks) process.stdout.write(`${ok ? 'ok' : 'missing'} ${label}\n`)
+  process.exit(checks.every(([, ok]) => ok) ? 0 : 1)
+}

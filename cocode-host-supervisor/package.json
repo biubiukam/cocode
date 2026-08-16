@@ -1,0 +1,67 @@
+{
+  "name": "@cocode/host-supervisor",
+  "version": "0.1.0",
+  "description": "Shared lifecycle supervisor for the Cocode DSH host.",
+  "type": "module",
+  "main": "packages/host-supervisor/lib/index.js",
+  "types": "packages/host-supervisor/lib/index.d.ts",
+  "bin": {
+    "cocode-host-supervisor": "packages/host-supervisor/bin/cocode-host-supervisor.mjs"
+  },
+  "exports": {
+    ".": {
+      "types": "./packages/host-supervisor/lib/index.d.ts",
+      "import": "./packages/host-supervisor/lib/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "packages/host-supervisor/lib",
+    "packages/host-supervisor/bin",
+    "runtime"
+  ],
+  "scripts": {
+    "build": "node packages/host-supervisor/scripts/build.mjs",
+    "typecheck": "tsc --noEmit -p packages/host-supervisor/tsconfig.json",
+    "test": "node --test packages/host-supervisor/test/*.test.mjs",
+    "prepack": "pnpm run build"
+  },
+  "dependencies": {
+    "@deepseek-ai/dsh": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-agent": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-api-gateway": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-attachment-local": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-credentials-local": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-host-apiproxy": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-host-frontend-static": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-host-webserver": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-llm": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-llm-deepseek": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-llm-pi-ai": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-session": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-session-persistence-jsonl": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-session-query-sqlite": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-session-telemetry-otel": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-settings": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-subagent": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-subprocess-local": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-system-prompt": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-tools": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-typert-loader": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-typert-registry": "0.1.0-rc.6",
+    "node-pty": "^1.1.0",
+    "schemastery": "^3.18.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.9.2"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

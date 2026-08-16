@@ -14,9 +14,9 @@ const config: ForgeConfig = {
 	packagerConfig: {
 		asar: false,
 	},
-	hooks: {
-		packageAfterCopy: async (_config, buildPath: string) => {
-			const runtimeDependencies = ["better-sqlite3", "node-addon-api"]
+		hooks: {
+			packageAfterCopy: async (_config, buildPath: string) => {
+				const runtimeDependencies = ["better-sqlite3", "node-addon-api"]
 
 			await Promise.all(
 				runtimeDependencies.map(async (dependency) => {
@@ -31,14 +31,8 @@ const config: ForgeConfig = {
 				"--destination",
 				path.join(buildPath, "resources", "dsh-runtime"),
 			])
-			await fs.cp(
-				path.resolve("resources", "dsh-utility-entry.mjs"),
-				path.join(buildPath, "resources", "dsh-utility-entry.mjs"),
-			)
-			await fs.cp(
-				path.resolve("resources", "dsh-noop-hmr.mjs"),
-				path.join(buildPath, "resources", "dsh-noop-hmr.mjs"),
-			)
+			await fs.cp(process.execPath, path.join(buildPath, "resources", "cocode-node"))
+			await fs.chmod(path.join(buildPath, "resources", "cocode-node"), 0o755)
 		},
 	},
 	rebuildConfig: {},

@@ -3,43 +3,10 @@ import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { resolveCompanionRuntimeLayout } from './companion-layout.mjs'
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 loadDotenv(resolve(packageRoot, '.env'))
-
-try {
-	const layout = resolveCompanionRuntimeLayout(
-		new URL('./companion-runner.mjs', import.meta.url),
-	)
-	if (!process.env.COCODE_HARNESS_ROOT?.trim()) {
-		process.env.COCODE_HARNESS_ROOT = layout.harnessRoot
-	}
-} catch (error) {
-	process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`)
-	process.stderr.write(
-		'Build harness: cd ../cocode-harness && pnpm install && pnpm run build\n',
-	)
-	process.exit(1)
-}
-
-if (!process.env.COCODE_HARNESS_CMD?.trim()) {
-	process.env.COCODE_HARNESS_CMD = process.execPath
-}
-if (!process.env.COCODE_HARNESS_ARGS?.trim()) {
-	process.env.COCODE_HARNESS_ARGS = [
-		'--import',
-		'tsx/esm',
-		resolve(packageRoot, 'scripts/companion-runner.mjs'),
-	].join(',')
-}
-if (!process.env.COCODE_HARNESS_CWD?.trim()) {
-	process.env.COCODE_HARNESS_CWD = process.cwd()
-}
-if (!process.env.COCODE_HOME?.trim()) {
-	process.env.COCODE_HOME = resolve(packageRoot, '.dev/home')
-}
 
 const result = spawnSync(
 	process.execPath,

@@ -2,29 +2,24 @@ import { describe, expect, it } from 'vitest'
 import { parseInitFromEnv, parseLaunchFromEnv } from '../../packages/connection/src/env.ts'
 
 describe('parseLaunchFromEnv', () => {
-  it('rejects missing args', () => {
-    const result = parseLaunchFromEnv({ COCODE_HARNESS_CMD: 'node' })
-    expect(result).toEqual({
-      code: 'CONFIG_HARNESS_ARGS_REQUIRED',
-    })
+  it('does not require a subprocess command', () => {
+    const result = parseLaunchFromEnv({ COCODE_CWD: '/work' })
+    expect(result).toMatchObject({ cwd: '/work' })
   })
 
-  it('splits comma-separated args', () => {
+  it('preserves environment for Supervisor scope resolution', () => {
     const result = parseLaunchFromEnv({
-      COCODE_HARNESS_CMD: 'node',
-      COCODE_HARNESS_ARGS: '--import,tsx/esm,./bin.ts',
+      DSH_HOME: '/dsh',
+      DSH_PROFILE: 'web',
     })
-    expect(result).toEqual({
-      command: 'node',
-      args: ['--import', 'tsx/esm', './bin.ts'],
-      cwd: undefined,
-    })
+    expect(result.env?.DSH_HOME).toBe('/dsh')
+    expect(result.env?.DSH_PROFILE).toBe('web')
   })
 })
 
 describe('parseInitFromEnv', () => {
   it('defaults provider and model', () => {
-    const result = parseInitFromEnv({ COCODE_HARNESS_CWD: '/work' })
+    const result = parseInitFromEnv({ DSH_CWD: '/work' })
     expect(result).toMatchObject({
       cwd: '/work',
       provider: 'deepseek-official',

@@ -12,7 +12,7 @@
     "build": "node -e \"process.exit(0)\""
   },
   "dependencies": {
-    "@deepseek-ai/dsh-sdk-client": "0.1.0-rc.6"
+    "@cocode/host-supervisor": "link:../../../cocode-host-supervisor"
   },
   "devDependencies": {
     "@types/node": "^22.20.1"

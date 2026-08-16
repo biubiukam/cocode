@@ -45,12 +45,12 @@ TUI 自己产生的失败会显示为 `CODE · 解释`。语言由 `COCODE_LANG`
 
 ## RUNTIME
 
-jsonrpc 子进程的启动、停止和未分类失败。
+共享 Host JSON-RPC 的启动、停止和未分类失败。
 
 | Code                  | 何时出现                     | 解释                                                                                        |
 | --------------------- | ---------------------------- | ------------------------------------------------------------------------------------------- |
-| `RUNTIME_INIT_FAILED` | `initialize` 失败            | 初始化失败。请先构建 sibling cocode-harness，设置 COCODE_HARNESS_ARGS，然后 /exit。{detail} |
-| `RUNTIME_STOPPED`     | 子进程退出或传输断开         | 运行时已停止：{detail}。                                                                    |
+| `RUNTIME_INIT_FAILED` | `initialize` 失败            | 初始化失败。请检查共享 DSH Host 与 Supervisor，然后 /exit。{detail}                 |
+| `RUNTIME_STOPPED`     | Host 连接或传输断开          | 运行时已停止：{detail}                                                              |
 | `RUNTIME_UNKNOWN`     | 非 `TuiError` 的失败落到界面 | 未预期的错误：{detail}。                                                                    |
 
 ## COMMAND
@@ -75,10 +75,12 @@ jsonrpc 子进程的启动、停止和未分类失败。
 
 启动配置。
 
-| Code                           | 何时出现                              | 解释                                            |
-| ------------------------------ | ------------------------------------- | ----------------------------------------------- |
-| `CONFIG_HARNESS_ARGS_REQUIRED` | 未设置 `COCODE_HARNESS_ARGS`          | 需要设置 COCODE_HARNESS_ARGS。见 .env.example。 |
-| `CONFIG_PROVIDER_REF`          | 提供方 `apiKeyEnv` 不是合法环境变量名 | 提供方 {provider} 的凭证引用无效。              |
+TUI 不需要运行时命令或 sibling checkout。它通过 `DSH_HOME`、`DSH_PROFILE`
+以及可选的 Host fingerprint 环境变量发现共享 Supervisor 与 DSH Host。
+
+| Code                  | 何时出现                              | 解释                              |
+| --------------------- | ------------------------------------- | --------------------------------- |
+| `CONFIG_PROVIDER_REF` | 提供方 `apiKeyEnv` 不是合法环境变量名 | 提供方 {provider} 的凭证引用无效。 |
 
 ## IO
 

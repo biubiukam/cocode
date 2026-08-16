@@ -151,8 +151,8 @@ export const ERROR_CATALOG = {
   },
   RUNTIME_INIT_FAILED: {
     domain: 'RUNTIME',
-    en: 'Initialize failed. Build sibling cocode-harness, set COCODE_HARNESS_ARGS, then /exit. {detail}',
-    zh: '初始化失败。请先构建 sibling cocode-harness，设置 COCODE_HARNESS_ARGS，然后 /exit。{detail}',
+    en: 'Initialize failed. Check the shared DSH Host and Supervisor, then /exit. {detail}',
+    zh: '初始化失败。请检查共享 DSH Host 与 Supervisor，然后 /exit。{detail}',
   },
   RUNTIME_STOPPED: {
     domain: 'RUNTIME',
@@ -184,10 +184,10 @@ export const ERROR_CATALOG = {
     en: 'Could not allocate a session export filename.',
     zh: '无法分配会话导出文件名。',
   },
-  CONFIG_HARNESS_ARGS_REQUIRED: {
+  CONFIG_SUPERVISOR_UNAVAILABLE: {
     domain: 'CONFIG',
-    en: 'COCODE_HARNESS_ARGS is required. See .env.example.',
-    zh: '需要设置 COCODE_HARNESS_ARGS。见 .env.example。',
+    en: 'The shared DSH Host Supervisor is unavailable.',
+    zh: '共享 DSH Host Supervisor 不可用。',
   },
   CONFIG_PROVIDER_REF: {
     domain: 'CONFIG',
