@@ -5,6 +5,7 @@
  */
 import { defineStore, type EngineStoreHandle } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ThemePreference } from '../theme-settings.ts'
+import type { LogoPreference } from './logo-settings.ts'
 
 /** Store state mirrored from the theme snapshot. */
 export interface AppearanceRowState {
@@ -12,6 +13,8 @@ export interface AppearanceRowState {
   preference: ThemePreference
   /** Resolved scheme used to represent the hidden system preference. */
   activeColorScheme: 'light' | 'dark'
+  /** Selected sidebar logo style. */
+  logoPreference: LogoPreference
   /** Service revision; -1 until first sync so revision 0 lands as a change. */
   revision: number
 }
@@ -22,6 +25,7 @@ type AppearanceRowActions = {
     draft: AppearanceRowState,
     preference: ThemePreference,
     activeColorScheme: 'light' | 'dark',
+    logoPreference: LogoPreference,
     revision: number,
   ) => void
 }
@@ -35,6 +39,7 @@ export function createAppearanceRowStore(): EngineStoreHandle<AppearanceRowState
     init: (): AppearanceRowState => ({
       preference: 'system',
       activeColorScheme: 'light',
+      logoPreference: 'cocode',
       revision: -1,
     }),
     actions: {
@@ -42,11 +47,13 @@ export function createAppearanceRowStore(): EngineStoreHandle<AppearanceRowState
         d,
         preference: ThemePreference,
         activeColorScheme: 'light' | 'dark',
+        logoPreference: LogoPreference,
         revision: number,
       ) => {
         if (revision <= d.revision) return
         d.preference = preference
         d.activeColorScheme = activeColorScheme
+        d.logoPreference = logoPreference
         d.revision = revision
       },
     },

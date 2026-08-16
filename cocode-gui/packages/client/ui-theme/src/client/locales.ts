@@ -5,6 +5,9 @@ export const zh = {
   'appearance.title': '外观',
   'appearance.light': '浅色',
   'appearance.dark': '深色',
+  'appearance.logo.title': 'Logo 显示',
+  'appearance.logo.cocode': 'Cocode',
+  'appearance.logo.deepseek': 'DeepSeek',
 } satisfies Record<string, string>
 
 /** The settings.theme namespace key union. */
@@ -15,4 +18,7 @@ export const en = {
   'appearance.title': 'Appearance',
   'appearance.light': 'Light',
   'appearance.dark': 'Dark',
+  'appearance.logo.title': 'Logo display',
+  'appearance.logo.cocode': 'Cocode',
+  'appearance.logo.deepseek': 'DeepSeek',
 } satisfies Record<ThemeKey, string>

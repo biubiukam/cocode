@@ -96,20 +96,15 @@
   }
 
 /* Rail geometry (figma rail spec): 36x36 control boxes centered in the 56px
-   rail (10px side padding), 12px vertical rhythm, 18px from the rail top to
-   the whale's box (24px to the 24-wide whale glyph itself). */
+   rail (10px side padding), 12px vertical rhythm, 18px from the rail top. */
 .root.collapsed {
   padding: 18px 10px 6px;
 }
 
-.brandText {
-  font-size: 20px;
-  font-weight: 700;
+.brandLogo {
+  display: block;
+  flex: none;
   color: var(--dsw-alias-label-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  letter-spacing: -0.02em;
 }
 
 /* Scrollbars in the column are a pointer affordance: the shell adds this
@@ -245,7 +240,7 @@
   display: inline;
 }
 
-.collapsed .toggle:hover .railFish {
+.collapsed .toggle:hover .railLogo {
   display: none;
 }
 

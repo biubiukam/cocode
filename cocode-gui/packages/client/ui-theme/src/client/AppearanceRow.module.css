@@ -16,6 +16,11 @@
   color: var(--dsw-alias-label-primary);
 }
 
+.logoTitle {
+  composes: title;
+  margin-top: 12px;
+}
+
 .cubeRow {
   display: flex;
   align-items: stretch;
@@ -42,6 +47,21 @@
   line-height: 22px;
   color: var(--dsw-alias-label-primary);
   cursor: pointer;
+}
+
+.logoCube {
+  composes: themeCube;
+  padding: 16px 24px 14px;
+}
+
+.logoPreview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--dsw-alias-label-primary);
 }
 
 .themeCube:hover:not(.selected) {

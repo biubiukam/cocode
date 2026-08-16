@@ -7,7 +7,7 @@ window.__ModuleLoader__.load({
 		let _deepseek_ai_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-primitives");
 		let react_jsx_runtime = require("react/jsx-runtime");
 		let _deepseek_ai_dsh_client_runtime_client = require("@deepseek-ai/dsh-client-runtime/client");
-		//#region ../../../node_modules/clsx/dist/clsx.mjs
+		//#region node_modules/clsx/dist/clsx.mjs
 		function r(e) {
 			var t, f, n = "";
 			if ("string" == typeof e || "number" == typeof e) n += e;
@@ -22,8 +22,8 @@ window.__ModuleLoader__.load({
 			return n;
 		}
 		//#endregion
-		//#region \0dsh-css:/Users/kambiu/worker/open/electron-template/packages/client/ui-theme/src/client/AppearanceRow.module.css.mjs
-		const css = ".cfqL9q_group{border-bottom:1px solid var(--dsw-alias-border-l2);flex-direction:column;gap:8px;padding:16px 0;display:flex}.cfqL9q_title{color:var(--dsw-alias-label-primary);font-size:14px;font-weight:400;line-height:22px}.cfqL9q_cubeRow{flex-wrap:wrap;align-items:stretch;gap:8px;display:flex}.cfqL9q_themeCube{box-sizing:border-box;border:1px solid var(--dsw-alias-border-l2);border-radius:var(--ds-radius-lg);background:var(--cocode-surface-raised);font:inherit;color:var(--dsw-alias-label-primary);cursor:pointer;flex-direction:column;flex:220px;justify-content:center;align-items:center;gap:4px;padding:20px 32px;font-size:14px;line-height:22px;display:flex}.cfqL9q_themeCube:hover:not(.cfqL9q_selected){background:var(--dsw-alias-interactive-bg-hover)}.cfqL9q_selected{background:var(--cocode-accent-soft);border-color:color-mix(in srgb, var(--cocode-accent) 24%, var(--cocode-border))}";
+		//#region \0dsh-css:packages/client/ui-theme/src/client/AppearanceRow.module.css.mjs
+		const css = "._87KuIa_group{border-bottom:1px solid var(--dsw-alias-border-l2);flex-direction:column;gap:8px;padding:16px 0;display:flex}._87KuIa_title{color:var(--dsw-alias-label-primary);font-size:14px;font-weight:400;line-height:22px}._87KuIa_logoTitle{margin-top:12px;}._87KuIa_cubeRow{flex-wrap:wrap;align-items:stretch;gap:8px;display:flex}._87KuIa_themeCube{box-sizing:border-box;border:1px solid var(--dsw-alias-border-l2);border-radius:var(--ds-radius-lg);background:var(--cocode-surface-raised);font:inherit;color:var(--dsw-alias-label-primary);cursor:pointer;flex-direction:column;flex:220px;justify-content:center;align-items:center;gap:4px;padding:20px 32px;font-size:14px;line-height:22px;display:flex}._87KuIa_logoCube{padding:16px 24px 14px;}._87KuIa_logoPreview{max-width:100%;min-height:24px;color:var(--dsw-alias-label-primary);justify-content:center;align-items:center;display:flex;overflow:hidden}._87KuIa_themeCube:hover:not(._87KuIa_selected){background:var(--dsw-alias-interactive-bg-hover)}._87KuIa_selected{background:var(--cocode-accent-soft);border-color:color-mix(in srgb, var(--cocode-accent) 24%, var(--cocode-border))}";
 		const tagId = "@deepseek-ai/dsh-client-ui-theme/AppearanceRow.module.css";
 		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId) + "]") === null) {
 			const tag = document.createElement("style");
@@ -33,14 +33,17 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var AppearanceRow_module_css_default = {
-			"cubeRow": "cfqL9q_cubeRow",
-			"themeCube": "cfqL9q_themeCube",
-			"group": "cfqL9q_group",
-			"title": "cfqL9q_title",
-			"selected": "cfqL9q_selected"
+			"themeCube": "_87KuIa_themeCube",
+			"group": "_87KuIa_group",
+			"logoPreview": "_87KuIa_logoPreview",
+			"logoTitle": "_87KuIa_logoTitle",
+			"logoCube": "_87KuIa_logoCube",
+			"title": "_87KuIa_title",
+			"selected": "_87KuIa_selected",
+			"cubeRow": "_87KuIa_cubeRow"
 		};
 		//#endregion
-		//#region src/client/AppearanceRow.tsx
+		//#region packages/client/ui-theme/src/client/AppearanceRow.tsx
 		/**
 		* Appearance preference row registered into the General section item slot
 		* (figma 501:30012 'Frame 2117131228'): title + two preference cubes.
@@ -59,35 +62,112 @@ window.__ModuleLoader__.load({
 			labelKey: "appearance.dark",
 			Icon: _deepseek_ai_dsh_client_ui_primitives.IconDarkOutline16
 		}];
+		const LOGO_CELL_WIDTH = 10;
+		const LOGO_ROW_HEIGHT = 16;
+		const LOGO_LINES = [
+			" ▄█████ ▄████▄ ▄█████ ▄████▄ █████▄ ▄█████",
+			" ██     ██  ██ ██     ██  ██ ██  ██ ██▄▄",
+			" ██     ██  ██ ██     ██  ██ ██  ██ ██▀▀",
+			" ▀█████ ▀████▀ ▀█████ ▀████▀ █████▀ ▀█████"
+		];
+		/** Settings preview for the exact cocode.agency pixel wordmark. */
+		function CocodeLogoPreview() {
+			return /* @__PURE__ */ (0, react_jsx_runtime.jsx)("svg", {
+				width: 118.125,
+				height: 18,
+				viewBox: "0 0 420 64",
+				shapeRendering: "crispEdges",
+				"aria-hidden": "true",
+				children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("g", {
+					fill: "currentColor",
+					children: LOGO_LINES.flatMap((line, rowIndex) => [...line].flatMap((glyph, columnIndex) => {
+						const x = columnIndex * LOGO_CELL_WIDTH;
+						const y = rowIndex * LOGO_ROW_HEIGHT;
+						if (glyph === "█") return [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("rect", {
+							x,
+							y,
+							width: LOGO_CELL_WIDTH,
+							height: LOGO_ROW_HEIGHT
+						}, `${rowIndex}-${columnIndex}`)];
+						if (glyph === "▄") return [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("rect", {
+							x,
+							y: y + LOGO_ROW_HEIGHT / 2,
+							width: LOGO_CELL_WIDTH,
+							height: LOGO_ROW_HEIGHT / 2
+						}, `${rowIndex}-${columnIndex}`)];
+						if (glyph === "▀") return [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("rect", {
+							x,
+							y,
+							width: LOGO_CELL_WIDTH,
+							height: LOGO_ROW_HEIGHT / 2
+						}, `${rowIndex}-${columnIndex}`)];
+						return [];
+					}))
+				})
+			});
+		}
 		/**
 		* Render the Appearance row.
 		* @param props - composed slot props.
 		* @returns the row element tree.
 		*/
-		function AppearanceRow({ t, setTheme, useStore }) {
-			const { preference, activeColorScheme } = useStore((s) => s);
+		function AppearanceRow({ t, setTheme, setLogo, useStore }) {
+			const { preference, activeColorScheme, logoPreference } = useStore((s) => s);
 			const selected = preference === "system" ? activeColorScheme : preference;
 			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 				className: AppearanceRow_module_css_default.group,
-				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-					className: AppearanceRow_module_css_default.title,
-					children: t("appearance.title")
-				}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-					className: AppearanceRow_module_css_default.cubeRow,
-					children: CUBES.map(({ id, labelKey, Icon }) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
-						type: "button",
-						className: clsx(AppearanceRow_module_css_default.themeCube, selected === id && AppearanceRow_module_css_default.selected),
-						"aria-pressed": selected === id,
-						onClick: () => {
-							setTheme(id);
-						},
-						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Icon, {}), t(labelKey)]
-					}, id))
-				})]
+				children: [
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+						className: AppearanceRow_module_css_default.title,
+						children: t("appearance.title")
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+						className: AppearanceRow_module_css_default.cubeRow,
+						children: CUBES.map(({ id, labelKey, Icon }) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
+							type: "button",
+							className: clsx(AppearanceRow_module_css_default.themeCube, selected === id && AppearanceRow_module_css_default.selected),
+							"aria-pressed": selected === id,
+							onClick: () => {
+								setTheme(id);
+							},
+							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Icon, {}), t(labelKey)]
+						}, id))
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+						className: AppearanceRow_module_css_default.logoTitle,
+						children: t("appearance.logo.title")
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+						className: AppearanceRow_module_css_default.cubeRow,
+						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
+							type: "button",
+							className: clsx(AppearanceRow_module_css_default.logoCube, logoPreference === "cocode" && AppearanceRow_module_css_default.selected),
+							"aria-pressed": logoPreference === "cocode",
+							onClick: () => {
+								setLogo("cocode");
+							},
+							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+								className: AppearanceRow_module_css_default.logoPreview,
+								children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(CocodeLogoPreview, {})
+							}), t("appearance.logo.cocode")]
+						}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
+							type: "button",
+							className: clsx(AppearanceRow_module_css_default.logoCube, logoPreference === "deepseek" && AppearanceRow_module_css_default.selected),
+							"aria-pressed": logoPreference === "deepseek",
+							onClick: () => {
+								setLogo("deepseek");
+							},
+							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+								className: AppearanceRow_module_css_default.logoPreview,
+								children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.BrandWordmark, { size: 18 })
+							}), t("appearance.logo.deepseek")]
+						})]
+					})
+				]
 			});
 		}
 		//#endregion
-		//#region src/client/settings-store.ts
+		//#region packages/client/ui-theme/src/client/settings-store.ts
 		/**
 		* Appearance row slot store: a mirror of the theme service snapshot. The
 		* plugin's apply-world change listener is the only writer; the row component
@@ -102,33 +182,67 @@ window.__ModuleLoader__.load({
 				init: () => ({
 					preference: "system",
 					activeColorScheme: "light",
+					logoPreference: "cocode",
 					revision: -1
 				}),
-				actions: { sync: (d, preference, activeColorScheme, revision) => {
+				actions: { sync: (d, preference, activeColorScheme, logoPreference, revision) => {
 					if (revision <= d.revision) return;
 					d.preference = preference;
 					d.activeColorScheme = activeColorScheme;
+					d.logoPreference = logoPreference;
 					d.revision = revision;
 				} }
 			});
 		}
 		//#endregion
-		//#region src/client/locales.ts
+		//#region packages/client/ui-theme/src/client/locales.ts
 		/** `settings.theme` namespace dictionaries (the Appearance row's copy). */
 		/** Simplified Chinese dictionary (the key-set source of truth). */
 		const zh = {
 			"appearance.title": "外观",
 			"appearance.light": "浅色",
-			"appearance.dark": "深色"
+			"appearance.dark": "深色",
+			"appearance.logo.title": "Logo 显示",
+			"appearance.logo.cocode": "Cocode",
+			"appearance.logo.deepseek": "DeepSeek"
 		};
 		/** English dictionary, checked complete against the zh key set. */
 		const en = {
 			"appearance.title": "Appearance",
 			"appearance.light": "Light",
-			"appearance.dark": "Dark"
+			"appearance.dark": "Dark",
+			"appearance.logo.title": "Logo display",
+			"appearance.logo.cocode": "Cocode",
+			"appearance.logo.deepseek": "DeepSeek"
 		};
 		//#endregion
-		//#region ../../../vendor/cosmokit/src/misc.ts
+		//#region packages/client/ui-theme/src/client/logo-settings.ts
+		/** Renderer-local sidebar logo preference. */
+		const LOGO_PREFERENCES = ["cocode", "deepseek"];
+		const DEFAULT_LOGO_PREFERENCE = "cocode";
+		const STORAGE_KEY = "cocode.logo.preference";
+		function isLogoPreference(value) {
+			return LOGO_PREFERENCES.some((preference) => preference === value);
+		}
+		/** Read the device-local display choice; unavailable storage falls back safely. */
+		function readLogoPreference() {
+			if (typeof localStorage === "undefined") return DEFAULT_LOGO_PREFERENCE;
+			try {
+				const value = localStorage.getItem(STORAGE_KEY);
+				return isLogoPreference(value) ? value : DEFAULT_LOGO_PREFERENCE;
+			} catch {
+				return DEFAULT_LOGO_PREFERENCE;
+			}
+		}
+		/** Persist the display choice without making rendering depend on storage health. */
+		function writeLogoPreference(preference) {
+			if (typeof localStorage === "undefined") return;
+			try {
+				localStorage.setItem(STORAGE_KEY, preference);
+			} catch {}
+		}
+		//#endregion
+		//#region vendor/cosmokit/src/misc.ts
 		/** Return true when a value is `null` or `undefined`. */
 		function isNullable(value) {
 			return value === null || value === void 0;
@@ -153,7 +267,7 @@ window.__ModuleLoader__.load({
 			return result;
 		}
 		//#endregion
-		//#region ../../../vendor/cosmokit/src/types.ts
+		//#region vendor/cosmokit/src/types.ts
 		/** Test values using `instanceof` with a `toStringTag` fallback. */
 		function is(type, value) {
 			if (arguments.length === 1) return (value) => is(type, value);
@@ -255,7 +369,7 @@ window.__ModuleLoader__.load({
 			}).every((key) => deepEqual(a[key], b[key], strict));
 		}
 		//#endregion
-		//#region ../../../vendor/cosmokit/src/time.ts
+		//#region vendor/cosmokit/src/time.ts
 		let Time;
 		(function(_Time) {
 			_Time.millisecond = 1;
@@ -326,7 +440,7 @@ window.__ModuleLoader__.load({
 			_Time.template = template;
 		})(Time || (Time = {}));
 		//#endregion
-		//#region ../../../vendor/schemastery/src/index.ts
+		//#region vendor/schemastery/src/index.ts
 		const kSchema = Symbol.for("schemastery");
 		const kValidationError = Symbol.for("ValidationError");
 		globalThis.__schemastery_index__ ??= 0;
@@ -919,7 +1033,7 @@ window.__ModuleLoader__.load({
 			"preserve"
 		], ({ inner }, isInner) => inner.toString(isInner));
 		//#endregion
-		//#region src/theme-settings.ts
+		//#region packages/client/ui-theme/src/theme-settings.ts
 		/** Theme preferences stored in the Host user-settings document. */
 		/** Built-in preferences accepted at the registry and settings boundaries. */
 		const THEME_PREFERENCES = [
@@ -943,7 +1057,7 @@ window.__ModuleLoader__.load({
 			return THEME_PREFERENCES.some((preference) => preference === value);
 		}
 		//#endregion
-		//#region src/client/index.ts
+		//#region packages/client/ui-theme/src/client/index.ts
 		/** Namespace owning this feature's settings-row copy. */
 		const SETTINGS_NS = "settings.theme";
 		const BUILTIN_THEMES = Object.freeze([Object.freeze({
@@ -1064,6 +1178,7 @@ window.__ModuleLoader__.load({
 			host;
 			themes = [...BUILTIN_THEMES];
 			preference;
+			logoPreference;
 			revision = 0;
 			snapshot;
 			media;
@@ -1079,6 +1194,7 @@ window.__ModuleLoader__.load({
 				this.ctx = ctx;
 				this.host = host;
 				this.preference = DEFAULT_PREFERENCE;
+				this.logoPreference = readLogoPreference();
 				this.media = typeof matchMedia === "undefined" ? void 0 : matchMedia("(prefers-color-scheme: dark)");
 				this.snapshot = this.buildSnapshot();
 				if (this.media !== void 0) {
@@ -1129,7 +1245,15 @@ window.__ModuleLoader__.load({
 				if (isThemePreference(id)) this.host.set(THEME_PREFERENCE_FIELD, id);
 				this.publish();
 			}
-			/** Adopt the scope's accepted durable preference without writing it back. */
+			/** Switch the sidebar logo style and persist the accepted preference. */
+			setLogo(id) {
+				if (!isLogoPreference(id)) throw new Error(`logo "${id}" is not supported`);
+				if (this.logoPreference === id) return;
+				this.logoPreference = id;
+				writeLogoPreference(id);
+				this.publish();
+			}
+			/** Adopt the Host-backed color preference without touching device-local logo state. */
 			adopt() {
 				const section = this.host.getSnapshot().value;
 				if (section === void 0 || this.preference === section.preference) return;
@@ -1192,6 +1316,7 @@ window.__ModuleLoader__.load({
 				if (active === void 0) throw new Error(`theme registry lost "${resolvedId}"`);
 				return Object.freeze({
 					preference: this.preference,
+					logoPreference: this.logoPreference,
 					active: this.composeActive(active),
 					themes: Object.freeze([...this.themes]),
 					revision: this.revision
@@ -1274,15 +1399,20 @@ window.__ModuleLoader__.load({
 			const store = createAppearanceRowStore();
 			let bound;
 			const sync = (snapshot) => {
-				bound?.sync(snapshot.preference, snapshot.active.colorScheme, snapshot.revision);
+				bound?.sync(snapshot.preference, snapshot.active.colorScheme, snapshot.logoPreference, snapshot.revision);
 			};
 			ctx.on("theme/change", sync);
 			const injected = (actions) => {
 				bound = actions;
 				sync(theme.getTheme());
-				return { setTheme: (id) => {
-					theme.setTheme(id);
-				} };
+				return {
+					setTheme: (id) => {
+						theme.setTheme(id);
+					},
+					setLogo: (id) => {
+						theme.setLogo(id);
+					}
+				};
 			};
 			ctx.slots.inject("settings.general.item", () => ctx.slots.register({
 				name: "settings.general.item",
