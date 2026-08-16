@@ -477,7 +477,11 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     if (modelOverlayOpen) return
     if (questionOpen || approvalOpen) {
       if (isMousePointerEvent(event)) {
-        const pointer = { id: mouseClickId.current++, row: hitRow, action: event.action }
+        const pointer = {
+          id: mouseClickId.current++,
+          row: hitRow,
+          action: event.action === 'move' ? 'move' : 'press',
+        } as const
         if (questionOpen) setQuestionMousePointer(pointer)
         else setApprovalMousePointer(pointer)
       }
