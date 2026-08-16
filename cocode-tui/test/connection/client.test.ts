@@ -53,6 +53,7 @@ describe('runtime capability negotiation', () => {
         sessionList: false,
         modelList: false,
         imageAttachments: false,
+        commands: false,
         promptMode: false,
         queueMode: false,
       },
@@ -87,6 +88,7 @@ describe('runtime capability negotiation', () => {
         sessionList: true,
         modelList: true,
         imageAttachments: false,
+        commands: false,
         promptMode: false,
         queueMode: false,
       },
@@ -124,6 +126,7 @@ describe('runtime capability negotiation', () => {
       sessionList: false,
       modelList: false,
       imageAttachments: false,
+      commands: false,
       promptMode: false,
       queueMode: false,
     })

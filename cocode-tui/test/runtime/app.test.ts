@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type {
   TuiCapabilitySnapshot,
+  TuiCommandDescriptor,
   SessionEvent,
   TuiNotification,
   TuiQuestionAnswer,
@@ -34,6 +35,8 @@ function fakeRuntime(): TuiRuntime & {
   failRestartModels: Set<string>
   modelCatalog: TuiModelCatalog
   modelListError?: Error
+  commands: TuiCommandDescriptor[]
+  executedCommands: { sessionId: string; line: string }[]
 } {
   const handlers = new Set<(n: TuiNotification) => void>()
   const closeHandlers = new Set<(error?: string) => void>()
@@ -53,6 +56,8 @@ function fakeRuntime(): TuiRuntime & {
     rewinds: [],
     failRestartModels: new Set(),
     modelCatalog: { groups: [], failures: [] },
+    commands: [],
+    executedCommands: [],
     emit(n) {
       for (const handler of handlers) handler(n)
     },
@@ -94,6 +99,13 @@ function fakeRuntime(): TuiRuntime & {
     async listModels() {
       if (runtime.modelListError !== undefined) throw runtime.modelListError
       return runtime.modelCatalog
+    },
+    async listCommands() {
+      return runtime.commands
+    },
+    async executeCommand(sessionId, line) {
+      runtime.executedCommands.push({ sessionId, line })
+      return { commandId: 'cmd-1', result: { kind: 'success', text: 'goal updated' } }
     },
     async cancel(sessionId, keepInbox = false) {
       if (runtime.cancelError !== undefined) throw runtime.cancelError
@@ -510,6 +522,35 @@ describe('TuiApp', () => {
     await expect.poll(() => runtime.prompts).toContainEqual({
       sessionId: 's1',
       text: '/audit focus on security',
+    })
+  })
+
+  it('discovers and executes a runtime command without sending a model prompt', async () => {
+    const runtime = fakeRuntime()
+    runtime.commands = [{ name: 'goal', description: 'Manage the current goal' }]
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+    })
+    await app.start()
+
+    expect(app.snapshot().capabilities.commands).toBe(true)
+    expect(app.snapshot().commands).toContainEqual({
+      name: 'goal',
+      summary: 'Manage the current goal',
+    })
+    app.dispatch({ type: 'command', line: '/goal ship the release' })
+
+    await expect.poll(() => runtime.executedCommands).toEqual([
+      { sessionId: 's1', line: '/goal ship the release' },
+    ])
+    expect(runtime.prompts).toEqual([])
+    await expect.poll(() => app.snapshot().notice).toEqual({
+      tone: 'info',
+      message: 'goal updated',
     })
   })
 

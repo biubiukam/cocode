@@ -8,6 +8,7 @@ import type {
   TuiSessionOpenResult,
   TuiNotification,
   TuiCapabilitySnapshot,
+  TuiCommandDescriptor,
   TuiRuntimeCapabilityName,
   TuiApprovalAnswer,
   TuiApprovalRequest,
@@ -438,6 +439,7 @@ class TuiAppImpl implements TuiApp {
   private modelPicker: ModelPickerState | undefined
   private modelInputOpen = false
   private skills: SkillEntry[] = []
+  private remoteCommands: TuiCommandDescriptor[] = []
   private pendingSkillInvocation: string | undefined
   private readonly questions: QuestionCoordinator
   private readonly approvalQueue: PendingApproval[] = []
@@ -519,6 +521,7 @@ class TuiAppImpl implements TuiApp {
       this.workspaceBranch = (await resolveWorkspaceInfo(this.cwd)).branch
       await this.refreshSessionControls()
       await this.loadSkills()
+      await this.loadCommands()
       if (this.exiting) return
     } catch (error) {
       if (this.exiting) return
@@ -1629,6 +1632,34 @@ class TuiAppImpl implements TuiApp {
     }
   }
 
+  private async loadCommands(): Promise<void> {
+    const advertisedCommands =
+      this.runtimeCapabilitySnapshot?.source === 'runtime'
+        ? this.runtimeCapabilitySnapshot.capabilities.commands
+        : undefined
+    if (advertisedCommands === false) {
+      this.capabilities = { ...this.capabilities, commands: false }
+      this.remoteCommands = []
+      return
+    }
+    const listCommands = this.runtime.listCommands
+    if (listCommands === undefined || this.runtime.executeCommand === undefined) {
+      this.capabilities = { ...this.capabilities, commands: false }
+      this.remoteCommands = []
+      return
+    }
+    try {
+      this.remoteCommands = await listCommands.call(this.runtime, this.sessionId)
+      this.capabilities = {
+        ...this.capabilities,
+        commands: advertisedCommands ?? this.remoteCommands.length > 0,
+      }
+    } catch {
+      this.remoteCommands = []
+      this.capabilities = { ...this.capabilities, commands: false }
+    }
+  }
+
   private refreshRuntimeCapabilities(): void {
     const state = refreshRuntimeCapabilities(this.runtime, this.configuredCapabilities)
     this.runtimeCapabilitySnapshot = state.snapshot
@@ -1867,6 +1898,7 @@ class TuiAppImpl implements TuiApp {
       if (!resumed) this.resetToFreshSession()
       await this.refreshSessionControls()
       await this.loadSkills()
+      await this.loadCommands()
       this.resetSubagentActivity()
       this.agent = 'idle'
       this.notice = {
@@ -1890,6 +1922,7 @@ class TuiAppImpl implements TuiApp {
         if (!resumed) this.resetToFreshSession()
         await this.refreshSessionControls()
         await this.loadSkills()
+        await this.loadCommands()
         this.agent = 'idle'
         this.notice = {
           tone: 'error',
@@ -2310,6 +2343,18 @@ class TuiAppImpl implements TuiApp {
       (entry) => skillCommandName(entry) === parsed.name,
     )
     const selectedSkill = skill ?? namespacedSkill
+    const remoteName = parsed.name.toLowerCase()
+    const remoteCommand = this.remoteCommands.find((entry) => entry.name === remoteName)
+    if (this.capabilities.commands && remoteCommand !== undefined) {
+      this.draft = createDraft()
+      this.attachments = []
+      this.images = []
+      this.history.push(line)
+      const commandLine =
+        remoteName === parsed.name ? line : line.replace(/^\/\S+/u, `/${remoteName}`)
+      this.executeRemoteCommand(commandLine)
+      return
+    }
     if (this.capabilities.skills && selectedSkill !== undefined) {
       const invocation =
         selectedSkill === skill ? line : formatSkillInvocation(selectedSkill, parsed.args)
@@ -2321,6 +2366,35 @@ class TuiAppImpl implements TuiApp {
       this.emit()
       return
     }
+  }
+
+  private executeRemoteCommand(line: string): void {
+    const execute = this.runtime.executeCommand
+    if (execute === undefined) {
+      this.notice = errorNotice('COMMAND_UNKNOWN', { name: parseSlash(line)?.name ?? line })
+      this.emit()
+      return
+    }
+    this.notice = undefined
+    void execute.call(this.runtime, this.sessionId, line).then(
+      (execution) => {
+        if (execution === undefined) {
+          this.notice = errorNotice('COMMAND_UNKNOWN', { name: parseSlash(line)?.name ?? line })
+        } else if (execution.result.kind === 'error') {
+          this.notice = { tone: 'error', message: execution.result.text }
+        } else if (execution.result.text !== undefined && execution.result.text !== '') {
+          this.notice = { tone: 'info', message: execution.result.text }
+        } else {
+          this.notice = undefined
+        }
+        this.emit()
+      },
+      (error: unknown) => {
+        this.notice = { tone: 'error', message: errorMessage(error) }
+        this.emit()
+      },
+    )
+    this.emit()
   }
 
   private invokeSkill(
@@ -2339,7 +2413,24 @@ class TuiAppImpl implements TuiApp {
   }
 
   private visibleCommands(): Command[] {
-    return [...this.commands.list(this.capabilities), ...this.skillCommands()]
+    return [...this.commands.list(this.capabilities), ...this.skillCommands(), ...this.remoteCommandEntries()]
+  }
+
+  private remoteCommandEntries(): Command[] {
+    if (!this.capabilities.commands || this.remoteCommands.length === 0) return []
+    const visibleNames = new Set([
+      ...this.commands.list(this.capabilities).map((command) => command.name),
+      ...this.skillCommands().map((command) => command.name),
+    ])
+    return this.remoteCommands
+      .filter((command) => !visibleNames.has(command.name))
+      .map((command) => ({
+        name: command.name,
+        summary: command.description,
+        kind: 'prompt-text' as const,
+        available: () => true,
+        run: () => undefined,
+      }))
   }
 
   private skillCommands(): Command[] {
@@ -2486,6 +2577,7 @@ function runtimeCapabilityEntries(
     'sessionList',
     'modelList',
     'imageAttachments',
+    'commands',
     'promptMode',
     'queueMode',
   ]

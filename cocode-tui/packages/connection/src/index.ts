@@ -7,6 +7,8 @@ export type {
   ContentBlock,
   SessionEvent,
   SkillEntry,
+  TuiCommandDescriptor,
+  TuiCommandExecution,
   TuiQuestionAnswer,
   TuiQuestionAnswerItem,
   TuiQuestionItem,

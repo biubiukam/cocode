@@ -16,6 +16,8 @@ import type {
   TuiApprovalRequest,
   SessionEvent,
   SkillEntry,
+  TuiCommandDescriptor,
+  TuiCommandExecution,
   TuiPromptMode,
   TuiSessionSummary,
   TuiRuntimeAdvertisement,
@@ -237,6 +239,40 @@ class SdkTuiRuntime implements TuiRuntime {
     return parseSkillEntries(result.skills)
   }
 
+  async listCommands(sessionId: string): Promise<TuiCommandDescriptor[]> {
+    const client = this.requireClient()
+    this.requireCapability('commands')
+    const result = await client.request(this.wireMethod('cocode/commands/list', 'commands/list'), {
+      sessionId,
+    })
+    const rows = Array.isArray(result)
+      ? result
+      : isRecord(result) && Array.isArray(result.commands)
+        ? result.commands
+        : undefined
+    if (rows === undefined) {
+      throw new Error(`commands/list returned no command catalog: ${JSON.stringify(result)}`)
+    }
+    return rows.map(parseCommandDescriptor)
+  }
+
+  async executeCommand(sessionId: string, line: string): Promise<TuiCommandExecution | undefined> {
+    const client = this.requireClient()
+    this.requireCapability('commands')
+    const result = await client.request(
+      this.wireMethod('cocode/commands/execute', 'commands/execute'),
+      { sessionId, line },
+    )
+    if (result === undefined || result === null) return undefined
+    if (!isRecord(result) || typeof result.commandId !== 'string' || !isRecord(result.result)) {
+      throw new Error(`commands/execute returned an invalid result: ${JSON.stringify(result)}`)
+    }
+    return {
+      commandId: result.commandId,
+      result: parseCommandResult(result.result),
+    }
+  }
+
   async listSessions(cwd?: string): Promise<TuiSessionSummary[]> {
     const client = this.requireClient()
     this.requireCapability('sessionList')
@@ -401,6 +437,7 @@ class SdkTuiRuntime implements TuiRuntime {
           sessionList: companion.sessionList,
           modelList: companion.modelList,
           imageAttachments: companion.imageAttachments,
+          commands: companion.commands,
           promptMode: companion.promptModes.includes('steer'),
           queueMode: companion.promptModes.includes('queue'),
         },
@@ -510,6 +547,7 @@ type CompanionCapabilities = {
   interactions: 'notification-response'
   checkpoint: false
   skills: boolean
+  commands: boolean
 }
 
 function parseCompanionCapabilities(value: unknown): CompanionCapabilities | undefined {
@@ -547,6 +585,7 @@ function parseCompanionCapabilities(value: unknown): CompanionCapabilities | und
     interactions: 'notification-response',
     checkpoint: false,
     skills: value.skills === true,
+    commands: value.commands === true,
   }
 }
 
@@ -606,6 +645,44 @@ function parseSkillEntries(value: unknown[]): SkillEntry[] {
   return skills
 }
 
+function parseCommandDescriptor(value: unknown): TuiCommandDescriptor {
+  if (
+    !isRecord(value) ||
+    typeof value.name !== 'string' ||
+    typeof value.description !== 'string' ||
+    (value.input !== undefined &&
+      (!isRecord(value.input) || typeof value.input.hint !== 'string'))
+  ) {
+    throw new Error(`commands/list returned an invalid command entry: ${JSON.stringify(value)}`)
+  }
+  return {
+    name: value.name,
+    description: value.description,
+    ...(value.input === undefined ? {} : { input: { hint: value.input.hint as string } }),
+  }
+}
+
+function parseCommandResult(value: Record<string, unknown>): TuiCommandExecution['result'] {
+  if (value.kind === 'success') {
+    if (
+      (value.text !== undefined && typeof value.text !== 'string') ||
+      (value.sourceEventSeq !== undefined &&
+        (!Number.isSafeInteger(value.sourceEventSeq) || (value.sourceEventSeq as number) < 0))
+    ) {
+      throw new Error(`commands/execute returned an invalid success result: ${JSON.stringify(value)}`)
+    }
+    return {
+      kind: 'success',
+      ...(value.text === undefined ? {} : { text: value.text }),
+      ...(value.sourceEventSeq === undefined ? {} : { sourceEventSeq: value.sourceEventSeq as number }),
+    }
+  }
+  if (value.kind === 'error' && typeof value.text === 'string' && value.text.trim() !== '') {
+    return { kind: 'error', text: value.text }
+  }
+  throw new Error(`commands/execute returned an invalid command result: ${JSON.stringify(value)}`)
+}
+
 function parseRuntimeAdvertisement(value: Record<string, unknown>): TuiRuntimeAdvertisement {
   const promptModes: TuiPromptMode[] = Array.isArray(value.promptModes)
     ? value.promptModes.filter(
@@ -620,6 +697,7 @@ function parseRuntimeAdvertisement(value: Record<string, unknown>): TuiRuntimeAd
     sessionList: value.sessionList === true,
     modelList: value.modelList === true,
     imageAttachments: value.imageAttachments === true,
+    commands: value.commands === true,
     checkpoint: false,
   }
 }

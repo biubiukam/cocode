@@ -89,6 +89,24 @@ export type PromptParams = {
     contentBlocks: ContentBlock[];
     mode?: 'normal' | 'queue' | 'steer';
 };
+export type CommandDescriptor = {
+    name: string;
+    description: string;
+    input?: {
+        hint: string;
+    };
+};
+export type CommandExecution = {
+    commandId: string;
+    result: {
+        kind: 'success';
+        text?: string;
+        sourceEventSeq?: number;
+    } | {
+        kind: 'error';
+        text: string;
+    };
+};
 export type CompanionCapabilities = {
     protocolVersion: 1;
     promptModes: ('normal' | 'queue' | 'steer')[];
@@ -99,6 +117,7 @@ export type CompanionCapabilities = {
     permissionMode: boolean;
     planMode: boolean;
     sessionList: boolean;
+    commands: boolean;
     interactions: 'notification-response';
     checkpoint: false;
 };

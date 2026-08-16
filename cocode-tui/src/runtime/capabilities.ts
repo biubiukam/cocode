@@ -16,6 +16,7 @@ export type TuiCapabilities = {
   rewind: boolean
   sessionList: 'none' | 'jsonl' | 'rpc'
   skills: boolean
+  commands: boolean
 }
 
 export const P0_CAPABILITIES: TuiCapabilities = {
@@ -32,4 +33,5 @@ export const P0_CAPABILITIES: TuiCapabilities = {
   rewind: true,
   sessionList: 'none',
   skills: false,
+  commands: false,
 }

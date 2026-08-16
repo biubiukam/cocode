@@ -202,6 +202,7 @@ var TuiCompanionGateway = class {
       permissionMode: this.ctx.get("permissionPresets") !== void 0,
       planMode: this.ctx.get("planMode") !== void 0,
       sessionList: this.ctx.get("sessionPersistence") !== void 0,
+      commands: this.ctx.get("commands") !== void 0,
       interactions: "notification-response",
       checkpoint: false
     };
@@ -445,6 +446,23 @@ var TuiCompanionGateway = class {
       }))
     };
   }
+  async listCommands(params) {
+    if (params.sessionId.trim() === "") throw new Error("commands/list requires a session id");
+    const registry = this.ctx.get("commands");
+    if (registry === void 0) throw new Error("commands registry is not configured");
+    const record = await this.getOrCreateSession(params.sessionId);
+    this.assertLive(params.sessionId, record);
+    return { commands: [...registry.list(record.handle.agent)] };
+  }
+  async executeCommand(params) {
+    if (params.sessionId.trim() === "") throw new Error("commands/execute requires a session id");
+    if (typeof params.line !== "string") throw new TypeError("commands/execute requires a command line");
+    const registry = this.ctx.get("commands");
+    if (registry === void 0) throw new Error("commands registry is not configured");
+    const record = await this.getOrCreateSession(params.sessionId);
+    this.assertLive(params.sessionId, record);
+    return registry.execute(record.handle.agent, params.line, new AbortController().signal);
+  }
   async listModels() {
     const llm = this.ctx.get("llm");
     if (typeof llm?.listProviders !== "function" || typeof llm.listModels !== "function") {
@@ -533,6 +551,12 @@ var TuiCompanionGateway = class {
       case "cocode/skills/list":
       case "skills/list":
         return this.listSkills(params);
+      case "cocode/commands/list":
+      case "commands/list":
+        return this.listCommands(params);
+      case "cocode/commands/execute":
+      case "commands/execute":
+        return this.executeCommand(params);
       case "cocode/model/list":
       case "model/list":
         return this.listModels();

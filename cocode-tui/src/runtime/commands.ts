@@ -106,6 +106,7 @@ export function createBuiltinCommands(): CommandRegistry {
     name: 'rewind',
     summary: 'Rewind the conversation to a previous message',
     summaryZh: '回滚到之前的消息',
+    kind: 'local',
     available: (caps) => caps.rewind,
     run: (ctx) => ctx.showRewindPicker?.(),
   })

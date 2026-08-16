@@ -99,6 +99,7 @@ Inside `tmux` or `screen`, the TUI automatically uses inline rendering and suppr
 - Type `@` at any position in the message to search workspace files and directories; use `Tab`, `↑`, or `↓` to select, then Enter to insert the reference.
 - On send, selected files are appended with their contents and selected directories with a bounded listing; references must stay inside the workspace.
 - When the Host exposes user-invocable Skills, `/skills` opens a searchable workspace catalog and inserts `/skill-name ` into the composer for further editing. User-invocable Skills also appear in the `/` command menu and are sent through `session.prompt` as text. The command stays hidden when the catalog is empty.
+- When the Host exposes its human-command registry, registered commands appear in the `/` menu and execute through `commands/execute` against the current Agent instead of becoming model prompts. The base composition currently provides `/goal` with `/goal`, `/goal <objective>`, `/goal clear`, `/goal edit <objective>`, `/goal pause`, and `/goal resume`; the Host owns the result text.
 - When an agent calls `ask_user_question`, the message area first streams the question being prepared; once the complete request arrives, the composer is replaced by a question panel. Use `↑` `↓` to move, `Space` to toggle multiple choices, `Tab` to reach the custom answer, `Enter` to answer, `Backspace` or `Delete` to edit custom input, and `Esc` to cancel. Batched and concurrent requests are presented in FIFO order.
 
 Tool output is truncated by display mode; while a node remains in the projection cache, its raw payload is retained in node state, and the complete event stays in the session log. When the transcript is tight, the composer stays visible.
@@ -144,6 +145,7 @@ Type `/` to open the command menu. Keep typing to filter by prefix. `Tab` or arr
 | `/tokens` / `/cost`            | Show the latest token, cache, and context usage                                                   |
 | `/resume`                      | Open the local session picker and replay a selected session                                       |
 | `/skills`                      | Browse user-invocable skills from the current workspace                                           |
+| `/goal`                        | Inspect or change the current goal through the Host command registry                              |
 | `/use byok` / `/use cocode`    | Switch between your key and Cocode; switching starts a new session                                |
 | `/login` / `/logout`           | Sign in or out of Cocode Cloud; logout keeps your key and stays in chat                           |
 | `/exit` / `/quit` / `/q`       | Shut down TUI and restore the terminal                                                            |
@@ -173,6 +175,8 @@ If another TUI window is still open, `/use`, `/login`, and `/logout` refuse so t
 ## Runtime capability boundaries
 
 The `/skills` command is enabled only after `skills/list` returns a real catalog from the Host. A composition without a skills provider keeps the command hidden; an empty or failed probe is not presented as a usable feature.
+
+The Host advertises the `commands` capability through `cocode/capabilities`. The TUI only shows descriptors returned by the Host and sends the complete command line to `commands/execute`; unknown or failed commands stay errors instead of falling back to a normal prompt.
 
 The Host mounts Cocode's own `cocode-vision` plugin with `autoRead` enabled. `image` blocks are converted into visual evidence before the active text model runs, while the durable attachment reference is retained for native vision models. Choose `cocode` for the Cocode service, whose default vision model is `gpt-luna`, or `user` for a user-managed OpenAI-compatible endpoint. After switching the account to Cocode, the plugin automatically reuses the account-generated `COCODE_LLM_PROVIDERS.cocode-cloud` endpoint and credential reference; it does not select the first model from the cloud catalog. User settings can be persisted in `$COCODE_HOME/vision.yaml` (default `~/.cocode/vision.yaml`); use [vision.yaml.example](./vision.yaml.example) as a template. Environment variables such as `COCODE_VISION_PROVIDER` and `COCODE_VISION_USER_MODEL` override the file. Only credential references are configured here; Host credentials own the actual values, which never enter session logs or TUI settings.
 

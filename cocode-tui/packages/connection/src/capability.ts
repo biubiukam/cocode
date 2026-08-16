@@ -27,6 +27,7 @@ export async function probeRuntimeCapabilities(
     capabilities.sessionList = options.advertised.sessionList
     capabilities.modelList = options.advertised.modelList
     capabilities.imageAttachments = options.advertised.imageAttachments
+    capabilities.commands = options.advertised.commands === true
     // The running submit path uses `steer`; queue is implemented locally and
     // must not accidentally enable a wire mode the runtime does not advertise.
     capabilities.promptMode = options.advertised.promptModes.includes('steer')
@@ -172,6 +173,7 @@ function emptyCapabilities(onRequest: boolean): TuiCapabilitySnapshot['capabilit
     queueMode: false,
     modelList: false,
     imageAttachments: false,
+    commands: false,
   }
 }
 

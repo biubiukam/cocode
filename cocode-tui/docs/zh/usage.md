@@ -89,6 +89,7 @@ TTY，可以用于安装脚本和故障排查。
 - 在消息任意位置输入 `@` 可搜索工作区文件和目录；使用 `Tab`、`↑`、`↓` 选择，回车插入引用。
 - 发送时会在消息末尾附加选中文件内容，目录则附加受限的目录列表；文件必须位于当前工作区内。
 - Host 提供可由用户调用的 Skill 时，`/skills` 会打开可搜索的工作区技能目录；选择后向输入区插入 `/技能名 `，可以继续编辑 prompt 再发送。可由用户调用的 Skill 也会出现在 `/` 命令菜单中，执行时通过 `session.prompt` 文本路径发送。目录为空时不会显示该命令。
+- Host 提供 human-command registry 时，注册的命令会直接出现在 `/` 命令菜单中，并通过 `commands/execute` 在当前 Agent 上执行，不会伪装成模型 prompt。当前基础 composition 提供 `/goal`，支持 `/goal`、`/goal <目标>`、`/goal clear`、`/goal edit <目标>`、`/goal pause` 和 `/goal resume`；命令结果由 Host 直接返回。
 - Agent 调用 `ask_user_question` 时，会先在消息区流式显示正在生成的问题；完整请求到达后，输入区切换为问卷面板。使用 `↑` `↓` 移动，空格勾选多个选项，`Tab` 切换到自定义答案，回车回答，`Backspace` 或 `Delete` 删除自定义输入，`Esc` 取消。批量问题和并发请求按 FIFO 顺序显示。
 
 工具输出会按显示模式截断；未被投影缓存淘汰时，原始内容仍保留在节点状态，完整事件始终保存在 session log 中。对话区空间不足时，输入区保持可见。
@@ -134,6 +135,7 @@ TTY，可以用于安装脚本和故障排查。
 | `/tokens` / `/cost`            | 查看最近一次 token、缓存和 context 用量                              |
 | `/resume`                      | 打开当前工作区的 session 选择器并回放选中会话                        |
 | `/skills`                      | 浏览当前工作区中可由用户调用的技能                                   |
+| `/goal`                        | 使用 Host 的目标命令查看或修改当前目标；参数语法由 Host 注册表提供       |
 | `/use byok` / `/use cocode`    | 在自己的 Key 和 Cocode 之间切换；切换即新会话                        |
 | `/login` / `/logout`           | 登录或退出 Cocode Cloud；退出时若还有 Key 则留在对话里               |
 | `/exit` / `/quit` / `/q`       | 关闭 TUI 并恢复终端                                                  |
@@ -163,6 +165,8 @@ TTY，可以用于安装脚本和故障排查。
 ## Runtime capability 边界
 
 只有 Host 的 `skills/list` 返回真实目录后，TUI 才会启用 `/skills`。如果 Host composition 没有挂载技能 provider，命令会保持隐藏；探测失败或目录为空不会被展示成可用能力。
+
+Host 的 `commands` 能力由 `cocode/capabilities` 广告。TUI 只展示 Host 返回的命令描述，并把完整命令行交给 `commands/execute`；命令不存在或执行失败时显示错误，不会改走普通 prompt。
 
 Host 默认挂载 Cocode 自己的 `cocode-vision` 插件，并启用 `autoRead`。发送的 `image` block 会先转换为视觉证据，再交给当前文本模型；同时保留原始附件引用，支持原生视觉模型继续读取。视觉 provider 有两种：`cocode` 使用 Cocode 服务，默认视觉模型为 `gpt-luna`；`user` 使用用户配置的 OpenAI-compatible endpoint。用户配置可以写入 `$COCODE_HOME/vision.yaml`（默认 `~/.cocode/vision.yaml`），可参考 [vision.yaml.example](./vision.yaml.example)。`COCODE_VISION_PROVIDER`、`COCODE_VISION_USER_MODEL` 等环境变量优先级更高。账号切换到 Cocode 后，插件会自动复用账号生成的 `COCODE_LLM_PROVIDERS.cocode-cloud` endpoint 和 credential reference，不使用 cloud model 列表的首项。凭证只填写引用名，实际值由 Host credentials service 管理，不进入 session log 或 TUI 设置。
 

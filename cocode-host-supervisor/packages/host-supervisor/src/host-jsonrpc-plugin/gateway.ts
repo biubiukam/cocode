@@ -4,6 +4,8 @@ import { CompanionTransport } from './transport.js'
 import type {
   Agent,
   AgentHandle,
+  CommandDescriptor,
+  CommandExecution,
   CompanionCapabilities,
   ContentBlock,
   ImageAttachmentRef,
@@ -71,6 +73,10 @@ type SkillService = {
       invocation?: { userInvocable?: boolean }
     }[]
   >
+}
+type CommandService = {
+  list(agent: Agent): readonly CommandDescriptor[]
+  execute(agent: Agent, line: string, signal: AbortSignal): Promise<CommandExecution | undefined>
 }
 type LlmService = {
   listProviders(): readonly { id: string; name?: string }[]
@@ -248,6 +254,7 @@ export class TuiCompanionGateway {
       permissionMode: this.ctx.get('permissionPresets') !== undefined,
       planMode: this.ctx.get('planMode') !== undefined,
       sessionList: this.ctx.get('sessionPersistence') !== undefined,
+      commands: this.ctx.get('commands') !== undefined,
       interactions: 'notification-response',
       checkpoint: false,
     }
@@ -566,6 +573,25 @@ export class TuiCompanionGateway {
     }
   }
 
+  async listCommands(params: { sessionId: string }): Promise<{ commands: CommandDescriptor[] }> {
+    if (params.sessionId.trim() === '') throw new Error('commands/list requires a session id')
+    const registry = this.ctx.get('commands') as CommandService | undefined
+    if (registry === undefined) throw new Error('commands registry is not configured')
+    const record = await this.getOrCreateSession(params.sessionId)
+    this.assertLive(params.sessionId, record)
+    return { commands: [...registry.list(record.handle.agent)] }
+  }
+
+  async executeCommand(params: { sessionId: string; line: string }): Promise<CommandExecution | undefined> {
+    if (params.sessionId.trim() === '') throw new Error('commands/execute requires a session id')
+    if (typeof params.line !== 'string') throw new TypeError('commands/execute requires a command line')
+    const registry = this.ctx.get('commands') as CommandService | undefined
+    if (registry === undefined) throw new Error('commands registry is not configured')
+    const record = await this.getOrCreateSession(params.sessionId)
+    this.assertLive(params.sessionId, record)
+    return registry.execute(record.handle.agent, params.line, new AbortController().signal)
+  }
+
   async listModels(): Promise<{
     groups: Record<string, unknown>[]
     failures: Record<string, unknown>[]
@@ -668,6 +694,12 @@ export class TuiCompanionGateway {
       case 'cocode/skills/list':
       case 'skills/list':
         return this.listSkills(params as { sessionId: string })
+      case 'cocode/commands/list':
+      case 'commands/list':
+        return this.listCommands(params as { sessionId: string })
+      case 'cocode/commands/execute':
+      case 'commands/execute':
+        return this.executeCommand(params as { sessionId: string; line: string })
       case 'cocode/model/list':
       case 'model/list':
         return this.listModels()

@@ -42,6 +42,21 @@ export type SkillEntry = {
   source?: string
 }
 
+export type TuiCommandDescriptor = {
+  name: string
+  description: string
+  input?: { hint: string }
+}
+
+export type TuiCommandResult =
+  | { kind: 'success'; text?: string; sourceEventSeq?: number }
+  | { kind: 'error'; text: string }
+
+export type TuiCommandExecution = {
+  commandId: string
+  result: TuiCommandResult
+}
+
 export type TuiQuestionOption = {
   label: string
   description?: string
@@ -168,6 +183,7 @@ export type TuiRuntimeCapabilityName =
   | 'queueMode'
   | 'modelList'
   | 'imageAttachments'
+  | 'commands'
 
 export type TuiRuntimeCapabilities = Record<TuiRuntimeCapabilityName, boolean>
 
@@ -180,6 +196,7 @@ export type TuiRuntimeAdvertisement = {
   modelList: boolean
   imageAttachments: boolean
   checkpoint: false
+  commands?: boolean
 }
 
 /** Result of probing the live SDK runtime after its initialize handshake. */
@@ -245,6 +262,8 @@ export type TuiRuntime = {
     replaceSessionId?: string,
   ): Promise<{ sessionId: string; seedLength: number; seed: SessionEvent[] }>
   listSkills?(sessionId: string): Promise<SkillEntry[]>
+  listCommands?(sessionId: string): Promise<TuiCommandDescriptor[]>
+  executeCommand?(sessionId: string, line: string): Promise<TuiCommandExecution | undefined>
   listSessions?(cwd?: string): Promise<TuiSessionSummary[]>
   listModels?(): Promise<TuiModelCatalog>
   saveImages?(images: readonly TuiImageInput[]): Promise<TuiImageAttachmentRef[]>
