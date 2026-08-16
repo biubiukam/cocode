@@ -53,7 +53,7 @@
 }
 
 .trigger:focus-visible {
-  outline: 2px solid var(--dsw-alias-state-focus, currentColor);
+  outline: 2px solid var(--dsw-alias-state-business-primary);
   outline-offset: 1px;
 }
 
@@ -93,8 +93,8 @@
 }
 
 .accountAvatar {
-  background: var(--dsw-alias-accent-fill, #2f7cf6);
-  color: var(--dsw-alias-label-on-color, white);
+  background: var(--dsw-alias-state-business-primary);
+  color: var(--cocode-accent-foreground, #fff);
 }
 
 .providerAvatar {
@@ -141,7 +141,7 @@
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgba(0, 0, 0, .42);
+  background: var(--dsw-alias-bg-mask-3);
 }
 
 .panel {
@@ -149,7 +149,7 @@
   padding: 20px;
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 18px;
-  background: var(--dsw-alias-bg-l1, #18181c);
+  background: var(--dsw-alias-bg-layer-1);
   color: var(--dsw-alias-label-primary);
   box-shadow: 0 24px 70px rgba(0, 0, 0, .34);
 }
@@ -233,8 +233,8 @@
 }
 
 .planCard {
-  background: linear-gradient(135deg, var(--dsw-alias-bg-layer-2), var(--dsw-alias-bg-l1, #18181c));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .035);
+  background: linear-gradient(135deg, var(--dsw-alias-bg-layer-2), var(--dsw-alias-bg-layer-1));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, currentColor 6%, transparent);
 }
 
 .planName {
@@ -299,7 +299,7 @@
   padding: 12px 11px 11px;
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 12px;
-  background: color-mix(in srgb, var(--dsw-alias-bg-layer-2) 88%, white 12%);
+  background: var(--dsw-alias-bg-layer-1);
 }
 
 .usageMetricHeader {
@@ -336,7 +336,7 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: var(--dsw-alias-accent-fill, #2f7cf6);
+  background: var(--dsw-alias-state-business-primary);
   transition: width 180ms var(--ds-ease-in-out);
 }
 
@@ -377,7 +377,7 @@
 }
 
 .panelAction:focus-visible {
-  outline: 2px solid var(--dsw-alias-state-focus, currentColor);
+  outline: 2px solid var(--dsw-alias-state-business-primary);
   outline-offset: 1px;
 }
 
