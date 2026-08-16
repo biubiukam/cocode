@@ -97,7 +97,7 @@ export async function removeProviderProfile(
   controller: ModelsSettingsStore,
   target: { provider?: string; settingsNs: string; settingsPath: readonly string[]; credentialRef?: string },
 ): Promise<string | undefined> {
-  if (target.provider === 'cocode-cloud') return 'Cocode Cloud is managed by the Cocode account.'
+  if (target.provider === 'cocode-nut') return 'Cocode Nut is managed by the Cocode account.'
   try {
     if (target.credentialRef !== undefined) {
       const credential = await api.credentials.unset({ ref: target.credentialRef })
@@ -322,7 +322,7 @@ function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
                   {row.entry.declared === true
                     ? <span className={styles['rowTag']}>{t('customTag')}</span>
                     : null}
-                  {row.entry.provider === 'cocode-cloud'
+                  {row.entry.provider === 'cocode-nut'
                     ? <span className={styles['rowTag']}>{t('managedTag')}</span>
                     : null}
                   {credentialConfigured
@@ -346,7 +346,7 @@ function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
                       : null}
                 </span>
                 <span className={styles['rowActions']}>
-                  {row.entry.provider === 'cocode-cloud'
+                  {row.entry.provider === 'cocode-nut'
                     ? null
                     : <button
                       type="button"

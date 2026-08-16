@@ -14,8 +14,8 @@ describe('runtime capability negotiation', () => {
   it('passes the cloud provider route to the Host without forwarding credentials', () => {
     const env = {
       DSH_HOME: '/tmp/cocode-home',
-      COCODE_LLM_PROVIDERS: '{"cocode-cloud":{"api":"openai-responses"}}',
-      COCODE_CLOUD_API_KEY: 'ck_live_secret',
+      COCODE_LLM_PROVIDERS: '{"cocode-nut":{"api":"openai-responses"}}',
+      COCODE_NUT_API_KEY: 'ck_live_secret',
     }
 
     expect(resolveHostRuntimeEnv(env)).toEqual({
@@ -44,14 +44,14 @@ describe('runtime capability negotiation', () => {
       cwd: '/tmp',
       env: {
         ...base,
-        COCODE_LLM_PROVIDERS: '{"cocode-cloud":{"models":[{"id":"cloud-1"}]}}',
+        COCODE_LLM_PROVIDERS: '{"cocode-nut":{"models":[{"id":"cloud-1"}]}}',
       },
     })
     const second = resolveHostScope({
       cwd: '/tmp',
       env: {
         ...base,
-        COCODE_LLM_PROVIDERS: '{"cocode-cloud":{"models":[{"id":"cloud-2"}]}}',
+        COCODE_LLM_PROVIDERS: '{"cocode-nut":{"models":[{"id":"cloud-2"}]}}',
       },
     })
 

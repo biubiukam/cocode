@@ -1,4 +1,7 @@
-const isIgnoredByEslint = (file) => file.replace(/\\/g, "/").includes("/packages/cocode/")
+const isIgnoredByEslint = (file) => {
+	const normalized = file.replace(/\\/g, "/")
+	return normalized.includes("/packages/cocode/") || normalized.includes("/packages/client/")
+}
 
 module.exports = {
 	"*.{js,cjs,mjs,ts,tsx}": (files) => {

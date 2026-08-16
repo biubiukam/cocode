@@ -149,7 +149,7 @@ export class ModelsSettingsStore {
         && entry.settingsPath.length > 0
         && hasPath(namespace.user, entry.settingsPath)
         && !hasPath(namespace.base, entry.settingsPath)
-        && entry.provider !== 'cocode-cloud'
+        && entry.provider !== 'cocode-nut'
       return {
         entry,
         configured,

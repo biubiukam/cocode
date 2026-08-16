@@ -248,7 +248,7 @@ test("Agency client never sends a non-ck value to the model catalog", async () =
 	try {
 		await assert.rejects(
 			new AgencyClient("https://cocode.agency").models("oauth-identity-token"),
-			/invalid Cocode Cloud API key/,
+			/invalid Cocode Nut API key/,
 		)
 		assert.equal(called, false)
 	} finally {
@@ -265,11 +265,25 @@ test("Agency client calculates rolling account usage from credit and usage windo
 		requests.push(url)
 		assert.equal(new Headers(init?.headers).get("authorization"), "Bearer identity-token")
 		if (url.includes("/v1/me/model-credit")) {
-			return new Response(JSON.stringify({ plan: "pro", granted_microusd: 100, settled_microusd: 25, reserved_microusd: 5 }), { status: 200 })
+			return new Response(
+				JSON.stringify({
+					plan: "pro",
+					granted_microusd: 100,
+					settled_microusd: 25,
+					reserved_microusd: 5,
+				}),
+				{ status: 200 },
+			)
 		}
 		if (url.includes("/v1/me/model-usage")) {
 			usageCalls += 1
-			return new Response(JSON.stringify({ fresh_at: "2026-08-15T00:00:00.000Z", totals: { billable_microusd: usageCalls === 1 ? 10 : 20 } }), { status: 200 })
+			return new Response(
+				JSON.stringify({
+					fresh_at: "2026-08-15T00:00:00.000Z",
+					totals: { billable_microusd: usageCalls === 1 ? 10 : 20 },
+				}),
+				{ status: 200 },
+			)
 		}
 		return new Response("{}", { status: 404 })
 	}) as typeof fetch

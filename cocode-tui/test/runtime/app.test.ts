@@ -2498,7 +2498,7 @@ describe('TuiApp', () => {
     const app = createTuiApp({
       runtime,
       cwd: '/tmp',
-      provider: 'cocode-cloud',
+      provider: 'cocode-nut',
       model: 'cloud-1',
       sessionId: 's1',
       capabilities: { ...P0_CAPABILITIES, permissionMode: true, planMode: true },
@@ -2558,7 +2558,7 @@ describe('TuiApp', () => {
     const app = createTuiApp({
       runtime,
       cwd: '/tmp',
-      provider: 'cocode-cloud',
+      provider: 'cocode-nut',
       model: 'cloud-1',
       sessionId: 's1',
       auth: {
@@ -2601,7 +2601,7 @@ describe('TuiApp', () => {
     const app = createTuiApp({
       runtime,
       cwd: '/tmp',
-      provider: 'cocode-cloud',
+      provider: 'cocode-nut',
       model: 'cloud-1',
       sessionId: 's1',
       auth: {
@@ -2662,7 +2662,7 @@ describe('TuiApp', () => {
     const app = createTuiApp({
       runtime,
       cwd: '/tmp',
-      provider: 'cocode-cloud',
+      provider: 'cocode-nut',
       model: 'cloud-1',
       sessionId: 's1',
       auth: {
@@ -2686,7 +2686,7 @@ describe('TuiApp', () => {
     app.dispatch({ type: 'command', line: '/use byok' })
     await expect.poll(() => app.snapshot().notice?.message ?? '').toMatch(/AUTH_HOME_BUSY/)
     expect(runtime.restarts).toEqual([])
-    expect(app.snapshot().header.provider).toBe('cocode-cloud')
+    expect(app.snapshot().header.provider).toBe('cocode-nut')
     expect(app.snapshot().header.sessionId).toBe('s1')
   })
 
@@ -2696,7 +2696,7 @@ describe('TuiApp', () => {
     const app = createTuiApp({
       runtime,
       cwd: '/tmp',
-      provider: 'cocode-cloud',
+      provider: 'cocode-nut',
       model: 'cloud-1',
       sessionId: 's1',
       auth: {

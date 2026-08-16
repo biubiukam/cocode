@@ -70,7 +70,7 @@ type VisionCommandService = {
 const DEFAULT_TIMEOUT_MS = 45_000
 const DEFAULT_COCODE_MODEL = 'gpt-luna'
 const DEFAULT_USER_CREDENTIAL = 'OPENAI_API_KEY'
-const DEFAULT_COCODE_CREDENTIAL = 'COCODE_CLOUD_API_KEY'
+const DEFAULT_COCODE_CREDENTIAL = 'COCODE_NUT_API_KEY'
 const IMAGE_BLOCK_TYPE = 'image'
 
 /** Cocode-owned visual bridge. It speaks an OpenAI-compatible HTTP contract without third-party runtime coupling. */
@@ -285,7 +285,7 @@ function readCocodeRoute(): CocodeRoute | undefined {
   if (raw === undefined || raw.trim() === '') return undefined
   try {
     const root = JSON.parse(raw) as unknown
-    const route = asRecord(asRecord(root)?.['cocode-cloud'])
+    const route = asRecord(asRecord(root)?.['cocode-nut'])
     if (route === undefined) return undefined
     const baseURL = typeof route.baseURL === 'string' && route.baseURL.trim() !== ''
       ? route.baseURL.trim()

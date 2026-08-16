@@ -215,7 +215,7 @@ export function createBuiltinCommands(): CommandRegistry {
   local('login', 'Sign in with Cocode', (ctx) => {
     ctx.useAuth?.('login')
   })
-  local('logout', 'Sign out of Cocode Cloud', (ctx) => {
+  local('logout', 'Sign out of Cocode Nut', (ctx) => {
     void ctx.logout()
   })
   registry.register({

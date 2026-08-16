@@ -162,7 +162,7 @@ TUI 仍然要求真实 TTY；管道、重定向和 CI 环境不会进入交互�
 | `/feedback <文本>`             | 记录当前会话反馈；需要 Host 挂载 feedback 命令                         |
 | `/permission <preset>`         | 直接切换 Host 权限 preset；需要 Host 挂载 permission 命令               |
 | `/use byok` / `/use cocode`    | 在自己的 Key 和 Cocode 之间切换；切换即新会话                        |
-| `/login` / `/logout`           | 登录或退出 Cocode Cloud；退出时若还有 Key 则留在对话里               |
+| `/login` / `/logout`           | 登录或退出 Cocode Nut；退出时若还有 Key 则留在对话里               |
 | `/exit` / `/quit` / `/q`       | 关闭 TUI 并恢复终端                                                  |
 
 `/resume` 会读取本地 session header，支持关键词过滤和 `↑` `↓` 选择，以流式方式将选中 JSONL 的事件回放到临时投影，并要求 runtime 重新打开同一个持久化 session 后再替换当前 TUI。后续输入会继续写入选中的 session id。TUI 不负责跨进程写入锁；如果其它客户端正在写同一 session，请不要同时恢复。
@@ -195,7 +195,7 @@ Host 的 `commands` 能力由 `cocode/capabilities` 广告。TUI 只展示 Host 
 
 Host 的 `plugins` 能力由 `cocode/capabilities` 广告。TUI 通过 `cocode/plugins/list` 读取 Loader 的实时条目，通过 `cocode/plugins/set-enabled` 修改当前 Loader 条目；没有对应能力时，相关命令不会伪装成成功。插件菜单支持搜索和连续切换，当前修改只作用于运行中的 Loader，不写入 profile 文件；安装和卸载需要后续的 profile 管理 wire。
 
-Host 默认挂载 Cocode 自己的 `cocode-vision` 插件，并启用 `autoRead`。文本模型不支持图片时，`image` block 会转换为仅供模型使用的视觉证据，TUI 和会话预览仍显示用户原始内容；原生视觉模型则直接读取原始附件引用。视觉 provider 有两种：`cocode` 使用 Cocode 服务，默认视觉模型为 `gpt-luna`；`user` 使用用户配置的 OpenAI-compatible endpoint。用户配置写入 `$COCODE_HOME/vision.yaml`（默认 `~/.cocode/vision.yaml`），可参考 [vision.yaml.example](./vision.yaml.example)。使用 `/vision` 命令修改 provider、model、endpoint 或 credential reference。账号切换到 Cocode 后，插件会自动复用账号生成的 `COCODE_LLM_PROVIDERS.cocode-cloud` endpoint 和 credential reference，不使用 cloud model 列表的首项。凭证只填写引用名，实际值由 Host credentials service 管理，不进入 session log 或 TUI 设置。
+Host 默认挂载 Cocode 自己的 `cocode-vision` 插件，并启用 `autoRead`。文本模型不支持图片时，`image` block 会转换为仅供模型使用的视觉证据，TUI 和会话预览仍显示用户原始内容；原生视觉模型则直接读取原始附件引用。视觉 provider 有两种：`cocode` 使用 Cocode 服务，默认视觉模型为 `gpt-luna`；`user` 使用用户配置的 OpenAI-compatible endpoint。用户配置写入 `$COCODE_HOME/vision.yaml`（默认 `~/.cocode/vision.yaml`），可参考 [vision.yaml.example](./vision.yaml.example)。使用 `/vision` 命令修改 provider、model、endpoint 或 credential reference。账号切换到 Cocode 后，插件会自动复用账号生成的 `COCODE_LLM_PROVIDERS.cocode-nut` endpoint 和 credential reference，不使用 cloud model 列表的首项。凭证只填写引用名，实际值由 Host credentials service 管理，不进入 session log 或 TUI 设置。
 
 `/doctor` 中的 `caps-configured` 表示 TUI 根据配置和本地实现预期的能力，`caps-runtime` 表示初始化后对真实 JSON-RPC runtime 的探测结果。两者不一致时，以运行时结果为准；`caps-errors` 会列出被禁用能力的原因。探测使用随机、不存在的 session id，不会创建或修改用户会话。
 

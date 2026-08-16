@@ -112,12 +112,12 @@ test('createRuntimePatch registers Cocode plugins by package name', () => {
 
 test('mergeHostRuntimeEnv preserves base credentials while overlaying the route', () => {
   const env = mergeHostRuntimeEnv(
-    { PATH: '/usr/bin', COCODE_CLOUD_API_KEY: 'ck_live_secret' },
-    { COCODE_LLM_PROVIDERS: '{"cocode-cloud":{}}' },
+    { PATH: '/usr/bin', COCODE_NUT_API_KEY: 'ck_live_secret' },
+    { COCODE_LLM_PROVIDERS: '{"cocode-nut":{}}' },
     '/tmp/cocode-home',
   )
 
   assert.equal(env.DSH_HOME, '/tmp/cocode-home')
-  assert.equal(env.COCODE_LLM_PROVIDERS, '{"cocode-cloud":{}}')
-  assert.equal(env.COCODE_CLOUD_API_KEY, 'ck_live_secret')
+  assert.equal(env.COCODE_LLM_PROVIDERS, '{"cocode-nut":{}}')
+  assert.equal(env.COCODE_NUT_API_KEY, 'ck_live_secret')
 })

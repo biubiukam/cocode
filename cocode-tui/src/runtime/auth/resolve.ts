@@ -241,7 +241,7 @@ function createCloudProvider(
   cloudModels?: CloudModel[],
 ): CloudProviderProfile {
   return {
-    displayName: 'Cocode Cloud',
+    displayName: 'Cocode Nut',
     api: CLOUD_API,
     baseURL: `${origin.replace(/\/$/, '')}/v1`,
     apiKeyEnv: CLOUD_KEY_REF,

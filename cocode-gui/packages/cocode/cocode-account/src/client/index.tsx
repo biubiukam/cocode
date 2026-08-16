@@ -6,6 +6,7 @@ import type { ConfigurableProviderView, ConnectionHandle } from "@deepseek-ai/ds
 import type {} from "@deepseek-ai/dsh-api-remotes/client"
 import {
   IconApiOutline14,
+  IconChevronUpOutline14,
   IconUserOutline16,
   Menu,
   type MenuEntry,
@@ -15,7 +16,7 @@ import css from "./account.module.css"
 type AccountSnapshot = {
   phase: "signed-out" | "signing-in" | "provisioning" | "signed-in" | "error"
   profile: { displayName: string; email?: string } | null
-  cloud: { status: "absent" | "ready" | "conflict" | "error"; providerId: "cocode-cloud" }
+  cloud: { status: "absent" | "ready" | "conflict" | "error"; providerId: "cocode-nut" }
   usage?: { plan?: string; fiveHour?: number; week?: number; month?: number; syncedAt?: string; error?: string }
   error?: { code: string; message: string }
 }
@@ -52,7 +53,7 @@ type OnboardingProps = {
 const EMPTY: AccountSnapshot = {
   phase: "signed-out",
   profile: null,
-  cloud: { status: "absent", providerId: "cocode-cloud" },
+  cloud: { status: "absent", providerId: "cocode-nut" },
 }
 
 const COPY = {
@@ -61,14 +62,14 @@ const COPY = {
     signInTitle: "登录 Cocode 账号",
     signOutTitle: "退出 Cocode 账号",
     waiting: "等待浏览器登录…",
-    provisioning: "配置 Cocode Cloud…",
+    provisioning: "配置 Cocode Nut…",
     retry: "重试 Cocode",
     browserHint: "请在系统浏览器中完成 Cocode 授权。",
-    provisioningHint: "正在为当前账号配置 Cocode Cloud 模型。",
+    provisioningHint: "正在为当前账号配置 Cocode Nut 模型。",
     intro: "登录 Cocode 后即可使用账号可用的云模型，也不会改变已有默认模型。",
     later: "稍后配置",
     conflict: "本机已有同名 Provider 或凭证，请先在模型设置中处理冲突。",
-    cleanupPending: "本地账号已退出，Cocode Cloud 配置将在运行时恢复后继续清理。",
+    cleanupPending: "本地账号已退出，Cocode Nut 配置将在运行时恢复后继续清理。",
     reauthentication: "请在浏览器中重新认证 Cocode 账号（十分钟内完成），然后点击重试。",
     account: "Cocode 账号",
     accountPlan: "账户与计划",
@@ -86,10 +87,10 @@ const COPY = {
     signInTitle: "Sign in to your Cocode account",
     signOutTitle: "Sign out of your Cocode account",
     waiting: "Waiting for browser sign-in…",
-    provisioning: "Configuring Cocode Cloud…",
+    provisioning: "Configuring Cocode Nut…",
     retry: "Retry Cocode",
     browserHint: "Complete Cocode authorization in your system browser.",
-    provisioningHint: "Configuring Cocode Cloud models for this account.",
+    provisioningHint: "Configuring Cocode Nut models for this account.",
     intro: "Sign in to use the cloud models available to your account without changing the existing default model.",
     later: "Configure later",
     conflict: "A provider or credential with the reserved Cocode name already exists. Resolve it in Models settings first.",
@@ -246,7 +247,7 @@ class ProviderStore {
     const active = providers.filter(provider => provider.active)
     const preferred = this.connection.hostDescription.getSnapshot()?.provider
     const provider = active.find(candidate => candidate.provider === preferred)
-      ?? active.find(candidate => candidate.provider !== "cocode-cloud")
+      ?? active.find(candidate => candidate.provider !== "cocode-nut")
       ?? active[0]
     return provider === undefined ? null : { id: provider.provider, name: provider.displayName }
   }
@@ -393,9 +394,9 @@ function AccountPanel({ kind, snapshot, provider, onClose }: {
 }): ReturnType<typeof createElement> {
   const t = copy()
   const title = kind === "usage" ? t.planUsage : t.help
-  const isCloud = provider?.id === "cocode-cloud"
+  const isCloud = provider?.id === "cocode-nut"
     || (provider === null && (snapshot.cloud.status === "ready" || snapshot.cloud.status === "conflict"))
-  const providerLabel = isCloud ? "Cocode Cloud" : provider?.name ?? "当前 Provider"
+  const providerLabel = isCloud ? "Cocode Nut" : provider?.name ?? "当前 Provider"
   const usageMetric = (label: string, value: number | undefined): ReturnType<typeof createElement> => {
     const percentage = typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(100, Math.round(value))) : undefined
     return createElement("div", { className: css.usageMetric },
@@ -419,16 +420,16 @@ function AccountPanel({ kind, snapshot, provider, onClose }: {
             usageMetric("周限额", snapshotUsage(snapshot, "week")),
             usageMetric("月限额", snapshotUsage(snapshot, "month")),
           ),
-          createElement("p", { className: css.panelHint }, "百分比代表当前周期已使用额度。本地 Provider 的请求不会计入 Cocode Cloud 用量。"),
+          createElement("p", { className: css.panelHint }, "百分比代表当前周期已使用额度。本地 Provider 的请求不会计入 Cocode Nut 用量。"),
         )
       : createElement("div", { className: css.panelStack },
           createElement("div", { className: css.providerHelpCard },
             createElement("span", { className: css.panelEyebrow }, "当前 Provider"),
             createElement("strong", { className: css.planName }, providerLabel),
-            createElement("span", { className: css.panelSecondary }, isCloud ? "账号云模型与 Cocode Cloud 服务" : "本地 Provider 与凭证配置"),
+            createElement("span", { className: css.panelSecondary }, isCloud ? "账号云模型与 Cocode Nut 服务" : "本地 Provider 与凭证配置"),
           ),
           createElement("p", { className: css.panelIntro }, isCloud
-            ? "Cocode Cloud 的账号、套餐和云模型问题，可以先打开个人中心；模型选择和本地配置仍在模型设置中管理。"
+            ? "Cocode Nut 的账号、套餐和云模型问题，可以先打开个人中心；模型选择和本地配置仍在模型设置中管理。"
             : "当前使用的是本地 Provider。连接、模型不可用或凭证问题，可以从 Provider 设置开始排查。"),
           isCloud ? createElement("a", { className: css.panelAction, href: ACCOUNT_CENTER_URL, target: "_blank", rel: "noreferrer" }, "打开 Cocode 个人中心") : null,
           createElement("a", { className: css.panelAction, href: "https://cocode.agency", target: "_blank", rel: "noreferrer" }, "访问 Cocode 文档"),
@@ -457,10 +458,9 @@ function AccountAction({ wide, store, providers }: AccountProps): ReturnType<typ
     ? snapshot.profile?.displayName ?? "Cocode"
     : provider?.name ?? labelOf(snapshot, true)
   const secondary = signedIn ? null : provider === null ? t.noProvider : t.customProvider
-  const title = accountError(snapshot) ?? (secondary === null ? primary : `${primary} · ${secondary}`)
+  const title = accountError(snapshot) ?? primary
   const entries: MenuEntry[] = signedIn
     ? [
-        { type: "label", id: "identity", text: snapshot.profile?.email ?? primary },
         { id: "account", label: t.accountPlan, icon: createElement(MenuGlyph, { kind: "account" }) },
         { id: "usage", label: t.planUsage, icon: createElement(MenuGlyph, { kind: "usage" }) },
         { type: "separator", id: "account-separator" },
@@ -531,10 +531,16 @@ function AccountAction({ wide, store, providers }: AccountProps): ReturnType<typ
             signedIn
               ? initialOf(primary)
               : provider === null
-                ? createElement(IconUserOutline16, { size: 16 })
-                : createElement(IconApiOutline14, { size: 16 }),
+                ? createElement(IconUserOutline16, { size: 18 })
+                : createElement(IconApiOutline14, { size: 18 }),
           ),
-          wide && createElement("span", { className: css.primary }, primary),
+          wide && createElement(
+            "span",
+            { className: css.copy },
+            createElement("span", { className: css.primary }, primary),
+            secondary === null ? null : createElement("span", { className: css.secondary }, secondary),
+          ),
+          wide && createElement(IconChevronUpOutline14, { className: css.chevron, size: 14 }),
         ),
       },
     ),

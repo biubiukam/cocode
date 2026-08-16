@@ -69,9 +69,9 @@ test('resolveHostScope applies the same environment-derived scope for every clie
     DSH_PROFILE: 'web',
     COCODE_HOST_CONFIG_FINGERPRINT: 'cocode-web-jsonrpc-v1',
     COCODE_RUNTIME_CHANNEL: 'stable',
-    COCODE_LLM_PROVIDERS: ' {"cocode-cloud":{"api":"openai-responses"}} ',
+    COCODE_LLM_PROVIDERS: ' {"cocode-nut":{"api":"openai-responses"}} ',
     COCODE_HOME: '/tmp/cocode-account',
-    COCODE_CLOUD_API_KEY: 'secret-is-not-part-of-the-scope',
+    COCODE_NUT_API_KEY: 'secret-is-not-part-of-the-scope',
   }
   const scope = resolveHostScope(env)
   assert.deepEqual(resolveHostRuntimeEnv(env), {
@@ -89,10 +89,10 @@ test('resolveHostScope ignores blank runtime configuration and secrets', () => {
     DSH_HOME: '/tmp/cocode-dsh',
     COCODE_LLM_PROVIDERS: '  ',
     COCODE_HOME: '  ',
-    COCODE_CLOUD_API_KEY: 'secret',
+    COCODE_NUT_API_KEY: 'secret',
   })
   assert.equal(scope.hostConfigFingerprint, 'cocode-web-jsonrpc-v1')
-  assert.deepEqual(resolveHostRuntimeEnv({ COCODE_CLOUD_API_KEY: 'secret' }), {})
+  assert.deepEqual(resolveHostRuntimeEnv({ COCODE_NUT_API_KEY: 'secret' }), {})
 })
 
 test('vision config location isolates shared Hosts by account home', () => {
@@ -159,7 +159,7 @@ test('older supervisor can be reused for an active compatible host', () => {
         clientKind: 'standalone-tui',
         requiredServices: ['jsonrpc'],
         minProtocolRevision: '1.0',
-        runtimeEnv: { COCODE_LLM_PROVIDERS: '{"cocode-cloud":{}}' },
+        runtimeEnv: { COCODE_LLM_PROVIDERS: '{"cocode-nut":{}}' },
       },
       { leaseCount: 1, descriptor: descriptor() },
     ),

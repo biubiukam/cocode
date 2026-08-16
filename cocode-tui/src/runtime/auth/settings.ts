@@ -1,5 +1,5 @@
 /**
- * Read and patch DSH settings.yaml (LLM routes and default model).
+ * Read/patch harness settings.yaml (llm routes + default model).
  */
 
 import {
@@ -130,7 +130,7 @@ async function writeCloudRoute(
   const llm = isRecord(root['llm-pi-ai']) ? root['llm-pi-ai'] : {}
   const providers = isRecord(llm.providers) ? llm.providers : {}
   providers[CLOUD_PROVIDER] = {
-    displayName: 'Cocode Cloud',
+    displayName: 'Cocode Nut',
     api: CLOUD_API,
     baseURL: `${origin.replace(/\/$/, '')}/v1`,
     apiKeyEnv: CLOUD_KEY_REF,

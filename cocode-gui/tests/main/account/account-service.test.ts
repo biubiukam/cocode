@@ -145,7 +145,7 @@ test("provider conflicts are reported before a cloud key or DSH write", async ()
 					revision: 4,
 					value: {
 						providers: {
-							"cocode-cloud": {
+							"cocode-nut": {
 								api: "openai-completions",
 								baseURL: "https://other.example/v1",
 								apiKeyEnv: "OTHER_KEY",
@@ -156,7 +156,7 @@ test("provider conflicts are reported before a cloud key or DSH write", async ()
 			],
 		}),
 		describeCredentials: async () => ({
-			COCODE_CLOUD_API_KEY: { configured: false, writable: true },
+			COCODE_NUT_API_KEY: { configured: false, writable: true },
 		}),
 		providers: async (): Promise<ProviderView[]> => [],
 		models: async (): Promise<ModelGroup[]> => [],
@@ -191,14 +191,14 @@ test("an active reserved provider without a managed route is a conflict", async 
 			namespaces: [{ ns: "llm-pi-ai", revision: 1, value: { providers: {} } }],
 		}),
 		describeCredentials: async () => ({
-			COCODE_CLOUD_API_KEY: { configured: false, writable: true },
+			COCODE_NUT_API_KEY: { configured: false, writable: true },
 		}),
 		providers: async (): Promise<ProviderView[]> => [
 			{
-				provider: "cocode-cloud",
+				provider: "cocode-nut",
 				displayName: "Other Cloud",
 				settingsNs: "llm-pi-ai",
-				settingsPath: ["providers", "cocode-cloud"],
+				settingsPath: ["providers", "cocode-nut"],
 				active: true,
 			},
 		],
@@ -230,22 +230,22 @@ test("reconciles a pre-existing reserved cloud credential", async () => {
 					value:
 						route === undefined
 							? { providers: {} }
-							: { providers: { "cocode-cloud": route } },
+							: { providers: { "cocode-nut": route } },
 				},
 			],
 		}),
 		describeCredentials: async () => ({
-			COCODE_CLOUD_API_KEY: { configured: true, writable: true },
+			COCODE_NUT_API_KEY: { configured: true, writable: true },
 		}),
 		providers: async (): Promise<ProviderView[]> =>
 			route === undefined
 				? []
 				: [
 						{
-							provider: "cocode-cloud",
-							displayName: "Cocode Cloud",
+							provider: "cocode-nut",
+							displayName: "Cocode Nut",
 							settingsNs: "llm-pi-ai",
-							settingsPath: ["providers", "cocode-cloud"],
+							settingsPath: ["providers", "cocode-nut"],
 							active: true,
 						},
 				  ],
@@ -254,8 +254,8 @@ test("reconciles a pre-existing reserved cloud credential", async () => {
 				? []
 				: [
 						{
-							id: "cocode-cloud",
-							name: "Cocode Cloud",
+							id: "cocode-nut",
+							name: "Cocode Nut",
 							models: [{ id: "cloud-model", name: "Cloud Model" }],
 						},
 				  ],
@@ -288,40 +288,40 @@ test("reuses a ready device cloud route without minting another API key", async 
 	const { client, createdKeys } = agency()
 	let writes = 0
 	const route = {
-		displayName: "Cocode Cloud",
+		displayName: "Cocode Nut",
 		api: "openai-responses",
 		baseURL: "https://cocode.agency/v1",
-		apiKeyEnv: "COCODE_CLOUD_API_KEY",
+		apiKeyEnv: "COCODE_NUT_API_KEY",
 		models: [{ id: "cloud-model", name: "Cloud Model" }],
 	}
 	const dsh = {
-		currentDefault: async () => ({ provider: "cocode-cloud", model: "cloud-model" }),
+		currentDefault: async () => ({ provider: "cocode-nut", model: "cloud-model" }),
 		describeSettings: async () => ({
 			writable: true,
 			namespaces: [
 				{
 					ns: "llm-pi-ai",
 					revision: 3,
-					value: { providers: { "cocode-cloud": route } },
+					value: { providers: { "cocode-nut": route } },
 				},
 			],
 		}),
 		describeCredentials: async () => ({
-			COCODE_CLOUD_API_KEY: { configured: true, writable: true },
+			COCODE_NUT_API_KEY: { configured: true, writable: true },
 		}),
 		providers: async (): Promise<ProviderView[]> => [
 			{
-				provider: "cocode-cloud",
-				displayName: "Cocode Cloud",
+				provider: "cocode-nut",
+				displayName: "Cocode Nut",
 				settingsNs: "llm-pi-ai",
-				settingsPath: ["providers", "cocode-cloud"],
+				settingsPath: ["providers", "cocode-nut"],
 				active: true,
 			},
 		],
 		models: async (): Promise<ModelGroup[]> => [
 			{
-				id: "cocode-cloud",
-				name: "Cocode Cloud",
+				id: "cocode-nut",
+				name: "Cocode Nut",
 				models: [{ id: "cloud-model", name: "Cloud Model" }],
 			},
 		],
@@ -343,7 +343,7 @@ test("reuses a ready device cloud route without minting another API key", async 
 	assert.equal(writes, 0)
 	assert.deepEqual(identity.value?.managedRoute, {
 		baseURL: "https://cocode.agency/v1",
-		apiKeyEnv: "COCODE_CLOUD_API_KEY",
+		apiKeyEnv: "COCODE_NUT_API_KEY",
 	})
 })
 
@@ -356,41 +356,41 @@ test("upgrades a Completions cloud route to Responses without minting another ke
 	)
 	const { client, createdKeys } = agency()
 	let route: Record<string, unknown> = {
-		displayName: "Cocode Cloud",
+		displayName: "Cocode Nut",
 		api: "openai-completions",
 		baseURL: "https://cocode.agency/v1",
-		apiKeyEnv: "COCODE_CLOUD_API_KEY",
+		apiKeyEnv: "COCODE_NUT_API_KEY",
 		models: [{ id: "cloud-model", name: "Cloud Model" }],
 	}
 	const writes: string[] = []
 	const dsh = {
-		currentDefault: async () => ({ provider: "cocode-cloud", model: "cloud-model" }),
+		currentDefault: async () => ({ provider: "cocode-nut", model: "cloud-model" }),
 		describeSettings: async () => ({
 			writable: true,
 			namespaces: [
 				{
 					ns: "llm-pi-ai",
 					revision: 3,
-					value: { providers: { "cocode-cloud": route } },
+					value: { providers: { "cocode-nut": route } },
 				},
 			],
 		}),
 		describeCredentials: async () => ({
-			COCODE_CLOUD_API_KEY: { configured: true, writable: true },
+			COCODE_NUT_API_KEY: { configured: true, writable: true },
 		}),
 		providers: async (): Promise<ProviderView[]> => [
 			{
-				provider: "cocode-cloud",
-				displayName: "Cocode Cloud",
+				provider: "cocode-nut",
+				displayName: "Cocode Nut",
 				settingsNs: "llm-pi-ai",
-				settingsPath: ["providers", "cocode-cloud"],
+				settingsPath: ["providers", "cocode-nut"],
 				active: true,
 			},
 		],
 		models: async (): Promise<ModelGroup[]> => [
 			{
-				id: "cocode-cloud",
-				name: "Cocode Cloud",
+				id: "cocode-nut",
+				name: "Cocode Nut",
 				models: [{ id: "cloud-model", name: "Cloud Model" }],
 			},
 		],
@@ -429,15 +429,14 @@ test("failed provider activation rolls back the managed route and credential", a
 		{
 			ns: "llm-pi-ai",
 			revision: mutations.length,
-			value:
-				route === undefined ? { providers: {} } : { providers: { "cocode-cloud": route } },
+			value: route === undefined ? { providers: {} } : { providers: { "cocode-nut": route } },
 		},
 	]
 	const dsh = {
 		currentDefault: async () => ({ provider: "deepseek-official", model: "deepseek-v4-flash" }),
 		describeSettings: async () => ({ writable: true, namespaces: settings() }),
 		describeCredentials: async () => ({
-			COCODE_CLOUD_API_KEY: { configured: credentialConfigured, writable: true },
+			COCODE_NUT_API_KEY: { configured: credentialConfigured, writable: true },
 		}),
 		setCredential: async () => {
 			credentialConfigured = true
@@ -455,10 +454,10 @@ test("failed provider activation rolls back the managed route and credential", a
 		},
 		providers: async () => [
 			{
-				provider: "cocode-cloud",
-				displayName: "Cocode Cloud",
+				provider: "cocode-nut",
+				displayName: "Cocode Nut",
 				settingsNs: "llm-pi-ai",
-				settingsPath: ["providers", "cocode-cloud"],
+				settingsPath: ["providers", "cocode-nut"],
 				active: false,
 			},
 		],
@@ -490,7 +489,7 @@ test("provider write failure before route creation still rolls back the credenti
 			namespaces: [{ ns: "llm-pi-ai", revision: 1, value: { providers: {} } }],
 		}),
 		describeCredentials: async () => ({
-			COCODE_CLOUD_API_KEY: { configured: credentialConfigured, writable: true },
+			COCODE_NUT_API_KEY: { configured: credentialConfigured, writable: true },
 		}),
 		providers: async (): Promise<ProviderView[]> => [],
 		models: async (): Promise<ModelGroup[]> => [],
@@ -517,17 +516,17 @@ test("sign out restores a cloud default before removing only the managed provide
 			preLoginDefault: previous,
 			managedRoute: {
 				baseURL: "https://cocode.agency/v1",
-				apiKeyEnv: "COCODE_CLOUD_API_KEY",
+				apiKeyEnv: "COCODE_NUT_API_KEY",
 			},
 		}),
 	)
 	const { client, revoked } = agency()
-	let current: DefaultSelection = { provider: "cocode-cloud", model: "cloud-model" }
+	let current: DefaultSelection = { provider: "cocode-nut", model: "cloud-model" }
 	let route: Record<string, unknown> | undefined = {
-		displayName: "Cocode Cloud",
+		displayName: "Cocode Nut",
 		api: "openai-completions",
 		baseURL: "https://cocode.agency/v1",
-		apiKeyEnv: "COCODE_CLOUD_API_KEY",
+		apiKeyEnv: "COCODE_NUT_API_KEY",
 		models: [{ id: "cloud-model", name: "Cloud Model" }],
 	}
 	const mutations: string[] = []
@@ -540,8 +539,8 @@ test("sign out restores a cloud default before removing only the managed provide
 				models: [{ id: "deepseek-v4-flash", name: "Flash" }],
 			},
 			{
-				id: "cocode-cloud",
-				name: "Cocode Cloud",
+				id: "cocode-nut",
+				name: "Cocode Nut",
 				models: [{ id: "cloud-model", name: "Cloud Model" }],
 			},
 		],
@@ -555,12 +554,12 @@ test("sign out restores a cloud default before removing only the managed provide
 					value:
 						route === undefined
 							? { providers: {} }
-							: { providers: { "cocode-cloud": route } },
+							: { providers: { "cocode-nut": route } },
 				},
 			],
 		}),
 		describeCredentials: async () => ({
-			COCODE_CLOUD_API_KEY: { configured: true, writable: true },
+			COCODE_NUT_API_KEY: { configured: true, writable: true },
 		}),
 		providers: async (): Promise<ProviderView[]> => [],
 		setCredential: async (): Promise<void> => undefined,
@@ -659,7 +658,7 @@ test("a desktop-key reauthentication requirement clears identity during hydrate"
 			namespaces: [{ ns: "llm-pi-ai", revision: 1, value: { providers: {} } }],
 		}),
 		describeCredentials: async () => ({
-			COCODE_CLOUD_API_KEY: { configured: false, writable: true },
+			COCODE_NUT_API_KEY: { configured: false, writable: true },
 		}),
 		providers: async (): Promise<ProviderView[]> => [],
 		models: async (): Promise<ModelGroup[]> => [],
@@ -708,25 +707,24 @@ test("desktop-key reauthentication opens a browser reauth gate before retry", as
 		{
 			ns: "llm-pi-ai",
 			revision: route === undefined ? 1 : 2,
-			value:
-				route === undefined ? { providers: {} } : { providers: { "cocode-cloud": route } },
+			value: route === undefined ? { providers: {} } : { providers: { "cocode-nut": route } },
 		},
 	]
 	const dsh = {
 		currentDefault: async () => ({ provider: "deepseek-official", model: "deepseek-v4-flash" }),
 		describeSettings: async () => ({ writable: true, namespaces: settings() }),
 		describeCredentials: async () => ({
-			COCODE_CLOUD_API_KEY: { configured: credentialConfigured, writable: true },
+			COCODE_NUT_API_KEY: { configured: credentialConfigured, writable: true },
 		}),
 		providers: async (): Promise<ProviderView[]> =>
 			route === undefined
 				? []
 				: [
 						{
-							provider: "cocode-cloud",
-							displayName: "Cocode Cloud",
+							provider: "cocode-nut",
+							displayName: "Cocode Nut",
 							settingsNs: "llm-pi-ai",
-							settingsPath: ["providers", "cocode-cloud"],
+							settingsPath: ["providers", "cocode-nut"],
 							active: credentialConfigured,
 						},
 				  ],
@@ -735,8 +733,8 @@ test("desktop-key reauthentication opens a browser reauth gate before retry", as
 				? []
 				: [
 						{
-							id: "cocode-cloud",
-							name: "Cocode Cloud",
+							id: "cocode-nut",
+							name: "Cocode Nut",
 							models: [{ id: "cloud-model", name: "Cloud Model" }],
 						},
 				  ],
@@ -815,7 +813,7 @@ test("DSH unavailability clears local secrets and leaves a non-secret cleanup ma
 			preLoginDefault: { provider: "deepseek-official", model: "deepseek-v4-flash" },
 			managedRoute: {
 				baseURL: "https://cocode.agency/v1",
-				apiKeyEnv: "COCODE_CLOUD_API_KEY",
+				apiKeyEnv: "COCODE_NUT_API_KEY",
 			},
 		}),
 	)
@@ -843,7 +841,7 @@ test("DSH unavailability clears local secrets and leaves a non-secret cleanup ma
 	assert.equal(pending.value?.pending, true)
 	assert.deepEqual(pending.value?.managedRoute, {
 		baseURL: "https://cocode.agency/v1",
-		apiKeyEnv: "COCODE_CLOUD_API_KEY",
+		apiKeyEnv: "COCODE_NUT_API_KEY",
 	})
 	const snapshot = await service.snapshot()
 	assert.equal(snapshot.phase, "error")
@@ -860,7 +858,7 @@ test("renderer-visible account errors redact cloud keys and bearer tokens", asyn
 			namespaces: [{ ns: "llm-pi-ai", revision: 1, value: { providers: {} } }],
 		}),
 		describeCredentials: async () => ({
-			COCODE_CLOUD_API_KEY: { configured: false, writable: true },
+			COCODE_NUT_API_KEY: { configured: false, writable: true },
 		}),
 		providers: async (): Promise<ProviderView[]> => [],
 		models: async (): Promise<ModelGroup[]> => [],

@@ -20,12 +20,11 @@ import { listenForCallback as createCallbackListener } from "../infrastructure/c
 import { CleanupPendingStore, type CleanupPendingState } from "../infrastructure/cleanup-pending"
 import { SecureVault } from "../infrastructure/secure-vault"
 import { SharedAccountStore } from "../infrastructure/shared-account-store"
-import type { DesktopLogger } from "../../../shared/logging/desktop-logger"
 
-const CLOUD_PROVIDER = "cocode-cloud"
+const CLOUD_PROVIDER = "cocode-nut"
 const CLOUD_NAMESPACE = "llm-pi-ai"
 const CLOUD_PATH = ["providers", CLOUD_PROVIDER] as const
-const CLOUD_CREDENTIAL = "COCODE_CLOUD_API_KEY"
+const CLOUD_CREDENTIAL = "COCODE_NUT_API_KEY"
 const CLOUD_API = "openai-responses"
 const CLOUD_KEY_PATTERN = /^ck_[A-Za-z0-9_-]+$/
 const CLOUD_READY_ATTEMPTS = 6
@@ -117,7 +116,7 @@ export type AccountServiceDependencies = {
 }
 
 class CloudProviderConflictError extends Error {
-	constructor(message = "cocode-cloud provider is already configured by another source") {
+	constructor(message = "cocode-nut provider is already configured by another source") {
 		super(message)
 		this.name = "CloudProviderConflictError"
 	}
@@ -193,7 +192,7 @@ function cloudRouteValue(
 	models: readonly { readonly id: string; readonly name: string }[],
 ): Record<string, unknown> {
 	return {
-		displayName: "Cocode Cloud",
+		displayName: "Cocode Nut",
 		api: CLOUD_API,
 		baseURL,
 		apiKeyEnv: CLOUD_CREDENTIAL,
@@ -243,11 +242,10 @@ export class AccountService {
 		private readonly dsh: AccountDshPort,
 		agency: AccountAgency = new AgencyClient(),
 		dependencies: Partial<AccountServiceDependencies> = {},
-		private readonly logger?: DesktopLogger,
 	) {
 		this.agency = agency
 		this.identity = dependencies.identity ?? new SharedAccountStore()
-		this.cloudKey = dependencies.cloudKey ?? new SecureVault<string>("cocode-cloud-key.bin")
+		this.cloudKey = dependencies.cloudKey ?? new SecureVault<string>("cocode-nut-key.bin")
 		this.cleanupPending = dependencies.cleanupPending ?? new CleanupPendingStore()
 		this.listenForCallback = dependencies.listenForCallback ?? createCallbackListener
 		this.openExternal = dependencies.openExternal ?? shell.openExternal
@@ -548,7 +546,7 @@ export class AccountService {
 		const settings = await this.dsh.describeSettings()
 		const cloudNamespace = settings.namespaces.find((item) => item.ns === CLOUD_NAMESPACE)
 		if (!settings.writable || cloudNamespace === undefined)
-			throw new Error("Cocode Cloud settings are not writable")
+			throw new Error("Cocode Nut settings are not writable")
 		const route = routeOf(settings.namespaces)
 		const intendedRoute = { baseURL, apiKeyEnv: CLOUD_CREDENTIAL }
 		this.stage = "credentials.describe"
@@ -557,7 +555,7 @@ export class AccountService {
 		const providersBefore = await this.dsh.providers()
 		const existingCredential = credentials[CLOUD_CREDENTIAL]
 		if (existingCredential?.writable === false)
-			throw new Error("Cocode Cloud credential storage is not writable")
+			throw new Error("Cocode Nut credential storage is not writable")
 		const hasManagedMetadata =
 			state.managedRoute?.baseURL === baseURL &&
 			state.managedRoute.apiKeyEnv === CLOUD_CREDENTIAL
@@ -593,7 +591,7 @@ export class AccountService {
 				return snapshot
 			}
 		}
-		// COCODE_CLOUD_API_KEY is a reserved product slot. If another client (for
+		// COCODE_NUT_API_KEY is a reserved product slot. If another client (for
 		// example TUI) left a value there, reconcile it to the current Agency
 		// account instead of stopping with a conflict. Other provider routes still
 		// fail closed above.
@@ -603,7 +601,7 @@ export class AccountService {
 		const key = await this.ensureCloudKey(state)
 		this.stage = "models"
 		const models = await this.agency.models(key.secret)
-		if (models.length === 0) throw new Error("Cocode Cloud returned no available models")
+		if (models.length === 0) throw new Error("Cocode Nut returned no available models")
 		// Persist a newly minted key before the DSH saga starts. If settings
 		// activation fails after the Agency has created the key, the next retry
 		// must reuse it instead of minting another device key.
@@ -626,7 +624,7 @@ export class AccountService {
 			})
 			this.stage = "cloud-verification"
 			const ready = await this.waitForCloudReady(models)
-			if (!ready) throw new Error("Cocode Cloud provider did not become active")
+			if (!ready) throw new Error("Cocode Nut provider did not become active")
 			const next: IdentityState = {
 				...state,
 				...(key.id === undefined ? {} : { personalKeyId: key.id }),
@@ -943,14 +941,10 @@ export class AccountService {
 
 	private logFailure(operation: string, error: unknown): void {
 		const detail = safeError(error, "account-operation-failed")
-		this.logger?.log("error", "account.operation.failed", {
-			outcome: "failure",
-			error,
-			attributes: {
-				operation,
-				stage: this.stage ?? "unknown",
-				code: detail.code,
-			},
+		console.error("[cocode-account]", operation, {
+			stage: this.stage ?? "unknown",
+			code: detail.code,
+			message: detail.message,
 		})
 	}
 }

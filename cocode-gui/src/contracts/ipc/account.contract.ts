@@ -9,7 +9,7 @@ export type AccountPhase = "signed-out" | "signing-in" | "provisioning" | "signe
 
 export type AccountCloudState = {
 	readonly status: "absent" | "ready" | "conflict" | "error"
-	readonly providerId: "cocode-cloud"
+	readonly providerId: "cocode-nut"
 }
 
 export type AccountProfile = {

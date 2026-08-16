@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -61,7 +61,7 @@ describe('AuthStore', () => {
     expect(await readCredentials(dshHome)).toEqual({ DEEPSEEK_API_KEY: 'sk-dsh' })
   })
 
-  it('restores the persisted Cloud route required by the DSH adapter', async () => {
+  it('rebuilds a runtime provider when a legacy cloud route is present', async () => {
     const accountHome = await tempHome()
     const dshHome = await tempHome()
     await writeAccount(accountHome, {
@@ -71,11 +71,10 @@ describe('AuthStore', () => {
       accessExpiresAt: Date.now() + 60_000,
       personalKeyId: 'key-1',
     })
-    await patchCredential(dshHome, 'COCODE_CLOUD_API_KEY', 'ck_live_x')
-    await writeFile(
-      join(dshHome, 'settings.yaml'),
-      'agent-default-model:\n  provider: cocode-cloud\n  model: cloud-1\nllm-pi-ai:\n  providers: {}\n',
-    )
+    await patchCredential(dshHome, 'COCODE_NUT_API_KEY', 'ck_live_x')
+    await patchCloudRoute(dshHome, 'https://cocode.agency', [
+      { id: 'cloud-1', name: 'Cloud 1' },
+    ])
     const store = await createAuthStore({
       accountHome,
       dshHome,
@@ -94,13 +93,10 @@ describe('AuthStore', () => {
     })
 
     expect(store.snapshot().mode).toBe('cocode')
-    expect(await readSettings(dshHome)).toMatchObject({
-      hasCloudRoute: true,
-      cloudModel: 'cloud-1',
-    })
+    expect((await readSettings(dshHome)).hasCloudRoute).toBe(false)
     const providerConfig = JSON.parse(store.resolved().env.COCODE_LLM_PROVIDERS ?? '{}')
-    expect(providerConfig['cocode-cloud'].api).toBe('openai-responses')
-    expect(providerConfig['cocode-cloud'].models).toHaveLength(2)
+    expect(providerConfig['cocode-nut'].api).toBe('openai-responses')
+    expect(providerConfig['cocode-nut'].models).toHaveLength(2)
   })
 
   it('starts at the gate with an empty home', async () => {
@@ -195,15 +191,12 @@ describe('AuthStore', () => {
     expect(JSON.stringify(store.snapshot())).not.toMatch(/access-secret|ck_live/)
     expect(opened[0]).toContain('user_code=ABCD-EFGH')
     expect((await readCredentials(home)).DEEPSEEK_API_KEY).toBe('sk-keep')
-    expect((await readCredentials(home)).COCODE_CLOUD_API_KEY).toBe('ck_live_new')
-    expect(await readSettings(home)).toMatchObject({
-      hasCloudRoute: true,
-      cloudModel: 'cloud-1',
-    })
+    expect((await readCredentials(home)).COCODE_NUT_API_KEY).toBe('ck_live_new')
+    expect((await readSettings(home)).hasCloudRoute).toBe(false)
     expect(await readAccount(home)).toMatchObject({ personalKeyId: 'key-1' })
     const providerConfig = JSON.parse(store.resolved().env.COCODE_LLM_PROVIDERS ?? '{}')
-    expect(providerConfig['cocode-cloud'].api).toBe('openai-responses')
-    expect(providerConfig['cocode-cloud'].models).toEqual([
+    expect(providerConfig['cocode-nut'].api).toBe('openai-responses')
+    expect(providerConfig['cocode-nut'].models).toEqual([
       { id: 'cloud-1', name: 'Cloud 1' },
       { id: 'cloud-2', name: 'Cloud 2' },
     ])
@@ -213,7 +206,7 @@ describe('AuthStore', () => {
   it('keeps BYOK ready after logout when a key remains', async () => {
     const home = await tempHome()
     await patchCredential(home, 'DEEPSEEK_API_KEY', 'sk-keep')
-    await patchCredential(home, 'COCODE_CLOUD_API_KEY', 'ck_live_x')
+    await patchCredential(home, 'COCODE_NUT_API_KEY', 'ck_live_x')
     await patchCloudRoute(home, 'https://cocode.agency', [{ id: 'cloud-1', name: 'Cloud' }])
     await writeAccount(home, {
       origin: 'https://cocode.agency',
@@ -232,14 +225,14 @@ describe('AuthStore', () => {
     expect(store.snapshot().phase).toBe('ready')
     expect(store.snapshot().mode).toBe('byok')
     expect(await readCredentials(home)).toEqual({ DEEPSEEK_API_KEY: 'sk-keep' })
-    expect(store.resolved().env.COCODE_CLOUD_API_KEY).toBeUndefined()
+    expect(store.resolved().env.COCODE_NUT_API_KEY).toBeUndefined()
     expect((await readSettings(home)).provider).toBe('deepseek-official')
   })
 
   it('selectMode switches the default provider without dropping the other secret', async () => {
     const home = await tempHome()
     await patchCredential(home, 'DEEPSEEK_API_KEY', 'sk-keep')
-    await patchCredential(home, 'COCODE_CLOUD_API_KEY', 'ck_live_x')
+    await patchCredential(home, 'COCODE_NUT_API_KEY', 'ck_live_x')
     await patchCloudRoute(home, 'https://cocode.agency', [{ id: 'cloud-1', name: 'Cloud' }])
     await writeAccount(home, {
       origin: 'https://cocode.agency',
@@ -256,14 +249,14 @@ describe('AuthStore', () => {
     expect((await readSettings(home)).provider).toBe('deepseek-official')
     expect(await readCredentials(home)).toMatchObject({
       DEEPSEEK_API_KEY: 'sk-keep',
-      COCODE_CLOUD_API_KEY: 'ck_live_x',
+      COCODE_NUT_API_KEY: 'ck_live_x',
     })
-    expect(store.resolved().env.COCODE_CLOUD_API_KEY).toBeUndefined()
+    expect(store.resolved().env.COCODE_NUT_API_KEY).toBeUndefined()
   })
 
   it('selectMode asks for a key when BYOK is missing', async () => {
     const home = await tempHome()
-    await patchCredential(home, 'COCODE_CLOUD_API_KEY', 'ck_live_x')
+    await patchCredential(home, 'COCODE_NUT_API_KEY', 'ck_live_x')
     await patchCloudRoute(home, 'https://cocode.agency', [{ id: 'cloud-1', name: 'Cloud' }])
     await writeAccount(home, {
       origin: 'https://cocode.agency',
@@ -279,7 +272,7 @@ describe('AuthStore', () => {
 
   it('requires a Cocode account when only a legacy route exists', async () => {
     const home = await tempHome()
-    await patchCredential(home, 'COCODE_CLOUD_API_KEY', 'ck_live_x')
+    await patchCredential(home, 'COCODE_NUT_API_KEY', 'ck_live_x')
     await patchCloudRoute(home, 'https://cocode.agency', [{ id: 'cloud-1', name: 'Cloud' }])
     const store = await createAuthStore({ home, env: {} })
     expect(store.snapshot().phase).toBe('gate')
@@ -289,7 +282,7 @@ describe('AuthStore', () => {
   it('uses a hosted model when switching back from BYOK', async () => {
     const home = await tempHome()
     await patchCredential(home, 'DEEPSEEK_API_KEY', 'sk-keep')
-    await patchCredential(home, 'COCODE_CLOUD_API_KEY', 'ck_live_x')
+    await patchCredential(home, 'COCODE_NUT_API_KEY', 'ck_live_x')
     await writeAccount(home, {
       origin: 'https://cocode.agency',
       accessToken: 'access',
@@ -339,7 +332,7 @@ describe('AuthStore', () => {
   it('logout refuses when another TUI shares the home', async () => {
     const home = await tempHome()
     await patchCredential(home, 'DEEPSEEK_API_KEY', 'sk-keep')
-    await patchCredential(home, 'COCODE_CLOUD_API_KEY', 'ck_live_x')
+    await patchCredential(home, 'COCODE_NUT_API_KEY', 'ck_live_x')
     await patchCloudRoute(home, 'https://cocode.agency', [{ id: 'cloud-1', name: 'Cloud' }])
     const live = {
       pid: 99,
@@ -353,12 +346,12 @@ describe('AuthStore', () => {
       client: { fetch: async () => new Response(null, { status: 204 }) },
     })
     await expect(store.logout()).rejects.toMatchObject({ code: 'AUTH_HOME_BUSY' })
-    expect((await readCredentials(home)).COCODE_CLOUD_API_KEY).toBe('ck_live_x')
+    expect((await readCredentials(home)).COCODE_NUT_API_KEY).toBe('ck_live_x')
   })
 
   it('refreshes an expiring Cloud account before resolving it', async () => {
     const home = await tempHome()
-    await patchCredential(home, 'COCODE_CLOUD_API_KEY', 'ck_live_existing')
+    await patchCredential(home, 'COCODE_NUT_API_KEY', 'ck_live_existing')
     await patchCloudRoute(home, 'https://cocode.agency', [{ id: 'cloud-1', name: 'Cloud' }])
     await writeAccount(home, {
       origin: 'https://cocode.agency',
@@ -392,7 +385,7 @@ describe('AuthStore', () => {
   it('clears failed Cloud refresh state while preserving BYOK', async () => {
     const home = await tempHome()
     await patchCredential(home, 'DEEPSEEK_API_KEY', 'sk-keep')
-    await patchCredential(home, 'COCODE_CLOUD_API_KEY', 'ck_live_existing')
+    await patchCredential(home, 'COCODE_NUT_API_KEY', 'ck_live_existing')
     await patchCloudRoute(home, 'https://cocode.agency', [{ id: 'cloud-1', name: 'Cloud' }])
     await writeAccount(home, {
       origin: 'https://cocode.agency',
@@ -455,7 +448,7 @@ describe('AuthStore', () => {
     store.dispatch({ type: 'chooseCocode' })
     await new Promise((resolve) => setTimeout(resolve, 10))
     expect(store.snapshot().phase).toBe('failed')
-    expect((await readCredentials(home)).COCODE_CLOUD_API_KEY).toBeUndefined()
+    expect((await readCredentials(home)).COCODE_NUT_API_KEY).toBeUndefined()
     expect(await readAccount(home)).toBeUndefined()
   })
 
