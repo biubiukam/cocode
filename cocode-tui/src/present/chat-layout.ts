@@ -1,16 +1,16 @@
-/** Calculate the rows reserved by the chat chrome and overlays. */
+/** Calculate the shared horizontal and vertical projection for the chat page. */
 
+import { CHECKLIST_WINDOW_SIZE } from '../runtime/checklist.ts'
+import { PLUGIN_PICKER_WINDOW_SIZE } from '../runtime/plugin-picker.ts'
 import { RESUME_WINDOW_SIZE } from '../runtime/resume-picker.ts'
 import { REWIND_WINDOW_SIZE } from '../runtime/rewind-picker.ts'
 import { SKILLS_WINDOW_SIZE } from '../runtime/skills-picker.ts'
-import { PLUGIN_PICKER_WINDOW_SIZE } from '../runtime/plugin-picker.ts'
 import { PERMISSION_PICKER_WINDOW_SIZE } from '../runtime/permission-picker.ts'
-import { CHECKLIST_WINDOW_SIZE } from '../runtime/checklist.ts'
 import { listWindowStart } from './list-window.ts'
+import { compactColumns, resolveInspectorLayout, type InspectorLayout } from './panel-layout.ts'
 
 export const CHAT_HEADER_ROWS = 2
 const STATUS_ROWS = 2
-const COMPOSER_CHROME_ROWS = 4
 const FOOTER_ROWS = 2
 const MIN_MESSAGE_ROWS_WITH_OVERLAY = 1
 const MIN_OVERLAY_ROWS = 5
@@ -19,9 +19,45 @@ const MIN_REWIND_OVERLAY_ROWS = 7
 
 export const MAX_COMPOSER_ROWS = 6
 
+export type ChatViewport = { columns: number; rows: number }
+
+export type ChatOverlayKind =
+  | 'help'
+  | 'slash'
+  | 'command-argument'
+  | 'file'
+  | 'history'
+  | 'resume'
+  | 'checklist'
+  | 'rewind'
+  | 'skills'
+  | 'plugins'
+  | 'permission'
+  | 'question'
+  | 'approval'
+  | 'review'
+  | 'action-menu'
+  | 'model'
+  | 'quit'
+
+export type ChatOverlayInput = {
+  kind: ChatOverlayKind
+  rows: number
+  minimumRows?: number
+}
+
 export type ChatLayoutInput = {
-  viewportRows: number
-  composerLines: number
+  viewport?: ChatViewport
+  viewportColumns?: number
+  viewportRows?: number
+  composerRows?: number
+  composerInputRows?: number
+  /** @deprecated Use composerRows, which is the actual projected row count. */
+  composerLines?: number
+  attachmentRows?: number
+  inspectorPreferredWidth?: number
+  activeOverlays?: readonly ChatOverlayInput[]
+  /** Legacy inputs kept while callers migrate to activeOverlays. */
   hasAttachments?: boolean
   noticeRows?: number
   hasStatusDetails?: boolean
@@ -57,6 +93,23 @@ export type ChatLayoutInput = {
 }
 
 export type ChatLayout = {
+  mode: 'tiny' | 'compact' | 'wide'
+  mainColumns: number
+  inspector?: InspectorLayout
+  rows: {
+    header: number
+    transcript: number
+    checklist: number
+    status: number
+    editorFeedback: number
+    overlay: number
+    composer: number
+    footer: number
+  }
+  activeOverlay?: ChatOverlayInput
+  composerInputRows: number
+  composerAttachmentRows: number
+  /** Legacy fields kept until downstream panel consumers migrate. */
   baseRows: number
   composerRows: number
   overlayRows: number
@@ -67,71 +120,204 @@ export type ChatLayout = {
 }
 
 export function calculateChatLayout(input: ChatLayoutInput): ChatLayout {
-  const viewportRows = nonNegativeInteger(input.viewportRows)
-  const composerRows = Math.min(MAX_COMPOSER_ROWS, atLeastOne(input.composerLines))
+  const viewportRows = nonNegativeInteger(input.viewport?.rows ?? input.viewportRows)
+  const viewportColumns = nonNegativeInteger(
+    input.viewport?.columns ?? input.viewportColumns ?? 120,
+  )
+  const mode = compactColumns(viewportColumns)
+  const inspector = mode === 'wide'
+    ? resolveInspectorLayout(viewportColumns, input.inspectorPreferredWidth ?? 30)
+    : undefined
+  const mainColumns = inspector?.mainColumns ?? Math.max(1, viewportColumns)
+  const composerAttachmentRows = input.attachmentRows === undefined
+    ? optionalRow(input.hasAttachments)
+    : nonNegativeInteger(input.attachmentRows)
+  const composerInputRows = atLeastOne(
+    input.composerInputRows ?? input.composerRows ?? input.composerLines ?? 1,
+  )
+  const composerRows = atLeastOne(
+    input.composerRows ?? composerInputRows + composerAttachmentRows + 1,
+  )
+  const statusRows =
+    STATUS_ROWS + nonNegativeInteger(input.noticeRows) + optionalRow(input.hasStatusDetails)
+  const checklistRows = nonNegativeInteger(input.checklistStripRows)
+  const editorFeedbackRows = nonNegativeInteger(input.editorFeedbackRows)
+  const composerRegionRows = composerRows
   const baseRows =
     CHAT_HEADER_ROWS +
-    STATUS_ROWS +
-    COMPOSER_CHROME_ROWS +
+    statusRows +
+    composerRegionRows +
     FOOTER_ROWS +
-    composerRows +
-    optionalRow(input.hasAttachments) +
-    nonNegativeInteger(input.noticeRows) +
-    optionalRow(input.hasStatusDetails) +
-    nonNegativeInteger(input.checklistStripRows) +
-    nonNegativeInteger(input.editorFeedbackRows)
-  const requestedOverlayRows =
-    helpRows(input.helpLines) +
-    slashRows(input.slashItems) +
-    slashRows(input.commandArgumentItems) +
-    fileRows(input.fileItems, input.fileLoading) +
-    historyRows(input.historyMatches) +
-    resumeRows(input.resumeItems, input.resumeSelected) +
-    checklistRows(input.checklistItems, input.checklistSelected) +
-    rewindRows(input.rewindItems, input.rewindSelected, input.rewindConfirming) +
-    skillsRows(input.skillsItems, input.skillsSelected) +
-    pluginRows(input.pluginItems, input.pluginSelected, input.pluginStatus) +
-    permissionRows(input.permissionItems, input.permissionSelected) +
-    questionRows(input.questionRows) +
-    questionRows(input.approvalRows) +
-    reviewRows(input.reviewRows) +
-    actionMenuRows(input.actionMenuItems, input.actionMenuQuery) +
-    modelSwitchRows(input.modelSwitchRows) +
-    (input.quitConfirmation === true ? 7 : 0)
+    checklistRows +
+    editorFeedbackRows
+  const overlayInputs = input.activeOverlays ?? legacyOverlays(input)
+  const activeOverlay = selectActiveOverlay(overlayInputs)
+  const requestedOverlayRows = nonNegativeInteger(activeOverlay?.rows)
   const availableRows = Math.max(0, viewportRows - baseRows)
-  const minimumOverlayRows = minimumOverlayHeight(input)
+  const minimumOverlayRows = activeOverlay === undefined
+    ? 0
+    : nonNegativeInteger(activeOverlay.minimumRows ?? defaultMinimumOverlayRows(activeOverlay.kind))
   const minimumRows =
     baseRows + (requestedOverlayRows > 0 ? minimumOverlayRows + MIN_MESSAGE_ROWS_WITH_OVERLAY : 0)
-  const tooSmall = viewportRows < minimumRows
+  const verticallyTooSmall = viewportRows < minimumRows
+  const tooSmall = verticallyTooSmall || mode === 'tiny'
   const messageFloor =
-    requestedOverlayRows > 0 && availableRows > 0 ? MIN_MESSAGE_ROWS_WITH_OVERLAY : 0
+    requestedOverlayRows > 0 && availableRows > 0 && !verticallyTooSmall
+      ? MIN_MESSAGE_ROWS_WITH_OVERLAY
+      : 0
   const overlayRows = Math.min(
     requestedOverlayRows,
-    tooSmall ? 0 : Math.max(0, availableRows - messageFloor),
+    verticallyTooSmall ? 0 : Math.max(0, availableRows - messageFloor),
   )
   const reservedRows = baseRows + overlayRows
+  const messageRows = Math.max(0, viewportRows - reservedRows)
 
   return {
+    mode,
+    mainColumns,
+    inspector,
+    rows: {
+      header: CHAT_HEADER_ROWS,
+      transcript: messageRows,
+      checklist: checklistRows,
+      status: statusRows,
+      editorFeedback: editorFeedbackRows,
+      overlay: overlayRows,
+      composer: composerRegionRows,
+      footer: FOOTER_ROWS,
+    },
+    activeOverlay,
+    composerInputRows,
+    composerAttachmentRows,
     baseRows,
     composerRows,
     overlayRows,
     reservedRows,
-    messageRows: Math.max(0, viewportRows - reservedRows),
+    messageRows,
     minimumRows,
     tooSmall,
   }
 }
 
+function legacyOverlays(input: ChatLayoutInput): ChatOverlayInput[] {
+  const overlays: ChatOverlayInput[] = []
+  if (input.helpLines !== undefined) overlays.push({ kind: 'help', rows: helpRows(input.helpLines) })
+  if (input.slashItems !== undefined) overlays.push({ kind: 'slash', rows: slashRows(input.slashItems) })
+  if (input.commandArgumentItems !== undefined) {
+    overlays.push({ kind: 'command-argument', rows: slashRows(input.commandArgumentItems) })
+  }
+  if (input.fileItems !== undefined || input.fileLoading === true) {
+    overlays.push({ kind: 'file', rows: fileRows(input.fileItems, input.fileLoading) })
+  }
+  if (input.historyMatches !== undefined) {
+    overlays.push({ kind: 'history', rows: historyRows(input.historyMatches) })
+  }
+  if (input.resumeItems !== undefined) {
+    overlays.push({
+      kind: 'resume',
+      rows: resumeRows(input.resumeItems, input.resumeSelected),
+      minimumRows: MIN_RESUME_OVERLAY_ROWS,
+    })
+  }
+  if (input.checklistItems !== undefined) {
+    overlays.push({
+      kind: 'checklist',
+      rows: checklistRows(input.checklistItems, input.checklistSelected),
+    })
+  }
+  if (input.rewindItems !== undefined) {
+    overlays.push({
+      kind: 'rewind',
+      rows: rewindRows(input.rewindItems, input.rewindSelected, input.rewindConfirming),
+      minimumRows: MIN_REWIND_OVERLAY_ROWS,
+    })
+  }
+  if (input.skillsItems !== undefined) {
+    overlays.push({ kind: 'skills', rows: skillsRows(input.skillsItems, input.skillsSelected) })
+  }
+  if (input.pluginItems !== undefined) {
+    overlays.push({
+      kind: 'plugins',
+      rows: pluginRows(input.pluginItems, input.pluginSelected, input.pluginStatus),
+    })
+  }
+  if (input.permissionItems !== undefined) {
+    overlays.push({
+      kind: 'permission',
+      rows: permissionRows(input.permissionItems, input.permissionSelected),
+    })
+  }
+  if (input.questionRows !== undefined) {
+    overlays.push({ kind: 'question', rows: questionRows(input.questionRows) })
+  }
+  if (input.approvalRows !== undefined) {
+    overlays.push({ kind: 'approval', rows: questionRows(input.approvalRows) })
+  }
+  if (input.reviewRows !== undefined) {
+    overlays.push({ kind: 'review', rows: reviewRows(input.reviewRows) })
+  }
+  if (input.actionMenuItems !== undefined) {
+    overlays.push({
+      kind: 'action-menu',
+      rows: actionMenuRows(input.actionMenuItems, input.actionMenuQuery),
+    })
+  }
+  if (input.modelSwitchRows !== undefined) {
+    overlays.push({ kind: 'model', rows: modelSwitchRows(input.modelSwitchRows) })
+  }
+  if (input.quitConfirmation === true) overlays.push({ kind: 'quit', rows: 7 })
+  return overlays
+}
+
+const OVERLAY_PRIORITY: readonly ChatOverlayKind[] = [
+  'question',
+  'approval',
+  'review',
+  'rewind',
+  'resume',
+  'checklist',
+  'skills',
+  'plugins',
+  'permission',
+  'model',
+  'quit',
+  'action-menu',
+  'history',
+  'file',
+  'slash',
+  'command-argument',
+  'help',
+]
+
+function selectActiveOverlay(overlays: readonly ChatOverlayInput[]): ChatOverlayInput | undefined {
+  const candidates = overlays.filter((overlay) => nonNegativeInteger(overlay.rows) > 0)
+  if (candidates.length <= 1) return candidates[0]
+  const active = [...candidates].sort(
+    (left, right) => OVERLAY_PRIORITY.indexOf(left.kind) - OVERLAY_PRIORITY.indexOf(right.kind),
+  )[0]
+  if (process.env.NODE_ENV !== 'production') {
+    console.debug('[cocode-tui] multiple active overlays; using highest priority', {
+      active: active?.kind,
+      candidates: candidates.map((candidate) => candidate.kind),
+    })
+  }
+  return active
+}
+
+function defaultMinimumOverlayRows(kind: ChatOverlayKind): number {
+  if (kind === 'resume') return MIN_RESUME_OVERLAY_ROWS
+  if (kind === 'rewind') return MIN_REWIND_OVERLAY_ROWS
+  return MIN_OVERLAY_ROWS
+}
+
 function helpRows(lines: number | undefined): number {
   if (lines === undefined) return 0
-  const count = nonNegativeInteger(lines)
-  return count + 4
+  return nonNegativeInteger(lines) + 4
 }
 
 function slashRows(items: number | undefined): number {
   if (items === undefined) return 0
-  const count = nonNegativeInteger(items)
-  return Math.max(1, count) + 4
+  return Math.max(1, nonNegativeInteger(items)) + 4
 }
 
 function fileRows(items: number | undefined, loading = false): number {
@@ -142,8 +328,7 @@ function fileRows(items: number | undefined, loading = false): number {
 
 function historyRows(matches: number | undefined): number {
   if (matches === undefined) return 0
-  const count = Math.max(1, nonNegativeInteger(matches))
-  return count + 5
+  return Math.max(1, nonNegativeInteger(matches)) + 5
 }
 
 function resumeRows(items: number | undefined, selected = 0): number {
@@ -153,32 +338,6 @@ function resumeRows(items: number | undefined, selected = 0): number {
   const start = listWindowStart(selected, count, RESUME_WINDOW_SIZE)
   const indicators = optionalRow(start > 0) + optionalRow(count - start - visible > 0)
   return visible + indicators + 5
-}
-
-function minimumOverlayHeight(input: ChatLayoutInput): number {
-  if (input.resumeItems !== undefined) return MIN_RESUME_OVERLAY_ROWS
-  if (input.checklistItems !== undefined) return MIN_OVERLAY_ROWS
-  if (input.rewindItems !== undefined) return MIN_REWIND_OVERLAY_ROWS
-  if (input.skillsItems !== undefined) return MIN_OVERLAY_ROWS
-  if (input.pluginItems !== undefined) return MIN_OVERLAY_ROWS
-  if (input.permissionItems !== undefined) return MIN_OVERLAY_ROWS
-  if (input.questionRows !== undefined) return MIN_OVERLAY_ROWS
-  if (input.approvalRows !== undefined) return MIN_OVERLAY_ROWS
-  if (input.reviewRows !== undefined) return MIN_OVERLAY_ROWS
-  if (input.actionMenuItems !== undefined) return MIN_OVERLAY_ROWS
-  if (input.modelSwitchRows !== undefined) return MIN_OVERLAY_ROWS
-  if (input.historyMatches !== undefined) return MIN_OVERLAY_ROWS
-  if (input.fileItems !== undefined || input.fileLoading === true) {
-    return MIN_OVERLAY_ROWS + optionalRow(input.fileLoading)
-  }
-  if (
-    input.helpLines !== undefined ||
-    input.slashItems !== undefined ||
-    input.commandArgumentItems !== undefined
-  ) {
-    return MIN_OVERLAY_ROWS
-  }
-  return MIN_OVERLAY_ROWS
 }
 
 function checklistRows(items: number | undefined, selected = 0): number {

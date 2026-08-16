@@ -13,6 +13,27 @@ export type ComposerRow = {
   spans: ComposerSpan[]
 }
 
+/** Number of input rows that the borderless composer visibly reserves. */
+export function composerInputRows(text: string, maxRows = 6): number {
+  const lineCount = text.split('\n').length
+  return Math.min(Math.max(1, Math.trunc(maxRows)), Math.max(1, lineCount))
+}
+
+/** Complete borderless composer height: input, optional summaries, and metadata. */
+export function composerRenderedRows(options: {
+  text: string
+  maxRows?: number
+  hasAttachments?: boolean
+  hasImages?: boolean
+}): number {
+  return (
+    composerInputRows(options.text, options.maxRows) +
+    Number(options.hasAttachments === true) +
+    Number(options.hasImages === true) +
+    1
+  )
+}
+
 export function composerCursorStyle(
   appleTerminal: boolean,
   disabled: boolean,

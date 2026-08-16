@@ -66,7 +66,7 @@ export function Inspector(props: {
       minHeight={0}
     >
       <Text color={theme.brand} bold>
-        <Text color={resizing ? theme.brand : theme.mute}>↔</Text>{' '}
+        <Text color={resizing ? theme.brand : theme.mute}>⇄</Text>{' '}
         {text(locale, 'inspector')}
       </Text>
       <ScrollablePanel
@@ -79,10 +79,10 @@ export function Inspector(props: {
         <Section title={text(locale, 'inspectorActivity')}>
           {hasActivity ? (
             <>
-              <Line label="status" value={snapshot.status.line} color={theme.text} />
+              <Line label={text(locale, 'inspectorStatus')} value={snapshot.status.line} color={theme.text} />
               {telemetry.activity !== undefined ? (
                 <Line
-                  label={telemetry.activity.phase || 'activity'}
+                  label={telemetry.activity.phase || text(locale, 'inspectorActivity')}
                   value={telemetry.activity.line}
                   color={theme.info}
                 />
@@ -90,14 +90,14 @@ export function Inspector(props: {
               {snapshot.status.subagents?.running !== undefined &&
               snapshot.status.subagents.running > 0 ? (
                 <Line
-                  label="agents"
+                  label={text(locale, 'inspectorAgents')}
                   value={String(snapshot.status.subagents.running)}
                   color={theme.info}
                 />
               ) : null}
               {snapshot.status.queueCount > 0 ? (
                 <Line
-                  label="queue"
+                  label={text(locale, 'inspectorQueue')}
                   value={String(snapshot.status.queueCount)}
                   color={theme.running}
                 />
@@ -112,24 +112,24 @@ export function Inspector(props: {
             <>
               {snapshot.status.tokens !== undefined ? (
                 <Line
-                  label="tokens"
-                  value={`${snapshot.status.tokens.input} in · ${snapshot.status.tokens.output} out`}
+                  label={text(locale, 'inspectorTokens')}
+                  value={`${snapshot.status.tokens.input} ${text(locale, 'tokensInShort')} · ${snapshot.status.tokens.output} ${text(locale, 'tokensOutShort')}`}
                 />
               ) : null}
               {telemetry.contextPercent !== undefined ? (
-                <Line label="window" value={`${formatMetric(telemetry.contextPercent)}%`} />
+                <Line label={text(locale, 'inspectorWindow')} value={`${formatMetric(telemetry.contextPercent)}%`} />
               ) : null}
               {telemetry.cacheHitRate !== undefined ? (
-                <Line label="cache" value={`${formatMetric(telemetry.cacheHitRate)}%`} />
+                <Line label={text(locale, 'inspectorCache')} value={`${formatMetric(telemetry.cacheHitRate)}%`} />
               ) : null}
               {telemetry.tps !== undefined ? (
-                <Line label="speed" value={`${formatMetric(telemetry.tps)} t/s`} />
+                <Line label={text(locale, 'inspectorSpeed')} value={`${formatMetric(telemetry.tps)} t/s`} />
               ) : null}
               {telemetry.reasoningEffort !== undefined ? (
-                <Line label="reasoning" value={telemetry.reasoningEffort} />
+                <Line label={text(locale, 'inspectorReasoning')} value={telemetry.reasoningEffort} />
               ) : null}
               <Text color={theme.mute} wrap="truncate-end">
-                segments {formatSegments(telemetry.contextSegments)}
+                {text(locale, 'inspectorSegments', { value: formatSegments(telemetry.contextSegments) })}
               </Text>
             </>
           ) : (
@@ -137,7 +137,7 @@ export function Inspector(props: {
           )}
         </Section>
         <Section title={text(locale, 'inspectorFiles')}>
-          <Line label="cwd" value={snapshot.header.cwd} />
+          <Line label={text(locale, 'inspectorCwd')} value={snapshot.header.cwd} />
           {hasFiles ? (
             snapshot.composer.attachments.map((path) => (
               <Text key={path} color={theme.text} wrap="truncate-start">
@@ -145,14 +145,14 @@ export function Inspector(props: {
               </Text>
             ))
           ) : (
-            <Text color={theme.mute}>no attachments</Text>
+            <Text color={theme.mute}>{text(locale, 'inspectorNoAttachments')}</Text>
           )}
         </Section>
         <Section title={text(locale, 'inspectorSession')}>
-          <Line label="model" value={snapshot.header.model} />
-          <Line label="id" value={snapshot.header.sessionId.slice(0, 8)} />
+          <Line label={text(locale, 'inspectorModel')} value={snapshot.header.model} />
+          <Line label={text(locale, 'inspectorId')} value={snapshot.header.sessionId.slice(0, 8)} />
           {snapshot.status.sessionTitle !== undefined ? (
-            <Line label="title" value={snapshot.status.sessionTitle} />
+            <Line label={text(locale, 'inspectorTitle')} value={snapshot.status.sessionTitle} />
           ) : null}
           {snapshot.status.goal !== undefined ? (
             <>
@@ -169,7 +169,7 @@ export function Inspector(props: {
             />
           ) : null}
           {snapshot.status.agentPreset !== undefined ? (
-            <Line label="preset" value={snapshot.status.agentPreset} />
+            <Line label={text(locale, 'inspectorPreset')} value={snapshot.status.agentPreset} />
           ) : null}
         </Section>
         <Section title={text(locale, 'inspectorRuntime')}>

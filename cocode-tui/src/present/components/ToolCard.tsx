@@ -5,15 +5,11 @@ import { theme } from '../theme.ts'
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
 import {
   extractPartialJsonStringArgument,
-  toolViewDetail,
   truncatePlanProgress,
 } from '../../runtime/nodes/tool-view.ts'
-import { formatDiffSummary } from '../../runtime/diff-summary.ts'
 import { Markdown, StreamingMarkdown } from './Markdown.tsx'
 import {
-  formatElapsed,
-  toolArgumentSummary,
-  toolDisplayState,
+  projectToolSummary,
   toolErrorSummary,
 } from '../tool-display.ts'
 
@@ -24,14 +20,15 @@ export function ToolCard(props: {
   maxColumns?: number
 }) {
   const { node, verbose } = props
-  const displayState = toolDisplayState(node, props.locale)
-  const elapsed = node.status === 'running' ? formatElapsed(node.time) : undefined
+  const summary = projectToolSummary(
+    node,
+    props.locale,
+    Math.max(1, (props.maxColumns ?? 120) - 3),
+    Date.now(),
+  )
   const result = formatToolResult(node.result, verbose)
-  const summary = !verbose ? result ?? toolErrorSummary(node.error) : undefined
-  const detail = toolViewDetail(node.view)
-  const argumentSummary = !verbose ? toolArgumentSummary(node.args) : undefined
   const diffSummary = node.view?.kind === 'diff' ? node.view.summary : undefined
-  const toolName = node.name === '' ? 'tool' : node.name
+  const toolName = node.name.trim() === '' ? 'tool' : node.name
   const plan =
     toolName === 'exit_plan_mode'
       ? extractPartialJsonStringArgument(node.args, 'plan')
@@ -49,22 +46,12 @@ export function ToolCard(props: {
       width={props.maxColumns}
       minWidth={0}
     >
-      <Text color={displayState.color}>
+      <Text color={theme[summary.tone]} wrap="truncate-end">
         <Text color={theme.mute}>↳ </Text>
-        {displayState.mark} <Text bold>{toolName}</Text> · {displayState.label}
-        {elapsed ? ` · ${elapsed}` : ''}
-        {summary ? ` · ${summary}` : ''}
+        {summary.mark} <Text bold>{summary.name}</Text> · {summary.statusLabel}
+        {summary.elapsed ? ` · ${summary.elapsed}` : ''}
+        {summary.primaryDetail ? ` · ${summary.primaryDetail}` : ''}
       </Text>
-      {detail !== undefined ? <Text color={theme.mute}> {detail}</Text> : null}
-      {argumentSummary !== undefined ? (
-        <Text color={theme.dim} wrap="truncate-end">
-          {' '}
-          {argumentSummary}
-        </Text>
-      ) : null}
-      {diffSummary !== undefined ? (
-        <Text color={theme.info}> {formatDiffSummary(diffSummary)}</Text>
-      ) : null}
       {planProgress !== undefined ? (
         <Box flexDirection="column" paddingLeft={2}>
           <Text color={theme.info} wrap="truncate-end">

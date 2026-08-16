@@ -9,7 +9,7 @@ export function AgentStatusIndicator(props: { agent: TuiSnapshot['agent'] }) {
 
   useEffect(() => {
     setFrame(0)
-    if (animation.frames.length < 2) return
+    if (animation.frames.length < 2 || process.env.TERM_PROGRAM === 'Apple_Terminal') return
     const timer = setInterval(() => {
       setFrame((current) => (current + 1) % animation.frames.length)
     }, animation.interval)

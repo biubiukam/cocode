@@ -1,9 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
 import type { TuiMouseEvent } from './mouse.ts'
+import {
+  INSPECTOR_MAX_WIDTH,
+  INSPECTOR_MIN_MAIN_COLUMNS,
+  INSPECTOR_MIN_WIDTH,
+  resolveInspectorLayout,
+  type InspectorLayout,
+} from './panel-layout.ts'
 
-export const INSPECTOR_MIN_WIDTH = 24
-export const INSPECTOR_MAX_WIDTH = 60
-export const INSPECTOR_MIN_MAIN_COLUMNS = 60
+export {
+  INSPECTOR_MAX_WIDTH,
+  INSPECTOR_MIN_MAIN_COLUMNS,
+  INSPECTOR_MIN_WIDTH,
+  resolveInspectorLayout,
+}
+export type { InspectorLayout }
 
 export type InspectorResizeDrag = {
   startX: number
@@ -58,28 +69,7 @@ export function useInspectorResize(props: {
     return false
   }
 
-  return { layout, resizing, handleMouseEvent }
-}
-
-export type InspectorLayout = {
-  width: number
-  mainColumns: number
-  startColumn: number
-}
-
-export function resolveInspectorLayout(
-  terminalColumns: number,
-  preferredWidth: number,
-): InspectorLayout {
-  const columns = normalizeColumns(terminalColumns)
-  const maxWidth = Math.max(
-    1,
-    Math.min(INSPECTOR_MAX_WIDTH, columns - INSPECTOR_MIN_MAIN_COLUMNS - 1),
-  )
-  const minWidth = Math.min(INSPECTOR_MIN_WIDTH, maxWidth)
-  const width = Math.max(minWidth, Math.min(maxWidth, normalizeColumns(preferredWidth)))
-  const mainColumns = Math.max(1, columns - width - 1)
-  return { width, mainColumns, startColumn: mainColumns + 2 }
+  return { layout, preferredWidth, resizing, handleMouseEvent }
 }
 
 export function resizeInspectorWidth(props: {
@@ -93,8 +83,4 @@ export function resizeInspectorWidth(props: {
 
 export function inspectorResizeHandleContains(x: number, startColumn: number): boolean {
   return x === startColumn - 1 || x === startColumn
-}
-
-function normalizeColumns(value: number): number {
-  return Number.isFinite(value) ? Math.max(1, Math.trunc(value)) : 1
 }

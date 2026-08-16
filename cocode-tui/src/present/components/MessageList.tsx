@@ -14,6 +14,7 @@ export function MessageList(props: {
   scrollOffset?: number
   selectedNodeId?: string | null
   expandedNodeIds?: ReadonlySet<string>
+  expandedNodeLevels?: ReadonlyMap<string, 0 | 1 | 2>
   locale: UiLocale
   maxColumns?: number
 }) {
@@ -21,7 +22,12 @@ export function MessageList(props: {
     props.maxColumns === undefined
       ? undefined
       : Math.max(1, props.maxColumns - (props.selectedNodeId !== undefined ? 2 : 0))
-  const visibleNodes = props.nodes.filter((node) => node.kind !== 'context' || props.verbose)
+  const visibleNodes = props.nodes.filter((node) => {
+    const expanded = props.expandedNodeIds?.has(nodeKey(node.kind, node.id)) === true
+    if (node.kind === 'context') return props.verbose || expanded
+    if (node.kind === 'notice' && node.verboseOnly === true) return props.verbose
+    return true
+  })
   const window =
     props.maxRows === undefined
       ? { nodes: visibleNodes, hiddenRowsBefore: 0 }
@@ -59,7 +65,7 @@ export function MessageList(props: {
                 key={`${node.kind}:${node.id}`}
                 alignItems="flex-start"
               >
-                {props.selectedNodeId !== undefined ? (
+                {props.selectedNodeId !== undefined && node.kind !== 'user' && node.kind !== 'assistant' ? (
                   <Box marginTop={1}>
                     <Text color={selected ? theme.brand : theme.mute}>
                       {selected ? '› ' : '  '}
@@ -69,8 +75,13 @@ export function MessageList(props: {
                 <Box flexDirection="column" flexGrow={1} minWidth={0}>
                   {renderNode(node, props.verbose, {
                     expanded,
+                    expandedLevel: props.expandedNodeLevels?.get(key),
+                    selected,
                     locale: props.locale,
-                    maxColumns: contentColumns,
+                    maxColumns:
+                      node.kind === 'user' || node.kind === 'assistant'
+                        ? props.maxColumns
+                        : contentColumns,
                   })}
                 </Box>
               </Box>

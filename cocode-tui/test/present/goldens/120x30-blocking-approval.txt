@@ -1,0 +1,30 @@
+[header] render-contract                                                session fixture-⌄ ╭────────────────────────────╮
+                                                                                          │ ⇄ inspector                │
+                                                                                          │ ↑ wheel / Alt+↑ · 0        │
+   ↳ ◌ read · running · 2s · /workspace/very/long/路径/README.md                          │                            │
+                                                                                          │ activity                   │
+╭───────────────────────────────────────────────────────────────────────────────────────╮ │ status: [status] waiting   │
+│ Checklist · 1/3                                                                       │ │                            │
+│   ✓ [task] capture geometry                                                           │ │ context                    │
+│   ● verify wide characters                                                            │ │ no active details          │
+│   ○ record PTY evidence                                                               │ │                            │
+╰───────────────────────────────────────────────────────────────────────────────────────╯ │ files                      │
+◐ [status] waiting                                                                        │ cwd: /workspace/[header] … │
+todos 1/3                                                                                 │ no attachments             │
+                                                                                          │                            │
+                                                                                          │ session                    │
+╭───────────────────────────────────────────────────────────────────────────────────────╮ │ model: fixture-model       │
+│ ◆ Approval required                                                                   │ │ id: fixture-               │
+│ [overlay] write_file                                                                  │ │ todos: 1/3                 │
+│ target: /workspace/render-contract.txt                                                │ │                            │
+│ risk: writes a deterministic fixture                                                  │ │ runtime / MCP              │
+│ source: render-contract                                                               │ │ runtime: unavailable       │
+│   Allow once a / enter                                                                │ │ MCP / companion: not repo… │
+│   Allow for turn t                                                                    │ │ capability source: unknown │
+│   Deny d / n                                                                          │ │                            │
+│ Please wait…                                                                          │ │ skills                     │
+╰───────────────────────────────────────────────────────────────────────────────────────╯ │ loaded skill: not reported │
+                                                                                          │ none                       │
+↑↓ move · enter confirm · esc cancel                                                      │                            │
+Build · fixture-provider / fixture-model                                  tab queue draft │ ↓ wheel / Alt+↓ · 9        │
+> [composer] pending approval                                                             ╰────────────────────────────╯

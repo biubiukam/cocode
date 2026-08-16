@@ -10,7 +10,7 @@ import { theme } from '../theme.ts'
 export function WhaleLogo(props: { size?: WhaleLogoSize; compact?: boolean; animate?: boolean }) {
   const size = props.size ?? (props.compact === true ? 'inline' : 'large')
   const animation = animationForWhaleSize(size)
-  const animate = props.animate !== false
+  const animate = props.animate !== false && process.env.TERM_PROGRAM !== 'Apple_Terminal'
   const frame = useCharacterFrame(animation, animate)
 
   if (size === 'inline') return <InlineFrame frame={frame} />

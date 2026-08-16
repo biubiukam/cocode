@@ -13,8 +13,10 @@ import type { UiLocale } from '../runtime/ui-locale.ts'
 
 export type NodeRenderOptions = {
   expanded?: boolean
+  selected?: boolean
   locale?: UiLocale
   maxColumns?: number
+  expandedLevel?: 0 | 1 | 2
 }
 
 export type NodeView = (
@@ -25,9 +27,16 @@ export type NodeView = (
 
 const views: Record<string, NodeView> = {
   user: (node, _verbose, options) =>
-    node.kind === 'user' ? <UserRow node={node} locale={options.locale ?? 'en'} /> : null,
+    node.kind === 'user' ? (
+      <UserRow
+        node={node}
+        selected={options.selected === true}
+        locale={options.locale ?? 'en'}
+        maxColumns={options.maxColumns}
+      />
+    ) : null,
   context: (node, verbose, options) =>
-    node.kind === 'context' && verbose ? (
+    node.kind === 'context' && (verbose || options.expanded === true) ? (
       <ContextRow
         node={node}
         expanded={options.expanded === true}
@@ -39,8 +48,10 @@ const views: Record<string, NodeView> = {
       <AssistantRow
         node={node}
         verbose={verbose || options.expanded === true}
+        selected={options.selected === true}
         locale={options.locale ?? 'en'}
         maxColumns={options.maxColumns}
+        expandedLevel={options.expandedLevel}
       />
     ) : null,
   tool: (node, verbose, options) =>

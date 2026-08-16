@@ -88,7 +88,7 @@ TUI 仍然要求真实 TTY；管道、重定向和 CI 环境不会进入交互�
 - `Ctrl+V` 从系统剪贴板读取 PNG、JPEG、WebP 或 GIF 图片，也可以执行 `/paste-image`。图片先保留在本地草稿中，发送时才写入 Host attachment store；删除输入区中的 `[Image: ...]` 标记会移除对应草稿图片。单张图片上限为 5 MiB，一条输入最多 20 张。部分终端会占用 `Ctrl+V`，此时使用 `/paste-image`。
 - `/vision` 查看或修改视觉理解配置；支持 `/vision provider cocode|user`、`/vision model <model-id>`、`/vision endpoint <url>`、`/vision credential <ref>`、`/vision enable` 和 `/vision disable`。配置会写入 `vision.yaml` 并立即对后续图片生效，真实 API Key 不会写入文件。
 - `Shift+↑` 进入消息选择模式；使用 `↑` `↓` 移动，回车展开或收起当前消息，`Esc` 退出。
-- 窄屏布局不开启鼠标追踪。终端宽度达到 120 列时，Inspector 会启用鼠标以支持调整宽度和面板交互，部分终端的原生拖动选择可能受影响。模型、命令、问题和消息操作仍可使用键盘；命令菜单使用 `Ctrl+P` 打开，消息操作可通过 `Shift+↑` 进入消息选择模式后按 `m` 打开。
+- 普通会话中始终关闭鼠标追踪，包括宽屏 Inspector 显示时，以保留 Terminal/iTerm 的原生拖动选字。弹窗控件可能临时启用鼠标追踪；模型、命令、问题和消息操作仍可使用键盘。命令菜单使用 `Ctrl+P` 打开，消息操作可通过 `Shift+↑` 进入消息选择模式后按 `m` 打开。
 - 在消息选择模式按 `c` 可复制当前消息；也可以使用 `/copy` 复制最近一条 assistant 回复。复制依次尝试 macOS `pbcopy`、Windows `clip.exe`，以及 Linux 的 `wl-copy`、`xclip`、`xsel`；命令不可用时只显示提示，不影响会话。
 - `/focus` 切换本地「最近一轮」视图。开启后，对话区只显示最近一条用户消息及其后续节点，状态栏显示「聚焦：最近一轮」。它只改变界面投影，不修改 `/clear`、`/resume`、`/rewind`、导出或持久化 session log 的语义；再次执行可恢复完整会话视图。
 - `/lang zh` 或 `/lang en` 立即切换界面语言；未指定时启动语言由 `COCODE_LANG`、`LANG` 等环境变量决定。

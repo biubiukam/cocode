@@ -4,6 +4,7 @@ import { Box, render } from 'ink'
 import { describe, expect, it } from 'vitest'
 import type { ContextNode } from '../../src/runtime/nodes/types.ts'
 import { ContextRow } from '../../src/present/components/ContextRow.tsx'
+import { MessageList } from '../../src/present/components/MessageList.tsx'
 
 const node: ContextNode = {
   kind: 'context',
@@ -31,6 +32,37 @@ describe('ContextRow rendering', () => {
     const output = await renderRow(true)
     expect(output).toContain('sandbox:policy')
     expect(output).toContain('danger-full-access')
+  })
+
+  it('keeps explicitly expanded context visible while global verbose is off', async () => {
+    const stdout = new CaptureStream(100, 20)
+    const app = render(
+      React.createElement(
+        Box,
+        { width: 100 },
+        React.createElement(MessageList, {
+          nodes: [node],
+          verbose: false,
+          expandedNodeIds: new Set(['context:context-1']),
+          locale: 'en',
+          maxRows: 10,
+        }),
+      ),
+      {
+        stdout: stdout as unknown as NodeJS.WriteStream,
+        debug: true,
+        patchConsole: false,
+        exitOnCtrlC: false,
+      },
+    )
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    app.unmount()
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    app.cleanup()
+
+    const output = stdout.output.replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, '')
+    expect(output).toContain('context injection')
+    expect(output).toContain('sandbox:policy')
   })
 })
 

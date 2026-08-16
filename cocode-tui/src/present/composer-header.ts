@@ -6,7 +6,7 @@ export const COMPOSER_META_SEPARATOR = ' · '
 export const COMPOSER_ROUTE_SEPARATOR = ' / '
 
 const COMPACT_COLUMNS = 84
-const CONTENT_START_COLUMN = 3
+const CONTENT_START_COLUMN = 1
 
 export type ComposerHeaderLayout = {
   title: string
@@ -18,7 +18,7 @@ export type ComposerHeaderLayout = {
 }
 
 export function composerHeaderLayout(options: {
-  composer: Pick<TuiSnapshot['composer'], 'disabled' | 'mask'>
+  composer: Pick<TuiSnapshot['composer'], 'disabled' | 'mask' | 'placeholder'>
   agent: TuiSnapshot['agent']
   planMode: boolean
   planModeAvailable: boolean
@@ -30,13 +30,15 @@ export function composerHeaderLayout(options: {
   const title = options.composer.mask
     ? text(options.locale, 'secret')
     : text(options.locale, options.planMode ? 'modePlan' : 'modeBuild')
-  const hint = options.composer.disabled
+  const hint = options.composer.mask
+    ? options.composer.placeholder
+    : options.composer.disabled
     ? text(options.locale, 'locked')
     : options.agent === 'running'
-    ? text(options.locale, 'footerRunning')
+    ? text(options.locale, 'footerQueueDraft')
     : options.planModeAvailable
     ? text(options.locale, 'modeSwitchHint')
-    : text(options.locale, 'send')
+    : ''
   const columns = Math.max(1, Math.trunc(options.columns ?? 80))
   const hintWidth = stringWidth(hint)
   const fullRouteWidth =
@@ -56,7 +58,7 @@ export function composerHeaderLayout(options: {
     ? COMPOSER_META_SEPARATOR
     : `${COMPOSER_META_SEPARATOR}${options.provider}${COMPOSER_ROUTE_SEPARATOR}`
   const modelStartColumn = CONTENT_START_COLUMN + stringWidth(title) + stringWidth(routePrefix)
-  const hintStartColumn = columns - 1 - hintWidth
+  const hintStartColumn = columns - hintWidth + 1
   const modelEndColumn = Math.min(
     modelStartColumn + stringWidth(options.model),
     hintStartColumn,

@@ -2,7 +2,6 @@ import { Box, Text } from 'ink'
 import type { TuiSnapshot } from '../../runtime/app.ts'
 import { formatFileMention } from '../../runtime/file-mentions.ts'
 import { isAppleTerminalEnvironment } from '../../runtime/platform.ts'
-import { text, type UiLocale } from '../../runtime/ui-locale.ts'
 import {
   clipComposerRow,
   composerCursorStyle,
@@ -10,6 +9,7 @@ import {
   visibleComposerRows,
 } from '../composer-layout.ts'
 import { theme } from '../theme.ts'
+import { text, type UiLocale } from '../../runtime/ui-locale.ts'
 import {
   COMPOSER_META_SEPARATOR,
   COMPOSER_ROUTE_SEPARATOR,
@@ -46,14 +46,22 @@ export function Composer(props: {
     : visibleComposerRows(
         renderComposerRows(composer.text, composer.cursor, composer.selection),
         props.maxRows ?? 6,
-      ).map((row) => clipComposerRow(row, Math.max(1, (props.maxColumns ?? 80) - 6)))
+      ).map((row) => clipComposerRow(row, Math.max(1, (props.maxColumns ?? 80) - 2)))
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      borderColor={composer.disabled ? theme.border : theme.brand}
-      paddingX={1}
-    >
+    <Box flexDirection="column" width="100%">
+      {/* Keep all non-editable chrome above the draft: the terminal's real cursor
+          is left on the final draft row so native IME candidates anchor there. */}
+      {composer.attachments.length > 0 ? (
+        <Text color={theme.info} wrap="truncate-end">
+          {text(props.locale, 'attached')} ·{' '}
+          {composer.attachments.map(formatFileMention).join(' · ')}
+        </Text>
+      ) : null}
+      {composer.images.length > 0 ? (
+        <Text color={theme.info} wrap="truncate-end">
+          image · {composer.images.map((image) => image.name).join(' · ')}
+        </Text>
+      ) : null}
       <Box width="100%" height={1} overflowY="hidden" justifyContent="space-between">
         <Box minWidth={0} flexShrink={1} height={1} overflowY="hidden">
           <Box flexShrink={0}>
@@ -90,13 +98,15 @@ export function Composer(props: {
             </>
           ) : null}
         </Box>
-        <Text color={theme.mute} wrap="truncate-end">
-          {header.hint}
-        </Text>
+        {header.hint === '' ? null : (
+          <Text color={theme.mute} wrap="truncate-end">
+            {header.hint}
+          </Text>
+        )}
       </Box>
-      <Box flexDirection="column" marginTop={1}>
+      <Box flexDirection="column">
         {empty ? (
-          <Box>
+          <Box width="100%" height={1} overflowY="hidden">
             <Text color={composer.disabled ? theme.mute : theme.brand}>{'> '}</Text>
             <Text color={theme.mute} wrap="truncate-end">
               {composer.placeholder}
@@ -106,7 +116,7 @@ export function Composer(props: {
           rows.map((row, index) => (
             <Box key={index} width="100%" height={1} overflowY="hidden">
               <Text color={composer.disabled ? theme.mute : theme.brand}>
-                {index === 0 ? '> ' : '  '}
+                {index === 0 ? '> ' : '│ '}
               </Text>
               {row.spans.map((span, spanIndex) => (
                 <Text
@@ -125,17 +135,6 @@ export function Composer(props: {
           ))
         )}
       </Box>
-      {composer.attachments.length > 0 ? (
-        <Text color={theme.info} wrap="truncate-end">
-          {text(props.locale, 'attached')} ·{' '}
-          {composer.attachments.map(formatFileMention).join(' · ')}
-        </Text>
-      ) : null}
-      {composer.images.length > 0 ? (
-        <Text color={theme.info} wrap="truncate-end">
-          image · {composer.images.map((image) => image.name).join(' · ')}
-        </Text>
-      ) : null}
     </Box>
   )
 }

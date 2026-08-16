@@ -1,5 +1,5 @@
 /**
- * Theme tokens. Brand color is focus-only.
+ * Theme tokens. Brand color marks focus and user-origin message rails.
  */
 
 export type ThemeName = 'dark' | 'light'

@@ -9,7 +9,8 @@ import {
 describe('presentation text formatting', () => {
   it('shows active reasoning and collapses it after completion by default', () => {
     expect(formatReasoning('thinking', false, true)).toBe('thinking')
-    expect(formatReasoning('thinking', false, false)).toBe('thinking · 8 chars')
+    expect(formatReasoning('thinking', false, false)).toBe('thinking')
+    expect(formatReasoning('thinking', false, false, 1250)).toBe('thinking\n\nThought for 1.3s')
     expect(formatReasoning('thinking', true, false)).toBe('thinking')
     expect(formatReasoning('', false, false)).toBeUndefined()
   })

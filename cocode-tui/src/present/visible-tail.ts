@@ -10,6 +10,7 @@ import {
   extractPartialJsonStringArgument,
   truncatePlanProgress,
 } from '../runtime/nodes/tool-view.ts'
+import { ASSISTANT_CONTENT_CHROME } from './assistant-layout.ts'
 
 export function visibleTail(
   nodes: readonly ConversationNode[],
@@ -53,10 +54,10 @@ export function estimateNodeRows(
   const detailed = verbose || expanded
   switch (node.kind) {
     case 'user':
-      return 2 + lineCount(node.text, contentColumns(maxColumns, 2))
+      return 2 + Math.max(1, lineCount(node.text, contentColumns(maxColumns, 2)))
     case 'context': {
-      if (!verbose) return 0
-      if (!expanded) return 2
+      if (!detailed) return 0
+      if (!expanded && verbose) return 2
       const columns = contentColumns(maxColumns, 2)
       if (node.sections.length === 0) return 2 + lineCount(node.text, columns)
       return 2 + node.sections.reduce(
@@ -66,9 +67,16 @@ export function estimateNodeRows(
       )
     }
     case 'assistant': {
-      const reasoning = formatReasoning(node.reasoning, detailed, node.streaming)
-      const columns = contentColumns(maxColumns, 3)
-      return 2 + lineCount(reasoning, columns) + lineCount(node.text, columns)
+      const reasoning = formatReasoning(
+        node.reasoning,
+        detailed,
+        node.streaming && node.thinking !== false,
+        node.thinkingDurationMs,
+      )
+      const columns = contentColumns(maxColumns, ASSISTANT_CONTENT_CHROME)
+      const thinkingIndicator =
+        node.streaming && node.thinking !== false && node.text === '' && reasoning === undefined ? 1 : 0
+      return 2 + lineCount(reasoning, columns) + thinkingIndicator + lineCount(node.text, columns)
     }
     case 'tool': {
       const result = formatToolResult(node.result, detailed)

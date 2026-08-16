@@ -1381,7 +1381,10 @@ class TuiAppImpl implements TuiApp {
       },
       showUsage: () => {
         const telemetry = this.telemetry.snapshot()
-        const usage = telemetry.usage ?? latestUsage(this.assembler.snapshot())
+        const latest = latestUsage(this.assembler.snapshot())
+        const usage = telemetry.usage ?? (latest === undefined
+          ? undefined
+          : { ...latest, cacheRead: 0, cacheWrite: 0 })
         if (usage === undefined) {
           this.notice = {
             tone: 'info',

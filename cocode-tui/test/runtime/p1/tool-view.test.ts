@@ -3,6 +3,7 @@ import {
   extractPartialJsonStringArgument,
   inferToolView,
   toolViewDetail,
+  toolViewPrimaryDetail,
   truncatePlanProgress,
 } from '../../../src/runtime/nodes/tool-view.ts'
 import { parseDiffSummary } from '../../../src/runtime/diff-summary.ts'
@@ -36,6 +37,11 @@ describe('tool view projection', () => {
 
   it('leaves unparseable diff output available for the text fallback', () => {
     expect(parseDiffSummary('plain command output').files).toEqual([])
+  })
+
+  it('projects diff file and line statistics as the primary detail', () => {
+    const summary = parseDiffSummary('diff --git a/a.ts b/a.ts\n--- a/a.ts\n+++ b/a.ts\n@@ -1 +1 @@\n-old\n+new')
+    expect(toolViewPrimaryDetail({ kind: 'diff', summary })).toBe('a.ts · +1/-1')
   })
 
   it('extracts a plan while the JSON tool argument is still incomplete', () => {

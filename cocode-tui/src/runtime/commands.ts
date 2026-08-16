@@ -360,7 +360,7 @@ export function helpText(
       ? undefined
       : locale === 'zh'
         ? `${displayShortcut('transcript.toggleVerbose')} 详情`
-        : `${displayShortcut('transcript.toggleVerbose')} verbose`,
+        : `${displayShortcut('transcript.toggleVerbose')} details`,
     displayShortcut('editor.open') === undefined
       ? undefined
       : locale === 'zh'

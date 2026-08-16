@@ -169,6 +169,8 @@ const assistantDefinition: NodeDefinition<AssistantNode> = {
       text: '',
       reasoning: '',
       streaming: event.type === 'assistant/chunk',
+      thinking: event.type === 'assistant/chunk',
+      thinkingStartedAt: event.type === 'assistant/chunk' ? event.time : undefined,
     }
     return applyAssistant(node, event)
   },
@@ -193,10 +195,19 @@ function applyAssistant(node: AssistantNode, event: SessionEvent): AssistantNode
     const chunk = isRecord(data.chunk) ? data.chunk : {}
     if (chunk.type === 'text-delta' && typeof chunk.text === 'string') {
       node.text += chunk.text
+      node.thinking = false
+      finishThinking(node, event.time)
     } else if (chunk.type === 'reasoning-delta' && typeof chunk.text === 'string') {
       node.reasoning += chunk.text
+    } else if (chunk.type === 'tool-call-delta') {
+      node.thinking = false
+      finishThinking(node, event.time)
     } else if (chunk.type === 'usage' && isRecord(chunk.usage)) {
       node.usage = usageOf(chunk.usage)
+    }
+    if (chunk.type === 'finish') {
+      node.thinking = false
+      finishThinking(node, event.time)
     }
     node.streaming = chunk.type !== 'finish'
     return node
@@ -205,8 +216,15 @@ function applyAssistant(node: AssistantNode, event: SessionEvent): AssistantNode
   node.text = blocksToText(message.content)
   node.reasoning = reasoningToText(message.content)
   node.streaming = false
+  node.thinking = false
+  finishThinking(node, event.time)
   if (isRecord(data.usage)) node.usage = usageOf(data.usage)
   return node
+}
+
+function finishThinking(node: AssistantNode, time: number): void {
+  if (node.thinkingStartedAt === undefined || node.thinkingDurationMs !== undefined) return
+  node.thinkingDurationMs = Math.max(0, time - node.thinkingStartedAt)
 }
 
 function usageOf(usage: Record<string, unknown>): {
