@@ -220,6 +220,27 @@ export class WorkspaceManager {
   }
 
   /**
+   * Reflect a session attachment immediately after session.create succeeds.
+   * The Host sends the durable workspace-changed frame asynchronously; keeping
+   * this local projection in front of that frame prevents a newly opened
+   * session from briefly (or indefinitely, when the frame is delayed) landing
+   * in the ungrouped bucket. The Host frame remains authoritative and adopts
+   * over this projection when it arrives.
+   */
+  attachSessionOptimistically(workspaceId: WorkspaceId, sessionId: SessionId): void {
+    const item = this.items.find(candidate => candidate.getSnapshot().view?.workspaceId === workspaceId)
+    const view = item?.getSnapshot().view
+    if (view === undefined || view.sessionIds.includes(sessionId)) return
+    this.upsert({
+      ...view,
+      sessionIds: [sessionId, ...view.sessionIds],
+      // Preserve the Host timestamp: a local clock must not make a later
+      // changed frame look stale to the manager's monotonicity guard.
+      updatedAt: view.updatedAt,
+    })
+  }
+
+  /**
    * Archive one session in the registry-global set, then install the
    * returned full set without waiting for the changed frame.
    * @param sessionId - session to archive.

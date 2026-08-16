@@ -110,6 +110,14 @@ export class WorkspaceRuntime implements IWorkspaces {
         && !archived.includes(summary.id)) return summary.id
     }
     const attempt = this.sessions.create({ workspaceId })
+      .then((sessionId) => {
+        // session.create commits the Host attachment before resolving, but
+        // its workspace-changed stream frame may arrive later than the
+        // session id. Project the membership now so opening the new session
+        // cannot render it as Ungrouped while the frame is in flight.
+        this.manager.attachSessionOptimistically(workspaceId, sessionId)
+        return sessionId
+      })
       .finally(() => { this.connecting.delete(workspaceId) })
     this.connecting.set(workspaceId, attempt)
     return attempt

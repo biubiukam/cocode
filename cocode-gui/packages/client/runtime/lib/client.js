@@ -9626,6 +9626,17 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 				if (result.ok) this.upsert(result.value.workspace);
 				return result;
 			}
+			/** Reflect a successful session attachment before its Host stream echo. */
+			attachSessionOptimistically(workspaceId, sessionId) {
+				const item = this.items.find((candidate) => candidate.getSnapshot().view?.workspaceId === workspaceId);
+				const view = item?.getSnapshot().view;
+				if (view === void 0 || view.sessionIds.includes(sessionId)) return;
+				this.upsert({
+					...view,
+					sessionIds: [sessionId, ...view.sessionIds],
+					updatedAt: view.updatedAt
+				});
+			}
 			/**
 			* Archive one session in the registry-global set, then install the
 			* returned full set without waiting for the changed frame.
@@ -9874,7 +9885,10 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 					const summary = sessions.byId[id];
 					if (summary !== void 0 && summary.blank && summary.cwd === workspace.path && workspace.sessionIds.includes(summary.id) && !archived.includes(summary.id)) return summary.id;
 				}
-				const attempt = this.sessions.create({ workspaceId }).finally(() => {
+				const attempt = this.sessions.create({ workspaceId }).then((sessionId) => {
+					this.manager.attachSessionOptimistically(workspaceId, sessionId);
+					return sessionId;
+				}).finally(() => {
 					this.connecting.delete(workspaceId);
 				});
 				this.connecting.set(workspaceId, attempt);
