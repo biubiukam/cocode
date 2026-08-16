@@ -28,6 +28,7 @@ export type ChatLayoutInput = {
   editorFeedbackRows?: number
   helpLines?: number
   slashItems?: number
+  commandArgumentItems?: number
   fileItems?: number
   fileLoading?: boolean
   historyMatches?: number
@@ -78,6 +79,7 @@ export function calculateChatLayout(input: ChatLayoutInput): ChatLayout {
   const requestedOverlayRows =
     helpRows(input.helpLines) +
     slashRows(input.slashItems) +
+    slashRows(input.commandArgumentItems) +
     fileRows(input.fileItems, input.fileLoading) +
     historyRows(input.historyMatches) +
     resumeRows(input.resumeItems, input.resumeSelected) +
@@ -162,7 +164,11 @@ function minimumOverlayHeight(input: ChatLayoutInput): number {
   if (input.fileItems !== undefined || input.fileLoading === true) {
     return MIN_OVERLAY_ROWS + optionalRow(input.fileLoading)
   }
-  if (input.helpLines !== undefined || input.slashItems !== undefined) {
+  if (
+    input.helpLines !== undefined ||
+    input.slashItems !== undefined ||
+    input.commandArgumentItems !== undefined
+  ) {
     return MIN_OVERLAY_ROWS
   }
   return MIN_OVERLAY_ROWS

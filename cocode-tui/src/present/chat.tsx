@@ -28,6 +28,7 @@ import {
 } from './components/PlanReviewPanel.tsx'
 import { SkillsPicker } from './components/SkillsPicker.tsx'
 import { PluginsPicker } from './components/PluginsPicker.tsx'
+import { CommandArgumentMenu } from './components/CommandArgumentMenu.tsx'
 import {
   noticeRows,
   StatusLine,
@@ -38,6 +39,7 @@ import {
   isSlashDraft,
   moveSlashSelection,
   SlashMenu,
+  slashCommandCompletion,
   type SlashMenuItem,
 } from './components/SlashMenu.tsx'
 import { theme } from './theme.ts'
@@ -106,6 +108,7 @@ import {
 } from './mouse.ts'
 import { nodeKey } from '../runtime/nodes/types.ts'
 import { filterSearchItems } from './search.ts'
+import { commandArgumentCompletions } from './command-completion.ts'
 import { CHECKLIST_WINDOW_SIZE } from '../runtime/checklist.ts'
 import {
   actionMenuItemIndexAtRow,
@@ -120,6 +123,8 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
   const keymap = useMemo(() => props.keymap ?? resolveKeymap(), [props.keymap])
   const [slashDismissed, setSlashDismissed] = useState(false)
   const [slashIndex, setSlashIndex] = useState(0)
+  const [commandArgumentDismissed, setCommandArgumentDismissed] = useState(false)
+  const [commandArgumentIndex, setCommandArgumentIndex] = useState(0)
   const [fileDismissed, setFileDismissed] = useState(false)
   const [fileIndex, setFileIndex] = useState(0)
   const [fileItems, setFileItems] = useState<readonly string[]>([])
@@ -148,6 +153,10 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
   const { isRawModeSupported, setRawMode } = useStdin()
   const slashItems = useMemo<readonly SlashMenuItem[]>(
     () => filterSlashItems(snap.commands, snap.composer.text),
+    [snap.commands, snap.composer.text],
+  )
+  const commandArgumentState = useMemo(
+    () => commandArgumentCompletions(snap.commands, snap.composer.text),
     [snap.commands, snap.composer.text],
   )
   const resumeOpen = snap.resumePicker?.open === true
@@ -189,6 +198,26 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     !snap.helpOpen &&
     !slashDismissed &&
     isSlashDraft(snap.composer.text)
+  const commandArgumentOpen =
+    !questionOpen &&
+    !approvalOpen &&
+    !reviewOpen &&
+    !forkOpen &&
+    !rewindOpen &&
+    !skillsOpen &&
+    !pluginOpen &&
+    !resumeOpen &&
+    !sessionTreeOpen &&
+    !queueOpen &&
+    !checklistOpen &&
+    !historySearchOpen &&
+    !commandPaletteOpen &&
+    !messageActionMenuOpen &&
+    !modelOverlayOpen &&
+    !snap.helpOpen &&
+    !slashOpen &&
+    !commandArgumentDismissed &&
+    commandArgumentState !== undefined
   const fileMention = useMemo(
     () => findFileMentionAtCursor(snap.composer.text, snap.composer.cursor),
     [snap.composer.cursor, snap.composer.text],
@@ -211,6 +240,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     !modelOverlayOpen &&
     !snap.helpOpen &&
     !slashOpen &&
+    !commandArgumentOpen &&
     !fileDismissed &&
     fileMention !== undefined
   const fileOpen = fileVisible && (fileLoading || fileItems.length > 0)
@@ -296,6 +326,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     editorFeedbackRows: Number(editorBusy) + Number(editorError !== undefined),
     helpLines: snap.helpOpen ? snap.helpText.split('\n').length : undefined,
     slashItems: slashOpen ? slashItems.length : undefined,
+    commandArgumentItems: commandArgumentOpen ? commandArgumentState?.items.length : undefined,
     fileItems: fileOpen ? fileItems.length : undefined,
     fileLoading: fileOpen && fileLoading,
     historyMatches: historySearchOpen ? historyItems.length : undefined,
@@ -463,6 +494,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
         forkOpen ||
         skillsOpen ||
         pluginOpen ||
+        commandArgumentOpen ||
         resumeOpen ||
         sessionTreeOpen ||
         queueOpen ||
@@ -572,6 +604,23 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
         app.dispatch({ type: 'command', line: `/${item.name}` })
       } else if (index !== undefined) {
         setSlashIndex(index)
+      }
+      return
+    }
+    if (commandArgumentOpen && commandArgumentState !== undefined) {
+      const index = listItemIndexAtRow({
+        row: hitRow,
+        itemStartRow: popupStartRow + 4,
+        itemCount: commandArgumentState.items.length,
+        selectedIndex: commandArgumentIndex,
+        windowSize: overlayWindowSize(layout.overlayRows, commandArgumentState.items.length, 4),
+      })
+      if (index !== undefined) {
+        setCommandArgumentIndex(index)
+        if (isPress) {
+          const item = commandArgumentState.items[index]
+          if (item !== undefined) app.dispatch({ type: 'command', line: item.insert.trimEnd() })
+        }
       }
       return
     }
@@ -825,6 +874,8 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
   useEffect(() => {
     setSlashDismissed(false)
     setSlashIndex(0)
+    setCommandArgumentDismissed(false)
+    setCommandArgumentIndex(0)
     setFileDismissed(false)
     setFileIndex(0)
   }, [snap.composer.text])
@@ -1002,6 +1053,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
       !historySearchOpen &&
       !messageSelectionActive &&
       !slashOpen &&
+      !commandArgumentOpen &&
       !fileOpen &&
       !snap.helpOpen
     ) {
@@ -1277,6 +1329,13 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
         return
       }
       if (key.downArrow || key.tab) {
+        if (key.tab) {
+          const selected = slashItems[moveSlashSelection(slashIndex, 0, slashItems.length)]
+          if (selected !== undefined) {
+            app.dispatch({ type: 'setDraft', text: slashCommandCompletion(selected) })
+          }
+          return
+        }
         setSlashIndex((index) => moveSlashSelection(index, 1, slashItems.length))
         return
       }
@@ -1289,6 +1348,33 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
         if (selected !== undefined) {
           app.dispatch({ type: 'command', line: `/${selected.name}` })
         }
+        return
+      }
+    }
+
+    if (commandArgumentOpen && commandArgumentState !== undefined) {
+      if (key.escape) {
+        setCommandArgumentDismissed(true)
+        return
+      }
+      if (key.downArrow || key.upArrow) {
+        setCommandArgumentIndex((index) =>
+          moveSelection(index, key.upArrow ? -1 : 1, commandArgumentState.items.length),
+        )
+        return
+      }
+      if (key.tab) {
+        const item = commandArgumentState.items[
+          moveSelection(commandArgumentIndex, 0, commandArgumentState.items.length)
+        ]
+        if (item !== undefined) app.dispatch({ type: 'setDraft', text: item.insert })
+        return
+      }
+      if (key.return) {
+        const item = commandArgumentState.items[
+          moveSelection(commandArgumentIndex, 0, commandArgumentState.items.length)
+        ]
+        if (item !== undefined) app.dispatch({ type: 'command', line: item.insert.trimEnd() })
         return
       }
     }
@@ -1460,6 +1546,16 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
           items={slashItems}
           selectedIndex={slashIndex}
           query={snap.composer.text.slice(1)}
+          locale={snap.locale}
+          maxRows={layout.overlayRows}
+        />
+      ) : null}
+      {commandArgumentOpen && commandArgumentState !== undefined ? (
+        <CommandArgumentMenu
+          commandName={commandArgumentState.commandName}
+          items={commandArgumentState.items}
+          selectedIndex={commandArgumentIndex}
+          query={commandArgumentState.query}
           locale={snap.locale}
           maxRows={layout.overlayRows}
         />
