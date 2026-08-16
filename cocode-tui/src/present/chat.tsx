@@ -1337,6 +1337,15 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
       return
     }
     if (input === '') return
+    if (
+      input.length > 1 &&
+      !key.ctrl &&
+      !key.meta &&
+      !key.shift
+    ) {
+      app.dispatch({ type: 'insertPastedInput', text: input })
+      return
+    }
     app.dispatch({ type: 'insertDraft', text: input })
   })
 

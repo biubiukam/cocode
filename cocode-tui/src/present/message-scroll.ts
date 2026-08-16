@@ -124,10 +124,8 @@ export function resolveMessageWindow(
     const nodeEnd = cursor + nodeRows
     cursor = nodeEnd
 
-    const visible =
-      nodeRows > 0
-        ? nodeEnd > windowStart && nodeStart < windowEnd
-        : nodeStart >= windowStart && nodeStart <= windowEnd
+    if (nodeRows === 0) continue
+    const visible = nodeEnd > windowStart && nodeStart < windowEnd
     if (!visible) continue
     if (start === nodes.length) firstNodeStart = nodeStart
     start = Math.min(start, index)

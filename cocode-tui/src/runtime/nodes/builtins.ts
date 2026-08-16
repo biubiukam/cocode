@@ -99,7 +99,7 @@ function applyAssistant(node: AssistantNode, event: SessionEvent): AssistantNode
     } else if (chunk.type === 'usage' && isRecord(chunk.usage)) {
       node.usage = usageOf(chunk.usage)
     }
-    node.streaming = true
+    node.streaming = chunk.type !== 'finish'
     return node
   }
   const message = isRecord(data.message) ? data.message : {}

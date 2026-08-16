@@ -137,6 +137,7 @@ import {
 } from './session-tree-picker.ts'
 import { buildSessionTree, flattenSessionTree } from './session-tree.ts'
 import { listSessionSummaries } from './sessions-fs.ts'
+import { basename } from 'node:path'
 import {
   clampChecklistSelection,
   closeChecklist,
@@ -144,7 +145,12 @@ import {
   moveChecklistSelection,
   type ChecklistState,
 } from './checklist.ts'
-import { ClipboardImageError, readClipboardImage } from './image-clipboard.ts'
+import {
+  ClipboardImageError,
+  pastedImagePath,
+  readClipboardImage,
+  readImageFile,
+} from './image-clipboard.ts'
 import type { Keymap } from './keymap.ts'
 import { resolveKeymap } from './keymap-config.ts'
 
@@ -154,6 +160,7 @@ export type TuiAction =
   | { type: 'command'; line: string }
   | { type: 'setDraft'; text: string }
   | { type: 'insertDraft'; text: string }
+  | { type: 'insertPastedInput'; text: string }
   | { type: 'deleteBackward' }
   | { type: 'moveCursor'; delta: number; extendSelection?: boolean }
   | { type: 'selectAllDraft' }
@@ -385,6 +392,7 @@ export type TuiAppOptions = {
     env?: NodeJS.ProcessEnv
   }
   readClipboardImage?: () => Promise<TuiImageInput>
+  readPastedImage?: (path: string) => Promise<TuiImageInput | undefined>
 }
 
 export function createTuiApp(options: TuiAppOptions): TuiApp {
@@ -429,6 +437,7 @@ class TuiAppImpl implements TuiApp {
   private readonly auth: TuiAuthInfo | undefined
   private readonly terminalNotify: NonNullable<TuiAppOptions['terminalNotify']>
   private readonly imageReader: () => Promise<TuiImageInput>
+  private readonly pastedImageReader: (path: string) => Promise<TuiImageInput | undefined>
   private readonly keymap: Keymap
   private imageSerial = 0
   private readonly activeSubagents = new Set<string>()
@@ -483,6 +492,7 @@ class TuiAppImpl implements TuiApp {
     this.terminalNotify =
       options.terminalNotify ?? (process.stdout.isTTY === true ? {} : { mode: 'off' })
     this.imageReader = options.readClipboardImage ?? (() => readClipboardImage())
+    this.pastedImageReader = options.readPastedImage ?? readImageFile
     this.keymap = resolveKeymap()
     this.questions = createQuestionCoordinator({
       emit: () => this.emit(),
@@ -712,6 +722,9 @@ class TuiAppImpl implements TuiApp {
         this.pruneAttachments()
         this.pruneImages()
         this.emit()
+        return
+      case 'insertPastedInput':
+        void this.insertPastedInput(action.text)
         return
       case 'deleteBackward':
         this.draft = backspaceDraft(this.draft)
@@ -2320,13 +2333,7 @@ class TuiAppImpl implements TuiApp {
   }
 
   private async pasteImage(): Promise<void> {
-    if (
-      this.capturingByok ||
-      this.agent === 'dead' ||
-      this.exiting ||
-      !this.capabilities.imageAttachments ||
-      this.runtime.saveImages === undefined
-    ) {
+    if (!this.canAttachImages()) {
       this.notice = { tone: 'error', message: text(this.locale, 'imageRuntimeUnavailable') }
       this.emit()
       return
@@ -2340,17 +2347,71 @@ class TuiAppImpl implements TuiApp {
     this.emit()
     try {
       const input = await this.imageReader()
-      const serial = ++this.imageSerial
-      const name = `clipboard-${serial}.${imageExtension(input.mediaType)}`
-      const token = `[Image: ${name}]`
-      this.images = [...this.images, { ...input, id: `image-${serial}`, name, token }]
-      this.draft = insertDraft(this.draft, `${token} `)
-      this.pendingSkillInvocation = undefined
-      this.notice = { tone: 'info', message: text(this.locale, 'imageAttached', { name }) }
+      this.attachDraftImage(input)
     } catch (error) {
       this.notice = { tone: 'error', message: clipboardImageError(this.locale, error) }
     }
     this.emit()
+  }
+
+  private async insertPastedInput(input: string): Promise<void> {
+    const path = pastedImagePath(input, this.cwd)
+    if (path === undefined) {
+      this.insertPlainInput(input)
+      return
+    }
+    if (!this.canAttachImages()) {
+      this.insertPlainInput(input)
+      return
+    }
+    if (this.images.length >= MAX_DRAFT_IMAGES) {
+      this.notice = { tone: 'error', message: text(this.locale, 'imageCountLimit') }
+      this.emit()
+      return
+    }
+    try {
+      const image = await this.pastedImageReader(path)
+      if (image === undefined) {
+        this.insertPlainInput(input)
+        return
+      }
+      this.attachDraftImage(image, basename(path))
+    } catch {
+      this.insertPlainInput(input)
+      return
+    }
+    this.emit()
+  }
+
+  private insertPlainInput(input: string): void {
+    this.draft = insertDraft(this.draft, input)
+    this.pendingSkillInvocation = undefined
+    this.interruptArmed = false
+    this.pruneAttachments()
+    this.pruneImages()
+    this.emit()
+  }
+
+  private attachDraftImage(input: TuiImageInput, preferredName?: string): void {
+    const serial = ++this.imageSerial
+    const name = preferredName === undefined || preferredName === ''
+      ? `clipboard-${serial}.${imageExtension(input.mediaType)}`
+      : preferredName
+    const token = `[Image: ${name}]`
+    this.images = [...this.images, { ...input, id: `image-${serial}`, name, token }]
+    this.draft = insertDraft(this.draft, `${token} `)
+    this.pendingSkillInvocation = undefined
+    this.notice = { tone: 'info', message: text(this.locale, 'imageAttached', { name }) }
+  }
+
+  private canAttachImages(): boolean {
+    return (
+      !this.capturingByok &&
+      this.agent !== 'dead' &&
+      !this.exiting &&
+      this.capabilities.imageAttachments &&
+      this.runtime.saveImages !== undefined
+    )
   }
 
   private runCommand(line: string): void {

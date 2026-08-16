@@ -26,6 +26,8 @@ describe('keymap', () => {
       id: 'permission.toggle',
     })
     expect(matchKey({ raw: 'f', ctrl: true, empty: false })).toEqual({ id: 'file.open' })
+    expect(matchKey({ raw: 'v', ctrl: true, empty: false })).toEqual({ id: 'image.paste' })
+    expect(matchKey({ raw: 'v', alt: true, empty: false })).toEqual({ id: 'image.paste' })
   })
 
   it('allows known commands to override their default bindings', () => {
