@@ -32,6 +32,8 @@
   /* The shell owns this row so the collapsed rail can carry the same seam. */
   height: var(--dsh-shell-header-height, 46px);
   overflow: hidden;
+  /* Match the left sidebar surface so the top chrome reads as one band. */
+  background: var(--dsw-specific-sidebar-fill);
 }
 
 /* Bottom pixel row of the header, which the frame continues leftwards across a

@@ -340,7 +340,7 @@
   min-height: var(--dsh-shell-header-height, 46px);
   max-height: var(--dsh-shell-header-height, 46px);
   overflow: hidden;
-  background: var(--dsw-alias-bg-layer-1);
+  background: var(--dsw-specific-sidebar-fill);
   -webkit-app-region: no-drag;
 }
 
@@ -526,12 +526,11 @@
 }
 
 .emptyHint {
-  max-width: 300px;
   margin: 0;
   color: var(--dsw-alias-label-secondary);
   font-size: 12px;
   line-height: 1.55;
-  text-wrap: pretty;
+  text-wrap: balance;
 }
 
 /* auto-fit：右侧 dock 拖窄到一列宽度放不下时自动塌成单列。 */

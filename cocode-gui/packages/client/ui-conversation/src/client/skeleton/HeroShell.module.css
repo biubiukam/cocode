@@ -47,6 +47,14 @@
   grid-column: 2;
 }
 
+.headlineCocode {
+  grid-template-columns: auto;
+}
+
+.headlineCocode .headlineText {
+  grid-column: 1;
+}
+
 .previewBadge {
   grid-row: 1;
   grid-column: 3;

@@ -2076,7 +2076,7 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
         data: {
           turn: scenario.turn, step: 1,
           provider: 'fixture', mode: 'normal', policyKey: 'fixture-normal',
-          retry, maxRetries: 2, delayMs, failure,
+          retry, maxRetries: 5, delayMs, failure,
         },
       })
       scenario.stepStarted = false
@@ -2092,7 +2092,7 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
         data: {
           turn: scenario.turn, step: 1,
           provider: 'fixture', mode: 'normal', policyKey: 'fixture-normal',
-          retry: 1, maxRetries: 2, delayMs, failure,
+          retry: 1, maxRetries: 5, delayMs, failure,
         },
       })
       append(sessionId, { type: 'step/end', data: { turn: scenario.turn, step: 1 } })

@@ -1,14 +1,12 @@
 /**
- * Agent-preset surface plugin, browser half — three surfaces over one roster:
- * a General-settings row for the default preset, a chip on the new-session
- * screen for the session about to start, and a settings section that manages
- * the roster (copy, delete,
- * default, and the way into a preset's own files).
+ * Agent-preset surface plugin, browser half — two settings surfaces over one roster:
+ * a General-settings row for the default preset, and a settings section that
+ * manages the roster (copy, delete, default, and the way into a preset's own files).
  *
  * A running session keeps the composition it began with (the host refuses to
- * adopt an existing session under a different preset). The General row and
- * hero chip are both before-the-fact; running sessions keep their composition
- * without adding extra header chrome.
+ * adopt an existing session under a different preset). The General row is
+ * before-the-fact; running sessions keep their composition without adding
+ * extra header chrome.
  */
 
 import type { ConnectionHandle } from '@deepseek-ai/dsh-api-remotes/client'
@@ -22,8 +20,6 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import { AgentPresetRow } from './AgentPresetRow.tsx'
 import type { AgentPresetRowInjected } from './AgentPresetRow.tsx'
-import { AgentPresetSeat } from './AgentPresetSeat.tsx'
-import type { AgentPresetSeatInjected } from './AgentPresetSeat.tsx'
 import { AgentPresetSection } from './AgentPresetSection.tsx'
 import type { AgentPresetSectionInjected } from './AgentPresetSection.tsx'
 import { AgentPresetSeatController } from './seat-store.ts'
@@ -53,8 +49,8 @@ export const inject = ['slots', 'locale', 'connection', 'remote']
 export function apply(ctx: ClientContext): void {
   const { api } = ctx.get('connection') as ConnectionHandle
   const controller = new AgentPresetSettingsController(api)
-  // One roster, three surfaces. The chip is registered in a later scope, so it
-  // subscribes here rather than being reached from this one.
+  // One roster, two surfaces. The session staging controller lives in a later
+  // scope, so it subscribes here rather than being reached from this one.
   const rosterReaders = new Set<() => void>()
   const section = new AgentPresetSectionController(api, () => {
     void controller.load()
@@ -95,8 +91,8 @@ export function apply(ctx: ClientContext): void {
   // render and simply hides the button while no flow exists.
   let creatorDraft: (() => void) | undefined
 
-  // The new-session chip uses one controller because the staged choice belongs
-  // to the flow rather than to any one session.
+  // The new-session staging controller applies the default preset when a blank
+  // session is created.
   ctx.inject(['slots', 'conversation', 'sessions', 'workspaces'], (scope: ClientContext) => {
     const api = (scope.get('connection') as ConnectionHandle).api
     const seat = new AgentPresetSeatController(api, (): SeatSessionSummary | undefined => {
@@ -113,23 +109,11 @@ export function apply(ctx: ClientContext): void {
       scope.sessions.noteAgentPreset(sessionId as never, agentPreset)
     })
 
-    const seatInjected = (): AgentPresetSeatInjected => ({
-      hooks: { agentPresetSeat: seat.store },
-      load: () => seat.load(),
-      select: (id: string) => seat.select(id),
-      introduced: () => { seat.introduced() },
-    })
-
     scope.effect(() => {
       // Connecting a workspace either creates a blank session or reuses one,
-      // and either way the chip's pick predates it — so the stage is applied
-      // when the session arrives, not when it was made.
+      // and the staged preset is applied when the session arrives.
       const stop = scope.sessions.list.subscribe(() => { void seat.apply() })
-      // The chip opens on the deployment default, so a default changed from
-      // the settings surface moves it too — otherwise the screen that starts
-      // the next session keeps offering the previous default until a reload,
-      // which is exactly the session the setting claims to govern. A staged
-      // pick survives: `load()` prefers it over the refreshed fallback.
+      // Keep the staging controller aligned with the deployment default.
       const settingsMoved = scope.remote.$on('settings/document-updated', (ns) => {
         if (ns !== AGENT_PRESET_SETTINGS_NS) return
         void seat.load()
@@ -139,36 +123,24 @@ export function apply(ctx: ClientContext): void {
       const presetSelected = scope.remote.$on('agent-preset/selected', (sessionId, agentPreset) => {
         scope.sessions.noteAgentPreset(sessionId, agentPreset)
       })
-      // Authoring writes a FILE, not a setting, so nothing on the wire
-      // announces it — without this the screen that starts the next session
-      // keeps offering the roster as it stood when the chip first loaded, and
-      // a preset authored to be used is missing from the one place it is used.
+      // Authoring writes a FILE, not a setting, so refresh the staging roster
+      // when presets change.
       const readRoster = (): void => { void seat.load() }
       rosterReaders.add(readRoster)
       // Stage WITHOUT applying — the still-current running session would
-      // refuse the swap and drop the stage — then start the session it lands
-      // on: the chip's list-change applier composes the blank session the
-      // workspace connect produces or reuses.
+      // refuse the swap and drop the stage — then start the session it lands on.
       creatorDraft = () => {
-        // The introduce cue makes the chip announce the pick the user never
-        // made on this screen — the stage happened back in settings.
         seat.stage('cordis', true)
         scope.workspaces.startSession()
       }
-      const chip = scope.slots.register({
-        name: 'conversation.hero.agentPreset',
-        locale: 'settings.agentPreset',
-        inject: seatInjected,
-      }, AgentPresetSeat)
       return () => {
         stop()
         settingsMoved()
         presetSelected()
         rosterReaders.delete(readRoster)
         creatorDraft = undefined
-        chip()
       }
-    }, 'ui-agent-preset: new-session chip')
+    }, 'ui-agent-preset: new-session staging')
   })
 
   const sectionInjected = (): AgentPresetSectionInjected => ({

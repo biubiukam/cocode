@@ -1,4 +1,0 @@
-# Cocode Workbench is a first-party plugin; it owns both halves.
-insert:
-  - id: cocode-workbench
-    name: 'cocode-workbench'

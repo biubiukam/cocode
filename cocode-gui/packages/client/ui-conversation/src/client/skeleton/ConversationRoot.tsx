@@ -28,7 +28,7 @@ function workspaceSelectionError(reason: unknown): string {
 
 export function ConversationRoot({
   sessionId, useSession, useSessions, useWorkspaces, useInput, useComposerBlock,
-  renderSlot, renderSlotChain, selectWorkspace, t,
+  renderSlot, renderSlotChain, selectWorkspace, t, useStore,
 }: ConversationRootProps) {
   const openState = useSession(s => s.openState)
   const composerPhase = useSession(s => s.composerPhase)
@@ -41,6 +41,8 @@ export function ConversationRoot({
   // A plugin this package cannot import (ui-model-selection) says this session cannot
   // send; its reason is already localized by whoever raised it.
   const composerBlock = useComposerBlock(block => block)
+
+  const logoPreference = useStore(state => state.logoPreference)
 
   const [pickerOpen, setPickerOpen] = useState(false)
   const [workspaceSelection, setWorkspaceSelection] = useState<WorkspaceSelection | undefined>()
@@ -141,7 +143,6 @@ export function ConversationRoot({
           },
           onClose: () => { setPickerOpen(false) },
         })}
-        {renderSlot('conversation.hero.agentPreset', {})}
       </div>
       {workspaceSelection?.error !== undefined && (
         <div className={css.heroWorkspaceError} role="alert">
@@ -187,7 +188,7 @@ export function ConversationRoot({
   const composerBar = (
     <div className={clsx(css.composerStack, hero && css.composerHero)}>
       {hero && <HeroGlow className={css.heroGlow} />}
-      {hero && <HeroShell t={t} />}
+      {hero && <HeroShell t={t} logoPreference={logoPreference} />}
       {hero && heroWorkspaceRow}
       {zone !== undefined && renderSlot('conversation.input.dock', zone)}
       {inputBar}

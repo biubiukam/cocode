@@ -324,7 +324,7 @@
   gap: 6px;
 }
 
-/* Attach control (figma + control): 28px, selector fill, primary glyph. */
+/* Attach control (figma + control): 28px circular, selector fill, primary glyph. */
 .add {
   display: grid;
   place-items: center;
@@ -332,7 +332,7 @@
   width: 28px;
   height: 28px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--ds-radius-pill);
   background: var(--dsw-specific-selector);
   color: var(--dsw-alias-label-primary);
   cursor: pointer;

@@ -82,7 +82,7 @@
   left: 0;
   z-index: 1;
   height: var(--dsh-shell-header-height);
-  background: var(--dsw-alias-bg-base);
+  background: var(--dsw-specific-sidebar-fill);
   border-bottom: 1px solid var(--dsw-alias-border-l2);
   pointer-events: none;
 }
@@ -110,6 +110,7 @@
   grid-row: 1 / -1;
   overflow: hidden;
   border-left: 1px solid var(--dsw-alias-border-l2);
+  background: var(--dsw-specific-sidebar-fill);
 }
 
 .workbenchBottom {
@@ -118,6 +119,7 @@
   grid-row: 2;
   overflow: hidden;
   border-top: 1px solid var(--dsw-alias-border-l2);
+  background: var(--dsw-specific-sidebar-fill);
 }
 
 /* The details subtree stays mounted at zero width, so its border must not paint
