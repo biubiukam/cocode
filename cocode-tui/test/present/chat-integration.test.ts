@@ -8,117 +8,114 @@ import { createTuiApp } from '../../src/runtime/app.ts'
 
 describe('Chat', () => {
   it('sends session cancellation when Esc is pressed during a running turn', async () => {
-    const handlers = new Set<(notification: TuiNotification) => void>()
     const cancel = vi.fn(async () => true)
-    const runtime: TuiRuntime = {
-      async start() {
-        return { name: 'test-runtime', version: '0' }
-      },
-      async prompt() {
-        return 'message-1'
-      },
-      cancel,
-      subscribe(handler) {
-        handlers.add(handler)
-        return () => handlers.delete(handler)
-      },
-      async close() {},
-    }
-    const app = createTuiApp({
-      runtime,
-      cwd: '/tmp',
-      provider: 'test-provider',
-      model: 'test-model',
-      sessionId: 'session-1',
-    })
-    await app.start()
-    for (const handler of handlers) {
-      handler({
+    const runtime = createTestRuntime({ cancel })
+    const chat = await renderChat(runtime.value, { startBeforeRender: true })
+
+    try {
+      runtime.emit({
         method: 'session.status',
         params: { sessionId: 'session-1', status: 'running' },
       })
+
+      await flush()
+      chat.stdin.write('\u001B')
+      await flush()
+
+      expect(cancel).toHaveBeenCalledWith('session-1')
+    } finally {
+      await closeChat(chat)
     }
-
-    const stdin = new InputStream()
-    const stdout = new CaptureStream(100, 30)
-    const screen = render(React.createElement(Chat, { app, mouseSupported: false }), {
-      stdin: stdin as unknown as NodeJS.ReadStream,
-      stdout: stdout as unknown as NodeJS.WriteStream,
-      patchConsole: false,
-      exitOnCtrlC: false,
-    })
-
-    await flush()
-    stdin.write('\u001B')
-    await flush()
-
-    expect(cancel).toHaveBeenCalledWith('session-1')
-
-    screen.unmount()
-    await flush()
-    screen.cleanup()
-    await app.close()
   })
 
   it('keeps the main logo after initialization becomes ready', async () => {
-    const handlers = new Set<(notification: TuiNotification) => void>()
-    const runtime: TuiRuntime = {
+    const runtime = createTestRuntime({
+      onStart: (emit) => {
+        emit({
+          method: 'session.event',
+          params: {
+            sessionId: 'session-1',
+            event: { type: 'turn/start', seq: 1, time: 1, data: { turn: 1 } },
+          },
+        })
+      },
+    })
+    const chat = await renderChat(runtime.value, { locale: 'en' })
+
+    try {
+      await flush()
+      expect(plainOutput(chat.stdout.output)).toContain('cocode is ready')
+      chat.stdout.output = ''
+
+      await chat.app.start()
+      await renderFlush()
+
+      expect(chat.app.snapshot().status.line).toBe('ready')
+      expect(plainOutput(chat.stdout.output)).toContain('cocode is ready')
+    } finally {
+      await closeChat(chat)
+    }
+  })
+})
+
+function createTestRuntime(options: {
+  cancel?: (sessionId: string) => Promise<boolean>
+  onStart?: (emit: (notification: TuiNotification) => void) => void
+} = {}): { value: TuiRuntime; emit: (notification: TuiNotification) => void } {
+  const handlers = new Set<(notification: TuiNotification) => void>()
+  const emit = (notification: TuiNotification): void => {
+    for (const handler of handlers) handler(notification)
+  }
+  return {
+    emit,
+    value: {
       async start() {
-        for (const handler of handlers) {
-          handler({
-            method: 'session.event',
-            params: {
-              sessionId: 'session-1',
-              event: { type: 'turn/start', seq: 1, time: 1, data: { turn: 1 } },
-            },
-          })
-        }
+        options.onStart?.(emit)
         return { name: 'test-runtime', version: '0' }
       },
       async prompt() {
         return 'message-1'
       },
+      ...(options.cancel === undefined ? {} : { cancel: options.cancel }),
       subscribe(handler) {
         handlers.add(handler)
         return () => handlers.delete(handler)
       },
       async close() {},
-    }
-    const app = createTuiApp({
-      runtime,
-      cwd: '/tmp',
-      provider: 'test-provider',
-      model: 'test-model',
-      sessionId: 'session-1',
-      locale: 'en',
-    })
-    const stdin = new InputStream()
-    const stdout = new CaptureStream(100, 30)
-    const screen = render(React.createElement(Chat, { app, mouseSupported: false }), {
-      stdin: stdin as unknown as NodeJS.ReadStream,
-      stdout: stdout as unknown as NodeJS.WriteStream,
-      patchConsole: false,
-      exitOnCtrlC: false,
-    })
+    },
+  }
+}
 
-    try {
-      await flush()
-      expect(plainOutput(stdout.output)).toContain('cocode is ready')
-      stdout.output = ''
-
-      await app.start()
-      await renderFlush()
-
-      expect(app.snapshot().status.line).toBe('ready')
-      expect(plainOutput(stdout.output)).toContain('cocode is ready')
-    } finally {
-      screen.unmount()
-      await flush()
-      screen.cleanup()
-      await app.close()
-    }
+async function renderChat(
+  runtime: TuiRuntime,
+  options: { locale?: 'en' | 'zh'; startBeforeRender?: boolean } = {},
+) {
+  const app = createTuiApp({
+    runtime,
+    cwd: '/tmp',
+    provider: 'test-provider',
+    model: 'test-model',
+    sessionId: 'session-1',
+    locale: options.locale,
   })
-})
+  if (options.startBeforeRender === true) await app.start()
+  const stdin = new InputStream()
+  const stdout = new CaptureStream(100, 30)
+  const screen = render(React.createElement(Chat, { app, mouseSupported: false }), {
+    stdin: stdin as unknown as NodeJS.ReadStream,
+    stdout: stdout as unknown as NodeJS.WriteStream,
+    patchConsole: false,
+    exitOnCtrlC: false,
+  })
+  return { app, stdin, stdout, screen }
+}
+
+async function closeChat(chat: Awaited<ReturnType<typeof renderChat>>): Promise<void> {
+  chat.screen.unmount()
+  await flush()
+  chat.screen.cleanup()
+  await chat.app.close()
+}
 
 function flush(): Promise<void> {
   return new Promise((resolve) => setImmediate(resolve))
