@@ -34,6 +34,7 @@ describe('QuestionPanel input', () => {
       {
         stdin: stdin as unknown as NodeJS.ReadStream,
         stdout: stdout as unknown as NodeJS.WriteStream,
+        debug: true,
         patchConsole: false,
         exitOnCtrlC: false,
       },
@@ -75,6 +76,7 @@ describe('QuestionPanel input', () => {
       {
         stdin: stdin as unknown as NodeJS.ReadStream,
         stdout: stdout as unknown as NodeJS.WriteStream,
+        debug: true,
         patchConsole: false,
         exitOnCtrlC: false,
       },
