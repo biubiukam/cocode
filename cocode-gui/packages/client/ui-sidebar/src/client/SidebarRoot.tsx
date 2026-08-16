@@ -23,6 +23,7 @@ import {
   Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SidebarRootComponentProps } from './contract/slots.ts'
+import { CocodeLogo } from './CocodeLogo.tsx'
 import css from './SidebarRoot.module.css'
 
 /** Wide-content unmount delay; matches the 150ms wide-content fade-out. */
@@ -48,7 +49,9 @@ export function SidebarRoot({
   toggleSidebar,
   t,
   renderSlot,
+  useStore,
 }: SidebarRootComponentProps) {
+  const logoPreference = useStore(state => state.logoPreference)
   // Wide content stays mounted while the collapse animates (fading via
   // .collapsed .wide), unmounts at settle, and remounts right away on expand.
   const [settled, setSettled] = useState(collapsed)
@@ -139,11 +142,12 @@ export function SidebarRoot({
             aria-label={t('session.new.label')}
             onClick={() => { startSession() }}
           >
-            {/* <BrandWordmark /> */}
-            <span className={css.brandText}>COCODE</span>
+            {logoPreference === 'cocode'
+              ? <CocodeLogo className={css.brandLogo} size={18} />
+              : <BrandWordmark className={css.brandLogo} size={18} />}
           </button>
         )}
-        {/* Rail resting state is the whale mark; hovering swaps in the panel
+        {/* Rail resting state is the Cocode mark; hovering swaps in the panel
             icon (the expand affordance, figma sidebar-hover flow). */}
         <Tooltip label={collapsed ? t('toggle.open') : t('toggle.collapse')} delayMs={500}>
           <button
@@ -152,7 +156,9 @@ export function SidebarRoot({
             aria-label={collapsed ? t('toggle.open') : t('toggle.collapse')}
             onClick={() => { toggleSidebar() }}
           >
-            {!wide && <FishLogo className={css.railFish} size={24} />}
+            {!wide && (logoPreference === 'cocode'
+              ? <CocodeLogo className={css.railLogo} variant="mark" size={24} />
+              : <FishLogo className={css.railLogo} size={24} />)}
             {/* Rail icons render at 18 (figma rail spec); expanded keeps the glyph-native sizes. */}
             <IconPanelLeftOutline16 className={css.panelIcon} size={wide ? 16 : 18} />
           </button>
