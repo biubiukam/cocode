@@ -9,9 +9,9 @@ import type { LogoPreference } from './logo-settings.ts'
 
 /** Store state mirrored from the theme snapshot. */
 export interface AppearanceRowState {
-  /** Persisted preference; it may remain `system` while the row shows two choices. */
+  /** Persisted preference (light, dark, or system/auto). */
   preference: ThemePreference
-  /** Resolved scheme used to represent the hidden system preference. */
+  /** Resolved scheme while preference is `system`. */
   activeColorScheme: 'light' | 'dark'
   /** Selected sidebar logo style. */
   logoPreference: LogoPreference

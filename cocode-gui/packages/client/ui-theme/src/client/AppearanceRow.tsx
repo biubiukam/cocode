@@ -1,14 +1,12 @@
 /**
  * Appearance preference row registered into the General section item slot
- * (figma 501:30012 'Frame 2117131228'): title + two preference cubes.
+ * (figma 501:30012 'Frame 2117131228'): title + three preference cubes.
  * Registered by this package — the theme feature owns its own settings
- * surface. The hidden system preference is represented by the resolved
- * light/dark scheme so the row reflects the operating-system theme without a
- * third user-facing option.
+ * surface.
  */
 import clsx from 'clsx'
 import {
-  BrandWordmark, IconDarkOutline16, IconLightOutline16,
+  BrandWordmark, IconDarkOutline16, IconFollowsystemOutline16, IconLightOutline16,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ThemePreference } from '../theme-settings.ts'
@@ -31,9 +29,10 @@ export type AppearanceRowComponentProps =
   PropsRuntime<'settings.general.item'> & PropsStore<ReturnType<typeof createAppearanceRowStore>>
   & PropsLocale<'settings.theme'> & AppearanceRowInjected
 
-/** Cube order and icons: the user-facing settings surface has two choices. */
+/** Cube order and icons: light, auto (system), dark. */
 const CUBES: readonly { id: ThemePreference; labelKey: ThemeKey; Icon: typeof IconLightOutline16 }[] = [
   { id: 'light', labelKey: 'appearance.light', Icon: IconLightOutline16 },
+  { id: 'system', labelKey: 'appearance.auto', Icon: IconFollowsystemOutline16 },
   { id: 'dark', labelKey: 'appearance.dark', Icon: IconDarkOutline16 },
 ]
 
@@ -69,8 +68,7 @@ function CocodeLogoPreview() {
  * @returns the row element tree.
  */
 export function AppearanceRow({ t, setTheme, setLogo, useStore }: AppearanceRowComponentProps) {
-  const { preference, activeColorScheme, logoPreference } = useStore(s => s)
-  const selected = preference === 'system' ? activeColorScheme : preference
+  const { preference, logoPreference } = useStore(s => s)
   return (
     <div className={css.group}>
       <div className={css.title}>{t('appearance.title')}</div>
@@ -79,8 +77,8 @@ export function AppearanceRow({ t, setTheme, setLogo, useStore }: AppearanceRowC
           <button
             key={id}
             type="button"
-            className={clsx(css.themeCube, selected === id && css.selected)}
-            aria-pressed={selected === id}
+            className={clsx(css.themeCube, preference === id && css.selected)}
+            aria-pressed={preference === id}
             onClick={() => { setTheme(id) }}
           >
             <Icon />
