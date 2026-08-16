@@ -7,6 +7,7 @@ import {
 	discoverDshClientPackages,
 	hasUnregisteredClientExternal,
 	isClientBundleStale,
+	createClientBuildConfig,
 	resolveClientBuildTsconfig,
 	resolveRuntimeClientBundlePath,
 } from "../../scripts/watch-dsh-client.mjs"
@@ -115,4 +116,32 @@ test("marks bundles with non-table CommonJS externals for rebuild", () => {
 	} finally {
 		rmSync(root, { recursive: true, force: true })
 	}
+})
+
+test("forces ordinary client dependencies into the browser bundle", async () => {
+	const config = await createClientBuildConfig({
+		id: "@deepseek-ai/dsh-client-ui-trajectory",
+		root: path.resolve("packages/client/ui-trajectory"),
+		configPath: path.resolve("packages/client/ui-trajectory/tsdown.config.ts"),
+		tsconfigPath: path.resolve("tsconfig.base.client.json"),
+	})
+
+	assert.deepEqual(config.external, [
+		"react",
+		"react/jsx-runtime",
+		"react-dom",
+		"react-dom/client",
+		"@deepseek-ai/cordis",
+		"@deepseek-ai/dsh-client-ui-slots",
+		"@deepseek-ai/dsh-client-web-react",
+		"@deepseek-ai/dsh-client-ui-primitives",
+		"@deepseek-ai/dsh-client-ui-attachment",
+		"@deepseek-ai/dsh-client-schema-form",
+		"@deepseek-ai/dsh-client-runtime/client",
+	])
+	assert.equal(config.noExternal?.("@tanstack/react-virtual"), true)
+	assert.equal(config.noExternal?.("diff"), true)
+	assert.equal(config.noExternal?.("react"), undefined)
+	assert.equal(typeof config.alias?.["@tanstack/react-virtual"], "string")
+	assert.equal(typeof config.alias?.diff, "string")
 })

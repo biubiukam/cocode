@@ -11,7 +11,7 @@
 import { readFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { basename, dirname, relative, resolve as resolvePath, sep } from 'node:path'
+import { basename, dirname, join, relative, resolve as resolvePath, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { UserConfig } from 'tsdown'
 import { transform } from 'lightningcss'
@@ -80,14 +80,25 @@ export const CLIENT_EXTERNALS: readonly string[] = [...PLATFORM_MODULES, RUNTIME
 
 const REPOSITORY_ROOT = fileURLToPath(new URL('../..', import.meta.url))
 const GUI_REQUIRE = createRequire(resolvePath(REPOSITORY_ROOT, 'package.json'))
-const SUPERVISOR_REQUIRE = createRequire(
-  GUI_REQUIRE.resolve('@cocode/host-supervisor/package.json'),
+const SUPERVISOR_MANIFEST = GUI_REQUIRE.resolve('@cocode/host-supervisor/package.json')
+const SUPERVISOR_ROOT = dirname(SUPERVISOR_MANIFEST)
+const SUPERVISOR_REQUIRE = createRequire(SUPERVISOR_MANIFEST)
+const SUPERVISOR_PNPM_REQUIRE_PATH = join(
+  SUPERVISOR_ROOT,
+  'node_modules',
+  '.pnpm',
+  'node_modules',
+  'package.json',
 )
+const SUPERVISOR_PNPM_REQUIRE = existsSync(dirname(SUPERVISOR_PNPM_REQUIRE_PATH))
+  ? createRequire(SUPERVISOR_PNPM_REQUIRE_PATH)
+  : undefined
 
 function resolveDevDependency(specifier: string): string | undefined {
-	for (const resolver of [GUI_REQUIRE, SUPERVISOR_REQUIRE]) {
-		try {
-			return resolver.resolve(specifier)
+  for (const resolver of [GUI_REQUIRE, SUPERVISOR_REQUIRE, SUPERVISOR_PNPM_REQUIRE]) {
+    if (resolver === undefined) continue
+    try {
+      return resolver.resolve(specifier)
 		} catch {
 			// try the next resolver root
 		}
@@ -218,11 +229,10 @@ function clientConfig(id: string, entry: string): UserConfig {
     // must carry the TS/TSX mapping consumed by browser profiling tools.
     sourcemap: true,
     clean: false,
-    // tsdown 0.21 uses the `deps` policy for dependency externalization.
     // Keep only loader module-table entries external and force every other
-    // dependency into each client closure. The deprecated top-level
-    // `external`/`noExternal` pair can be applied after dependency auto-
-    // externalization and leave schemastery as a runtime require.
+    // dependency into each client closure. The client build runs with a
+    // package manifest, so tsdown's dependency plugin applies this modern
+    // `deps` policy to the source-entry browser bundle.
     deps: {
       neverBundle: [...CLIENT_EXTERNALS],
       alwaysBundle: (specifier: string) => !CLIENT_EXTERNALS.includes(specifier),
