@@ -1,14 +1,14 @@
 /**
- * Agent-preset surface plugin, browser half — four surfaces over one roster:
+ * Agent-preset surface plugin, browser half — three surfaces over one roster:
  * a General-settings row for the default preset, a chip on the new-session
- * screen for the session about to start, a read-only label in the session
- * header, and a settings section that manages the roster (copy, delete,
+ * screen for the session about to start, and a settings section that manages
+ * the roster (copy, delete,
  * default, and the way into a preset's own files).
  *
  * A running session keeps the composition it began with (the host refuses to
- * adopt an existing session under a different preset). That is what splits
- * the choice from the display: the General row and the hero chip are both
- * before-the-fact, while the header only reports what a session already runs.
+ * adopt an existing session under a different preset). The General row and
+ * hero chip are both before-the-fact; running sessions keep their composition
+ * without adding extra header chrome.
  */
 
 import type { ConnectionHandle } from '@deepseek-ai/dsh-api-remotes/client'
@@ -20,8 +20,6 @@ import type {} from '@deepseek-ai/dsh-api-remotes/client'
 // Type-only: pulls the settings shell's SlotMap merge (the 'settings.section' entry).
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
-import { AgentPresetLabel } from './AgentPresetLabel.tsx'
-import type { AgentPresetLabelInjected } from './AgentPresetLabel.tsx'
 import { AgentPresetRow } from './AgentPresetRow.tsx'
 import type { AgentPresetRowInjected } from './AgentPresetRow.tsx'
 import { AgentPresetSeat } from './AgentPresetSeat.tsx'
@@ -55,7 +53,7 @@ export const inject = ['slots', 'locale', 'connection', 'remote']
 export function apply(ctx: ClientContext): void {
   const { api } = ctx.get('connection') as ConnectionHandle
   const controller = new AgentPresetSettingsController(api)
-  // One roster, four surfaces. The chip is registered in a later scope, so it
+  // One roster, three surfaces. The chip is registered in a later scope, so it
   // subscribes here rather than being reached from this one.
   const rosterReaders = new Set<() => void>()
   const section = new AgentPresetSectionController(api, () => {
@@ -97,8 +95,8 @@ export function apply(ctx: ClientContext): void {
   // render and simply hides the button while no flow exists.
   let creatorDraft: (() => void) | undefined
 
-  // The new-session chip and the header label: one controller, because the
-  // staged choice belongs to the flow rather than to any one session.
+  // The new-session chip uses one controller because the staged choice belongs
+  // to the flow rather than to any one session.
   ctx.inject(['slots', 'conversation', 'sessions', 'workspaces'], (scope: ClientContext) => {
     const api = (scope.get('connection') as ConnectionHandle).api
     const seat = new AgentPresetSeatController(api, (): SeatSessionSummary | undefined => {
@@ -120,11 +118,6 @@ export function apply(ctx: ClientContext): void {
       load: () => seat.load(),
       select: (id: string) => seat.select(id),
       introduced: () => { seat.introduced() },
-    })
-
-    const labelInjected = (): AgentPresetLabelInjected => ({
-      hooks: { agentPresets: controller.store },
-      load: () => controller.load(),
     })
 
     scope.effect(() => {
@@ -167,14 +160,6 @@ export function apply(ctx: ClientContext): void {
         locale: 'settings.agentPreset',
         inject: seatInjected,
       }, AgentPresetSeat)
-      const label = scope.slots.register({
-        name: 'conversation.session.header.actions',
-        id: 'agent-preset',
-        // Static session context occupies the header's leading negative-order band.
-        order: -10,
-        locale: 'settings.agentPreset',
-        inject: labelInjected,
-      }, AgentPresetLabel)
       return () => {
         stop()
         settingsMoved()
@@ -182,9 +167,8 @@ export function apply(ctx: ClientContext): void {
         rosterReaders.delete(readRoster)
         creatorDraft = undefined
         chip()
-        label()
       }
-    }, 'ui-agent-preset: new-session chip and header label')
+    }, 'ui-agent-preset: new-session chip')
   })
 
   const sectionInjected = (): AgentPresetSectionInjected => ({

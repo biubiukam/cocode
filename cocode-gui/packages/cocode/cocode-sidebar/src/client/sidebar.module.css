@@ -182,7 +182,7 @@
    under it. */
 .bottomClose {
   position: absolute;
-  top: 3px;
+  top: 9px;
   right: 6px;
   z-index: 4;
   display: inline-flex;
