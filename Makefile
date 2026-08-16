@@ -2,12 +2,14 @@
 
 DSH_DIR ?= cocode-host-supervisor
 
-.PHONY: help dev gui gui-web tui tui-preflight dsh install-gui install-tui install-dsh
+.PHONY: help dev gui gui-dev gui-build gui-web tui tui-preflight dsh install-gui install-tui install-dsh
 
 .DEFAULT_GOAL := help
 
 help:
-	@echo "GUI (Electron):  make dev gui      → desktop client + Vite on :5273"
+	@echo "GUI dev:         make gui-dev      → desktop client + Vite on :5273"
+	@echo "                 make dev gui      → alias for make gui-dev"
+	@echo "GUI build:       make gui-build    → Electron Forge distributables"
 	@echo "GUI (browser):   make dev gui-web  → http://localhost:5273"
 	@echo "GUI cache:       make dev gui reuses the OS cache directory"
 	@echo "                 DSH_FORCE_RESTAGE=1 make dev gui  → refresh runtime cache"
@@ -19,12 +21,17 @@ help:
 	@echo "Install TUI:     make install-tui"
 	@echo "Install DSH:     make install-dsh    → install @deepseek-ai/dsh dependencies"
 
-# Anchor target so `make dev gui` runs the gui dev server.
+# Anchor target so `make dev gui` runs the GUI dev server.
 dev:
 	@:
 
-gui:
+gui: gui-dev
+
+gui-dev:
 	cd cocode-gui && pnpm run dev
+
+gui-build:
+	cd cocode-gui && pnpm run make
 
 gui-web:
 	cd cocode-gui && pnpm run dev:web
