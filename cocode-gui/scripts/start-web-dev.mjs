@@ -15,7 +15,6 @@ import { acquireDevLock } from "./lib/dev-lock.mjs"
 import { cleanupRuntime, prepareRuntime, resolveRuntimeRoot } from "./lib/runtime-cache.mjs"
 
 const ENTRY_SCRIPT = "start-web-dev.mjs"
-const ABORTED_EXIT_CODE = 130
 const VITE_PORT = "5273"
 
 const workspace = path.resolve(process.cwd())
@@ -36,15 +35,16 @@ try {
 	devLock.release()
 }
 
+/** Resolves to the exit code this runner should report. */
 async function run() {
 	buildDevRuntime()
 	prepareRuntime(runtime)
-	if (children.isStopping()) return ABORTED_EXIT_CODE
+	if (children.isStopping()) return 0
 
 	const watcher = forkClientWatcher(runtime.root)
 	children.track(watcher.child, "DSH client watcher")
 	await watcher.ready
-	if (children.isStopping()) return ABORTED_EXIT_CODE
+	if (children.isStopping()) return 0
 
 	const runtimeUrl = await acquireHostEndpoint()
 
@@ -61,7 +61,9 @@ async function run() {
 
 	const exitCode = await waitForExit(startVite(runtimeUrl))
 	if (watcherFailure) throw watcherFailure
-	return exitCode
+	// A shutdown this runner initiated is what the developer asked for, so the
+	// signal-derived exit code of the child it killed is not a failure to report.
+	return children.isStopping() ? 0 : exitCode
 }
 
 async function acquireHostEndpoint() {

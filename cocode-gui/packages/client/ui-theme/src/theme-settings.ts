@@ -27,7 +27,7 @@ export type MessageFontSize = typeof MESSAGE_FONT_SIZES[number]
 export const DEFAULT_PREFERENCE: ThemePreference = 'system'
 
 /** Default message-list font size when no override is stored. */
-export const DEFAULT_MESSAGE_FONT_SIZE: MessageFontSize = '16'
+export const DEFAULT_MESSAGE_FONT_SIZE: MessageFontSize = '14'
 
 /** Durable theme section shared by the Host schema and the browser scope. */
 export interface ThemeSettings {

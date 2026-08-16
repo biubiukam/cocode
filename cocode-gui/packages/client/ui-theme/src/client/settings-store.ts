@@ -4,7 +4,11 @@
  * component reads via props.useStore.
  */
 import { defineStore, type EngineStoreHandle } from '@deepseek-ai/dsh-client-runtime/client'
-import type { MessageFontSize, ThemePreference } from '../theme-settings.ts'
+import {
+  DEFAULT_MESSAGE_FONT_SIZE,
+  type MessageFontSize,
+  type ThemePreference,
+} from '../theme-settings.ts'
 import type { LogoPreference } from './logo-settings.ts'
 
 /** Store state mirrored from the theme snapshot. */
@@ -43,7 +47,7 @@ export function createAppearanceSectionStore(): EngineStoreHandle<AppearanceSect
       preference: 'system',
       activeColorScheme: 'light',
       logoPreference: 'cocode',
-      messageFontSize: '16',
+      messageFontSize: DEFAULT_MESSAGE_FONT_SIZE,
       revision: -1,
     }),
     actions: {

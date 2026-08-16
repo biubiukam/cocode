@@ -15,7 +15,6 @@ import { stopProcessesMatching } from "./lib/process-control.mjs"
 import { cleanupRuntime, prepareRuntime, resolveRuntimeRoot } from "./lib/runtime-cache.mjs"
 
 const ENTRY_SCRIPT = "start-with-dsh-runtime.mjs"
-const ABORTED_EXIT_CODE = 130
 // Benign macOS IMK / Chromium stderr noise; see electron/electron#45002.
 const BENIGN_MACOS_STDERR_PATTERNS = [
 	/error messaging the mach port for IMKCFRunLoopWakeUpReliable/,
@@ -42,16 +41,17 @@ try {
 	devLock.release()
 }
 
+/** Resolves to the exit code this runner should report. */
 async function run() {
 	await stopStrayElectron()
 	buildDevRuntime({ hardenElectron: true })
 	prepareRuntime(runtime)
-	if (children.isStopping()) return ABORTED_EXIT_CODE
+	if (children.isStopping()) return 0
 
 	const watcher = forkClientWatcher(runtime.root)
 	children.track(watcher.child, "DSH client watcher")
 	await watcher.ready
-	if (children.isStopping()) return ABORTED_EXIT_CODE
+	if (children.isStopping()) return 0
 
 	let watcherFailure
 	watcher.child.once("exit", (code, signal) => {
@@ -66,7 +66,9 @@ async function run() {
 
 	const exitCode = await waitForExit(startElectron())
 	if (watcherFailure) throw watcherFailure
-	return exitCode
+	// A shutdown this runner initiated is what the developer asked for, so the
+	// signal-derived exit code of the child it killed is not a failure to report.
+	return children.isStopping() ? 0 : exitCode
 }
 
 function startElectron() {

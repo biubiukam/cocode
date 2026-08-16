@@ -234,7 +234,10 @@ class SupervisorService {
       child.once('exit', (code, signal) => {
         flushPartialLines()
         clearTimeout(timer)
-        this.logger.log('error', readyObserved ? 'dsh.host.exit' : 'dsh.host.exit.before-ready', {
+        // An exit this Supervisor asked for is the normal end of a session; only
+        // one it did not ask for signals a problem worth surfacing as an error.
+        const expected = readyObserved && this.hostStopPromise !== null
+        this.logger.log(expected ? 'info' : 'error', readyObserved ? 'dsh.host.exit' : 'dsh.host.exit.before-ready', {
           exitCode: code ?? -1,
           signal: signal ?? 'none',
           hostPid: child.pid ?? -1,
