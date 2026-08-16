@@ -1,7 +1,7 @@
-import { lstatSync, readFileSync } from 'node:fs'
+import { chmodSync, lstatSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { isAbsolute, join, resolve } from 'node:path'
-import { parse } from 'yaml'
+import { dirname, isAbsolute, join, resolve } from 'node:path'
+import { parse, stringify } from 'yaml'
 import type { VisionConfig, VisionEndpointConfig, VisionProvider } from './index.ts'
 
 const CONFIG_FILE_NAME = 'vision.yaml'
@@ -26,6 +26,35 @@ export function loadVisionConfig(env: NodeJS.ProcessEnv = process.env): VisionCo
     throw new Error(`could not parse cocode vision config: ${path}`)
   }
   return parseVisionConfig(value, path)
+}
+
+/** Persist non-secret visual settings with an atomic replace. */
+export function saveVisionConfig(config: VisionConfig, env: NodeJS.ProcessEnv = process.env): void {
+  const path = configPath(env)
+  const directory = dirname(path)
+  mkdirSync(directory, { recursive: true, mode: 0o700 })
+  let metadata
+  try {
+    metadata = lstatSync(path)
+  } catch (error) {
+    if (!isMissing(error)) throw error
+  }
+  if (metadata?.isSymbolicLink()) throw new Error(`cocode vision config must not be a symbolic link: ${path}`)
+  if (metadata !== undefined && !metadata.isFile()) throw new Error(`cocode vision config must be a file: ${path}`)
+
+  const temporaryPath = `${path}.${process.pid}.${Date.now()}.tmp`
+  try {
+    writeFileSync(temporaryPath, stringify(config), { encoding: 'utf8', mode: 0o600 })
+    chmodSync(temporaryPath, 0o600)
+    renameSync(temporaryPath, path)
+  } catch (error) {
+    try {
+      if (lstatSync(temporaryPath).isFile()) unlinkSync(temporaryPath)
+    } catch {
+      // The temporary file may not have been created or may already be renamed.
+    }
+    throw error
+  }
 }
 
 /** Merge persisted settings first, then explicit runtime configuration. */

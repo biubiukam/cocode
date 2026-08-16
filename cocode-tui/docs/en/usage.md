@@ -35,6 +35,28 @@ sign in to Cocode. Later launches reuse the local configuration. The `cocode`
 command's `--help`, `--version`, and `--doctor` options do not require a TTY and
 are suitable for installation scripts and troubleshooting.
 
+## Start from the source checkout
+
+From the repository root, run:
+
+```sh
+make dev tui
+```
+
+The command checks the Node.js version, TUI dependencies, and the sibling Host
+Supervisor before starting. Missing dependencies are installed automatically;
+the Host Supervisor is rebuilt when its sources or build configuration are newer
+than `lib/index.js`. To run the checks without starting the TUI:
+
+```sh
+make tui-preflight
+```
+
+The TUI still requires a real TTY; pipes, redirects, and CI do not enter the
+interactive screen. For Host, JSON-RPC, or lease diagnostics, run
+`cd cocode-tui && pnpm run build && node bin/cocode-tui.mjs --doctor` after the
+dependencies and build output are ready.
+
 ## Before launch
 
 No Desktop installation or separate runtime checkout is required. The first TUI
@@ -77,6 +99,7 @@ Inside `tmux` or `screen`, the TUI automatically uses inline rendering and suppr
 - `Ctrl+R` opens history search; type to filter recent messages, use `↑` `↓` to select, Enter to restore the draft, and `Esc` to close.
 - `Ctrl+G` opens the draft in `$VISUAL` or `$EDITOR`; the edited Markdown is restored to the composer when the editor exits. Non-zero exits, invalid UTF-8, and drafts over 256 KiB are reported as errors.
 - `Ctrl+V` reads a PNG, JPEG, WebP, or GIF from the system clipboard; `/paste-image` provides the same action when a terminal reserves that key. Images remain local drafts until send, and deleting their `[Image: ...]` marker removes them. The limit is 5 MiB per image and 20 images per prompt.
+- `/vision` shows or changes visual understanding settings. Use `/vision provider cocode|user`, `/vision model <model-id>`, `/vision endpoint <url>`, `/vision credential <ref>`, `/vision enable`, or `/vision disable`. Changes are persisted to `vision.yaml` and apply to subsequent images immediately; actual API keys are never written to the file.
 - `Shift+↑` enters message selection; use `↑` `↓` to move, Enter to expand or collapse the current message, and `Esc` to exit.
 - Mouse tracking stays off in narrow layouts. At 120 columns or wider, the Inspector enables mouse tracking for resize and panel interaction, which can affect native drag-selection in some terminals. Models, commands, questions, and message actions remain keyboard accessible; open the command menu with `Ctrl+P`, or press `Shift+↑` and then `m` for message actions.
 - Press `c` in message selection to copy the current node, or use `/copy` to copy the latest assistant reply. The TUI tries macOS `pbcopy`, Windows `clip.exe`, then Linux `wl-copy`, `xclip`, and `xsel`; an unavailable command produces a notice without interrupting the session.
@@ -100,6 +123,7 @@ Inside `tmux` or `screen`, the TUI automatically uses inline rendering and suppr
 - On send, selected files are appended with their contents and selected directories with a bounded listing; references must stay inside the workspace.
 - When the Host exposes user-invocable Skills, `/skills` opens a searchable workspace catalog and inserts `/skill-name ` into the composer for further editing. User-invocable Skills also appear in the `/` command menu and are sent through `session.prompt` as text. The command stays hidden when the catalog is empty.
 - When the Host exposes its human-command registry, registered commands appear in the `/` menu and execute through `commands/execute` against the current Agent instead of becoming model prompts. The base composition currently provides `/goal` with `/goal`, `/goal <objective>`, `/goal clear`, `/goal edit <objective>`, `/goal pause`, and `/goal resume`; the Host owns the result text.
+- When the Host exposes plugin inventory, `/plugins`, `/plugins list`, and `/plugins status` open a searchable plugin menu showing every non-group Loader entry with its module name, `entryId`, enablement, and fiber phase. Type to match the module name, `entryId`, or state; use `↑`/`↓` to select, Enter or Space to toggle, and `Esc` to close. When the Host also exposes mutation, `/plugins enable <entryId>` and `/plugins disable <entryId>` remain available for direct operations; install and uninstall are still unavailable.
 - When an agent calls `ask_user_question`, the message area first streams the question being prepared; once the complete request arrives, the composer is replaced by a question panel. Use `↑` `↓` to move, `Space` to toggle multiple choices, `Tab` to reach the custom answer, `Enter` to answer, `Backspace` or `Delete` to edit custom input, and `Esc` to cancel. Batched and concurrent requests are presented in FIFO order.
 
 Tool output is truncated by display mode; while a node remains in the projection cache, its raw payload is retained in node state, and the complete event stays in the session log. When the transcript is tight, the composer stays visible.
@@ -139,12 +163,14 @@ Type `/` to open the command menu. Keep typing to filter by prefix. `Tab` or arr
 | `/lang zh` / `/lang en`        | Switch between Chinese and English UI                                                             |
 | `/model`                      | Open the model picker                                                                             |
 | `/models`                     | Open the model picker                                                                             |
+| `/vision`                     | Show or change the vision provider, model, and settings                                           |
 | `/redraw`                     | Redraw the terminal without clearing the session                                                    |
 | `/model <model-id>`            | Switch the current provider's model; preserve the session when durable reopen is supported       |
 | `/thinking`                    | Toggle detailed thinking and full tool output                                                     |
 | `/tokens` / `/cost`            | Show the latest token, cache, and context usage                                                   |
 | `/resume`                      | Open the local session picker and replay a selected session                                       |
 | `/skills`                      | Browse user-invocable skills from the current workspace                                           |
+| `/plugins`                     | Open a searchable DeepSeek plugin menu; requires the Host `plugins` capability              |
 | `/goal`                        | Inspect or change the current goal through the Host command registry                              |
 | `/feedback <text>`             | Record feedback for the current session when the Host mounts feedback                             |
 | `/permission <preset>`         | Switch the Host permission preset directly when the command is available                         |
@@ -179,6 +205,8 @@ If another TUI window is still open, `/use`, `/login`, and `/logout` refuse so t
 The `/skills` command is enabled only after `skills/list` returns a real catalog from the Host. A composition without a skills provider keeps the command hidden; an empty or failed probe is not presented as a usable feature.
 
 The Host advertises the `commands` capability through `cocode/capabilities`. The TUI only shows descriptors returned by the Host and sends the complete command line to `commands/execute`; unknown or failed commands stay errors instead of falling back to a normal prompt.
+
+The Host advertises the `plugins` capability through `cocode/capabilities`. The TUI reads live Loader entries through `cocode/plugins/list` and changes the current entry through `cocode/plugins/set-enabled`; without the corresponding capability, the TUI does not claim success. The plugin menu supports search and repeated toggles. These changes affect the live Loader only and are not written to the profile. Installation and uninstall require a later profile-management wire.
 
 The Host mounts Cocode's own `cocode-vision` plugin with `autoRead` enabled. `image` blocks are converted into visual evidence before the active text model runs, while the durable attachment reference is retained for native vision models. Choose `cocode` for the Cocode service, whose default vision model is `gpt-luna`, or `user` for a user-managed OpenAI-compatible endpoint. After switching the account to Cocode, the plugin automatically reuses the account-generated `COCODE_LLM_PROVIDERS.cocode-cloud` endpoint and credential reference; it does not select the first model from the cloud catalog. User settings can be persisted in `$COCODE_HOME/vision.yaml` (default `~/.cocode/vision.yaml`); use [vision.yaml.example](./vision.yaml.example) as a template. Environment variables such as `COCODE_VISION_PROVIDER` and `COCODE_VISION_USER_MODEL` override the file. Only credential references are configured here; Host credentials own the actual values, which never enter session logs or TUI settings.
 

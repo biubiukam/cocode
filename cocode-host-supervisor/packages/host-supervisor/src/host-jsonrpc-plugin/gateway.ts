@@ -15,6 +15,8 @@ import type {
   RuntimeContext,
   SessionEvent,
   UserMessage,
+  PluginEntry,
+  PluginFiberPhase,
 } from './types.js'
 
 type SessionRecord = { handle: AgentHandle; seed?: SessionEvent[]; owned: boolean }
@@ -77,6 +79,16 @@ type SkillService = {
 type CommandService = {
   list(agent: Agent): readonly CommandDescriptor[]
   execute(agent: Agent, line: string, signal: AbortSignal): Promise<CommandExecution | undefined>
+}
+type LoaderEntry = {
+  id: string
+  disabled?: boolean
+  options?: { group?: boolean; name?: string }
+  fiber?: { state?: unknown }
+  update?(options: { disabled?: boolean }): Promise<void>
+}
+type LoaderService = {
+  entries(): Iterable<LoaderEntry>
 }
 type LlmService = {
   listProviders(): readonly { id: string; name?: string }[]
@@ -263,6 +275,8 @@ export class TuiCompanionGateway {
       planMode: this.ctx.get('planMode') !== undefined,
       sessionList: this.ctx.get('sessionPersistence') !== undefined,
       commands: this.ctx.get('commands') !== undefined,
+      plugins: this.ctx.get('loader') !== undefined,
+      pluginsMutate: this.ctx.get('loader') !== undefined,
       interactions: 'notification-response',
       checkpoint: false,
     }
@@ -632,6 +646,39 @@ export class TuiCompanionGateway {
     return { commands: [...registry.list(record.handle.agent)] }
   }
 
+  listPlugins(): { plugins: PluginEntry[] } {
+    const loader = this.ctx.get('loader') as LoaderService | undefined
+    if (loader === undefined) throw new Error('plugins/list capability is unavailable: loader is not configured')
+    const plugins = [...loader.entries()]
+      .filter((entry) => entry.options?.group !== true)
+      .map((entry) => ({
+        entryId: String(entry.id),
+        moduleName: entry.options?.name ?? '',
+        enabled: entry.disabled !== true,
+        fiberPhase: pluginFiberPhase(entry.fiber?.state),
+      }))
+      .filter((entry) => entry.moduleName !== '')
+    return { plugins }
+  }
+
+  async setPluginEnabled(params: { entryId: string; enabled: boolean }): Promise<PluginEntry> {
+    const loader = this.ctx.get('loader') as LoaderService | undefined
+    if (loader === undefined) throw new Error('plugins/set-enabled capability is unavailable: loader is not configured')
+    if (params.entryId.trim() === '') throw new Error('plugins/set-enabled requires an entry id')
+    const entry = [...loader.entries()].find((candidate) => candidate.id === params.entryId)
+    if (entry === undefined || entry.options?.group === true || entry.options?.name === undefined) {
+      throw new Error(`plugin entry not found: ${params.entryId}`)
+    }
+    if (entry.update === undefined) throw new Error('plugins/set-enabled is unavailable for this Loader')
+    await entry.update({ disabled: !params.enabled })
+    return {
+      entryId: String(entry.id),
+      moduleName: entry.options.name,
+      enabled: entry.disabled !== true,
+      fiberPhase: pluginFiberPhase(entry.fiber?.state),
+    }
+  }
+
   async executeCommand(params: { sessionId: string; line: string }): Promise<CommandExecution | undefined> {
     if (params.sessionId.trim() === '') throw new Error('commands/execute requires a session id')
     if (typeof params.line !== 'string') throw new TypeError('commands/execute requires a command line')
@@ -750,6 +797,15 @@ export class TuiCompanionGateway {
       case 'cocode/commands/execute':
       case 'commands/execute':
         return this.executeCommand(params as { sessionId: string; line: string })
+      case 'cocode/plugins/list':
+      case 'plugins/list':
+        return this.listPlugins()
+      case 'cocode/plugins/set-enabled':
+      case 'plugins/set-enabled':
+        if (typeof params.entryId !== 'string' || typeof params.enabled !== 'boolean') {
+          throw new TypeError('plugins/set-enabled requires entryId and enabled')
+        }
+        return this.setPluginEnabled({ entryId: params.entryId, enabled: params.enabled })
       case 'cocode/model/list':
       case 'model/list':
         return this.listModels()
@@ -1190,6 +1246,16 @@ function createDeferred<T>(): Deferred<T> {
 
 function stringValue(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() !== '' ? value : undefined
+}
+
+function pluginFiberPhase(state: unknown): PluginFiberPhase {
+  if (state === null || state === undefined || state === 4 || state === 'DISPOSED') return null
+  if (state === 0 || state === 'PENDING') return 'pending'
+  if (state === 1 || state === 'LOADING') return 'loading'
+  if (state === 2 || state === 'ACTIVE') return 'active'
+  if (state === 3 || state === 'FAILED') return 'failed'
+  if (state === 5 || state === 'UNLOADING') return 'unloading'
+  return null
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

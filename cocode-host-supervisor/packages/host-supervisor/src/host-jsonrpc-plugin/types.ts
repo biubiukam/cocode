@@ -89,6 +89,21 @@ export type CommandExecution = {
     | { kind: 'error'; text: string }
 }
 
+export type PluginFiberPhase =
+  | 'pending'
+  | 'loading'
+  | 'active'
+  | 'failed'
+  | 'unloading'
+  | null
+
+export type PluginEntry = {
+  entryId: string
+  moduleName: string
+  enabled: boolean
+  fiberPhase: PluginFiberPhase
+}
+
 export type CompanionCapabilities = {
   protocolVersion: 1
   promptModes: ('normal' | 'queue' | 'steer')[]
@@ -100,6 +115,8 @@ export type CompanionCapabilities = {
   planMode: boolean
   sessionList: boolean
   commands: boolean
+  plugins: boolean
+  pluginsMutate: boolean
   interactions: 'notification-response'
   checkpoint: false
 }

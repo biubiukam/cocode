@@ -19,6 +19,7 @@ import type {
   SkillEntry,
   TuiCommandDescriptor,
   TuiCommandExecution,
+  TuiPluginEntry,
   TuiPromptMode,
   TuiSessionSummary,
   TuiRuntimeAdvertisement,
@@ -275,6 +276,33 @@ class SdkTuiRuntime implements TuiRuntime {
     }
   }
 
+  async listPlugins(): Promise<TuiPluginEntry[]> {
+    const client = this.requireClient()
+    this.requireCapability('plugins')
+    const result = await client.request(this.wireMethod('cocode/plugins/list', 'plugins/list'))
+    const rows = Array.isArray(result)
+      ? result
+      : isRecord(result) && Array.isArray(result.plugins)
+        ? result.plugins
+        : undefined
+    if (rows === undefined) {
+      throw new Error(`plugins/list returned no plugin list: ${JSON.stringify(result)}`)
+    }
+    return rows.map(parsePluginEntry)
+  }
+
+  async setPluginEnabled(entryId: string, enabled: boolean): Promise<TuiPluginEntry> {
+    const client = this.requireClient()
+    this.requireCapability('pluginsMutate')
+    const normalizedEntryId = entryId.trim()
+    if (normalizedEntryId === '') throw new Error('plugins/set-enabled requires an entry id')
+    const result = await client.request(this.wireMethod('cocode/plugins/set-enabled', 'plugins/set-enabled'), {
+      entryId: normalizedEntryId,
+      enabled,
+    })
+    return parsePluginEntry(result, 'plugins/set-enabled')
+  }
+
   async listSessions(cwd?: string): Promise<TuiSessionSummary[]> {
     const client = this.requireClient()
     this.requireCapability('sessionList')
@@ -440,6 +468,8 @@ class SdkTuiRuntime implements TuiRuntime {
           modelList: companion.modelList,
           imageAttachments: companion.imageAttachments,
           commands: companion.commands,
+          plugins: companion.plugins,
+          pluginsMutate: companion.pluginsMutate,
           promptMode: companion.promptModes.includes('steer'),
           queueMode: companion.promptModes.includes('queue'),
         },
@@ -545,6 +575,8 @@ type CompanionCapabilities = {
   checkpoint: false
   skills: boolean
   commands: boolean
+  plugins: boolean
+  pluginsMutate: boolean
 }
 
 function parseCompanionCapabilities(value: unknown): CompanionCapabilities | undefined {
@@ -567,6 +599,8 @@ function parseCompanionCapabilities(value: unknown): CompanionCapabilities | und
     typeof value.sessionList !== 'boolean' ||
     (value.modelList !== undefined && typeof value.modelList !== 'boolean')
     || (value.imageAttachments !== undefined && typeof value.imageAttachments !== 'boolean')
+    || (value.plugins !== undefined && typeof value.plugins !== 'boolean')
+    || (value.pluginsMutate !== undefined && typeof value.pluginsMutate !== 'boolean')
   ) {
     return undefined
   }
@@ -583,6 +617,8 @@ function parseCompanionCapabilities(value: unknown): CompanionCapabilities | und
     checkpoint: false,
     skills: value.skills === true,
     commands: value.commands === true,
+    plugins: value.plugins === true,
+    pluginsMutate: value.pluginsMutate === true,
   }
 }
 
@@ -659,6 +695,31 @@ function parseCommandDescriptor(value: unknown): TuiCommandDescriptor {
   }
 }
 
+function parsePluginEntry(value: unknown, operation = 'plugins/list'): TuiPluginEntry {
+  if (
+    !isRecord(value) ||
+    typeof value.entryId !== 'string' ||
+    value.entryId.trim() === '' ||
+    typeof value.moduleName !== 'string' ||
+    value.moduleName.trim() === '' ||
+    typeof value.enabled !== 'boolean' ||
+    (value.fiberPhase !== null &&
+      value.fiberPhase !== 'pending' &&
+      value.fiberPhase !== 'loading' &&
+      value.fiberPhase !== 'active' &&
+      value.fiberPhase !== 'failed' &&
+      value.fiberPhase !== 'unloading')
+  ) {
+    throw new Error(`${operation} returned an invalid plugin entry: ${JSON.stringify(value)}`)
+  }
+  return {
+    entryId: value.entryId,
+    moduleName: value.moduleName,
+    enabled: value.enabled,
+    fiberPhase: value.fiberPhase,
+  }
+}
+
 function parseCommandResult(value: Record<string, unknown>): TuiCommandExecution['result'] {
   if (value.kind === 'success') {
     if (
@@ -695,6 +756,8 @@ function parseRuntimeAdvertisement(value: Record<string, unknown>): TuiRuntimeAd
     modelList: value.modelList === true,
     imageAttachments: value.imageAttachments === true,
     commands: value.commands === true,
+    plugins: value.plugins === true,
+    pluginsMutate: value.pluginsMutate === true,
     checkpoint: false,
   }
 }

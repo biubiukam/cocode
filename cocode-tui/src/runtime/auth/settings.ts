@@ -1,5 +1,5 @@
 /**
- * Read/patch harness settings.yaml (llm routes + default model).
+ * Read and patch DSH settings.yaml (LLM routes and default model).
  */
 
 import {
@@ -109,6 +109,23 @@ export async function patchCloudRoute(
   origin: string,
   models: CloudModel[],
 ): Promise<void> {
+  await writeCloudRoute(home, origin, models, true)
+}
+
+export async function syncCloudRoute(
+  home: string,
+  origin: string,
+  models: CloudModel[],
+): Promise<void> {
+  await writeCloudRoute(home, origin, models, false)
+}
+
+async function writeCloudRoute(
+  home: string,
+  origin: string,
+  models: CloudModel[],
+  select: boolean,
+): Promise<void> {
   const root = await loadRoot(home)
   const llm = isRecord(root['llm-pi-ai']) ? root['llm-pi-ai'] : {}
   const providers = isRecord(llm.providers) ? llm.providers : {}
@@ -121,10 +138,12 @@ export async function patchCloudRoute(
   }
   llm.providers = providers
   root['llm-pi-ai'] = llm
-  const agent = isRecord(root['agent-default-model']) ? root['agent-default-model'] : {}
-  agent.provider = CLOUD_PROVIDER
-  if (models[0] !== undefined) agent.model = models[0].id
-  root['agent-default-model'] = agent
+  if (select) {
+    const agent = isRecord(root['agent-default-model']) ? root['agent-default-model'] : {}
+    agent.provider = CLOUD_PROVIDER
+    if (models[0] !== undefined) agent.model = models[0].id
+    root['agent-default-model'] = agent
+  }
   await writeYamlFile(settingsPath(home), root, 0o600)
 }
 
@@ -154,17 +173,6 @@ export async function unsetCloudRoute(home: string): Promise<void> {
     agent.model = DEFAULT_MODEL
     root['agent-default-model'] = agent
   }
-  await writeYamlFile(settingsPath(home), root, 0o600)
-}
-
-/** Remove a legacy persisted Cocode route without changing the selected model. */
-export async function removeCloudRoute(home: string): Promise<void> {
-  const root = await loadRoot(home)
-  const llm = isRecord(root['llm-pi-ai']) ? root['llm-pi-ai'] : {}
-  const providers = isRecord(llm.providers) ? llm.providers : {}
-  delete providers[CLOUD_PROVIDER]
-  llm.providers = providers
-  root['llm-pi-ai'] = llm
   await writeYamlFile(settingsPath(home), root, 0o600)
 }
 

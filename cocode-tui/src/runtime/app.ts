@@ -14,6 +14,7 @@ import type {
   TuiApprovalRequest,
   TuiRuntime,
   TuiImageInput,
+  TuiPluginEntry,
 } from '@cocode/tui-connection'
 import type { SelectModeResult } from './auth/store.ts'
 import type { AuthSnapshot, ResolvedAuth } from './auth/types.ts'
@@ -82,6 +83,18 @@ import {
   setSkillsQuery,
   type SkillsPickerState,
 } from './skills-picker.ts'
+import {
+  beginPluginMutation,
+  closePluginPicker,
+  completePluginMutation,
+  createPluginPicker,
+  failPluginMutation,
+  movePluginSelection,
+  pluginPhaseLabel,
+  selectedPlugin,
+  setPluginQuery,
+  type PluginPickerState,
+} from './plugin-picker.ts'
 import {
   closeModelPicker,
   createModelPicker,
@@ -197,6 +210,10 @@ export type TuiAction =
   | { type: 'skills.move'; delta: number }
   | { type: 'skills.close' }
   | { type: 'skills.confirm' }
+  | { type: 'plugins.setQuery'; query: string }
+  | { type: 'plugins.move'; delta: number }
+  | { type: 'plugins.close' }
+  | { type: 'plugins.confirm' }
   | { type: 'model.open' }
   | { type: 'image.paste' }
   | { type: 'model.setQuery'; query: string }
@@ -297,6 +314,7 @@ export type TuiSnapshot = {
   rewindPicker?: RewindPickerState
   forkPicker?: RewindPickerState
   skillsPicker?: SkillsPickerState
+  pluginPicker?: PluginPickerState
   modelPicker?: ModelPickerState
   modelInputOpen: boolean
   skills: readonly SkillEntry[]
@@ -345,6 +363,7 @@ export type TuiCommandCtx = {
   setModel?: (value: string) => void
   resumeSessions?: () => Promise<void>
   showSkillsPicker?: () => void
+  showPlugins?: (args: string) => void
   showModelPicker?: () => void
   showRewindPicker?: () => void
   showUsage?: () => void
@@ -453,6 +472,7 @@ class TuiAppImpl implements TuiApp {
   private rewindPicker: RewindPickerState | undefined
   private forkPicker: RewindPickerState | undefined
   private skillsPicker: SkillsPickerState | undefined
+  private pluginPicker: PluginPickerState | undefined
   private modelPicker: ModelPickerState | undefined
   private modelInputOpen = false
   private skills: SkillEntry[] = []
@@ -685,6 +705,7 @@ class TuiAppImpl implements TuiApp {
       rewindPicker: this.rewindPicker,
       forkPicker: this.forkPicker,
       skillsPicker: this.skillsPicker,
+      pluginPicker: this.pluginPicker,
       modelPicker: this.modelPicker,
       modelInputOpen: this.modelInputOpen,
       skills: this.skills,
@@ -967,6 +988,27 @@ class TuiAppImpl implements TuiApp {
         this.emit()
         return
       }
+      case 'plugins.setQuery':
+        if (this.pluginPicker !== undefined) {
+          this.pluginPicker = setPluginQuery(this.pluginPicker, action.query)
+          this.emit()
+        }
+        return
+      case 'plugins.move':
+        if (this.pluginPicker !== undefined) {
+          this.pluginPicker = movePluginSelection(this.pluginPicker, action.delta)
+          this.emit()
+        }
+        return
+      case 'plugins.close':
+        if (this.pluginPicker !== undefined) {
+          this.pluginPicker = closePluginPicker(this.pluginPicker)
+          this.emit()
+        }
+        return
+      case 'plugins.confirm':
+        this.toggleSelectedPlugin()
+        return
       case 'model.open':
         void this.openModelPicker()
         return
@@ -1312,6 +1354,9 @@ class TuiAppImpl implements TuiApp {
         this.skillsPicker = createSkillsPicker(this.skills)
         this.emit()
       },
+      showPlugins: (args) => {
+        void this.showPlugins(args)
+      },
       copyLatestAssistant: () => {
         const node = [...this.assembler.snapshot()]
           .reverse()
@@ -1646,6 +1691,116 @@ class TuiAppImpl implements TuiApp {
         : { tone: 'error', message: text(this.locale, 'copyUnavailable') }
       this.emit()
     })
+  }
+
+  private async showPlugins(args: string): Promise<void> {
+    const rawOperation = args.trim()
+    const operation = rawOperation.toLowerCase()
+    const mutation = /^(enable|disable)\s+(\S+)$/i.exec(rawOperation)
+    if (mutation !== null) {
+      await this.setPluginEnabled(mutation[2] ?? '', mutation[1]?.toLowerCase() === 'enable')
+      return
+    }
+    if (operation !== '' && operation !== 'list' && operation !== 'status') {
+      this.notice = {
+        tone: 'info',
+        message:
+          this.locale === 'zh'
+            ? '用法：/plugins、/plugins list、/plugins status、/plugins enable <entryId> 或 /plugins disable <entryId>。安装和卸载尚未开放。'
+            : 'Usage: /plugins, /plugins list, /plugins status, /plugins enable <entryId>, or /plugins disable <entryId>. Install and uninstall are not available yet.',
+      }
+      this.emit()
+      return
+    }
+    const listPlugins = this.runtime.listPlugins
+    if (!this.capabilities.plugins || listPlugins === undefined) {
+      this.notice = {
+        tone: 'info',
+        message:
+          this.locale === 'zh'
+            ? '当前运行时未提供插件清单能力。'
+            : 'The current runtime does not provide a plugin inventory.',
+      }
+      this.emit()
+      return
+    }
+    this.notice = {
+      tone: 'info',
+      message: this.locale === 'zh' ? '正在读取插件状态…' : 'Reading plugin status…',
+    }
+    this.emit()
+    try {
+      const plugins = await listPlugins.call(this.runtime)
+      this.pluginPicker = createPluginPicker(plugins)
+      this.notice = undefined
+    } catch (error) {
+      this.notice = { tone: 'error', message: errorMessage(error) }
+    }
+    this.emit()
+  }
+
+  private async setPluginEnabled(entryId: string, enabled: boolean): Promise<void> {
+    if (!this.capabilities.pluginsMutate || this.runtime.setPluginEnabled === undefined) {
+      this.notice = {
+        tone: 'info',
+        message:
+          this.locale === 'zh'
+            ? '当前运行时不允许修改插件状态。'
+            : 'The current runtime does not allow changing plugin state.',
+      }
+      this.emit()
+      return
+    }
+    this.notice = {
+      tone: 'info',
+      message: this.locale === 'zh' ? '正在更新插件状态…' : 'Updating plugin state…',
+    }
+    this.emit()
+    try {
+      const plugin = await this.runtime.setPluginEnabled(entryId, enabled)
+      this.notice = {
+        tone: 'info',
+        message: formatPluginMutationResult(plugin, this.locale),
+      }
+    } catch (error) {
+      this.notice = { tone: 'error', message: errorMessage(error) }
+    }
+    this.emit()
+  }
+
+  private toggleSelectedPlugin(): void {
+    const picker = this.pluginPicker
+    if (picker === undefined || picker.pendingEntryId !== undefined) return
+    const plugin = selectedPlugin(picker)
+    if (plugin === undefined) return
+    if (!this.capabilities.pluginsMutate || this.runtime.setPluginEnabled === undefined) {
+      this.pluginPicker = failPluginMutation(
+        picker,
+        this.locale === 'zh'
+          ? '当前运行时不允许修改插件状态。'
+          : 'The current runtime does not allow changing plugin state.',
+      )
+      this.emit()
+      return
+    }
+    this.pluginPicker = beginPluginMutation(picker, plugin.entryId)
+    this.emit()
+    void this.runtime
+      .setPluginEnabled(plugin.entryId, !plugin.enabled)
+      .then((updated) => {
+        if (this.pluginPicker === undefined) return
+        this.pluginPicker = completePluginMutation(
+          this.pluginPicker,
+          updated,
+          formatPluginMutationResult(updated, this.locale),
+        )
+        this.emit()
+      })
+      .catch((error: unknown) => {
+        if (this.pluginPicker === undefined) return
+        this.pluginPicker = failPluginMutation(this.pluginPicker, errorMessage(error))
+        this.emit()
+      })
   }
 
   private async loadSkills(): Promise<void> {
@@ -2201,10 +2356,12 @@ class TuiAppImpl implements TuiApp {
     if (attachments.length === 0 && images.length === 0) {
       return this.runtime.prompt(this.sessionId, [{ type: 'text', text: visiblePromptText }], mode)
     }
-    const fileContext = loadFileContext({
-      cwd: this.cwd,
-      paths: attachments.map((attachment) => attachment.path),
-    })
+    const fileContext = attachments.length === 0
+      ? Promise.resolve([])
+      : loadFileContext({
+        cwd: this.cwd,
+        paths: attachments.map((attachment) => attachment.path),
+      })
     const storedImages = images.length === 0
       ? Promise.resolve([])
       : this.runtime.saveImages === undefined
@@ -2682,6 +2839,8 @@ function runtimeCapabilityEntries(
     'modelList',
     'imageAttachments',
     'commands',
+    'plugins',
+    'pluginsMutate',
     'promptMode',
     'queueMode',
   ]
@@ -2698,6 +2857,13 @@ function runtimeCapabilityEntries(
           : effective[name as keyof Omit<TuiCapabilities, 'sessionList'>] === true
         : snapshot.capabilities[name],
   }))
+}
+
+function formatPluginMutationResult(plugin: TuiPluginEntry, locale: UiLocale): string {
+  const phase = pluginPhaseLabel(plugin.fiberPhase, locale)
+  return locale === 'zh'
+    ? `${plugin.moduleName}（${plugin.entryId}）已${plugin.enabled ? '启用' : '禁用'}（${phase}）。`
+    : `${plugin.moduleName} (${plugin.entryId}) is ${plugin.enabled ? 'enabled' : 'disabled'} (${phase}).`
 }
 
 function makeSessionTreeItems(

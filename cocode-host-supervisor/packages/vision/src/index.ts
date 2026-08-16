@@ -1,10 +1,11 @@
-import { loadVisionConfig, mergeVisionConfig } from './config.ts'
+import { loadVisionConfig, mergeVisionConfig, saveVisionConfig } from './config.ts'
 
 export type ContentBlock = { type: string; text?: string; [key: string]: unknown }
 export type ImageMediaType = 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif'
 export type RuntimeContext = {
   get<T = unknown>(name: string): T | undefined
   provide?(name: string, value: unknown): void
+  effect?(create: () => unknown, label?: string): unknown
 }
 
 export type VisionProvider = 'user' | 'cocode'
@@ -51,6 +52,19 @@ export type CocodeVisionService = {
     blocks: readonly ContentBlock[],
     options?: { preserveImages?: boolean },
   ): Promise<ContentBlock[]>
+  configure(patch: VisionConfig): Promise<VisionStatus>
+}
+
+type VisionCommandService = {
+  register(definition: {
+    name: string
+    description: string
+    input?: { hint: string }
+    handler(invocation: { rawInput: string; signal: AbortSignal }): Promise<
+      | { kind: 'success'; text?: string }
+      | { kind: 'error'; text: string }
+    >
+  }): () => void
 }
 
 const DEFAULT_TIMEOUT_MS = 45_000
@@ -64,48 +78,63 @@ export const name = 'cocode-vision'
 export const inject = ['attachments']
 
 export function apply(ctx: RuntimeContext, rawConfig: VisionConfig = {}): void {
-  const service = createVisionService(ctx, mergeVisionConfig(loadVisionConfig(), rawConfig))
+  const service = createVisionService(ctx, mergeVisionConfig(loadVisionConfig(), rawConfig), {
+    updateConfig: async (patch) => {
+      const next = mergeVisionConfig(loadVisionConfig(), patch)
+      saveVisionConfig(next)
+      return mergeVisionConfig(next, rawConfig)
+    },
+  })
   ctx.provide?.('cocodeVision', service)
+  registerVisionCommand(ctx, service)
 }
 
 export function createVisionService(
   ctx: RuntimeContext,
   rawConfig: VisionConfig = {},
+  options: { updateConfig?: (patch: VisionConfig) => Promise<VisionConfig> } = {},
 ): CocodeVisionService {
-  const config = resolveConfig(rawConfig)
+  let config = resolveConfig(rawConfig)
 
-  return {
-    status: async () => {
-      const target = targetOf(config)
-      if (!config.autoRead) {
-        return {
-          enabled: false,
-          provider: config.provider,
-          configured: false,
-          model: target.model,
-          endpoint: target.endpoint,
-          reason: 'automatic image reading is disabled',
-        }
+  const status = async (): Promise<VisionStatus> => {
+    const target = targetOf(config)
+    if (!config.autoRead) {
+      return {
+        enabled: false,
+        provider: config.provider,
+        configured: false,
+        model: target.model,
+        endpoint: target.endpoint === undefined ? undefined : redactEndpoint(target.endpoint),
+        reason: 'automatic image reading is disabled',
       }
-      if (target.endpoint === undefined || target.model === '') {
-        return {
-          enabled: true,
-          provider: config.provider,
-          configured: false,
-          model: target.model,
-          endpoint: undefined,
-          reason: target.endpoint === undefined ? 'vision endpoint is not configured' : 'vision model is not configured',
-        }
-      }
-      const credential = await resolveCredential(ctx, target.credentialRef)
+    }
+    if (target.endpoint === undefined || target.model === '') {
       return {
         enabled: true,
         provider: config.provider,
-        configured: credential !== undefined,
+        configured: false,
         model: target.model,
-        endpoint: redactEndpoint(target.endpoint),
-        ...(credential === undefined ? { reason: `credential ${target.credentialRef} is not configured` } : {}),
+        endpoint: undefined,
+        reason: target.endpoint === undefined ? 'vision endpoint is not configured' : 'vision model is not configured',
       }
+    }
+    const credential = await resolveCredential(ctx, target.credentialRef)
+    return {
+      enabled: true,
+      provider: config.provider,
+      configured: credential !== undefined,
+      model: target.model,
+      endpoint: redactEndpoint(target.endpoint),
+      ...(credential === undefined ? { reason: `credential ${target.credentialRef} is not configured` } : {}),
+    }
+  }
+
+  return {
+    status,
+    configure: async (patch) => {
+      if (options.updateConfig === undefined) throw new Error('vision configuration is not writable in this runtime')
+      config = resolveConfig(await options.updateConfig(patch))
+      return status()
     },
     prepareBlocks: async (blocks, options = {}) => {
       if (!config.autoRead || !blocks.some((block) => block.type === IMAGE_BLOCK_TYPE)) {
@@ -352,4 +381,64 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
     ? value as Record<string, unknown>
     : undefined
+}
+
+function registerVisionCommand(ctx: RuntimeContext, service: CocodeVisionService): void {
+  const commands = ctx.get<VisionCommandService>('commands')
+  if (commands === undefined) return
+  const register = () => commands.register({
+    name: 'vision',
+    description: 'Configure the image understanding provider and model',
+    input: { hint: 'status | provider <cocode|user> | model <id> | endpoint <url> | credential <ref> | enable|disable' },
+    handler: async ({ rawInput }) => {
+      try {
+        return { kind: 'success', text: await runVisionCommand(service, rawInput) }
+      } catch (error) {
+        return { kind: 'error', text: error instanceof Error ? error.message : 'vision command failed' }
+      }
+    },
+  })
+  if (ctx.effect === undefined) {
+    register()
+    return
+  }
+  ctx.effect(register, 'cocode-vision.command')
+}
+
+async function runVisionCommand(service: CocodeVisionService, rawInput: string): Promise<string> {
+  const input = rawInput.trim()
+  if (input === '' || input === 'status') return formatVisionStatus(await service.status())
+  const [action, ...rest] = input.split(/\s+/u)
+  const value = rest.join(' ').trim()
+  if (action === 'provider') {
+    if (value !== 'cocode' && value !== 'user') throw new Error('usage: /vision provider <cocode|user>')
+    return formatVisionStatus(await service.configure({ provider: value }))
+  }
+  if (action === 'model') {
+    if (value === '') throw new Error('usage: /vision model <model-id>')
+    const status = await service.status()
+    const field = status.provider === 'user' ? 'user' : 'cocode'
+    return formatVisionStatus(await service.configure({ [field]: { model: value } }))
+  }
+  if (action === 'endpoint') {
+    if (value === '') throw new Error('usage: /vision endpoint <url>')
+    const status = await service.status()
+    if (status.provider !== 'user') throw new Error('vision endpoint can only be changed for the user provider')
+    return formatVisionStatus(await service.configure({ user: { endpoint: value } }))
+  }
+  if (action === 'credential') {
+    if (value === '') throw new Error('usage: /vision credential <credential-ref>')
+    const status = await service.status()
+    const field = status.provider === 'user' ? 'user' : 'cocode'
+    return formatVisionStatus(await service.configure({ [field]: { credentialRef: value } }))
+  }
+  if (action === 'enable' && value === '') return formatVisionStatus(await service.configure({ autoRead: true }))
+  if (action === 'disable' && value === '') return formatVisionStatus(await service.configure({ autoRead: false }))
+  throw new Error('usage: /vision [status|provider|model|endpoint|credential|enable|disable]')
+}
+
+function formatVisionStatus(status: VisionStatus): string {
+  const state = !status.enabled ? 'disabled' : status.configured ? 'ready' : 'not configured'
+  const endpoint = status.endpoint === undefined ? 'none' : status.endpoint
+  return `vision: ${state}; provider=${status.provider}; model=${status.model || 'none'}; endpoint=${endpoint}${status.reason === undefined ? '' : `; ${status.reason}`}`
 }

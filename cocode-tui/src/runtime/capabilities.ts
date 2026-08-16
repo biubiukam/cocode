@@ -17,6 +17,8 @@ export type TuiCapabilities = {
   sessionList: 'none' | 'jsonl' | 'rpc'
   skills: boolean
   commands: boolean
+  plugins: boolean
+  pluginsMutate: boolean
 }
 
 export const P0_CAPABILITIES: TuiCapabilities = {
@@ -34,4 +36,6 @@ export const P0_CAPABILITIES: TuiCapabilities = {
   sessionList: 'none',
   skills: false,
   commands: false,
+  plugins: false,
+  pluginsMutate: false,
 }

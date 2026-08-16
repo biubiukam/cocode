@@ -37,6 +37,8 @@ function fakeRuntime(): TuiRuntime & {
   modelListError?: Error
   commands: TuiCommandDescriptor[]
   executedCommands: { sessionId: string; line: string }[]
+  plugins: { entryId: string; moduleName: string; enabled: boolean; fiberPhase: 'active' | null }[]
+  setPluginEnabled: (entryId: string, enabled: boolean) => Promise<{ entryId: string; moduleName: string; enabled: boolean; fiberPhase: 'active' | null }>
 } {
   const handlers = new Set<(n: TuiNotification) => void>()
   const closeHandlers = new Set<(error?: string) => void>()
@@ -58,6 +60,7 @@ function fakeRuntime(): TuiRuntime & {
     modelCatalog: { groups: [], failures: [] },
     commands: [],
     executedCommands: [],
+    plugins: [],
     emit(n) {
       for (const handler of handlers) handler(n)
     },
@@ -102,6 +105,16 @@ function fakeRuntime(): TuiRuntime & {
     },
     async listCommands() {
       return runtime.commands
+    },
+    async listPlugins() {
+      return runtime.plugins
+    },
+    async setPluginEnabled(entryId, enabled) {
+      const plugin = runtime.plugins.find((candidate) => candidate.entryId === entryId)
+      if (plugin === undefined) throw new Error(`plugin entry not found: ${entryId}`)
+      plugin.enabled = enabled
+      plugin.fiberPhase = enabled ? 'active' : null
+      return plugin
     },
     async executeCommand(sessionId, line) {
       runtime.executedCommands.push({ sessionId, line })
@@ -312,6 +325,10 @@ describe('TuiApp', () => {
         planMode: false,
         sessionList: false,
         modelList: false,
+        imageAttachments: false,
+        commands: false,
+        plugins: false,
+        pluginsMutate: false,
         queueMode: false,
         promptMode: false,
       },
@@ -496,6 +513,72 @@ describe('TuiApp', () => {
     })
   })
 
+  it('opens a searchable plugin picker and toggles the selected plugin', async () => {
+    const runtime = fakeRuntime()
+    runtime.plugins = [
+      {
+        entryId: 'vision',
+        moduleName: '@cocode/vision',
+        enabled: true,
+        fiberPhase: 'active',
+      },
+      {
+        entryId: 'legacy',
+        moduleName: '@deepseek-ai/dsh-legacy',
+        enabled: false,
+        fiberPhase: null,
+      },
+    ]
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+      capabilities: { ...P0_CAPABILITIES, plugins: true, pluginsMutate: true },
+      locale: 'zh',
+    })
+    await app.start()
+
+    app.dispatch({ type: 'command', line: '/plugins status' })
+    await expect.poll(() => app.snapshot().pluginPicker?.open).toBe(true)
+    expect(app.snapshot().pluginPicker?.plugins).toHaveLength(2)
+
+    app.dispatch({ type: 'plugins.setQuery', query: 'legacy' })
+    app.dispatch({ type: 'plugins.confirm' })
+    await expect.poll(() => runtime.plugins[1]?.enabled).toBe(true)
+    expect(app.snapshot().pluginPicker?.open).toBe(true)
+    expect(app.snapshot().pluginPicker?.status?.message).toContain(
+      '@deepseek-ai/dsh-legacy（legacy）已启用（运行中）',
+    )
+  })
+
+  it('preserves the entry id when parsing a plugin mutation command', async () => {
+    const runtime = fakeRuntime()
+    runtime.plugins = [
+      {
+        entryId: 'VisionPlugin',
+        moduleName: '@cocode/vision',
+        enabled: true,
+        fiberPhase: 'active',
+      },
+    ]
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+      capabilities: { ...P0_CAPABILITIES, plugins: true, pluginsMutate: true },
+      locale: 'zh',
+    })
+    await app.start()
+
+    app.dispatch({ type: 'command', line: '/plugins disable VisionPlugin' })
+    await expect.poll(() => app.snapshot().notice?.message).toContain('@cocode/vision（VisionPlugin）已禁用（未加载）')
+    expect(runtime.plugins[0]?.enabled).toBe(false)
+  })
+
   it('exposes user-invocable skills in the slash menu and sends them as prompts', async () => {
     const runtime = fakeRuntime() as TuiRuntime & {
       listSkills(sessionId: string): Promise<{ name: string; description: string }[]>
@@ -633,9 +716,11 @@ describe('TuiApp', () => {
 
   it('keeps pasted images in the draft until send and then sends attachment blocks', async () => {
     const runtime = fakeRuntime()
+    const cwd = join(tmpdir(), 'cocode-image-only-prompt-missing-workspace')
+    await rm(cwd, { recursive: true, force: true })
     const app = createTuiApp({
       runtime,
-      cwd: '/tmp',
+      cwd,
       provider: 'p',
       model: 'm',
       sessionId: 's1',

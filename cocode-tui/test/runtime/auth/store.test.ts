@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -61,7 +61,7 @@ describe('AuthStore', () => {
     expect(await readCredentials(dshHome)).toEqual({ DEEPSEEK_API_KEY: 'sk-dsh' })
   })
 
-  it('rebuilds a runtime provider when a legacy cloud route is present', async () => {
+  it('restores the persisted Cloud route required by the DSH adapter', async () => {
     const accountHome = await tempHome()
     const dshHome = await tempHome()
     await writeAccount(accountHome, {
@@ -72,9 +72,10 @@ describe('AuthStore', () => {
       personalKeyId: 'key-1',
     })
     await patchCredential(dshHome, 'COCODE_CLOUD_API_KEY', 'ck_live_x')
-    await patchCloudRoute(dshHome, 'https://cocode.agency', [
-      { id: 'cloud-1', name: 'Cloud 1' },
-    ])
+    await writeFile(
+      join(dshHome, 'settings.yaml'),
+      'agent-default-model:\n  provider: cocode-cloud\n  model: cloud-1\nllm-pi-ai:\n  providers: {}\n',
+    )
     const store = await createAuthStore({
       accountHome,
       dshHome,
@@ -93,7 +94,10 @@ describe('AuthStore', () => {
     })
 
     expect(store.snapshot().mode).toBe('cocode')
-    expect((await readSettings(dshHome)).hasCloudRoute).toBe(false)
+    expect(await readSettings(dshHome)).toMatchObject({
+      hasCloudRoute: true,
+      cloudModel: 'cloud-1',
+    })
     const providerConfig = JSON.parse(store.resolved().env.COCODE_LLM_PROVIDERS ?? '{}')
     expect(providerConfig['cocode-cloud'].api).toBe('openai-responses')
     expect(providerConfig['cocode-cloud'].models).toHaveLength(2)
@@ -192,7 +196,10 @@ describe('AuthStore', () => {
     expect(opened[0]).toContain('user_code=ABCD-EFGH')
     expect((await readCredentials(home)).DEEPSEEK_API_KEY).toBe('sk-keep')
     expect((await readCredentials(home)).COCODE_CLOUD_API_KEY).toBe('ck_live_new')
-    expect((await readSettings(home)).hasCloudRoute).toBe(false)
+    expect(await readSettings(home)).toMatchObject({
+      hasCloudRoute: true,
+      cloudModel: 'cloud-1',
+    })
     expect(await readAccount(home)).toMatchObject({ personalKeyId: 'key-1' })
     const providerConfig = JSON.parse(store.resolved().env.COCODE_LLM_PROVIDERS ?? '{}')
     expect(providerConfig['cocode-cloud'].api).toBe('openai-responses')

@@ -34,6 +34,7 @@ export type CommandContextOptions = {
   showResumePicker?: (sessions: readonly SessionSummary[]) => void
   resumeSessions?: TuiCommandCtx['resumeSessions']
   showSkillsPicker?: TuiCommandCtx['showSkillsPicker']
+  showPlugins?: TuiCommandCtx['showPlugins']
   copyLatestAssistant?: TuiCommandCtx['copyLatestAssistant']
   pasteImage?: TuiCommandCtx['pasteImage']
   toggleFocus?: TuiCommandCtx['toggleFocus']
@@ -76,6 +77,7 @@ export type AppCommandContextOptions = {
   showResumePicker: (sessions: readonly SessionSummary[]) => void
   resumeSessions?: TuiCommandCtx['resumeSessions']
   showSkillsPicker: TuiCommandCtx['showSkillsPicker']
+  showPlugins?: TuiCommandCtx['showPlugins']
   copyLatestAssistant?: TuiCommandCtx['copyLatestAssistant']
   pasteImage?: TuiCommandCtx['pasteImage']
   toggleFocus?: TuiCommandCtx['toggleFocus']
@@ -140,6 +142,7 @@ export function createCommandContext(options: CommandContextOptions): TuiCommand
         }
       }),
     showSkillsPicker: options.showSkillsPicker,
+    showPlugins: options.showPlugins,
     copyLatestAssistant: options.copyLatestAssistant,
     pasteImage: options.pasteImage,
     toggleFocus: options.toggleFocus,
@@ -193,6 +196,7 @@ export function createAppCommandContext(options: AppCommandContextOptions): TuiC
     showResumePicker: options.showResumePicker,
     resumeSessions: options.resumeSessions,
     showSkillsPicker: options.showSkillsPicker,
+    showPlugins: options.showPlugins,
     copyLatestAssistant: options.copyLatestAssistant,
     pasteImage: options.pasteImage,
     toggleFocus: options.toggleFocus,

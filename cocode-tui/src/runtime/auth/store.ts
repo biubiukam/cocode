@@ -28,9 +28,10 @@ import { accountHome as defaultAccountHome, defaultHomeContext, dshHome as defau
 import { apiKeyEnvFor, channelAvailability, resolveAuth, saveByokKey } from './resolve.ts'
 import {
   captureCloudSettings,
+  patchCloudRoute,
   patchAgentDefaultModel,
-  removeCloudRoute,
   restoreCloudSettings,
+  syncCloudRoute,
   unsetCloudRoute,
   readSettings,
 } from './settings.ts'
@@ -150,8 +151,11 @@ class AuthStoreImpl implements AuthStore {
       }
       if (signal?.aborted) return
       const settings = await readSettings(this.dshHome)
-      if (account !== undefined && settings.hasCloudRoute) {
-        await removeCloudRoute(this.dshHome)
+      if (account !== undefined && cloudKey !== undefined) {
+        const models = this.cloudModels?.length
+          ? this.cloudModels
+          : [fallbackCloudModel(settings)]
+        await syncCloudRoute(this.dshHome, account.origin, models)
       }
       const resolved = await resolveAuth({
         dshHome: this.dshHome,
@@ -447,8 +451,7 @@ class AuthStoreImpl implements AuthStore {
           this.ensureCurrent(operation)
           if (!reusable) await patchCredential(this.dshHome, CLOUD_KEY_REF, secret)
           this.ensureCurrent(operation)
-          await removeCloudRoute(this.dshHome)
-          await patchAgentDefaultModel(this.dshHome, CLOUD_PROVIDER, models[0].id)
+          await patchCloudRoute(this.dshHome, origin, models)
           this.ensureCurrent(operation)
           await writeAccount(this.accountHome, account)
         } catch (error) {
@@ -605,4 +608,10 @@ class AuthCancelledError extends Error {
 function nonempty(value: string | undefined): string | undefined {
   const trimmed = value?.trim()
   return trimmed === undefined || trimmed === '' ? undefined : trimmed
+}
+
+function fallbackCloudModel(settings: Awaited<ReturnType<typeof readSettings>>): CloudModel {
+  const id = settings.cloudModel ??
+    (settings.provider === CLOUD_PROVIDER ? settings.model : DEFAULT_MODEL)
+  return { id, name: id }
 }

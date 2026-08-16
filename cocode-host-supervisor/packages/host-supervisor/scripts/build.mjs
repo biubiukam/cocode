@@ -4,6 +4,7 @@ import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { build } from 'esbuild'
+import { assertBuiltRuntimePlugin } from './runtime-plugins.mjs'
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const workspaceRoot = resolve(packageRoot, '../..')
@@ -67,6 +68,7 @@ if (existsSync(pluginSourceRoot)) {
     if (!existsSync(manifestPath)) continue
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
     if (!manifest.name || manifest.private !== true || !manifest.cocode) continue
+    assertBuiltRuntimePlugin(source, manifest.name)
     const target = join(runtimeRoot, 'plugins', manifest.name)
     rmSync(target, { recursive: true, force: true })
     mkdirSync(target, { recursive: true })

@@ -210,6 +210,16 @@ export function createBuiltinCommands(): CommandRegistry {
     },
   })
   registry.register({
+    name: 'plugins',
+    summary: 'Show the DeepSeek plugins loaded by the current runtime',
+    summaryZh: '查看当前运行时加载的 DeepSeek 插件',
+    kind: 'local',
+    available: (caps) => caps.plugins,
+    run: (ctx, args) => {
+      ctx.showPlugins?.(args)
+    },
+  })
+  registry.register({
     name: 'permissions',
     summary: 'Cycle runtime permission mode',
     summaryZh: '切换运行时权限模式',

@@ -2,9 +2,15 @@ import { PassThrough, Writable } from 'node:stream'
 import React from 'react'
 import { render } from 'ink'
 import { describe, expect, it, vi } from 'vitest'
-import type { TuiNotification, TuiRuntime } from '@cocode/tui-connection'
+import type {
+  TuiCapabilities,
+  TuiNotification,
+  TuiPluginEntry,
+  TuiRuntime,
+} from '@cocode/tui-connection'
 import { Chat } from '../../src/present/chat.tsx'
 import { createTuiApp } from '../../src/runtime/app.ts'
+import { P0_CAPABILITIES } from '../../src/runtime/capabilities.ts'
 
 describe('Chat', () => {
   it('sends session cancellation when Esc is pressed during a running turn', async () => {
@@ -43,8 +49,7 @@ describe('Chat', () => {
     const chat = await renderChat(runtime.value, { locale: 'en' })
 
     try {
-      await flush()
-      expect(plainOutput(chat.stdout.output)).toContain('cocode is ready')
+      await expect.poll(() => plainOutput(chat.stdout.output)).toContain('cocode is ready')
       chat.stdout.output = ''
 
       await chat.app.start()
@@ -56,18 +61,53 @@ describe('Chat', () => {
       await closeChat(chat)
     }
   })
+
+  it('filters the plugin menu and toggles the selected entry without closing it', async () => {
+    const runtime = createTestRuntime({
+      plugins: [
+        { entryId: 'vision', moduleName: '@cocode/vision', enabled: true, fiberPhase: 'active' },
+        { entryId: 'legacy', moduleName: '@deepseek-ai/dsh-legacy', enabled: false, fiberPhase: null },
+      ],
+    })
+    const chat = await renderChat(runtime.value, {
+      locale: 'en',
+      capabilities: { ...P0_CAPABILITIES, plugins: true, pluginsMutate: true },
+      startBeforeRender: true,
+    })
+
+    try {
+      chat.app.dispatch({ type: 'command', line: '/plugins' })
+      await expect.poll(() => chat.app.snapshot().pluginPicker?.open).toBe(true)
+      await renderFlush()
+      chat.app.dispatch({ type: 'plugins.setQuery', query: 'legacy' })
+      expect(chat.app.snapshot().pluginPicker?.query).toBe('legacy')
+      chat.app.dispatch({ type: 'plugins.confirm' })
+      await expect.poll(() => runtime.plugins[1]?.enabled).toBe(true)
+      expect(chat.app.snapshot().pluginPicker?.open).toBe(true)
+      expect(plainOutput(chat.stdout.output)).toContain('Runtime plugins')
+    } finally {
+      await closeChat(chat)
+    }
+  })
 })
 
 function createTestRuntime(options: {
   cancel?: (sessionId: string) => Promise<boolean>
   onStart?: (emit: (notification: TuiNotification) => void) => void
-} = {}): { value: TuiRuntime; emit: (notification: TuiNotification) => void } {
+  plugins?: TuiPluginEntry[]
+  } = {}): {
+  value: TuiRuntime
+  emit: (notification: TuiNotification) => void
+  plugins: TuiPluginEntry[]
+} {
   const handlers = new Set<(notification: TuiNotification) => void>()
+  const plugins = options.plugins ?? []
   const emit = (notification: TuiNotification): void => {
     for (const handler of handlers) handler(notification)
   }
   return {
     emit,
+    plugins,
     value: {
       async start() {
         options.onStart?.(emit)
@@ -77,6 +117,17 @@ function createTestRuntime(options: {
         return 'message-1'
       },
       ...(options.cancel === undefined ? {} : { cancel: options.cancel }),
+      async listPlugins() {
+        return plugins
+      },
+      async setPluginEnabled(entryId: string, enabled: boolean) {
+        const index = plugins.findIndex((plugin) => plugin.entryId === entryId)
+        const plugin = plugins[index]
+        if (plugin === undefined) throw new Error(`plugin entry not found: ${entryId}`)
+        const updated = { ...plugin, enabled, fiberPhase: enabled ? 'active' : null } as TuiPluginEntry
+        plugins[index] = updated
+        return updated
+      },
       subscribe(handler) {
         handlers.add(handler)
         return () => handlers.delete(handler)
@@ -88,7 +139,11 @@ function createTestRuntime(options: {
 
 async function renderChat(
   runtime: TuiRuntime,
-  options: { locale?: 'en' | 'zh'; startBeforeRender?: boolean } = {},
+  options: {
+    locale?: 'en' | 'zh'
+    startBeforeRender?: boolean
+    capabilities?: TuiCapabilities
+  } = {},
 ) {
   const app = createTuiApp({
     runtime,
@@ -97,6 +152,7 @@ async function renderChat(
     model: 'test-model',
     sessionId: 'session-1',
     locale: options.locale,
+    capabilities: options.capabilities,
   })
   if (options.startBeforeRender === true) await app.start()
   const stdin = new InputStream()
@@ -104,6 +160,7 @@ async function renderChat(
   const screen = render(React.createElement(Chat, { app, mouseSupported: false }), {
     stdin: stdin as unknown as NodeJS.ReadStream,
     stdout: stdout as unknown as NodeJS.WriteStream,
+    debug: true,
     patchConsole: false,
     exitOnCtrlC: false,
   })

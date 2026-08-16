@@ -91,4 +91,45 @@ describe('vision user configuration', () => {
       endpoint: 'https://stored.example/v1/chat/completions',
     })
   })
+
+  it('registers /vision and persists model changes without storing secrets', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'cocode-vision-'))
+    temporaryDirectories.push(home)
+    vi.stubEnv('COCODE_HOME', home)
+    vi.stubEnv('COCODE_VISION_PROVIDER', 'user')
+
+    type RegisteredCommand = { handler(input: { rawInput: string; signal: AbortSignal }): Promise<unknown> }
+    let registered: RegisteredCommand | undefined
+    const provided = new Map<string, unknown>()
+    const context: RuntimeContext = {
+      get(name) {
+        if (name === 'credentials') return { resolve: async () => ({ value: 'secret-value' }) }
+        if (name === 'commands') {
+          return {
+            register(definition: RegisteredCommand) {
+              registered = definition
+              return () => undefined
+            },
+          }
+        }
+        return undefined
+      },
+      provide(name, value) {
+        provided.set(name, value)
+      },
+    }
+    apply(context)
+
+    await expect(registered?.handler({ rawInput: 'model vision-model', signal: new AbortController().signal })).resolves.toMatchObject({
+      kind: 'success',
+    })
+    expect(loadVisionConfig({ COCODE_HOME: home })).toMatchObject({
+      user: { model: 'vision-model' },
+    })
+    expect(JSON.stringify(loadVisionConfig({ COCODE_HOME: home }))).not.toContain('secret-value')
+    await expect((provided.get('cocodeVision') as CocodeVisionService).status()).resolves.toMatchObject({
+      provider: 'user',
+      model: 'vision-model',
+    })
+  })
 })

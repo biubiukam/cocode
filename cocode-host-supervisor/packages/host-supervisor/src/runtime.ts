@@ -1,6 +1,6 @@
 import { createRequire } from 'node:module'
 import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
-import { basename, dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { runtimeSlotDirectory } from './paths.js'
 import { hostKey, type HostRuntimeEnv, type HostScope } from './protocol.js'
@@ -44,14 +44,15 @@ export function resolveDshPackage(): { root: string; entry: string; version: str
 export function prepareRuntimeSlot(scope: HostScope, jsonRpcEndpoint: string, pluginPath: string): RuntimeSlot {
   const dsh = resolveDshPackage()
   const slot = runtimeSlotDirectory(scope, dsh.version)
-  const entry = join(slot, 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js')
+  const dshSlotRoot = join(slot, 'node_modules', '@deepseek-ai', 'dsh')
+  const entry = join(dshSlotRoot, 'lib', 'bin.js')
   const pluginRoot = resolve(dirname(pluginPath), '../../../runtime/plugins')
   const pluginSources = existsSync(pluginRoot)
     ? readdirSync(pluginRoot, { withFileTypes: true })
       .filter((item) => item.isDirectory())
       .map((item) => join(pluginRoot, item.name))
     : []
-  if (!existsSync(entry)) {
+  if (!isRuntimePackageComplete(dsh.root, dshSlotRoot)) {
     rmSync(slot, { recursive: true, force: true })
     mkdirSync(join(slot, 'node_modules', '@deepseek-ai'), { recursive: true })
     copyPackageClosure(dsh.root, slot, pluginSources)
@@ -87,6 +88,25 @@ export function prepareRuntimeSlot(scope: HostScope, jsonRpcEndpoint: string, pl
     plugins: pluginEntries,
   }, null, 2)}\n`)
   return { root: slot, entry, version: dsh.version, ...(dsh.buildId === undefined ? {} : { buildId: dsh.buildId }), patch, jsonRpcEndpoint }
+}
+
+function isRuntimePackageComplete(sourceRoot: string, targetRoot: string): boolean {
+  if (!existsSync(targetRoot)) return false
+  const sourceManifestPath = join(sourceRoot, 'package.json')
+  const targetManifestPath = join(targetRoot, 'package.json')
+  if (!existsSync(sourceManifestPath) || !existsSync(targetManifestPath)) return false
+  const sourceManifest = JSON.parse(readFileSync(sourceManifestPath, 'utf8')) as { version?: string }
+  const targetManifest = JSON.parse(readFileSync(targetManifestPath, 'utf8')) as { version?: string }
+  if (sourceManifest.version !== targetManifest.version) return false
+  return listPackageFiles(sourceRoot).every((sourcePath) => existsSync(join(targetRoot, relative(sourceRoot, sourcePath))))
+}
+
+function listPackageFiles(root: string, current = root): string[] {
+  return readdirSync(current, { withFileTypes: true }).flatMap((entry) => {
+    if (entry.name === 'node_modules') return []
+    const path = join(current, entry.name)
+    return entry.isDirectory() ? listPackageFiles(root, path) : [path]
+  })
 }
 
 /**
