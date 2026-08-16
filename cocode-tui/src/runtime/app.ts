@@ -2346,6 +2346,15 @@ class TuiAppImpl implements TuiApp {
     const remoteName = parsed.name.toLowerCase()
     const remoteCommand = this.remoteCommands.find((entry) => entry.name === remoteName)
     if (this.capabilities.commands && remoteCommand !== undefined) {
+      if (remoteCommand.input !== undefined && parsed.args === '') {
+        this.draft = replaceDraft(this.draft, `/${remoteName} `)
+        this.attachments = []
+        this.images = []
+        this.pendingSkillInvocation = undefined
+        this.notice = undefined
+        this.emit()
+        return
+      }
       this.draft = createDraft()
       this.attachments = []
       this.images = []

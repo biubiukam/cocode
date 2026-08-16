@@ -146,6 +146,8 @@ Type `/` to open the command menu. Keep typing to filter by prefix. `Tab` or arr
 | `/resume`                      | Open the local session picker and replay a selected session                                       |
 | `/skills`                      | Browse user-invocable skills from the current workspace                                           |
 | `/goal`                        | Inspect or change the current goal through the Host command registry                              |
+| `/feedback <text>`             | Record feedback for the current session when the Host mounts feedback                             |
+| `/permission <preset>`         | Switch the Host permission preset directly when the command is available                         |
 | `/use byok` / `/use cocode`    | Switch between your key and Cocode; switching starts a new session                                |
 | `/login` / `/logout`           | Sign in or out of Cocode Cloud; logout keeps your key and stays in chat                           |
 | `/exit` / `/quit` / `/q`       | Shut down TUI and restore the terminal                                                            |

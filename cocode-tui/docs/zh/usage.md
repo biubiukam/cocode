@@ -136,6 +136,8 @@ TTY，可以用于安装脚本和故障排查。
 | `/resume`                      | 打开当前工作区的 session 选择器并回放选中会话                        |
 | `/skills`                      | 浏览当前工作区中可由用户调用的技能                                   |
 | `/goal`                        | 使用 Host 的目标命令查看或修改当前目标；参数语法由 Host 注册表提供       |
+| `/feedback <文本>`             | 记录当前会话反馈；需要 Host 挂载 feedback 命令                         |
+| `/permission <preset>`         | 直接切换 Host 权限 preset；需要 Host 挂载 permission 命令               |
 | `/use byok` / `/use cocode`    | 在自己的 Key 和 Cocode 之间切换；切换即新会话                        |
 | `/login` / `/logout`           | 登录或退出 Cocode Cloud；退出时若还有 Key 则留在对话里               |
 | `/exit` / `/quit` / `/q`       | 关闭 TUI 并恢复终端                                                  |

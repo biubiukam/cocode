@@ -554,6 +554,30 @@ describe('TuiApp', () => {
     })
   })
 
+  it('uses a runtime command input hint to keep the draft editable', async () => {
+    const runtime = fakeRuntime()
+    runtime.commands = [
+      { name: 'feedback', description: 'Record feedback', input: { hint: '<text>' } },
+    ]
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+    })
+    await app.start()
+
+    app.dispatch({ type: 'command', line: '/feedback' })
+
+    expect(app.snapshot().composer.text).toBe('/feedback ')
+    expect(runtime.executedCommands).toEqual([])
+    app.dispatch({ type: 'submit', text: '/feedback useful feedback' })
+    await expect.poll(() => runtime.executedCommands).toEqual([
+      { sessionId: 's1', line: '/feedback useful feedback' },
+    ])
+  })
+
   it('keeps a skill draft while another turn is running', async () => {
     const runtime = fakeRuntime() as TuiRuntime & {
       listSkills(sessionId: string): Promise<{ name: string; description: string }[]>
