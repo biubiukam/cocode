@@ -24,6 +24,7 @@
     "build": "node packages/host-supervisor/scripts/build.mjs",
     "build:with-gui-plugins": "node packages/host-supervisor/scripts/build.mjs --include-gui-plugins",
     "typecheck": "tsc --noEmit -p packages/host-supervisor/tsconfig.json",
+    "pretest": "pnpm run build",
     "test": "node --test packages/host-supervisor/test/*.test.mjs",
     "prepack": "pnpm run build"
   },

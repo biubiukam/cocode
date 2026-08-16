@@ -44,3 +44,23 @@ await lease.release()
 Supervisor state lives below `~/.cocode/host-supervisor`; immutable runtime
 slots live below `~/.cocode/host-runtimes`. Override those roots with
 `COCODE_SUPERVISOR_HOME` and `COCODE_HOST_RUNTIME_HOME` for packaging/tests.
+
+## Build-generated runtime
+
+The repository does not track the generated `runtime/` tree. It is a build
+staging directory containing the Cocode plugin manifests and compiled plugin
+entries that are shipped with the package or copied into an Electron Desktop
+runtime. `pnpm run build` generates the standalone Supervisor runtime; the GUI
+release build uses `pnpm run build:with-gui-plugins` after building the GUI
+plugin bundles. The `prepack` lifecycle runs the standalone build before an npm
+tarball is created.
+
+The generated tree is intentionally different from the per-user runtime slots:
+
+```text
+runtime/                         # build output, not source
+~/.cocode/host-runtimes/<key>-<version>/  # materialized immutable runtime slot
+```
+
+Do not edit files under `runtime/` by hand. Change the plugin sources or their
+manifests, then rebuild the Supervisor/runtime.
