@@ -141,6 +141,7 @@ export const zh = {
   "preview.save": "保存",
   "preview.saving": "保存中…",
   "preview.truncated": "内容过长 · 只读",
+  "preview.readOnly": "只读",
   "preview.pickFile": "请从「文件」中选择一个文件",
   "preview.download": "下载文件",
 
@@ -294,6 +295,7 @@ export const en: Record<WorkbenchKey, string> = {
   "preview.save": "Save",
   "preview.saving": "Saving…",
   "preview.truncated": "Truncated · read only",
+  "preview.readOnly": "Read only",
   "preview.pickFile": "Choose a file from Files",
   "preview.download": "Download file",
 

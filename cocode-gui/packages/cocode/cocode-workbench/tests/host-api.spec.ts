@@ -3,17 +3,21 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 import { createWorkbenchApi } from "../src/host-api.ts"
-import type { WorkbenchContext } from "../src/host-types.ts"
+import type { SandboxMode, WorkbenchContext } from "../src/host-types.ts"
 
-/** Host context of a session rooted at `cwd`, with no optional service mounted. */
-function context(cwd: string): WorkbenchContext {
+/**
+ * Host context of a session rooted at `cwd`. Without a mounted `sandboxPolicy`
+ * the workbench assumes the narrowest mode, so the workspace is the only
+ * writable root; `mode` mounts a stub policy to exercise the wider modes.
+ */
+function context(cwd: string, mode?: SandboxMode): WorkbenchContext {
   return {
     sessions: { get: () => ({ header: { cwd } }) },
     webServer: { register: () => () => {}, registerUpgrade: () => () => {} },
-    get: () => undefined,
+    get: (name: string) => name === "sandboxPolicy" && mode !== undefined ? { resolve: () => ({ mode }) } : undefined,
     inject: () => {},
     effect: () => {},
-  }
+  } as WorkbenchContext
 }
 
 /** Same host surface, but the named session is not live in the store yet. */
@@ -49,12 +53,38 @@ describe("Cocode Workbench host API", () => {
     expect(read.value?.value).toMatchObject({ kind: "text", content: "hello" })
   })
 
-  it("rejects a path outside the session workspace", async () => {
+  it("reads outside the workspace but marks it unwritable", async () => {
     const cwd = await mkdtemp(join(tmpdir(), "cocode-workbench-"))
+    const outside = await mkdtemp(join(tmpdir(), "cocode-elsewhere-"))
+    await writeFile(join(outside, "note.txt"), "hello")
     const route = createWorkbenchApi(context(cwd))
-    const result = await invoke(route, "fs.read", { sessionId: "s1", path: "../outside.txt" })
+    const result = await invoke(route, "fs.read", { sessionId: "s1", path: join(outside, "note.txt") })
+    expect(result.status).toBe(200)
+    expect(result.value?.value).toMatchObject({ kind: "text", content: "hello", writable: false })
+  })
+
+  it("denies a write outside the writable roots of the current mode", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "cocode-workbench-"))
+    const outside = await mkdtemp(join(tmpdir(), "cocode-elsewhere-"))
+    const route = createWorkbenchApi(context(cwd))
+    const result = await invoke(route, "fs.write", { sessionId: "s1", path: join(outside, "note.txt"), content: "x" })
     expect(result.status).toBe(400)
-    expect(result.value.error?.message).toMatch(/outside/)
+    expect(result.value.error?.message).toMatch(/file access denied under read-only mode/)
+  })
+
+  it("keeps the workspace writable even under read-only", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "cocode-workbench-"))
+    const route = createWorkbenchApi(context(cwd, "read-only"))
+    const result = await invoke(route, "fs.write", { sessionId: "s1", path: "note.txt", content: "x" })
+    expect(result.value?.value).toMatchObject({ written: true })
+  })
+
+  it("lifts the write fence under danger-full-access", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "cocode-workbench-"))
+    const outside = await mkdtemp(join(tmpdir(), "cocode-elsewhere-"))
+    const route = createWorkbenchApi(context(cwd, "danger-full-access"))
+    const result = await invoke(route, "fs.write", { sessionId: "s1", path: join(outside, "note.txt"), content: "x" })
+    expect(result.value?.value).toMatchObject({ written: true })
   })
 
   it("writes text through the explicit editor action", async () => {

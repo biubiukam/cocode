@@ -41,6 +41,22 @@ export interface WorkbenchAttachments {
   }>
 }
 
+/** File-effect mode of the harness sandbox; the workbench mirrors it for writes. */
+export type SandboxMode = "read-only" | "workspace-write" | "danger-full-access"
+
+/** One live session, passed back to the sandbox policy for its mode override. */
+export interface WorkbenchSession {
+  readonly header?: { readonly cwd?: string }
+}
+
+/**
+ * Sandbox policy home; resolves the file-effect mode of one session. Optional,
+ * so the workbench still runs in a composition without the sandbox stack.
+ */
+export interface WorkbenchSandboxPolicy {
+  resolve(request: { readonly session?: WorkbenchSession }): { readonly mode: SandboxMode }
+}
+
 /** User settings document; carries the commit-message model choice. */
 export interface WorkbenchSettingsService {
   register(namespace: string, schema: unknown): unknown
@@ -54,7 +70,7 @@ export interface WorkbenchSettingsService {
 }
 
 export interface WorkbenchContext {
-  readonly sessions: { get(id: string): { header?: { cwd?: string } } | undefined }
+  readonly sessions: { get(id: string): WorkbenchSession | undefined }
   readonly webServer: {
     register(route: WorkbenchRoute): () => void
     registerUpgrade(route: WorkbenchUpgradeRoute): () => void
@@ -71,6 +87,7 @@ export interface WorkbenchContext {
   get(name: "attachments"): WorkbenchAttachments | undefined
   get(name: "llm"): import("@deepseek-ai/dsh-llm").LlmRuntime | undefined
   get(name: "settings"): WorkbenchSettingsService | undefined
+  get(name: "sandboxPolicy"): WorkbenchSandboxPolicy | undefined
   /** Run once the optional service is mounted; used to register the settings schema. */
   inject(
     deps: readonly ["settings"],

@@ -59,6 +59,8 @@ interface FileRead {
   readonly kind: string
   readonly content?: string
   readonly truncated?: boolean
+  /** False when the session's sandbox mode forbids writing this path. */
+  readonly writable?: boolean
 }
 
 function previewKind(extension: string | undefined, fileKind: string | undefined): PreviewKind | undefined {
@@ -161,8 +163,10 @@ function FilePreview(props: WorkbenchPanelProps) {
 
   const hasSource = file?.kind === "text"
   // A truncated read holds only the first megabytes; writing it back would
-  // destroy the tail, so such a file stays readable but never editable.
-  const editable = hasSource && file?.truncated !== true
+  // destroy the tail, so such a file stays readable but never editable. A file
+  // the sandbox mode puts out of write reach opens read-only for the same
+  // reason: better than accepting edits the save would reject.
+  const editable = hasSource && file?.truncated !== true && file.writable !== false
   const dirty = editable && text !== stored
   const mode = choice !== undefined && choice.path === path ? choice.mode : preferredMode(kind, hasSource)
 
@@ -229,7 +233,9 @@ function FilePreview(props: WorkbenchPanelProps) {
   return <div className={css.panel}>
     <div className={css.toolbar}>
       <span className={css.name} title={path}>{workspaceRelativePath(cwd, path)}</span>
-      {file?.truncated === true && <span className={css.flag}>{t("preview.truncated")}</span>}
+      {file?.truncated === true
+        ? <span className={css.flag}>{t("preview.truncated")}</span>
+        : hasSource && !editable && <span className={css.flag}>{t("preview.readOnly")}</span>}
       <span className={css.spacer} />
       <button
         type="button"

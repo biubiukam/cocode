@@ -13,11 +13,21 @@ import { HostLogger } from './logging.js'
 type AcquireRequest = AcquireHostRequest & { clientPid?: number }
 type HostProcess = { child: ReturnType<typeof spawn> | null; descriptor: HostDescriptor; idleTimer?: NodeJS.Timeout }
 
+const SHUTDOWN_SIGNALS: readonly NodeJS.Signals[] = ['SIGINT', 'SIGTERM', 'SIGHUP']
+/**
+ * How long a Host may take to unwind before it is killed. Workbench shutdown
+ * disposes PTYs and browser contexts, which regularly overran the original two
+ * seconds and forced a SIGKILL on an otherwise healthy exit.
+ */
+const HOST_TERMINATE_GRACE_MS = Number(process.env.COCODE_HOST_TERMINATE_GRACE_MS ?? 8_000)
+const HOST_KILL_GRACE_MS = 2_000
+
 export async function runSupervisorService(stateDirectory: string): Promise<void> {
   mkdirSync(stateDirectory, { recursive: true, mode: 0o700 })
   const scope = JSON.parse(readFileSync(scopePath(stateDirectory), 'utf8')) as HostScope
   const logger = new HostLogger({ stateDirectory })
   const service = new SupervisorService(stateDirectory, scope, logger)
+  const signals = installShutdownSignals(service, logger)
   try {
     await service.start()
     await service.wait()
@@ -25,7 +35,28 @@ export async function runSupervisorService(stateDirectory: string): Promise<void
     logger.log('fatal', 'supervisor.failed', { error: error instanceof Error ? error.message : String(error) })
     throw error
   } finally {
+    signals.dispose()
     logger.close()
+  }
+}
+
+/**
+ * Idle shutdown lives in this process, so a Supervisor that exits without
+ * stopping its Host strands one that nothing will ever reclaim.
+ */
+function installShutdownSignals(service: SupervisorService, logger: HostLogger): { dispose: () => void } {
+  const registered = SHUTDOWN_SIGNALS.map((signal) => {
+    const handler = (): void => {
+      logger.log('info', 'supervisor.signal.received', { signal })
+      void service.stop()
+    }
+    process.on(signal, handler)
+    return { signal, handler }
+  })
+  return {
+    dispose: (): void => {
+      for (const { signal, handler } of registered) process.off(signal, handler)
+    },
   }
 }
 
@@ -272,10 +303,14 @@ class SupervisorService {
   }
   private async terminateHost(host: HostProcess): Promise<void> {
     const pid = host.child?.pid ?? host.descriptor.hostPid
-    await terminateProcess(pid, () => {
-      if (host.child !== null) host.child.kill('SIGTERM')
-      else process.kill(pid, 'SIGTERM')
-    })
+    await terminateProcess(
+      pid,
+      () => {
+        if (host.child !== null) host.child.kill('SIGTERM')
+        else process.kill(pid, 'SIGTERM')
+      },
+      () => this.logger.log('warn', 'dsh.host.stop.escalated', { hostPid: pid, graceMs: HOST_TERMINATE_GRACE_MS }),
+    )
   }
   private cleanupLeases(): void {
     const now = Date.now()
@@ -305,7 +340,7 @@ class SupervisorService {
   private writeDescriptor(descriptor: HostDescriptor): void { const temp = `${descriptorPath(this.directory)}.${process.pid}.tmp`; writeFileSync(temp, JSON.stringify(descriptor, null, 2) + '\n', { mode: 0o600 }); renameSync(temp, descriptorPath(this.directory)) }
   private readDescriptor(): HostDescriptor | null { try { return JSON.parse(readFileSync(descriptorPath(this.directory), 'utf8')) as HostDescriptor } catch { return null } }
   private doctor(): Record<string, unknown> { return { supervisorProtocolRevision: SUPERVISOR_PROTOCOL_REVISION, supervisorBuildRevision: SUPERVISOR_BUILD_REVISION, scope: this.scope, descriptor: this.readDescriptor(), leaseCount: this.leases.size, pid: process.pid } }
-  private stop(): Promise<void> {
+  stop(): Promise<void> {
     if (this.stopPromise !== null) return this.stopPromise
     this.stopped = true
     this.stopPromise = (async () => {
@@ -422,13 +457,14 @@ async function terminateChild(child: ReturnType<typeof spawn>): Promise<void> {
   await terminateProcess(child.pid, () => child.kill('SIGTERM'))
 }
 
-async function terminateProcess(pid: number, terminate: () => void): Promise<void> {
+async function terminateProcess(pid: number, terminate: () => void, onEscalate?: () => void): Promise<void> {
   if (pid <= 0 || !isProcessAlive(pid)) return
   try { terminate() } catch { /* the process may have exited between checks */ }
-  await waitForProcessExit(pid, 2_000)
+  await waitForProcessExit(pid, HOST_TERMINATE_GRACE_MS)
   if (!isProcessAlive(pid)) return
+  onEscalate?.()
   try { process.kill(pid, 'SIGKILL') } catch { /* already gone */ }
-  await waitForProcessExit(pid, 2_000)
+  await waitForProcessExit(pid, HOST_KILL_GRACE_MS)
 }
 
 async function hostHealth(descriptor: HostDescriptor): Promise<boolean> {
