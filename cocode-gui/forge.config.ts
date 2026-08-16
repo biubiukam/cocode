@@ -35,10 +35,12 @@ const releaseTarget =
 	process.env.RELEASE_PLATFORM || process.env.RELEASE_ARCH || process.env.RELEASE_REQUIRE_SIGNING
 		? resolveReleaseTarget()
 		: undefined
+const defaultIconRoot = path.resolve("resources/icons")
+const targetPlatform = releaseTarget?.platform ?? process.platform
 const appIcon =
-	releaseTarget?.platform === "win32"
-		? process.env.WINDOWS_ICON_PATH
-		: process.env.MACOS_ICON_PATH
+	targetPlatform === "win32"
+		? process.env.WINDOWS_ICON_PATH?.trim() || path.join(defaultIconRoot, "cocode.ico")
+		: process.env.MACOS_ICON_PATH?.trim() || path.join(defaultIconRoot, "cocode.icns")
 const macSignOptions = releaseTarget?.platform === "win32" ? undefined : createMacSignOptions()
 const macNotarizeOptions =
 	releaseTarget?.platform === "win32" ? undefined : createMacNotarizeOptions()
