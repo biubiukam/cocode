@@ -11,6 +11,8 @@ export type ComposerSpan = {
 
 export type ComposerRow = {
   spans: ComposerSpan[]
+  /** Cursor sits after the last cell; used when the hardware caret is shown. */
+  caretAtEnd?: boolean
 }
 
 /** Number of input rows that the borderless composer visibly reserves. */
@@ -18,6 +20,10 @@ export function composerInputRows(text: string, maxRows = 6): number {
   const lineCount = text.split('\n').length
   return Math.min(Math.max(1, Math.trunc(maxRows)), Math.max(1, lineCount))
 }
+
+/** Cells occupied by the first-line `> ` / continuation `│ ` marker. */
+export const COMPOSER_PROMPT_PREFIX_CELLS = 2
+const COMPOSER_METADATA_ROWS = 1
 
 /** Complete borderless composer height: input, optional summaries, and metadata. */
 export function composerRenderedRows(options: {
@@ -30,8 +36,49 @@ export function composerRenderedRows(options: {
     composerInputRows(options.text, options.maxRows) +
     Number(options.hasAttachments === true) +
     Number(options.hasImages === true) +
-    1
+    COMPOSER_METADATA_ROWS
   )
+}
+
+export type ComposerImeCaret = {
+  /** 0-based row inside the visible input box. */
+  rowIndex: number
+  /** 0-based column inside the input box, including the prompt marker. */
+  column: number
+}
+
+/** Caret offset inside the composer input box for Ink's native IME cursor. */
+export function composerImeCaret(options: {
+  text: string
+  cursor: number
+  selection?: { start: number; end: number }
+  maxInputRows: number
+  maxColumns: number
+}): ComposerImeCaret {
+  const inputRows = options.text === ''
+    ? []
+    : visibleComposerRows(
+        renderComposerRows(options.text, options.cursor, options.selection, { caretCell: false }),
+        options.maxInputRows,
+      ).map((row) =>
+        clipComposerRow(
+          row,
+          Math.max(1, Math.trunc(options.maxColumns) - COMPOSER_PROMPT_PREFIX_CELLS),
+        ),
+      )
+  const cursorRow = inputRows.findIndex(hasCursor)
+  const rowIndex = cursorRow < 0 ? 0 : cursorRow
+  const row = inputRows[rowIndex]
+  const cursorSpanIndex = row?.spans.findIndex((span) => span.cursor === true) ?? -1
+  const beforeCursor = row === undefined
+    ? 0
+    : row.caretAtEnd === true || cursorSpanIndex < 0
+      ? spansWidth(row.spans)
+      : spansWidth(row.spans.slice(0, cursorSpanIndex))
+  return {
+    rowIndex,
+    column: COMPOSER_PROMPT_PREFIX_CELLS + beforeCursor,
+  }
 }
 
 export function composerCursorStyle(
@@ -53,7 +100,9 @@ export function renderComposerRows(
   text: string,
   cursor: number,
   selection?: ComposerSelection,
+  options?: { caretCell?: boolean },
 ): ComposerRow[] {
+  const caretCell = options?.caretCell !== false
   const safeCursor = normalizeGraphemeOffset(text, cursor)
   const safeSelection = normalizeSelection(selection, text)
   const rows: ComposerRow[] = []
@@ -73,11 +122,13 @@ export function renderComposerRows(
       })
       if (isCursor) cursorRendered = true
     }
+    let caretAtEnd = false
     if (!cursorRendered && safeCursor === lineEnd) {
-      appendSpan(spans, { text: ' ', cursor: true })
+      if (caretCell) appendSpan(spans, { text: ' ', cursor: true })
+      else caretAtEnd = true
       cursorRendered = true
     }
-    rows.push({ spans })
+    rows.push(caretAtEnd ? { spans, caretAtEnd: true } : { spans })
     offset = lineEnd + 1
   }
   return rows
@@ -96,7 +147,12 @@ export function clipComposerRow(row: ComposerRow, maxCells: number): ComposerRow
   if (rowWidth(row) <= width) return row
 
   const cursorIndex = row.spans.findIndex((span) => span.cursor === true)
-  if (cursorIndex < 0) return { spans: clipSpansStart(row.spans, width) }
+  if (cursorIndex < 0) {
+    return {
+      spans: clipSpansStart(row.spans, width),
+      ...(row.caretAtEnd === true ? { caretAtEnd: true } : {}),
+    }
+  }
 
   const cursor = row.spans[cursorIndex]
   if (cursor === undefined) return row
@@ -118,6 +174,7 @@ export function clipComposerRow(row: ComposerRow, maxCells: number): ComposerRow
       cursor,
       ...clipSpansStart(after, afterBudget),
     ],
+    ...(row.caretAtEnd === true ? { caretAtEnd: true } : {}),
   }
 }
 
@@ -126,7 +183,7 @@ export function composerRowText(row: ComposerRow): string {
 }
 
 function hasCursor(row: ComposerRow): boolean {
-  return row.spans.some((span) => span.cursor === true)
+  return row.caretAtEnd === true || row.spans.some((span) => span.cursor === true)
 }
 
 function rowWidth(row: ComposerRow): number {

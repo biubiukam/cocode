@@ -4,7 +4,6 @@
 
 import { Box, Text, useInput, useStdout, useStdin } from 'ink'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import stringWidth from 'string-width'
 import type { TuiApp, TuiSnapshot } from '../runtime/app.ts'
 import { matchKey, type Keymap } from '../runtime/keymap.ts'
 import { resolveKeymap } from '../runtime/keymap-config.ts'
@@ -88,11 +87,8 @@ import {
 } from './chat-layout.ts'
 import { composerHeaderLayout } from './composer-header.ts'
 import {
-  clipComposerRow,
   composerInputRows,
   composerRenderedRows,
-  renderComposerRows,
-  visibleComposerRows,
 } from './composer-layout.ts'
 import { Inspector, INSPECTOR_WIDTH } from './components/Inspector.tsx'
 import type { InspectorMouseInput } from './inspector-scroll.ts'
@@ -521,38 +517,6 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
   const composerMetadataRow =
     contentOverlayStartRow +
     layout.rows.overlay
-  const imeCursorAnchor = useMemo(() => {
-    if (snap.composer.disabled) return undefined
-    const inputRows = snap.composer.text === ''
-      ? []
-      : visibleComposerRows(
-          renderComposerRows(snap.composer.text, snap.composer.cursor, snap.composer.selection),
-          layout.composerInputRows,
-        ).map((row) => clipComposerRow(row, Math.max(1, mainColumns - 2)))
-    const cursorRow = inputRows.findIndex((row) => row.spans.some((span) => span.cursor === true))
-    const rowIndex = cursorRow < 0 ? 0 : cursorRow
-    const row = inputRows[rowIndex]
-    const cursorSpanIndex = row?.spans.findIndex((span) => span.cursor === true) ?? -1
-    const beforeCursor = row === undefined || cursorSpanIndex < 0
-      ? 0
-      : row.spans
-          .slice(0, cursorSpanIndex)
-          .reduce((width, span) => width + stringWidth(span.text), 0)
-    return {
-      row: composerMetadataRow + snap.composer.attachments.length + snap.composer.images.length + rowIndex + 2,
-      column: 3 + beforeCursor,
-    }
-  }, [
-    composerMetadataRow,
-    layout.composerInputRows,
-    mainColumns,
-    snap.composer.attachments.length,
-    snap.composer.cursor,
-    snap.composer.disabled,
-    snap.composer.images.length,
-    snap.composer.selection,
-    snap.composer.text,
-  ])
   const popupBounds = {
     startRow: contentOverlayStartRow,
     startColumn: 1,
@@ -613,12 +577,6 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     ],
   )
 
-  useEffect(() => {
-    const output = stdout as NodeJS.WriteStream & {
-      setCursorAnchor?: (anchor: { row: number; column: number } | undefined) => void
-    }
-    output.setCursorAnchor?.(imeCursorAnchor)
-  }, [imeCursorAnchor, stdout])
   const messageScrollMax = useMemo(
     () =>
       maxMessageScrollOffset(
@@ -2053,6 +2011,9 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
           locale={snap.locale}
           maxRows={layout.composerInputRows}
           maxColumns={mainColumns}
+          // composerMetadataRow is 1-based; adding summary rows yields the
+          // 0-based Ink row of the first input line.
+          inputRow={composerMetadataRow + layout.composerAttachmentRows}
         />
         <Box
           width={mainColumns}

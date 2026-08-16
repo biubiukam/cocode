@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import stringWidth from 'string-width'
 import {
   clipComposerRow,
+  composerImeCaret,
   composerInputRows,
   composerRenderedRows,
   composerRowText,
@@ -111,6 +112,42 @@ describe('composer row projection', () => {
       { text: '🙂', selected: true },
       { text: 'b' },
       { text: ' ', cursor: true },
+    ])
+  })
+
+  it('places the IME caret after the prompt marker on the draft row', () => {
+    const text = '帮我 asd'
+    expect(
+      composerImeCaret({
+        text,
+        cursor: text.length,
+        maxInputRows: 6,
+        maxColumns: 80,
+      }),
+    ).toEqual({
+      rowIndex: 0,
+      column: 2 + stringWidth(text),
+    })
+  })
+
+  it('follows the visible cursor row in a multiline draft', () => {
+    const text = 'one\ntwo'
+    expect(
+      composerImeCaret({
+        text,
+        cursor: text.length,
+        maxInputRows: 6,
+        maxColumns: 80,
+      }),
+    ).toEqual({
+      rowIndex: 1,
+      column: 2 + stringWidth('two'),
+    })
+  })
+
+  it('does not paint a trailing caret cell when the hardware cursor is used', () => {
+    expect(renderComposerRows('你好终于', 4, undefined, { caretCell: false })).toEqual([
+      { spans: [{ text: '你好终于' }], caretAtEnd: true },
     ])
   })
 })

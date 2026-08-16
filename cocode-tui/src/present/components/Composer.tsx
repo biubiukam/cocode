@@ -1,10 +1,11 @@
-import { Box, Text } from 'ink'
+import { Box, Text, useCursor } from 'ink'
 import type { TuiSnapshot } from '../../runtime/app.ts'
 import { formatFileMention } from '../../runtime/file-mentions.ts'
 import { isAppleTerminalEnvironment } from '../../runtime/platform.ts'
 import {
   clipComposerRow,
   composerCursorStyle,
+  composerImeCaret,
   renderComposerRows,
   visibleComposerRows,
 } from '../composer-layout.ts'
@@ -26,8 +27,12 @@ export function Composer(props: {
   locale: UiLocale
   maxRows?: number
   maxColumns?: number
+  /** 0-based Ink row of the first composer input line. */
+  inputRow?: number
 }) {
   const { composer } = props
+  const { setCursorPosition } = useCursor()
+  const hardwareCaret = !composer.disabled && props.inputRow !== undefined
   const cursorStyle = composerCursorStyle(isAppleTerminalEnvironment(), composer.disabled)
   const empty = composer.text === ''
   const header = composerHeaderLayout({
@@ -44,13 +49,27 @@ export function Composer(props: {
   const rows = empty
     ? []
     : visibleComposerRows(
-        renderComposerRows(composer.text, composer.cursor, composer.selection),
+        renderComposerRows(composer.text, composer.cursor, composer.selection, {
+          caretCell: !hardwareCaret,
+        }),
         props.maxRows ?? 6,
       ).map((row) => clipComposerRow(row, Math.max(1, (props.maxColumns ?? 80) - 2)))
+  const caret = composerImeCaret({
+    text: composer.text,
+    cursor: composer.cursor,
+    selection: composer.selection,
+    maxInputRows: props.maxRows ?? 6,
+    maxColumns: props.maxColumns ?? 80,
+  })
+  // Ink's useCursor must be set during render so IME follows this frame's caret.
+  setCursorPosition(
+    composer.disabled || props.inputRow === undefined
+      ? undefined
+      : { x: caret.column, y: props.inputRow + caret.rowIndex },
+  )
   return (
     <Box flexDirection="column" width="100%">
-      {/* Keep all non-editable chrome above the draft: the terminal's real cursor
-          is left on the final draft row so native IME candidates anchor there. */}
+      {/* Native IME follows Ink's hardware cursor on the draft row. */}
       {composer.attachments.length > 0 ? (
         <Text color={theme.info} wrap="truncate-end">
           {text(props.locale, 'attached')} ·{' '}
@@ -121,8 +140,8 @@ export function Composer(props: {
               {row.spans.map((span, spanIndex) => (
                 <Text
                   key={`${spanIndex}:${span.text}`}
-                  inverse={cursorStyle.inverse && span.cursor === true}
-                  underline={cursorStyle.underline && span.cursor === true}
+                  inverse={!hardwareCaret && cursorStyle.inverse && span.cursor === true}
+                  underline={!hardwareCaret && cursorStyle.underline && span.cursor === true}
                   color={composer.disabled ? theme.mute : theme.text}
                   backgroundColor={
                     !composer.disabled && span.selected === true ? theme.border : undefined
