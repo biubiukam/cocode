@@ -8,6 +8,7 @@ import { readSettings, type ProductSettings } from './settings.ts'
 import {
   CLOUD_API,
   CLOUD_KEY_REF,
+  CLOUD_MAX_RETRIES,
   CLOUD_PROVIDER,
   DEFAULT_MODEL,
   DEFAULT_PROVIDER,
@@ -248,6 +249,7 @@ function createCloudProvider(
     api: CLOUD_API,
     baseURL: `${origin.replace(/\/$/, '')}/v1`,
     apiKeyEnv: CLOUD_KEY_REF,
+    retryPolicy: { mode: 'normal', maxRetries: CLOUD_MAX_RETRIES },
     models: cloudModels?.length === 0 || cloudModels === undefined
       ? [{ id: model, name: model }]
       : cloudModels.map((entry) => ({ ...entry })),

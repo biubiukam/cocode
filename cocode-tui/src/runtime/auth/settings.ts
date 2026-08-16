@@ -5,6 +5,7 @@
 import {
   CLOUD_API,
   CLOUD_KEY_REF,
+  CLOUD_MAX_RETRIES,
   CLOUD_PROVIDER,
   DEFAULT_MODEL,
   DEFAULT_PROVIDER,
@@ -135,6 +136,7 @@ async function writeCloudRoute(
     api: CLOUD_API,
     baseURL: `${origin.replace(/\/$/, '')}/v1`,
     apiKeyEnv: CLOUD_KEY_REF,
+    retryPolicy: { mode: 'normal', maxRetries: CLOUD_MAX_RETRIES },
     models: models.map((model) => ({ id: model.id, name: model.name })),
   }
   llm.providers = providers
@@ -206,6 +208,7 @@ function migrateLegacyCloudRoot(root: Record<string, unknown>): Record<string, u
       ...(isRecord(legacyRoute) ? legacyRoute : {}),
       displayName: 'Cocode Nut',
       apiKeyEnv: CLOUD_KEY_REF,
+      retryPolicy: { mode: 'normal', maxRetries: CLOUD_MAX_RETRIES },
     }
   }
   delete nextProviders[LEGACY_CLOUD_PROVIDER]

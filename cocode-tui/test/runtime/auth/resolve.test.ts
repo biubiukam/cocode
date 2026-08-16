@@ -57,6 +57,9 @@ describe('resolveAuth', () => {
     await expect(readFile(join(home, 'settings.yaml'), 'utf8')).resolves.toContain(
       'api: openai-responses',
     )
+    await expect(readFile(join(home, 'settings.yaml'), 'utf8')).resolves.toContain(
+      'maxRetries: 5',
+    )
     const result = await resolveAuth({
       home,
       env: {},
@@ -69,6 +72,8 @@ describe('resolveAuth', () => {
     if (result.status !== 'ready') return
     expect(result.auth.mode).toBe('cocode')
     expect(result.auth.provider).toBe('cocode-nut')
+    const providers = JSON.parse(result.auth.env.COCODE_LLM_PROVIDERS ?? '{}')
+    expect(providers['cocode-nut'].retryPolicy).toEqual({ mode: 'normal', maxRetries: 5 })
   })
 
   it('opens the gate when nothing is configured', async () => {

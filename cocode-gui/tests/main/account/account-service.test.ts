@@ -292,6 +292,7 @@ test("reuses a ready device cloud route without minting another API key", async 
 		api: "openai-responses",
 		baseURL: "https://cocode.agency/v1",
 		apiKeyEnv: "COCODE_NUT_API_KEY",
+		retryPolicy: { mode: "normal", maxRetries: 5 },
 		models: [{ id: "cloud-model", name: "Cloud Model" }],
 	}
 	const dsh = {
@@ -345,6 +346,78 @@ test("reuses a ready device cloud route without minting another API key", async 
 		baseURL: "https://cocode.agency/v1",
 		apiKeyEnv: "COCODE_NUT_API_KEY",
 	})
+})
+
+test("upgrades a ready cloud route to the Cocode five-retry default", async () => {
+	const identity = new MemoryVault(
+		validIdentity({
+			personalKeyId: "key-from-tui",
+			personalKeyName: "Cocode Device — test-host",
+		}),
+	)
+	const { client, createdKeys } = agency()
+	let route: Record<string, unknown> = {
+		displayName: "Cocode Nut",
+		api: "openai-responses",
+		baseURL: "https://cocode.agency/v1",
+		apiKeyEnv: "COCODE_NUT_API_KEY",
+		models: [{ id: "cloud-model", name: "Cloud Model" }],
+	}
+	const writes: string[] = []
+	const dsh = {
+		currentDefault: async () => ({ provider: "cocode-nut", model: "cloud-model" }),
+		describeSettings: async () => ({
+			writable: true,
+			namespaces: [
+				{
+					ns: "llm-pi-ai",
+					revision: 3,
+					value: { providers: { "cocode-nut": route } },
+				},
+			],
+		}),
+		describeCredentials: async () => ({
+			COCODE_NUT_API_KEY: { configured: true, writable: true },
+		}),
+		providers: async (): Promise<ProviderView[]> => [
+			{
+				provider: "cocode-nut",
+				displayName: "Cocode Nut",
+				settingsNs: "llm-pi-ai",
+				settingsPath: ["providers", "cocode-nut"],
+				active: true,
+			},
+		],
+		models: async (): Promise<ModelGroup[]> => [
+			{
+				id: "cocode-nut",
+				name: "Cocode Nut",
+				models: [{ id: "cloud-model", name: "Cloud Model" }],
+			},
+		],
+		mutateSettings: async (request: { ops: { op: "set" | "unset"; value?: unknown }[] }) => {
+			route = request.ops[0]?.value as Record<string, unknown>
+			writes.push("route:set")
+		},
+		setCredential: async () => {
+			writes.push("credential:set")
+		},
+		unsetCredential: async () => {
+			writes.push("credential:unset")
+		},
+	} as never
+	const cloudKey = new MemoryVault("ck_live_existing")
+
+	const snapshot = await new AccountService(
+		dsh,
+		client,
+		dependencies(identity, cloudKey).deps,
+	).signIn()
+	assert.equal(snapshot.phase, "signed-in")
+	assert.equal(snapshot.cloud.status, "ready")
+	assert.deepEqual(createdKeys, [])
+	assert.deepEqual(route.retryPolicy, { mode: "normal", maxRetries: 5 })
+	assert.deepEqual(writes, ["credential:set", "route:set"])
 })
 
 test("upgrades a Completions cloud route to Responses without minting another key", async () => {
@@ -416,6 +489,7 @@ test("upgrades a Completions cloud route to Responses without minting another ke
 	assert.equal(snapshot.cloud.status, "ready")
 	assert.deepEqual(createdKeys, [])
 	assert.equal(route.api, "openai-responses")
+	assert.deepEqual(route.retryPolicy, { mode: "normal", maxRetries: 5 })
 	assert.deepEqual(writes, ["credential:set", "route:set"])
 })
 

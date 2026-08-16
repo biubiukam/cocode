@@ -29,6 +29,7 @@ const LEGACY_CLOUD_PATH = ["providers", LEGACY_CLOUD_PROVIDER] as const
 const CLOUD_CREDENTIAL = "COCODE_NUT_API_KEY"
 const LEGACY_CLOUD_CREDENTIAL = "COCODE_CLOUD_API_KEY"
 const CLOUD_API = "openai-responses"
+const CLOUD_MAX_RETRIES = 5
 const CLOUD_KEY_PATTERN = /^ck_[A-Za-z0-9_-]+$/
 const CLOUD_READY_ATTEMPTS = 6
 const CLOUD_READY_RETRY_MS = 100
@@ -187,7 +188,13 @@ function routeIsCurrent(
 	route: Record<string, unknown> | undefined,
 	managedRoute: { readonly baseURL: string; readonly apiKeyEnv: string } | undefined,
 ): boolean {
-	return isManagedCloudRoute(route, managedRoute) && route?.api === CLOUD_API
+	const retryPolicy = recordOf(route?.retryPolicy)
+	return (
+		isManagedCloudRoute(route, managedRoute) &&
+		route?.api === CLOUD_API &&
+		retryPolicy?.mode === "normal" &&
+		retryPolicy.maxRetries === CLOUD_MAX_RETRIES
+	)
 }
 
 function cloudRouteValue(
@@ -199,6 +206,7 @@ function cloudRouteValue(
 		api: CLOUD_API,
 		baseURL,
 		apiKeyEnv: CLOUD_CREDENTIAL,
+		retryPolicy: { mode: "normal", maxRetries: CLOUD_MAX_RETRIES },
 		models: models.map((model) => ({ id: model.id, name: model.name })),
 	}
 }
@@ -970,6 +978,7 @@ export class AccountService {
 					...legacyRoute,
 					displayName: "Cocode Nut",
 					apiKeyEnv: CLOUD_CREDENTIAL,
+					retryPolicy: { mode: "normal", maxRetries: CLOUD_MAX_RETRIES },
 				},
 			})
 		}

@@ -33,12 +33,14 @@ export type MeProfile = {
 export type CloudModel = { id: string; name: string }
 
 export const CLOUD_API = 'openai-responses'
+export const CLOUD_MAX_RETRIES = 5
 
 export type CloudProviderProfile = {
   displayName: string
   api: typeof CLOUD_API
   baseURL: string
   apiKeyEnv: typeof CLOUD_KEY_REF
+  retryPolicy: { mode: 'normal'; maxRetries: typeof CLOUD_MAX_RETRIES }
   models: CloudModel[]
 }
 
