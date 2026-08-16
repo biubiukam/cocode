@@ -3,7 +3,7 @@
  */
 
 import type { SessionEvent } from '@cocode/tui-connection'
-import { asNumber, asString, blocksToText, isRecord, reasoningToText } from '../text.ts'
+import { asNumber, asString, blocksToText, blocksToUserDisplayText, isRecord, reasoningToText } from '../text.ts'
 import type {
   AssistantNode,
   ContextNode,
@@ -44,7 +44,7 @@ const userDefinition: NodeDefinition<UserNode> = {
       id: asString(data.id, String(event.seq)),
       seq: event.seq,
       time: event.time,
-      text: blocksToText(data.content),
+      text: userDisplayText(data),
     }
   },
   update(state) {
@@ -56,6 +56,13 @@ const userDefinition: NodeDefinition<UserNode> = {
   buildViewNode(ctx) {
     return ctx.state
   },
+}
+
+function userDisplayText(data: Record<string, unknown>): string {
+  const source = isRecord(data.source) ? data.source : undefined
+  return source?.displayContent === undefined
+    ? blocksToUserDisplayText(data.content)
+    : blocksToText(source.displayContent)
 }
 
 const contextDefinition: NodeDefinition<ContextNode> = {

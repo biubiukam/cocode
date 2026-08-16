@@ -1392,16 +1392,23 @@ class TuiAppImpl implements TuiApp {
         }
         const parts = [
           `${text(this.locale, 'tokensIn')} ${usage.input} · ${text(this.locale, 'tokensOut')} ${usage.output}`,
-          text(this.locale, 'usageCache', { read: usage.cacheRead, write: usage.cacheWrite }),
+          ...(telemetry.usage === undefined
+            ? []
+            : [
+                text(this.locale, 'usageCache', {
+                  read: String(telemetry.usage.cacheRead),
+                  write: String(telemetry.usage.cacheWrite),
+                }),
+              ]),
           text(this.locale, 'usageTotals', {
-            input: telemetry.totals.input,
-            output: telemetry.totals.output,
+            input: String(telemetry.totals.input),
+            output: String(telemetry.totals.output),
           }),
         ]
         if (telemetry.contextWindow !== undefined && telemetry.contextPercent !== undefined) {
           parts.push(text(this.locale, 'usageContext', {
-            percent: telemetry.contextPercent,
-            window: telemetry.contextWindow,
+            percent: String(telemetry.contextPercent),
+            window: String(telemetry.contextWindow),
           }))
         }
         this.notice = { tone: 'info', message: parts.join(' · ') }

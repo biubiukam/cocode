@@ -27,7 +27,6 @@ import { Chat } from './present/chat.tsx'
 import { clearViewport, enterScreen, parseScreenMode } from './present/clear-screen.ts'
 import { resolveUiLocale, text } from './runtime/ui-locale.ts'
 import { detectTerminalEnvironment } from './runtime/platform.ts'
-import { terminalBrandMark } from './present/terminal-farewell.ts'
 
 loadDotenv(resolve(process.cwd(), '.env'))
 
@@ -117,7 +116,9 @@ async function main(): Promise<void> {
   })
 
   clearViewport()
-  const screen = render(<Chat app={app} mouseSupported={terminal.supportsMouse} />)
+  const screen = render(<Chat app={app} mouseSupported={terminal.supportsMouse} />, {
+    kittyKeyboard: { mode: 'enabled' },
+  })
   let exitStarted = false
   let appReady = false
   const finish = async (): Promise<void> => {
@@ -132,9 +133,7 @@ async function main(): Promise<void> {
     await screen.unmount()
     leaveScreen()
     if (appReady) {
-      process.stdout.write(
-        `\n${terminalBrandMark()}\n\n${text(app.snapshot().locale, 'farewell')}\n`,
-      )
+      process.stdout.write(`\n${text(app.snapshot().locale, 'farewell')}\n`)
     }
     try {
       await releaseLiveInstance(resolved.dshHome)
@@ -215,7 +214,9 @@ function runAuthGate(store: AuthStore): Promise<boolean> {
     process.once('SIGHUP', onTerminate)
 
     clearViewport()
-    screen = render(view())
+    screen = render(view(), {
+      kittyKeyboard: { mode: 'enabled' },
+    })
     unsubscribe = store.subscribe(() => {
       const snapshot = store.snapshot()
       if (snapshot.phase === 'ready') {

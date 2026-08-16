@@ -102,6 +102,9 @@ describe('chat input helpers', () => {
     expect(dispatchComposerShortcut(app, base, 'a', { ctrl: true })).toBe(true)
     expect(dispatchComposerShortcut(app, base, 'c', { meta: true })).toBe(true)
     expect(dispatchComposerShortcut(app, base, 'x', { ctrl: true })).toBe(true)
+    expect(dispatchComposerShortcut(app, base, 'a', { super: true })).toBe(true)
+    expect(dispatchComposerShortcut(app, base, 'c', { super: true })).toBe(true)
+    expect(dispatchComposerShortcut(app, base, 'x', { super: true })).toBe(true)
     expect(
       dispatchComposerShortcut(
         app,
@@ -110,7 +113,18 @@ describe('chat input helpers', () => {
         { ctrl: true },
       ),
     ).toBe(false)
+    expect(
+      dispatchComposerShortcut(
+        app,
+        { ...base, composer: { text: 'hello' } } as TuiSnapshot,
+        'c',
+        { super: true },
+      ),
+    ).toBe(true)
     expect(dispatch.mock.calls).toEqual([
+      [{ type: 'selectAllDraft' }],
+      [{ type: 'copyDraftSelection' }],
+      [{ type: 'cutDraftSelection' }],
       [{ type: 'selectAllDraft' }],
       [{ type: 'copyDraftSelection' }],
       [{ type: 'cutDraftSelection' }],

@@ -22,6 +22,18 @@ describe('runtime capability negotiation', () => {
     })
   })
 
+  it('passes only the vision config path to the Host', () => {
+    const env = {
+      COCODE_HOME: '/tmp/cocode-account',
+      COCODE_VISION_PROVIDER: 'user',
+      COCODE_VISION_USER_MODEL: 'vision-model',
+    }
+
+    expect(resolveHostRuntimeEnv(env)).toEqual({
+      COCODE_VISION_CONFIG: '/tmp/cocode-account/vision.yaml',
+    })
+  })
+
   it('changes the Host scope when the runtime provider route changes', () => {
     const base = {
       DSH_HOME: '/tmp/cocode-home',

@@ -99,6 +99,7 @@ export function dispatchCommandArgumentCompletion(
 type ComposerShortcutKey = {
   ctrl?: boolean
   meta?: boolean
+  super?: boolean
 }
 
 /** Handle standard text-selection shortcuts before global Ctrl+C routing. */
@@ -108,13 +109,13 @@ export function dispatchComposerShortcut(
   input: string,
   key: ComposerShortcutKey,
 ): boolean {
-  if (!key.ctrl && !key.meta) return false
+  if (!key.ctrl && !key.meta && !key.super) return false
   switch (input.toLowerCase()) {
     case 'a':
       app.dispatch({ type: 'selectAllDraft' })
       return true
     case 'c':
-      if (snapshot.composer.selection === undefined) return false
+      if (snapshot.composer.selection === undefined) return key.super === true
       app.dispatch({ type: 'copyDraftSelection' })
       return true
     case 'x':

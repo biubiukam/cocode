@@ -243,30 +243,27 @@ type ResolvedEndpointConfig = {
 }
 
 function resolveConfig(raw: VisionConfig): ResolvedVisionConfig {
-  const provider = envProvider() ?? raw.provider ?? 'cocode'
+  const provider = raw.provider ?? 'cocode'
   if (provider !== 'user' && provider !== 'cocode') {
     throw new Error('cocode-vision provider must be "user" or "cocode"')
   }
   const user = {
-    endpoint: process.env.COCODE_VISION_USER_ENDPOINT ?? raw.user?.endpoint,
-    model: process.env.COCODE_VISION_USER_MODEL ?? raw.user?.model ?? '',
-    credentialRef:
-      process.env.COCODE_VISION_USER_CREDENTIAL_REF ?? raw.user?.credentialRef ?? DEFAULT_USER_CREDENTIAL,
+    endpoint: raw.user?.endpoint,
+    model: raw.user?.model ?? '',
+    credentialRef: raw.user?.credentialRef ?? DEFAULT_USER_CREDENTIAL,
   }
   const cocodeRoute = readCocodeRoute()
   const cocode = {
     endpoint:
-      process.env.COCODE_VISION_ENDPOINT ??
       raw.cocode?.endpoint ??
       (cocodeRoute?.baseURL === undefined ? undefined : appendChatCompletions(cocodeRoute.baseURL)),
-    model: process.env.COCODE_VISION_MODEL ?? raw.cocode?.model ?? DEFAULT_COCODE_MODEL,
+    model: raw.cocode?.model ?? DEFAULT_COCODE_MODEL,
     credentialRef:
-      process.env.COCODE_VISION_CREDENTIAL_REF ??
       raw.cocode?.credentialRef ??
       cocodeRoute?.credentialRef ??
       DEFAULT_COCODE_CREDENTIAL,
   }
-  const timeoutMs = Number(process.env.COCODE_VISION_TIMEOUT_MS ?? raw.timeoutMs ?? DEFAULT_TIMEOUT_MS)
+  const timeoutMs = raw.timeoutMs ?? DEFAULT_TIMEOUT_MS
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) throw new Error('vision timeoutMs must be a positive safe integer')
   return {
     provider,
@@ -370,11 +367,6 @@ function safeVisionError(message: string): string {
     .replace(/\b(?:sk-|ck_(?:live|test)_)[A-Za-z0-9_-]+/g, '[redacted]')
     .replace(/[\r\n]+/g, ' ')
     .slice(0, 240)
-}
-
-function envProvider(): VisionProvider | undefined {
-  const value = process.env.COCODE_VISION_PROVIDER
-  return value === 'user' || value === 'cocode' ? value : undefined
 }
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {

@@ -27,7 +27,7 @@ export function ModelSwitchPanel(props: {
       setValue((current) => current.slice(0, -1))
       return
     }
-    if (input !== '' && !key.ctrl && !key.meta) setValue((current) => current + input)
+    if (input !== '' && !key.ctrl && !key.meta && !key.super) setValue((current) => current + input)
   })
 
   return (

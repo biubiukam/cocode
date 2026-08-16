@@ -13,6 +13,18 @@ import { createTuiApp } from '../../src/runtime/app.ts'
 import { P0_CAPABILITIES } from '../../src/runtime/capabilities.ts'
 
 describe('Chat', () => {
+  it('enables Kitty keyboard protocol without probing the terminal', async () => {
+    const runtime = createTestRuntime()
+    const chat = await renderChat(runtime.value, { startBeforeRender: true })
+
+    try {
+      expect(chat.stdout.output).toContain('\u001B[>1u')
+      expect(chat.stdout.output).not.toContain('\u001B[?u')
+    } finally {
+      await closeChat(chat)
+    }
+  })
+
   it('shows a quit confirmation for the first idle Ctrl+C', async () => {
     const runtime = createTestRuntime()
     const chat = await renderChat(runtime.value, { locale: 'en', startBeforeRender: true })
@@ -55,10 +67,27 @@ describe('Chat', () => {
       })
 
       await flush()
+      await renderFlush()
       chat.stdin.write('\u001B')
-      await flush()
+      await renderFlush()
 
       expect(cancel).toHaveBeenCalledWith('session-1')
+    } finally {
+      await closeChat(chat)
+    }
+  })
+
+  it('routes Kitty super shortcuts to the composer', async () => {
+    const runtime = createTestRuntime()
+    const chat = await renderChat(runtime.value, { startBeforeRender: true })
+
+    try {
+      chat.app.dispatch({ type: 'setDraft', text: 'hello' })
+      await renderFlush()
+      chat.stdin.write('\u001B[97;9u')
+      await renderFlush()
+
+      expect(chat.app.snapshot().composer.selection).toEqual({ start: 0, end: 5 })
     } finally {
       await closeChat(chat)
     }
@@ -225,6 +254,7 @@ async function renderChat(
     debug: true,
     patchConsole: false,
     exitOnCtrlC: false,
+    kittyKeyboard: { mode: 'enabled' },
   })
   return { app, stdin, stdout, screen }
 }
