@@ -3,7 +3,6 @@ import path from "node:path"
 
 const root = process.cwd()
 const example = path.join(root, ".env.release.example")
-const alias = path.join(root, "env.list.example")
 const allowed = new Set([
 	"ELECTRON_APP_ID",
 	"RELEASE_COPYRIGHT",
@@ -50,11 +49,6 @@ function parse(file) {
 	return rows
 }
 
-if (!existsSync(example) || !existsSync(alias))
-	throw new Error("Both release env example files are required.")
-const left = parse(example)
-const right = parse(alias)
-const normalize = (rows) => rows.map(([key, value]) => `${key}=${value}`).join("\n")
-if (normalize(left) !== normalize(right))
-	throw new Error("env.list.example must mirror .env.release.example exactly.")
-console.log(`Release env schema OK: ${left.length} variables.`)
+if (!existsSync(example)) throw new Error(".env.release.example is required.")
+const rows = parse(example)
+console.log(`Release env schema OK: ${rows.length} variables.`)

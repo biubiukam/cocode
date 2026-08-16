@@ -13,6 +13,10 @@ import {
 	unregisterDshRuntimeIpc,
 } from "../contexts/dsh-runtime/presentation/ipc/register-dsh-runtime-ipc"
 import { registerApplicationLifecycle } from "../shell/lifecycle/register-application-lifecycle"
+import {
+	registerApplicationUpdates,
+	type ApplicationUpdateRegistration,
+} from "../shell/updater/register-application-updates"
 import { createMainWindow } from "../shell/windows/create-main-window"
 import { createDatabaseModule, type DatabaseModule } from "./create-database-module"
 import { ShortcutService } from "../contexts/shortcuts/application/shortcut-service"
@@ -43,8 +47,9 @@ export const startApplication = (): void => {
 	let shortcuts: ShortcutService | null = null
 	let mainWindow: BrowserWindow | null = null
 	let dshUrl: string | null = null
+	let applicationUpdates: ApplicationUpdateRegistration | null = null
 
-	registerApplicationLifecycle({
+	const lifecycle = registerApplicationLifecycle({
 		logger: observability.logger,
 		createWindow: () => {
 			if (!dshUrl) throw new Error("DSH runtime URL was not available after startup.")
@@ -88,10 +93,13 @@ export const startApplication = (): void => {
 			)
 			shortcuts = new ShortcutService(() => mainWindow)
 			registerShortcutsIpc(shortcuts, observability.logger)
+			applicationUpdates = registerApplicationUpdates(lifecycle)
 			observability.logger.log("info", "app.ready.completed")
 		},
 		onBeforeQuit: async () => {
 			observability.logger.log("info", "app.shutdown.started")
+			applicationUpdates?.dispose()
+			applicationUpdates = null
 			try {
 				unregisterDiagnosticsIpc()
 				unregisterShortcutsIpc()

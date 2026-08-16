@@ -149,6 +149,28 @@ export function appendChecksumManifest(makeResults: readonly ForgeMakeResult[]):
 	]
 }
 
+/**
+ * The public Electron update service cannot use Windows ARM64 Squirrel feed
+ * metadata as an x64 feed. Keep those files available as CI artifacts, but do
+ * not publish them into the shared GitHub release feed.
+ */
+export function selectGitHubReleaseArtifacts(
+	makeResults: readonly ForgeMakeResult[],
+): ForgeMakeResult[] {
+	return makeResults.map((result) => {
+		if (result.platform !== "win32" || result.arch !== "arm64") {
+			return { ...result, artifacts: [...result.artifacts] }
+		}
+		return {
+			...result,
+			artifacts: result.artifacts.filter((artifact) => {
+				const name = path.basename(artifact)
+				return name !== "RELEASES" && !name.toLowerCase().endsWith(".nupkg")
+			}),
+		}
+	})
+}
+
 function verifyWindowsFile(file: string): void {
 	const script = [
 		"$signature = Get-AuthenticodeSignature -LiteralPath $env:VERIFY_FILE",

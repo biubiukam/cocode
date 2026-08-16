@@ -3,6 +3,10 @@
 	"productName": "Cocode Desktop",
 	"version": "1.0.0",
 	"description": "Cocode GUI Root",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/cocode-agency/cocode.git"
+	},
 	"main": ".vite/build/main.js",
 	"private": true,
 	"packageManager": "pnpm@10.34.5",
@@ -67,6 +71,7 @@
 		"@electron-forge/plugin-auto-unpack-natives": "^7.11.2",
 		"@electron-forge/plugin-fuses": "^7.11.2",
 		"@electron-forge/plugin-vite": "^7.11.2",
+		"@electron-forge/publisher-github": "7.11.2",
 		"@electron/asar": "3.4.1",
 		"@electron/fuses": "^1.8.0",
 		"@electron/notarize": "2.5.0",
@@ -151,6 +156,7 @@
 		"sonner": "^2.0.8",
 		"tailwind-merge": "^3.6.0",
 		"tar": "^7.5.22",
+		"update-electron-app": "3.3.0",
 		"vaul": "^1.1.2",
 		"yaml": "^2.9.0",
 		"zod": "^4.4.3"

@@ -18,6 +18,7 @@ import {
 	createSquirrelConfig,
 	createWindowsSignOptions,
 	loadReleaseEnvironment,
+	resolveGitHubReleaseRepository,
 	resolveReleaseTarget,
 } from "./scripts/release/release-config"
 import {
@@ -25,6 +26,7 @@ import {
 	notarizeFinalMacArtifacts,
 	normalizeArtifactNames,
 	prepareMacDmgDependencies,
+	selectGitHubReleaseArtifacts,
 	verifyMadeArtifacts,
 	verifyPackagedApplication,
 } from "./scripts/release/release-hooks"
@@ -124,7 +126,7 @@ const config: ForgeConfig = {
 			const normalized = normalizeArtifactNames(makeResults)
 			await notarizeFinalMacArtifacts(normalized)
 			verifyMadeArtifacts(normalized)
-			return appendChecksumManifest(normalized)
+			return appendChecksumManifest(selectGitHubReleaseArtifacts(normalized))
 		},
 	},
 	rebuildConfig: {},
@@ -137,6 +139,19 @@ const config: ForgeConfig = {
 		new MakerDMG(createDmgConfig(), ["darwin"]),
 		new MakerRpm({}),
 		new MakerDeb({}),
+	],
+	publishers: [
+		{
+			name: "@electron-forge/publisher-github",
+			config: {
+				repository: resolveGitHubReleaseRepository(),
+				tagPrefix: "v",
+				draft: true,
+				prerelease: false,
+				generateReleaseNotes: true,
+				force: true,
+			},
+		},
 	],
 	plugins: [
 		new VitePlugin({

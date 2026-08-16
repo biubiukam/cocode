@@ -21,7 +21,7 @@ export interface GitHubReleaseRepository {
 	readonly name: string
 }
 
-const RELEASE_ENV_FILES = ["env.list", ".env.release"] as const
+const RELEASE_ENV_FILE = ".env.release"
 const RELEASE_KEYS = new Set([
 	"ELECTRON_APP_ID",
 	"RELEASE_COPYRIGHT",
@@ -78,14 +78,8 @@ export function loadReleaseEnvironment(environment = process.env): string | unde
 }
 
 export function resolveImplicitReleaseEnvFile(): string | undefined {
-	const present = RELEASE_ENV_FILES.map((file) => path.resolve(file)).filter(existsSync)
-	if (present.length > 1) {
-		throw new Error(
-			`Multiple implicit release environment files found: ${present.join(", ")}. ` +
-				"Set RELEASE_ENV_FILE explicitly.",
-		)
-	}
-	return present[0]
+	const selected = path.resolve(RELEASE_ENV_FILE)
+	return existsSync(selected) ? selected : undefined
 }
 
 export function validateReleaseEnvFile(file: string): void {
