@@ -8599,7 +8599,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 				for (const id of this.entryCache.keys()) if (!items.some((e) => e.sessionId === id)) this.entryCache.delete(id);
 				if (!(items.length === this.itemsCache.length && items.every((e, i) => e === this.itemsCache[i]))) this.itemsCache = items;
 				const selected = this.selected;
-				const current = selected !== void 0 && (items.some((item) => item.sessionId === selected) || this.addresses.has(selected)) ? selected : void 0;
+				const current = selected !== void 0 && (items.some((item) => item.sessionId === selected) || this.addresses.has(selected)) || this.listPhase === "pending" && selected !== void 0 ? selected : void 0;
 				return {
 					items: this.itemsCache,
 					current,
@@ -9185,7 +9185,8 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			followCurrent() {
 				const snapshot = this.list.getSnapshot();
 				const current = snapshot.current;
-				if (current === void 0 || snapshot.byId[current] === void 0 || current === this.watched) return;
+				const restoringBeforeList = snapshot.phase === "pending" && current !== void 0;
+				if (current === void 0 || snapshot.byId[current] === void 0 && !restoringBeforeList || current === this.watched) return;
 				this.watched = current;
 				this.sweepDeferred();
 				const record = this.resolve(current);

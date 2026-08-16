@@ -609,7 +609,14 @@ export class SessionRuntime implements ISessions {
     // A masked gap (current blanked while the selection's session is
     // transiently absent) holds the stage: tearing down on the gap would
     // destroy exactly the frozen scope the mask exists to preserve.
-    if (current === undefined || snapshot.byId[current] === undefined || current === this.watched) return
+    const restoringBeforeList = snapshot.phase === 'pending' && current !== undefined
+    // During the first pull, the manager may expose the persisted id before
+    // its row arrives. That is an intentional fast-resume window: mint the
+    // scope and start history now; the completed baseline remains the authority
+    // that either confirms the row or masks a stale selection.
+    if (current === undefined
+      || (snapshot.byId[current] === undefined && !restoringBeforeList)
+      || current === this.watched) return
     this.watched = current
     this.sweepDeferred()
     const record = this.resolve(current)
