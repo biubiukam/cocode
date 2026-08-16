@@ -22,8 +22,24 @@ if (!packageJson.version) failures.push('package.json must declare a version')
 if (!packageJson.bin?.cocode) failures.push('package.json must expose the cocode bin')
 if (packageJson.bin?.['cocode-tui']) failures.push('package.json must not expose the cocode-tui compatibility bin')
 if (!packageJson.dependencies?.tsx) failures.push('package.json must include tsx for the TUI entry')
+const supervisorDependency = packageJson.dependencies?.['@cocode/host-supervisor']
+if (!supervisorDependency) failures.push('package.json must include @cocode/host-supervisor')
+if (typeof supervisorDependency === 'string' && supervisorDependency.startsWith('link:')) {
+  failures.push('package.json must not publish a link: @cocode/host-supervisor dependency')
+}
 for (const file of releaseFiles) {
   if (!existsSync(resolve(root, file))) failures.push(`missing release file: ${file}`)
+}
+
+const runtimeSmoke = spawnSync(process.execPath, [resolve(root, 'dist/cocode-tui.mjs')], {
+  cwd: root,
+  encoding: 'utf8',
+  ...npmSpawnOptionsForPlatform(),
+})
+if (runtimeSmoke.status !== 1 || !runtimeSmoke.stderr.includes('Cocode TUI requires a TTY.')) {
+  failures.push(
+    `bundled TUI runtime smoke failed: ${runtimeSmoke.stderr || runtimeSmoke.stdout || `exit ${runtimeSmoke.status}`}`,
+  )
 }
 
 const pack = spawnSync(npmCommandForPlatform(), ['pack', '--dry-run', '--json'], {

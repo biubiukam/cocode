@@ -30,6 +30,8 @@ import {
 } from "../contexts/diagnostics/presentation/ipc/register-diagnostics-ipc"
 import { createDesktopObservability } from "../shared/observability/desktop-observability"
 import { registerElectronObservers } from "../shared/observability/register-electron-observers"
+import { TuiLauncher } from "../contexts/tui/infrastructure/tui-launcher"
+import { registerTuiIpc, unregisterTuiIpc } from "../contexts/tui/presentation/ipc/register-tui-ipc"
 
 export const startApplication = (): void => {
 	if (started) {
@@ -48,6 +50,7 @@ export const startApplication = (): void => {
 	let mainWindow: BrowserWindow | null = null
 	let dshUrl: string | null = null
 	let applicationUpdates: ApplicationUpdateRegistration | null = null
+	let tuiLauncher: TuiLauncher | null = null
 
 	const lifecycle = registerApplicationLifecycle({
 		logger: observability.logger,
@@ -71,6 +74,28 @@ export const startApplication = (): void => {
 				throw error
 			}
 			dshRuntime = new DshRuntimeProcess(observability.logger)
+			tuiLauncher = new TuiLauncher()
+			if (shouldAutoInstallCommandLineTool()) {
+				try {
+					const result = await tuiLauncher.ensureCommandLineTool()
+					const warning =
+						result.status.state === "conflict" || result.status.state === "unavailable"
+					observability.logger.log(
+						warning ? "warn" : "info",
+						"tui.cli.ensure.completed",
+						{
+							attributes: {
+								state: result.status.state,
+								changed: result.changed,
+								directoryOnPath: result.status.directoryOnPath,
+							},
+						},
+					)
+				} catch (error) {
+					observability.logger.log("warn", "tui.cli.ensure.failed", { error })
+				}
+			}
+			registerTuiIpc(tuiLauncher, observability.logger)
 			registerDshRuntimeIpc(dshRuntime, observability.logger)
 			dshUrl = await dshRuntime.start()
 			observability.diagnostics.setHostLogDirectory(dshRuntime.hostLogDirectory)
@@ -102,6 +127,8 @@ export const startApplication = (): void => {
 			applicationUpdates = null
 			try {
 				unregisterDiagnosticsIpc()
+				unregisterTuiIpc()
+				tuiLauncher = null
 				unregisterShortcutsIpc()
 				shortcuts?.dispose()
 				shortcuts = null
@@ -131,4 +158,10 @@ function redactEndpoint(value: string): string {
 	} catch {
 		return "<invalid-endpoint>"
 	}
+}
+
+function shouldAutoInstallCommandLineTool(): boolean {
+	const configured = process.env.COCODE_AUTO_INSTALL_CLI?.trim()
+	if (configured === "0") return false
+	return app.isPackaged || configured === "1"
 }

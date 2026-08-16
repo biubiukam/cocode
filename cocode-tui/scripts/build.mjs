@@ -19,6 +19,14 @@ const tuiBuild = await build({
     'react-devtools-core': resolve(root, 'scripts/react-devtools-core-stub.mjs'),
   },
   define: { 'process.env.DEV': '"false"', 'process.env["DEV"]': '"false"' },
+  // The bundle is emitted as ESM, but Ink's dependency tree still contains
+  // CommonJS packages that use a runtime `require()` for Node built-ins (for
+  // example signal-exit -> assert/events).  Give esbuild's dynamic-require
+  // helper a real ESM-compatible require so the packaged CLI can start under
+  // the bundled Node runtime.
+  banner: {
+    js: 'import { createRequire } from "node:module"; const require = createRequire(import.meta.url);',
+  },
   sourcemap: true,
   tsconfig: resolve(root, 'tsconfig.json'),
   metafile: true,

@@ -7,6 +7,8 @@ import { WorkbenchController, type WorkbenchLayoutFace } from "./controller.ts"
 import { builtInPanels } from "./builtins.tsx"
 import { LOCALE_NS, attachLocale, en, zh, type WorkbenchKey } from "./locales.ts"
 import { CommitModelRow } from "./settings-row.tsx"
+import { CommandLineSection } from "./command-line-section.tsx"
+import { DiagnosticsSection } from "./diagnostics-section.tsx"
 import type { WorkbenchPanelProps } from "./model.ts"
 
 export type * from "./model.ts"
@@ -64,5 +66,21 @@ export function apply(ctx: ClientContext): void {
     order: 40,
     inject: () => ({}),
   }, CommitModelRow))
+  slots.inject("settings.section", () => slots.register({
+    name: "settings.section",
+    id: "cocode-workbench-command-line",
+    order: 850,
+    label: () => isChinese() ? "命令行" : "Command line",
+  }, CommandLineSection))
+  slots.inject("settings.section", () => slots.register({
+    name: "settings.section",
+    id: "cocode-workbench-diagnostics",
+    order: 900,
+    label: () => isChinese() ? "诊断" : "Diagnostics",
+  }, DiagnosticsSection))
   ctx.effect(() => () => { void disposeService() }, "cocode-workbench: dispose service")
+}
+
+function isChinese(): boolean {
+  return document.documentElement.lang.toLowerCase().startsWith("zh") || navigator.language.toLowerCase().startsWith("zh")
 }

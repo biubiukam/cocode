@@ -12,7 +12,7 @@
     "build": "node -e \"process.exit(0)\""
   },
   "dependencies": {
-    "@cocode/host-supervisor": "link:../../../cocode-host-supervisor"
+    "@cocode/host-supervisor": "0.1.0"
   },
   "devDependencies": {
     "@types/node": "^22.20.1"
