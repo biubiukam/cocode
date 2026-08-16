@@ -6,6 +6,7 @@ import {
   resolveHostRuntimeEnv as resolveSharedHostRuntimeEnv,
   resolveHostScope as resolveSharedHostScope,
   type HostLease,
+  type HostClientKind,
   type HostRuntimeEnv,
   type HostScope,
   type JsonRpcPeer,
@@ -73,7 +74,7 @@ class SdkTuiRuntime implements TuiRuntime {
     try {
       const lease = await createHostSupervisorClient().acquire({
         scope: resolveHostScope(this.launch),
-        clientKind: 'standalone-tui',
+        clientKind: resolveTuiClientKind(this.launch.env ?? process.env),
         requiredServices: ['jsonrpc'],
         minProtocolRevision: '1.0',
         runtimeEnv: resolveHostRuntimeEnv(this.launch.env ?? process.env),
@@ -548,6 +549,12 @@ class SdkTuiRuntime implements TuiRuntime {
       .request('cocode/approval/respond', { requestId, outcome: outcome.outcome })
       .catch(() => undefined)
   }
+}
+
+function resolveTuiClientKind(env: NodeJS.ProcessEnv): Extract<HostClientKind, 'desktop-tui' | 'standalone-tui'> {
+  return env.COCODE_TUI_CLIENT_KIND?.trim() === 'desktop-tui'
+    ? 'desktop-tui'
+    : 'standalone-tui'
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

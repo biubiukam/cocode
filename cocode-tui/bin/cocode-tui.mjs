@@ -2,14 +2,18 @@
 
 import { existsSync, readFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
-import { dirname, resolve } from 'node:path'
-import { homedir } from 'node:os'
+import { createRequire } from 'node:module'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+
+const require = createRequire(import.meta.url)
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const packageJson = JSON.parse(
   readFileSync(resolve(packageRoot, 'package.json'), 'utf8'),
 )
+
+configureRuntimeEnvironment()
 
 const args = process.argv.slice(2)
 if (args.includes('--help') || args.includes('-h')) {
@@ -50,17 +54,15 @@ if (result.error) {
 process.exit(result.status ?? 1)
 
 async function runDoctor() {
-  const { createHostSupervisorClient } = await import('@cocode/host-supervisor')
-  const home = process.env.DSH_HOME?.trim() || resolve(homedir(), '.dsh')
-  const profile = process.env.DSH_PROFILE?.trim() || 'web'
-  const scope = {
-    dshHome: home,
-    profile,
-    hostConfigFingerprint: process.env.COCODE_HOST_CONFIG_FINGERPRINT?.trim() || 'cocode-web-jsonrpc-v1',
-    runtimeChannel: process.env.COCODE_RUNTIME_CHANNEL === 'preview' || process.env.COCODE_RUNTIME_CHANNEL === 'dev'
-      ? process.env.COCODE_RUNTIME_CHANNEL
-      : 'stable',
-  }
+  const {
+    createHostSupervisorClient,
+    resolveHostRuntimeEnv,
+    resolveHostScope,
+  } = await import('@cocode/host-supervisor')
+  const scope = resolveHostScope(process.env)
+  const runtimeEnv = resolveHostRuntimeEnv(process.env)
+  const home = scope.dshHome
+  const profile = scope.profile
   const checks = [
     ['package', true],
     ['built TUI', existsSync(resolve(packageRoot, 'dist', 'cocode-tui.mjs'))],
@@ -71,9 +73,10 @@ async function runDoctor() {
   try {
     lease = await createHostSupervisorClient().acquire({
       scope,
-      clientKind: 'standalone-tui',
+      clientKind: process.env.COCODE_TUI_CLIENT_KIND === 'desktop-tui' ? 'desktop-tui' : 'standalone-tui',
       requiredServices: ['jsonrpc'],
       minProtocolRevision: '1.0',
+      runtimeEnv,
     })
     const descriptor = lease.descriptor
     checks.push(
@@ -95,4 +98,28 @@ async function runDoctor() {
   }
   for (const [label, ok] of checks) process.stdout.write(`${ok ? 'ok' : 'missing'} ${label}\n`)
   process.exit(checks.every(([, ok]) => ok) ? 0 : 1)
+}
+
+function configureRuntimeEnvironment() {
+  if (!process.env.COCODE_TUI_CLIENT_KIND?.trim()) {
+    process.env.COCODE_TUI_CLIENT_KIND = 'standalone-tui'
+  }
+  if (!process.env.COCODE_NODE_EXECUTABLE?.trim()) {
+    process.env.COCODE_NODE_EXECUTABLE = process.execPath
+  }
+  if (process.env.COCODE_SUPERVISOR_SERVICE_ENTRY?.trim()) return
+
+  let packageJsonPath
+  try {
+    packageJsonPath = require.resolve('@cocode/host-supervisor/package.json')
+  } catch (error) {
+    throw new Error(
+      `Unable to resolve @cocode/host-supervisor. Install it before running Cocode TUI. ${String(error)}`,
+    )
+  }
+  const entry = join(dirname(packageJsonPath), 'packages', 'host-supervisor', 'lib', 'bin.js')
+  if (!existsSync(entry)) {
+    throw new Error(`@cocode/host-supervisor is missing its built service entry: ${entry}`)
+  }
+  process.env.COCODE_SUPERVISOR_SERVICE_ENTRY = entry
 }

@@ -5,6 +5,7 @@ import { dshRuntimeBridge } from "./bridges/dsh-runtime.bridge"
 import { accountBridge } from "./bridges/account.bridge"
 import { shortcutsBridge } from "./bridges/shortcuts.bridge"
 import { diagnosticsBridge } from "./bridges/diagnostics.bridge"
+import { tuiBridge } from "./bridges/tui.bridge"
 
 const desktopApi: DesktopApi = {
 	database: databaseBridge,
@@ -12,6 +13,7 @@ const desktopApi: DesktopApi = {
 	account: accountBridge,
 	shortcuts: shortcutsBridge,
 	diagnostics: diagnosticsBridge,
+	tui: tuiBridge,
 }
 
 contextBridge.exposeInMainWorld("desktopApi", desktopApi)

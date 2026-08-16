@@ -22,6 +22,7 @@ import { registerLinkInterception } from './link-intercept.ts'
 import { registerImeGuard } from './ime-guard.ts'
 import { loadPrefs } from './prefs.ts'
 import { SideCardSection } from './SideCardSection.tsx'
+import { CommandLineSection } from './CommandLineSection.tsx'
 import { DiagnosticsSection } from './DiagnosticsSection.tsx'
 import { api } from './api.ts'
 import { LOCALE_NS, attachLocale, t, zh, en } from './locales.ts'
@@ -211,6 +212,13 @@ export function apply(ctx: Context): void {
       label: () => t('settingsNav'),
       inject: () => ({ store: sidebarStore, service }),
     }, SideCardSection))
+
+    ctx.slots.inject('settings.section', () => ctx.slots.register({
+      name: 'settings.section',
+      id: 'command-line',
+      order: 850,
+      label: () => isChinese() ? '命令行' : 'Command line',
+    }, CommandLineSection))
 
     ctx.slots.inject('settings.section', () => ctx.slots.register({
       name: 'settings.section',
