@@ -269,7 +269,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
   const layout = calculateChatLayout({
     viewportRows: stdout.rows,
     composerLines: snap.composer.text.split('\n').length,
-    hasAttachments: snap.composer.attachments.length > 0,
+    hasAttachments: snap.composer.attachments.length + snap.composer.images.length > 0,
     hasNotice: snap.notice !== undefined,
     hasStatusDetails: hasStatusDetails(snap.status),
     checklistStripRows: mainChecklistRows,

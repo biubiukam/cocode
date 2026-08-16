@@ -12,9 +12,9 @@ import {
 } from '../../src/runtime/prompt-queue-picker.ts'
 
 const items: PromptQueuePickerItem[] = [
-  { id: 'one', text: 'Fix the parser', attachments: [] },
-  { id: 'two', text: 'Add tests', attachments: [] },
-  { id: 'three', text: 'Update docs', attachments: [] },
+  { id: 'one', text: 'Fix the parser', attachments: [], images: [] },
+  { id: 'two', text: 'Add tests', attachments: [], images: [] },
+  { id: 'three', text: 'Update docs', attachments: [], images: [] },
 ]
 
 describe('prompt queue picker', () => {

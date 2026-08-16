@@ -1874,7 +1874,12 @@ class TuiAppImpl implements TuiApp {
   }
 
   private async resumeSessionAfterRestart(sessionId: string): Promise<boolean> {
-    if (!this.capabilities.open || this.runtime.open === undefined) return false
+    if (
+      !this.capabilities.open ||
+      this.runtime.open === undefined
+    ) {
+      return false
+    }
     try {
       const opened = normalizeOpenResult(await this.runtime.open(sessionId))
       if (!opened.opened) return false
@@ -2041,6 +2046,21 @@ class TuiAppImpl implements TuiApp {
       this.emit()
     })
     this.emit()
+  }
+
+  private sendSkill(line: string): void {
+    if (this.agent !== 'idle') {
+      this.notice = { tone: 'info', message: text(this.locale, 'turnBusy') }
+      this.emit()
+      return
+    }
+    const attachments = this.attachments.slice()
+    const images = this.images.slice()
+    this.history.push(line)
+    this.draft = createDraft()
+    this.attachments = []
+    this.images = []
+    this.invokeSkill(line, attachments, images)
   }
 
   private requestCompact(): void {
@@ -2228,6 +2248,7 @@ class TuiAppImpl implements TuiApp {
       const token = `[Image: ${name}]`
       this.images = [...this.images, { ...input, id: `image-${serial}`, name, token }]
       this.draft = insertDraft(this.draft, `${token} `)
+      this.pendingSkillInvocation = undefined
       this.notice = { tone: 'info', message: text(this.locale, 'imageAttached', { name }) }
     } catch (error) {
       this.notice = { tone: 'error', message: clipboardImageError(this.locale, error) }
@@ -2269,27 +2290,16 @@ class TuiAppImpl implements TuiApp {
     }
   }
 
-  private sendSkill(line: string): void {
-    if (this.agent !== 'idle') {
-      this.notice = { tone: 'info', message: text(this.locale, 'turnBusy') }
-      this.emit()
-      return
-    }
-    const attachments = this.attachments.slice()
-    const images = this.images.slice()
-    this.history.push(line)
-    this.draft = createDraft()
-    this.attachments = []
-    this.images = []
+  private invokeSkill(
+    line: string,
+    attachments: readonly { path: string; token: string }[],
+    images: readonly DraftImage[],
+  ): void {
     this.notice = undefined
     void this.promptWithAttachments(line, attachments, 'normal', images).catch((error: unknown) => {
-      if (this.draft.text.trim() === '' && this.attachments.length === 0 && this.images.length === 0) {
-        this.draft = insertDraft(createDraft(), line)
-        this.attachments = [...attachments]
-        this.images = [...images]
-        if (this.history.at(-1) === line) this.history.pop()
-      }
+      this.restoreFailedPrompt(line, attachments, images)
       this.notice = { tone: 'error', message: errorMessage(error) }
+      if (this.agent === 'running') this.agent = 'idle'
       this.emit()
     })
     this.emit()
