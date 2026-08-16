@@ -75,6 +75,10 @@ export function ConversationSessionHeader({
     <header
       className={clsx(css.header, hideChrome && css.headerHidden)}
       aria-hidden={hideChrome || undefined}
+      /* Shell-visible marker: the frame continues this header's seam across a
+         collapsed sidebar rail so the top row reads as one title bar. Absent
+         on the hero, where there is no seam to continue. */
+      data-dsh-session-header={hideChrome ? undefined : ''}
     >
       <div className={css.headerDrag}></div>
       {!hideChrome && (

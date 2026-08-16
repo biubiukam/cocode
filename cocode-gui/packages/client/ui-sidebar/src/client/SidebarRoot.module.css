@@ -72,14 +72,10 @@
   display: none;
 }
 
-/* Rail geometry (figma rail spec): 36x36 control boxes centered in the rail,
-   12px vertical rhythm, 18px from the rail top. The rail is 56px wide unless
-   the desktop host declares a wider one to clear its window controls
-   (--dsh-sidebar-rail-width); the side padding is whatever centers a 36px
-   control in it, and the shell sizes the grid track from the same variable, so
-   the two can never disagree. */
+/* Rail geometry (figma rail spec): 36x36 control boxes centered in the 56px
+   rail (10px side padding), 12px vertical rhythm, 18px from the rail top. */
 .root.collapsed {
-  padding: 18px calc((var(--dsh-sidebar-rail-width, 56px) - 36px) / 2) 6px;
+  padding: 18px 10px 6px;
 }
 
 :global(html[data-dsh-desktop='true']) .root.collapsed {

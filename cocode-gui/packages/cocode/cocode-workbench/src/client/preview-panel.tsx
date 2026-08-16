@@ -4,6 +4,7 @@ import type { WorkbenchPanelProps } from "./model.ts"
 import { State, message, useRemote } from "./panel-state.tsx"
 import { fileUrl, workbenchRequest } from "./runtime-api.ts"
 import { resolveMarkdownImages } from "./markdown-assets.ts"
+import { relativeTo } from "./files-actions.ts"
 import { GitDiffView } from "./git-diff.tsx"
 import type { GitGroup } from "./git-client.ts"
 import { t } from "./locales.ts"
@@ -42,6 +43,13 @@ function preferredMode(kind: PreviewKind | undefined, hasSource: boolean): ViewM
 function fileName(path: string): string {
   const boundary = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"))
   return boundary < 0 ? path : path.slice(boundary + 1)
+}
+
+/** Show a file under the current workspace, falling back to its bare name. */
+function workspaceRelativePath(root: string | undefined, path: string): string {
+  if (root === undefined || root === "") return fileName(path)
+  const relative = relativeTo(root, path)
+  return relative === "" ? fileName(path) : relative
 }
 
 /** 源代码管理面板打开一行时带来的差异请求，其余目标一律按文件预览处理。 */
@@ -157,7 +165,7 @@ function FilePreview(props: WorkbenchPanelProps) {
 
   return <div className={css.panel}>
     <div className={css.toolbar}>
-      <span className={css.name} title={path}>{fileName(path)}</span>
+      <span className={css.name} title={path}>{workspaceRelativePath(cwd, path)}</span>
       {file?.truncated === true && <span className={css.flag}>{t("preview.truncated")}</span>}
       <span className={css.spacer} />
       {hasSource && kind !== undefined && <div className={css.modes} role="group" aria-label={t("preview.viewMode")}>

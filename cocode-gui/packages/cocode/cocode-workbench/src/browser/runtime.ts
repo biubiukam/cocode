@@ -28,8 +28,12 @@ import {
 
 const APPROVAL_TIMEOUT_MS = 60_000
 
+/** How long a closed panel's page waits to be reclaimed by a remount. */
+const RELEASE_GRACE_MS = 3_000
+
 export interface RuntimeObserver {
-  onTabs(tabs: readonly BrowserTabView[]): void
+  /** Tab state moved. Each viewport reads back the slice it shows. */
+  onTabs(): void
   onEngine(status: BrowserEngineStatus): void
   onDownloads(downloads: readonly BrowserDownloadState[]): void
   onApproval(request: BrowserApprovalRequest): void
@@ -52,12 +56,13 @@ export class BrowserRuntime {
   private readonly observers = new Set<RuntimeObserver>()
   private readonly screencasts = new Map<string, Screencast>()
   private readonly approvals = new Map<string, PendingApproval>()
+  private readonly releases = new Map<string, NodeJS.Timeout>()
   private approvalCounter = 0
 
   constructor(private readonly options: RuntimeOptions) {
     this.engine = new BrowserEngine(status => { this.emit(observer => { observer.onEngine(status) }) })
     this.tabs = new BrowserTabs(this.engine, options.policy, {
-      onChange: () => { this.emit(observer => { observer.onTabs(this.tabs.list()) }) },
+      onChange: () => { this.emit(observer => { observer.onTabs() }) },
       onDownloads: downloads => { this.emit(observer => { observer.onDownloads(downloads) }) },
     })
   }
@@ -89,14 +94,65 @@ export class BrowserRuntime {
 
   // --- human side -----------------------------------------------------------
 
-  /** The tab the viewport shows, creating one on first use. */
-  async humanTab(url?: string): Promise<BrowserTab> {
-    const existing = this.tabs.first("human")
+  /**
+   * The tab a panel drives. Keying on the panel instance rather than a tab
+   * strip of our own is what makes the workbench tab bar the browser's tab bar:
+   * reopening the socket after a reload lands on the same page.
+   */
+  async panelTab(panelId: string, url?: string): Promise<BrowserTab> {
+    this.cancelRelease(panelId)
+    const existing = this.tabs.byPanel(panelId)
     if (existing !== undefined) {
       if (url !== undefined) await this.tabs.navigate(existing, url)
       return existing
     }
-    return this.tabs.open({ owner: "human", profile: DEFAULT_PROFILE, ...(url === undefined ? {} : { url }) })
+    return this.tabs.open({ owner: "human", profile: DEFAULT_PROFILE, panelId, ...(url === undefined ? {} : { url }) })
+  }
+
+  /** Show an existing tab — an agent's or a popup's — in a panel, without taking it over. */
+  adoptIntoPanel(tabId: string, panelId: string): BrowserTab {
+    this.cancelRelease(panelId)
+    const tab = this.tabs.require(tabId)
+    const previous = this.tabs.byPanel(panelId)
+    if (previous !== undefined && previous !== tab) previous.panelId = undefined
+    tab.panelId = panelId
+    return tab
+  }
+
+  /**
+   * The panel was closed for good: its tab goes with it. A tab the agent still
+   * drives only loses its viewport — closing a window the user was watching
+   * must not abort the work they were watching.
+   *
+   * The close waits out a short window because a panel also unmounts when it is
+   * dragged to another pane, and that must not destroy the page.
+   */
+  async releasePanel(panelId: string): Promise<void> {
+    const tab = this.tabs.byPanel(panelId)
+    if (tab === undefined) return
+    if (tab.owner === "agent") {
+      tab.panelId = undefined
+      this.emit(observer => { observer.onTabs() })
+      await this.releaseScreencast(tab.id)
+      return
+    }
+    // Armed before any await, so a remount that reattaches in the meantime
+    // cancels it rather than racing it.
+    this.cancelRelease(panelId)
+    this.releases.set(panelId, setTimeout(() => {
+      this.releases.delete(panelId)
+      if (this.tabs.byPanel(panelId) !== tab) return
+      tab.panelId = undefined
+      void this.tabs.close(tab.id)
+    }, RELEASE_GRACE_MS))
+    await this.releaseScreencast(tab.id)
+  }
+
+  private cancelRelease(panelId: string): void {
+    const pending = this.releases.get(panelId)
+    if (pending === undefined) return
+    clearTimeout(pending)
+    this.releases.delete(panelId)
   }
 
   screencast(tab: BrowserTab, onFrame: (header: BrowserFrameHeader, payload: Uint8Array) => void): Screencast {
@@ -127,7 +183,7 @@ export class BrowserRuntime {
     tab.bump()
     if (tab.owner !== "agent") return
     tab.owner = "human"
-    this.emit(observer => { observer.onTabs(this.tabs.list()) })
+    this.emit(observer => { observer.onTabs() })
   }
 
   resolveApproval(id: string, granted: boolean): void {
@@ -222,6 +278,8 @@ export class BrowserRuntime {
     this.screencasts.clear()
     for (const pending of this.approvals.values()) clearTimeout(pending.timer)
     this.approvals.clear()
+    for (const timer of this.releases.values()) clearTimeout(timer)
+    this.releases.clear()
     await this.tabs.dispose()
     await this.engine.dispose()
   }

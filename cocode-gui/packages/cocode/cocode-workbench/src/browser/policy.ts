@@ -2,7 +2,7 @@
  * Navigation and trust policy. Every hop is re-checked, because a redirect is
  * exactly how an allowed URL turns into a forbidden one.
  */
-import { BrowserError } from "./protocol.ts"
+import { BrowserError, toWebUrl } from "./protocol.ts"
 
 /** Origins the page must never reach: reaching them means same-origin access to our own API. */
 export interface PolicyOptions {
@@ -10,12 +10,12 @@ export interface PolicyOptions {
 }
 
 export function normalizeUrl(input: string): string {
-  const trimmed = input.trim()
-  if (trimmed === "") throw new BrowserError("BROWSER_NAVIGATION_BLOCKED", "An address is required.")
-  const candidate = /^[a-z][a-z0-9+.-]*:/i.test(trimmed) ? trimmed : `https://${trimmed}`
-  let parsed: URL
-  try { parsed = new URL(candidate) } catch { throw new BrowserError("BROWSER_NAVIGATION_BLOCKED", `${input} is not a valid address.`) }
-  return parsed.href
+  if (input.trim() === "") throw new BrowserError("BROWSER_NAVIGATION_BLOCKED", "An address is required.")
+  const url = toWebUrl(input)
+  if (url === undefined) {
+    throw new BrowserError("BROWSER_NAVIGATION_BLOCKED", `${input} is not a web address. This browser does not search; give it a full address.`)
+  }
+  return url
 }
 
 /**

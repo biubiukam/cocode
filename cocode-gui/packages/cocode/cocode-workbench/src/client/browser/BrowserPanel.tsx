@@ -16,14 +16,25 @@ import css from "./browser.module.css"
 
 type FrameSink = (header: BrowserFrameHeader, payload: Uint8Array) => void
 
+/** A panel opened to show a tab that already exists carries its id here. */
+function adoptedTabId(target: WorkbenchPanelProps["instance"]["target"]): string | undefined {
+  const data = target?.data
+  if (typeof data !== "object" || data === null) return undefined
+  const tabId = (data as { tabId?: unknown }).tabId
+  return typeof tabId === "string" ? tabId : undefined
+}
+
 export function BrowserPanel(props: WorkbenchPanelProps) {
-  const sessionId = props.scope.sessionId
+  const panelId = props.instance.id
+  const adopt = adoptedTabId(props.instance.target)
   const sink = useRef<FrameSink>()
   const connection = useMemo(
-    () => new BrowserConnection((header, payload) => { sink.current?.(header, payload) }, sessionId),
-    [sessionId],
+    () => new BrowserConnection((header, payload) => { sink.current?.(header, payload) }, panelId, adopt),
+    [panelId, adopt],
   )
-  useEffect(() => () => { connection.close() }, [connection])
+  // Closing the panel closes the page; a reload never runs this and so keeps it.
+  useEffect(() => () => { connection.release() }, [connection])
+  useEffect(() => { connection.setSession(props.scope.sessionId) }, [connection, props.scope.sessionId])
 
   const state = useSyncExternalStore(connection.subscribe, connection.getSnapshot, connection.getSnapshot)
   const send = useCallback((event: BrowserInputEvent) => { connection.send(event) }, [connection])
@@ -37,7 +48,17 @@ export function BrowserPanel(props: WorkbenchPanelProps) {
     send({ kind: "navigate", url: initial })
   }, [initial, send, state.attachedTabId])
 
-  const active = state.tabs.find(tab => tab.id === state.attachedTabId)
+  // A browser tab is a workbench tab, so showing a page nothing is showing yet
+  // means opening another panel beside this one.
+  const showTab = useCallback((tabId: string) => {
+    props.open("browser", {
+      dock: props.instance.dock,
+      ...(props.instance.paneId === undefined ? {} : { paneId: props.instance.paneId }),
+      target: { data: { tabId } },
+    })
+  }, [props])
+
+  const active = state.tab
   const engine = state.engine
 
   if (engine !== undefined && !engine.ready) {
@@ -50,9 +71,13 @@ export function BrowserPanel(props: WorkbenchPanelProps) {
   }
 
   return <div className={css.panel}>
-    <BrowserToolbar tabs={state.tabs} activeTabId={state.attachedTabId} send={send} />
+    <BrowserToolbar tab={active} send={send} />
     {state.status === "open" ? null : <div className={css.notice}>{t(state.status === "connecting" ? "browser.connecting" : "browser.reconnecting")}</div>}
     {state.error === undefined ? null : <div className={css.error}>{state.error}</div>}
+    {state.detached.map(tab => <div key={tab.id} className={css.notice}>
+      <span className={css.title}>{t("browser.detachedTab", { title: tab.title === "" ? tab.url : tab.title })}</span>
+      <button type="button" onClick={() => { showTab(tab.id) }}>{t("browser.showTab")}</button>
+    </div>)}
     {state.approvals.map(request => <div key={request.id} className={css.approval}>
       <span className={css.approvalText}>{t("browser.agentWants", { summary: request.summary })}</span>
       <button type="button" onClick={() => { send({ kind: "approve", id: request.id, granted: true }) }}>{t("browser.allow")}</button>

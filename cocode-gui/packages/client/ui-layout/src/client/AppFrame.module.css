@@ -1,4 +1,9 @@
 .frame {
+  /* The top chrome row. The session header fills it and the collapsed rail
+     continues its seam across, so the window controls and the session title
+     sit in one band spanning the frame — hence a frame-level declaration
+     rather than a number each occupant repeats. */
+  --dsh-shell-header-height: 46px;
   position: relative; /* anchors the drag handles, which straddle column borders */
   display: grid;
   grid-template-rows: minmax(0, 1fr) 0;
@@ -36,7 +41,50 @@
   min-height: 0;
   overflow: hidden;
   background: var(--dsw-specific-sidebar-fill);
-  border-right: 1px solid var(--dsw-alias-border-l1);
+}
+
+/* The column seam is a pseudo-element, not a border: while the rail is
+   collapsed under a session header it has to stop below the title bar, and a
+   border cannot be cut short. Above the sidebar's own fill (z-index), which
+   would otherwise paint over the column's last pixel. */
+.sidebarCol::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  width: 1px;
+  background: var(--dsw-alias-border-l1);
+  pointer-events: none;
+}
+
+/* macOS alone parks its window controls in the frame's top-left corner, where a
+   collapsed rail would box them off from the session header. Only there does
+   the rail also hold its controls below a titlebar inset, leaving the top row
+   free to join the header into one title bar spanning the frame: same surface,
+   closed by the same seam, with the column seam starting underneath.
+
+   The band paints over the rail (z-index) because the sidebar fills its own
+   column; it is inert chrome, so the sidebar's drag strip underneath keeps the
+   row draggable. */
+:global(html[data-dsh-desktop-platform='darwin'])
+  .frame[data-sidebar-collapsed]:has([data-dsh-session-header]) .sidebarCol::before {
+  top: var(--dsh-shell-header-height);
+}
+
+:global(html[data-dsh-desktop-platform='darwin'])
+  .frame[data-sidebar-collapsed]:has([data-dsh-session-header]) .sidebarCol::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 1;
+  height: var(--dsh-shell-header-height);
+  background: var(--dsw-alias-bg-base);
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+  pointer-events: none;
 }
 
 .centerCol {

@@ -6,7 +6,7 @@
  * that can move the page under the agent's feet bumps it, which is what makes
  * a stale `ref` detectable instead of silently wrong.
  */
-import type { CDPSession, Download, Page } from "playwright-core"
+import type { BrowserContext, CDPSession, Download, Page } from "playwright-core"
 import type { BrowserEngine } from "./engine.ts"
 import { DEFAULT_PROFILE } from "./engine.ts"
 import { assertNavigable, normalizeUrl, registrableDomain, type PolicyOptions } from "./policy.ts"
@@ -29,6 +29,12 @@ export interface TabRefEntry {
 
 export class BrowserTab {
   owner: BrowserTabOwner
+  /**
+   * Workbench panel instance showing this tab. The panel is the only tab strip:
+   * one panel drives exactly one tab, and a tab without a panel is one the user
+   * cannot see yet — an agent tab or a popup.
+   */
+  panelId?: string
   generation = 1
   title = ""
   loading = false
@@ -107,6 +113,7 @@ export interface OpenTabOptions {
   readonly profile?: string
   readonly owner?: BrowserTabOwner
   readonly url?: string
+  readonly panelId?: string
 }
 
 let counter = 0
@@ -118,6 +125,8 @@ function nextTabId(): string {
 export class BrowserTabs {
   private readonly tabs = new Map<string, BrowserTab>()
   private readonly downloads = new Map<string, BrowserDownloadState>()
+  private readonly adopted = new WeakSet<Page>()
+  private readonly watched = new WeakSet<BrowserContext>()
 
   constructor(
     private readonly engine: BrowserEngine,
@@ -135,11 +144,16 @@ export class BrowserTabs {
     return tab
   }
 
-  first(owner?: BrowserTabOwner): BrowserTab | undefined {
+  byPanel(panelId: string): BrowserTab | undefined {
     for (const tab of this.tabs.values()) {
-      if (owner === undefined || tab.owner === owner) return tab
+      if (tab.panelId === panelId) return tab
     }
     return undefined
+  }
+
+  /** Tabs no panel is showing: agent work and site popups. */
+  detached(): readonly BrowserTabView[] {
+    return [...this.tabs.values()].filter(tab => tab.panelId === undefined).map(tab => tab.view())
   }
 
   async open(options: OpenTabOptions = {}): Promise<BrowserTab> {
@@ -148,10 +162,35 @@ export class BrowserTabs {
     }
     const profile = options.profile ?? DEFAULT_PROFILE
     const context = await this.engine.context(profile)
-    const page = await context.newPage()
+    this.watchPopups(context, profile)
+    // A persistent context starts with a blank page; claim it before adding one.
+    const spare = context.pages().find(page => !this.adopted.has(page))
+    const page = spare ?? await context.newPage()
     const tab = await this.adopt(page, profile, options.owner ?? "human")
+    if (options.panelId !== undefined) tab.panelId = options.panelId
     if (options.url !== undefined) await this.navigate(tab, options.url)
     return tab
+  }
+
+  /**
+   * A page the site opened itself — `target=_blank`, an OAuth window — is a real
+   * tab the user must be able to see, so it enters the registry detached rather
+   * than floating invisibly inside the context. An opener distinguishes it from
+   * the pages we create ourselves, which arrive on the same event.
+   */
+  private watchPopups(context: BrowserContext, profile: string): void {
+    if (this.watched.has(context)) return
+    this.watched.add(context)
+    context.on("page", page => {
+      void (async () => {
+        const opener = await page.opener()
+        if (opener === null || this.adopted.has(page)) return
+        const parent = [...this.tabs.values()].find(tab => tab.page === opener)
+        const tab = await this.adopt(page, profile, parent?.owner ?? "human")
+        // A popup continues the flow that opened it, including its site boundary.
+        tab.agentOrigin = parent?.agentOrigin
+      })().catch(() => { /* page closed during setup */ })
+    })
   }
 
   /**
@@ -159,6 +198,7 @@ export class BrowserTabs {
    * stay inside the same context so an OAuth flow keeps its session.
    */
   async adopt(page: Page, profile: string, owner: BrowserTabOwner): Promise<BrowserTab> {
+    this.adopted.add(page)
     const cdp = await page.context().newCDPSession(page)
     const tab = new BrowserTab(nextTabId(), profile, page, cdp, owner)
     this.tabs.set(tab.id, tab)

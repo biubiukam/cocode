@@ -4,7 +4,7 @@ import type { WorkbenchController } from "./controller.ts"
 import type { WorkbenchDock, WorkbenchPanelDescriptor, WorkbenchPanelInstance, WorkbenchPanelProps, WorkbenchSplitNode } from "./model.ts"
 import { bindWorkbenchCwd } from "./runtime-api.ts"
 import css from "./workbench.module.css"
-import { CloseIcon, PanelBottomIcon, PanelRightIcon, PlusIcon } from "./icons.tsx"
+import { CloseIcon, FileGlyph, fileTypeIcon, PanelBottomIcon, PanelRightIcon, PlusIcon } from "./icons.tsx"
 
 interface SessionListSlice {
   readonly byId: Readonly<Record<string, { readonly cwd?: string } | undefined>>
@@ -43,8 +43,18 @@ function panelTitle(descriptor: WorkbenchPanelDescriptor): string {
   return typeof descriptor.title === "function" ? descriptor.title() : descriptor.title
 }
 
-function panelIcon(descriptor: WorkbenchPanelDescriptor): ReactNode {
-  return typeof descriptor.icon === "function" ? descriptor.icon() : descriptor.icon
+function panelIcon(descriptor: WorkbenchPanelDescriptor | undefined): ReactNode {
+  if (descriptor === undefined) return <FileGlyph size={15} />
+  return typeof descriptor.icon === "function" ? descriptor.icon() : descriptor.icon ?? <FileGlyph size={15} />
+}
+
+/** File preview tabs use the file's format icon; every other tab uses its panel icon. */
+function tabIcon(descriptor: WorkbenchPanelDescriptor | undefined, instance: WorkbenchPanelInstance): ReactNode {
+  if (descriptor?.id === "preview") {
+    const path = instance.target?.path
+    if (path !== undefined) return fileTypeIcon(path)
+  }
+  return panelIcon(descriptor)
 }
 
 function addablePanels(catalog: readonly WorkbenchPanelDescriptor[]): readonly WorkbenchPanelDescriptor[] {
@@ -233,7 +243,7 @@ function Pane(props: {
       }}>
         {paneInstances.map(instance => {
           const descriptor = props.snapshot.catalog.find(item => item.id === instance.type)
-          return <Tab key={instance.id} instance={instance} icon={descriptor === undefined ? undefined : panelIcon(descriptor)} active={instance.id === activeId} activate={() => props.controller.activate(instance.id)} close={() => props.controller.close(instance.id)} drop={(draggedId, beforeId) => props.controller.moveToPane(draggedId, props.node.id, beforeId)} contextMenu={(x, y) => {
+          return <Tab key={instance.id} instance={instance} icon={tabIcon(descriptor, instance)} active={instance.id === activeId} activate={() => props.controller.activate(instance.id)} close={() => props.controller.close(instance.id)} drop={(draggedId, beforeId) => props.controller.moveToPane(draggedId, props.node.id, beforeId)} contextMenu={(x, y) => {
             props.controller.activate(instance.id)
             setTabMenu({ id: instance.id, x, y })
           }} />

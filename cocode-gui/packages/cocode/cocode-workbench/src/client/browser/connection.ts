@@ -21,14 +21,17 @@ import { workbenchSocket } from "../runtime-api.ts"
 export interface BrowserConnectionState {
   readonly status: "connecting" | "open" | "closed"
   readonly engine?: BrowserEngineStatus
-  readonly tabs: readonly BrowserTabView[]
+  /** The single tab this panel drives. */
+  readonly tab?: BrowserTabView
   readonly attachedTabId?: string
+  /** Tabs no panel is showing yet, offered for adoption into a new panel. */
+  readonly detached: readonly BrowserTabView[]
   readonly downloads: readonly BrowserDownloadState[]
   readonly approvals: readonly BrowserApprovalRequest[]
   readonly error?: string
 }
 
-const INITIAL: BrowserConnectionState = { status: "connecting", tabs: [], downloads: [], approvals: [] }
+const INITIAL: BrowserConnectionState = { status: "connecting", detached: [], downloads: [], approvals: [] }
 
 /** Backoff schedule; the last entry repeats for as long as the host is down. */
 const RECONNECT_DELAYS = [400, 800, 1600, 3200, 5000] as const
@@ -44,8 +47,35 @@ export class BrowserConnection {
   private attempt = 0
   private retry?: ReturnType<typeof setTimeout>
 
-  constructor(private readonly onFrame: FrameHandler, private readonly sessionId?: string) {
+  private sessionId?: string
+
+  /**
+   * @param panelId Workbench panel instance; the host keys the tab on it, so a
+   *   reconnect returns the same page instead of opening another one.
+   * @param adoptTabId Show a tab that already exists instead of the panel's own.
+   */
+  constructor(
+    private readonly onFrame: FrameHandler,
+    private readonly panelId: string,
+    private readonly adoptTabId?: string,
+  ) {
     this.connect()
+  }
+
+  /** The session can arrive after the panel mounts; re-attach is idempotent. */
+  setSession(sessionId: string | undefined): void {
+    if (this.sessionId === sessionId) return
+    this.sessionId = sessionId
+    this.attach()
+  }
+
+  private attach(): void {
+    this.send({
+      kind: "attach",
+      panelId: this.panelId,
+      ...(this.sessionId === undefined ? {} : { sessionId: this.sessionId }),
+      ...(this.adoptTabId === undefined ? {} : { tabId: this.adoptTabId }),
+    })
   }
 
   getSnapshot = (): BrowserConnectionState => this.state
@@ -69,7 +99,7 @@ export class BrowserConnection {
       this.update({ status: "open", error: undefined })
       // The host owns the tabs, so reattaching restores the same page rather
       // than starting over — a dropped socket costs nothing but a repaint.
-      this.send({ kind: "attach", ...(this.sessionId === undefined ? {} : { sessionId: this.sessionId }) })
+      this.attach()
       const pending = this.queued
       this.queued = []
       for (const event of pending) this.send(event)
@@ -95,7 +125,8 @@ export class BrowserConnection {
     try { message = JSON.parse(data) as BrowserStreamMessage } catch { return }
     switch (message.kind) {
       case "attached": this.update({ attachedTabId: message.tabId }); return
-      case "tabs": this.update({ tabs: message.tabs }); return
+      case "tab": this.update({ tab: message.tab }); return
+      case "agentTabs": this.update({ detached: message.tabs }); return
       case "engine": this.update({ engine: message.status }); return
       case "downloads": this.update({ downloads: message.downloads }); return
       case "approval": this.update({ approvals: [...this.state.approvals, message.request] }); return
@@ -112,11 +143,21 @@ export class BrowserConnection {
   send(event: BrowserInputEvent): void {
     const socket = this.socket
     if (socket === undefined || socket.readyState !== WebSocket.OPEN) {
-      // Only intent-carrying events are worth replaying after a reconnect.
-      if (event.kind !== "ack" && event.kind !== "mouse") this.queued.push(event)
+      // Only intent-carrying events are worth replaying after a reconnect, and
+      // attach is not one of them: opening the socket always re-attaches.
+      if (event.kind !== "ack" && event.kind !== "mouse" && event.kind !== "attach") this.queued.push(event)
       return
     }
     socket.send(JSON.stringify(event))
+  }
+
+  /**
+   * The panel was closed rather than hidden or dropped, so the page should go
+   * too. A reload never reaches here, which is what lets it restore the tab.
+   */
+  release(): void {
+    this.send({ kind: "release" })
+    this.close()
   }
 
   close(): void {

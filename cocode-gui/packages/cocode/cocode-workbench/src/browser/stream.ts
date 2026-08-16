@@ -26,6 +26,7 @@ interface StreamSession {
   tab?: BrowserTab
   cast?: Screencast
   sessionId?: string
+  panelId?: string
 }
 
 export interface StreamOptions {
@@ -50,8 +51,21 @@ export function createBrowserStream(options: StreamOptions): {
     for (const socket of sessions.keys()) send(socket, message)
   }
 
+  /**
+   * Each viewport sees its own tab plus whatever no panel is showing, so agent
+   * browsing stays surfaced without a second tab strip inside the panel.
+   */
+  const publishTabs = (): void => {
+    const detached = options.runtime.tabs.detached()
+    for (const [socket, session] of sessions) {
+      const tab = session.tab
+      if (tab !== undefined) send(socket, { kind: "tab", tab: tab.view() })
+      send(socket, { kind: "agentTabs", tabs: detached })
+    }
+  }
+
   const unobserve = options.runtime.observe({
-    onTabs: tabs => { broadcast({ kind: "tabs", tabs }) },
+    onTabs: () => { publishTabs() },
     onEngine: status => { broadcast({ kind: "engine", status }) },
     onDownloads: downloads => { broadcast({ kind: "downloads", downloads }) },
     onApproval: request => { broadcast({ kind: "approval", request }) },
@@ -64,24 +78,36 @@ export function createBrowserStream(options: StreamOptions): {
   }
 
   const attach = async (socket: WebSocket, session: StreamSession, tabId?: string): Promise<void> => {
+    const panelId = session.panelId
+    if (panelId === undefined) return
     const status = await options.runtime.probe()
     send(socket, { kind: "engine", status })
     if (!status.ready) return
-    const tab = tabId === undefined ? await options.runtime.humanTab() : options.runtime.tabs.require(tabId)
+    const tab = tabId === undefined
+      ? await options.runtime.panelTab(panelId)
+      : options.runtime.adoptIntoPanel(tabId, panelId)
     session.tab = tab
     session.cast = options.runtime.screencast(tab, (header, payload) => {
       if (socket.readyState === socket.OPEN) socket.send(encodeFrame(header, payload))
     })
     send(socket, { kind: "attached", tabId: tab.id })
-    send(socket, { kind: "tabs", tabs: options.runtime.list() })
+    publishTabs()
   }
 
   const handle = async (socket: WebSocket, session: StreamSession, event: BrowserInputEvent): Promise<void> => {
     switch (event.kind) {
       case "attach": {
         session.sessionId = event.sessionId
+        session.panelId = event.panelId
         await options.runtime.releaseScreencast(session.tab?.id ?? "")
         await attach(socket, session, event.tabId)
+        return
+      }
+      case "release": {
+        if (session.panelId === undefined) return
+        await options.runtime.releasePanel(session.panelId)
+        session.tab = undefined
+        session.cast = undefined
         return
       }
       case "subscribe": {
@@ -121,26 +147,6 @@ export function createBrowserStream(options: StreamOptions): {
         else if (event.to === "back") await tab.page.goBack().catch(() => { /* no history */ })
         else if (event.to === "forward") await tab.page.goForward().catch(() => { /* no history */ })
         else await tab.page.reload().catch(() => { /* page gone */ })
-        return
-      }
-      case "open": {
-        const tab = await options.runtime.tabs.open({ owner: "human", url: event.url })
-        await options.runtime.releaseScreencast(session.tab?.id ?? "")
-        session.tab = tab
-        session.cast = options.runtime.screencast(tab, (header, payload) => {
-          if (socket.readyState === socket.OPEN) socket.send(encodeFrame(header, payload))
-        })
-        send(socket, { kind: "attached", tabId: tab.id })
-        await session.cast.start()
-        return
-      }
-      case "closeTab": {
-        await options.runtime.releaseScreencast(event.tabId)
-        await options.runtime.tabs.close(event.tabId)
-        if (session.tab?.id === event.tabId) {
-          session.tab = undefined
-          session.cast = undefined
-        }
         return
       }
       case "dialog": {

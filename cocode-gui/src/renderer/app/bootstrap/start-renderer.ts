@@ -16,14 +16,6 @@ const logger = new RendererLogger()
 /** macOS traffic-light strip height; sidebar logo row starts below it. */
 const DESKTOP_DARWIN_TITLEBAR_INSET_PX = 32
 
-/**
- * Collapsed-sidebar rail width on macOS. The traffic lights reach x≈68, so the
- * rail widens past the cross-platform 56px to keep the whole light cluster on
- * the sidebar fill instead of straddling the conversation seam. Both the rail's
- * own padding and the shell's grid track derive from this one declaration.
- */
-const DESKTOP_DARWIN_SIDEBAR_RAIL_PX = 90
-
 export async function startRenderer(element: HTMLElement): Promise<void> {
 	logger.info("renderer.start.started", { component: "renderer" })
 	try {
@@ -76,10 +68,6 @@ function markDesktopHost(): void {
 		html.style.setProperty(
 			"--dsh-desktop-titlebar-inset",
 			`${String(DESKTOP_DARWIN_TITLEBAR_INSET_PX)}px`,
-		)
-		html.style.setProperty(
-			"--dsh-sidebar-rail-width",
-			`${String(DESKTOP_DARWIN_SIDEBAR_RAIL_PX)}px`,
 		)
 	}
 }

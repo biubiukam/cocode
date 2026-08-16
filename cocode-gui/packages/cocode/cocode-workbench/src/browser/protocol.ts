@@ -32,6 +32,50 @@ export function browserErrorCode(error: unknown): BrowserErrorCode | undefined {
   return error instanceof BrowserError ? error.code : undefined
 }
 
+/**
+ * A host that can actually be resolved. Requiring a real suffix is what keeps
+ * a typed phrase from being punycoded into a domain that cannot exist.
+ */
+function isResolvableHost(host: string): boolean {
+  if (host === "localhost" || host.endsWith(".localhost")) return true
+  // Already bracketed by the URL parser, so it is a valid IPv6 literal.
+  if (host.startsWith("[")) return true
+  if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(host)) return true
+  const labels = host.split(".")
+  if (labels.length < 2) return false
+  if (labels.some(label => label === "" || label.startsWith("-") || label.endsWith("-"))) return false
+  const suffix = labels.at(-1) ?? ""
+  // A numeric last label means it is a number, not a name: "1.5" is not a host.
+  return /^[a-z]{2,}$/.test(suffix) || suffix.startsWith("xn--")
+}
+
+/**
+ * Resolve typed text to the URL it means, or `undefined` if it means nothing.
+ *
+ * The panel deliberately has no search box: turning a phrase into a query needs
+ * a search engine, a locale and a data-sharing decision that belong to the
+ * user's own browser, not to a panel that carries their logged-in session. So
+ * anything that is not an address is rejected rather than guessed at.
+ *
+ * Shared with the client, so the address bar refuses exactly what the host does.
+ */
+export function toWebUrl(input: string): string | undefined {
+  const trimmed = input.trim()
+  if (trimmed === "") return undefined
+  // Only `://` marks a scheme. A bare `localhost:3000` looks like one and is
+  // not: treating it as `localhost:` would break the commonest address here.
+  const candidate = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`
+  let url: URL
+  try { url = new URL(candidate) } catch { return undefined }
+  if (url.protocol !== "http:" && url.protocol !== "https:") return undefined
+  if (url.username !== "" || url.password !== "") return undefined
+  return isResolvableHost(url.hostname) ? url.href : undefined
+}
+
+export function isWebAddress(input: string): boolean {
+  return toWebUrl(input) !== undefined
+}
+
 /** Who currently drives a tab. A tab has exactly one owner at a time. */
 export type BrowserTabOwner = "human" | "agent"
 
@@ -94,7 +138,15 @@ export type BrowserModifier = "alt" | "ctrl" | "meta" | "shift"
 
 /** Uplink events produced by the human viewport. */
 export type BrowserInputEvent =
-  | { readonly kind: "attach"; readonly tabId?: string; readonly sessionId?: string }
+  /**
+   * Bind this socket to a tab. `panelId` is the workbench panel instance, which
+   * owns exactly one tab — reattaching with the same id after a reload or a
+   * dropped socket returns the same page. `tabId` overrides it to watch a tab
+   * the agent opened.
+   */
+  | { readonly kind: "attach"; readonly panelId: string; readonly sessionId?: string; readonly tabId?: string }
+  /** The panel was closed, as opposed to hidden or disconnected: drop the tab. */
+  | { readonly kind: "release" }
   | { readonly kind: "subscribe"; readonly enabled: boolean }
   | { readonly kind: "ack"; readonly seq: number }
   | { readonly kind: "viewport"; readonly width: number; readonly height: number; readonly deviceScaleFactor: number }
@@ -122,8 +174,6 @@ export type BrowserInputEvent =
   | { readonly kind: "text"; readonly text: string }
   | { readonly kind: "copy" }
   | { readonly kind: "navigate"; readonly url?: string; readonly to?: "back" | "forward" | "reload" }
-  | { readonly kind: "open"; readonly url: string }
-  | { readonly kind: "closeTab"; readonly tabId: string }
   | { readonly kind: "dialog"; readonly accept: boolean; readonly text?: string }
   | { readonly kind: "install" }
   | { readonly kind: "cancelDownload"; readonly id: string }
@@ -144,7 +194,13 @@ export interface BrowserApprovalRequest {
 /** Textual downlink messages, interleaved with binary frames on one socket. */
 export type BrowserStreamMessage =
   | { readonly kind: "attached"; readonly tabId: string }
-  | { readonly kind: "tabs"; readonly tabs: readonly BrowserTabView[] }
+  /** State of the one tab this socket is bound to. */
+  | { readonly kind: "tab"; readonly tab: BrowserTabView }
+  /**
+   * Tabs the agent opened that no panel is showing. The client surfaces them so
+   * agent browsing is never invisible, and can adopt one into a new panel.
+   */
+  | { readonly kind: "agentTabs"; readonly tabs: readonly BrowserTabView[] }
   | { readonly kind: "engine"; readonly status: BrowserEngineStatus }
   | { readonly kind: "clipboard"; readonly text: string }
   | { readonly kind: "downloads"; readonly downloads: readonly BrowserDownloadState[] }

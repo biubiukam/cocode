@@ -3,6 +3,19 @@ import path from "node:path"
 import { registerDshWebSocketTransport } from "../security/register-dsh-websocket-transport"
 import type { DesktopLogger } from "../../shared/logging/desktop-logger"
 
+/**
+ * Height of the shell's top chrome row, mirroring the renderer's
+ * `--dsh-shell-header-height`. The session title is centered in it, and on
+ * macOS the window controls join the same row, so this window has to know it.
+ */
+const SHELL_HEADER_ROW_PX = 46
+
+/** Diameter of the macOS window-control buttons. */
+const WINDOW_CONTROL_DIAMETER_PX = 14
+
+/** AppKit's own left inset for the controls, kept so only their height moves. */
+const WINDOW_CONTROL_INSET_X_PX = 9
+
 export const createMainWindow = (dshRuntimeUrl: string, logger?: DesktopLogger): BrowserWindow => {
 	const mainWindow = new BrowserWindow({
 		width: 1280,
@@ -11,7 +24,18 @@ export const createMainWindow = (dshRuntimeUrl: string, logger?: DesktopLogger):
 		minHeight: 640,
 		// macOS keeps the native traffic-light controls while removing the
 		// separate title-bar/drag strip so the Renderer can own the full top edge.
-		...(process.platform === "darwin" ? { titleBarStyle: "hidden" as const } : {}),
+		// AppKit centers those controls in a title bar of its own height, which is
+		// shorter than the shell's row, so re-center them on the shell's row and
+		// they line up with the session title beside them.
+		...(process.platform === "darwin"
+			? {
+					titleBarStyle: "hidden" as const,
+					trafficLightPosition: {
+						x: WINDOW_CONTROL_INSET_X_PX,
+						y: (SHELL_HEADER_ROW_PX - WINDOW_CONTROL_DIAMETER_PX) / 2,
+					},
+				}
+			: {}),
 		webPreferences: {
 			preload: path.join(__dirname, "preload.js"),
 			contextIsolation: true,

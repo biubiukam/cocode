@@ -28,10 +28,7 @@ export const SIDEBAR_MIN = 264
 export const SIDEBAR_MAX = 420
 /** Sidebar width before any user drag. */
 export const SIDEBAR_DEFAULT = 280
-/** Closed-sidebar rail: a 36px control column between 10px horizontal paddings.
- * A desktop host whose window controls need more room declares a wider rail
- * (--dsh-sidebar-rail-width); AppFrame reads it and the sidebar derives its own
- * padding from the same variable. */
+/** Closed-sidebar rail: a 36px control column between 10px horizontal paddings. */
 export const SIDEBAR_COLLAPSED = 56
 /** Viewport width below which the sidebar auto-collapses to the rail (deepsuite
  * LG breakpoint); a manual toggle below it re-expands over the squeezed center
@@ -76,15 +73,11 @@ export function clampWidth(px: number, min: number, max: number): number {
  * @param sidebar - sidebar width preference in px (0 = closed).
  * @param details - details width preference in px (0 = closed).
  * @param workbench - workbench right-dock width preference in px (0 = closed).
- * @param rail - rendered width of the closed-sidebar rail.
  * @returns resolved widths; details 0 means visually closed (never unmounted), while a closed sidebar keeps its compact rail.
  */
-export function computeColumns(
-  viewport: number, sidebar: number, details: number,
-  workbench = 0, rail = SIDEBAR_COLLAPSED,
-): Columns {
+export function computeColumns(viewport: number, sidebar: number, details: number, workbench = 0): Columns {
   // The sidebar is fixed at its preference (or the rail) — it never concedes.
-  const s = sidebar === 0 ? rail : clampWidth(sidebar, SIDEBAR_MIN, SIDEBAR_MAX)
+  const s = sidebar === 0 ? SIDEBAR_COLLAPSED : clampWidth(sidebar, SIDEBAR_MIN, SIDEBAR_MAX)
   const d0 = details === 0 ? 0 : clampWidth(details, DETAILS_MIN, DETAILS_MAX)
   const w0 = workbench === 0 ? 0 : clampWidth(workbench, WORKBENCH_MIN, WORKBENCH_MAX)
 

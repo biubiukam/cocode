@@ -9,35 +9,32 @@
   font-size: 12px;
 }
 
-.chrome {
-  flex: none;
-  border-bottom: 1px solid var(--dsw-alias-border-l2);
-  background: var(--dsw-alias-bg-layer-1);
-}
-
 .toolbar {
   display: flex;
+  flex: none;
   align-items: center;
   gap: 4px;
   min-height: 40px;
   padding: 5px 8px;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+  background: var(--dsw-alias-bg-layer-1);
 }
 
+/* Matches the dock header buttons: same box, same icon size, same radius. */
 .navButton {
   display: inline-flex;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   flex: none;
   align-items: center;
   justify-content: center;
   padding: 0;
   border: 0;
-  border-radius: 6px;
+  border-radius: 7px;
   color: var(--dsw-alias-label-secondary);
   background: transparent;
-  font-size: 14px;
-  line-height: 1;
   cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease;
 }
 
 .navButton:hover:not(:disabled) {
@@ -75,60 +72,25 @@
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--dsw-alias-interactive-bg-hover-accent) 18%, transparent);
 }
 
-.tabs {
-  display: flex;
-  gap: 2px;
-  padding: 0 8px 5px;
-  overflow-x: auto;
+/* Set only after a rejected attempt, never while the address is half-typed. */
+.address[data-invalid],
+.address[data-invalid]:focus-visible {
+  border-color: var(--dsw-alias-state-error-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dsw-alias-state-error-primary) 18%, transparent);
 }
 
-.tab {
-  display: inline-flex;
-  max-width: 180px;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 6px 3px 9px;
-  border: 0;
-  border-radius: 6px;
-  color: var(--dsw-alias-label-secondary);
-  background: transparent;
-  font: var(--dsw-font-xxxs-11);
-  cursor: pointer;
-}
-
-.tab:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-
-.tab[data-active] {
-  color: var(--dsw-alias-label-primary);
-  background: var(--dsw-alias-interactive-bg-active);
-}
-
-.tabTitle {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Agent-driven tabs are always labelled: auditability is what makes a shared
-   login state acceptable. */
-.tabBadge {
+/* An agent-driven tab is always labelled: auditability is what makes a shared
+   login state acceptable. Clicking takes the page back. */
+.ownerBadge {
   flex: none;
-  padding: 0 5px;
+  height: 20px;
+  padding: 0 8px;
+  border: 0;
   border-radius: 999px;
   color: var(--dsw-alias-state-business-primary);
   background: var(--dsw-alias-fill-l2);
-  font-size: 9px;
-}
-
-.tabClose {
-  flex: none;
-  opacity: 0.5;
-}
-
-.tabClose:hover {
-  opacity: 1;
+  font: var(--dsw-font-xxxs-11);
+  cursor: pointer;
 }
 
 .viewport {
@@ -212,6 +174,7 @@
   text-overflow: ellipsis;
 }
 
+.notice button,
 .approval button,
 .dialog button,
 .download button {

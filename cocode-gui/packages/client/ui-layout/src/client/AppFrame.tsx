@@ -14,7 +14,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import type { ReactNode } from 'react'
 import type { PropsRenderSlots, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import {
-  clampWidth, computeColumns, SIDEBAR_AUTO_COLLAPSE, SIDEBAR_COLLAPSED,
+  clampWidth, computeColumns, SIDEBAR_AUTO_COLLAPSE,
   WORKBENCH_BOTTOM_MAX, WORKBENCH_BOTTOM_MIN,
 } from './columns.ts'
 import type { createLayoutStore } from './stores.ts'
@@ -25,18 +25,6 @@ export type AppFrameProps =
   & PropsRuntime<'root'>
   & PropsRenderSlots<'sidebar' | 'conversation' | 'details' | 'workbench.right' | 'workbench.bottom' | 'shell.overlay'>
   & PropsStore<ReturnType<typeof createLayoutStore>>
-
-/**
- * Rendered width of the collapsed sidebar rail. The host declares one only when
- * its window chrome needs a wider rail than the contract default (macOS traffic
- * lights); the sidebar centers its rail controls in the very same variable, so
- * the grid track and the column's padding cannot drift apart.
- */
-function readRailWidth(): number {
-  const declared = getComputedStyle(document.documentElement).getPropertyValue('--dsh-sidebar-rail-width')
-  const px = Number.parseFloat(declared)
-  return px > 0 ? px : SIDEBAR_COLLAPSED
-}
 
 /** Center column grid item (session-body building block). */
 function CenterColumn(props: { children?: ReactNode }) {
@@ -128,9 +116,6 @@ export function AppFrame({
   })
   const frameRef = useRef<HTMLDivElement | null>(null)
   const [viewport, setViewport] = useState(() => window.innerWidth)
-  // Host chrome geometry is fixed for the document's lifetime (declared before
-  // the plugin graph paints), so one read at mount is the whole story.
-  const [rail] = useState(readRailWidth)
 
   const lastSession = useRef(detailsSession)
   useLayoutEffect(() => {
@@ -176,7 +161,6 @@ export function AppFrame({
     sidebarCollapsed ? 0 : panels.sidebar,
     detailsSession === undefined || !panels.detailsOpen ? 0 : panels.details,
     panels.workbenchRightOpen ? panels.workbenchRight : 0,
-    rail,
   )
   const bottom = panels.workbenchBottomOpen
     ? clampWidth(panels.workbenchBottom, WORKBENCH_BOTTOM_MIN, WORKBENCH_BOTTOM_MAX)
