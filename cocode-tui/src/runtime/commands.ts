@@ -366,6 +366,9 @@ export function helpText(
   return [
     locale === 'zh' ? 'Cocode TUI（终端界面）' : 'Cocode TUI',
     coreShortcuts.join(' · '),
+    locale === 'zh'
+      ? 'Ctrl/Meta+A 全选 · Ctrl/Meta+C 复制选中 · Ctrl/Meta+X 剪切（Command 需终端转发）'
+      : 'Ctrl/Meta+A select all · Ctrl/Meta+C copy selection · Ctrl/Meta+X cut (Command requires terminal forwarding)',
     [
       ...detailShortcuts,
       caps.planMode ? (locale === 'zh' ? 'Tab Build/Plan' : 'tab Build/Plan') : undefined,

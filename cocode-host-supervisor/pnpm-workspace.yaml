@@ -2,5 +2,21 @@ packages:
   - packages/*
 
 allowBuilds:
+  '@deepseek-ai/dsh-subprocess-local': true
+  '@google/genai': true
   esbuild: true
+  koffi: true
   node-pty: true
+  protobufjs: true
+
+# These lockfile entries are intentionally pinned and are required by the
+# current AWS SDK graph. Keep the exception package-scoped rather than
+# disabling the release-age policy for the whole workspace.
+minimumReleaseAgeExclude:
+  - '@smithy/core@3.33.2'
+  - '@smithy/credential-provider-imds@4.5.2'
+  - '@smithy/fetch-http-handler@5.7.2'
+  - '@smithy/node-http-handler@4.11.2'
+  - '@smithy/signature-v4@5.7.2'
+  - '@smithy/types@4.17.2'
+  - 'jose@6.2.9'

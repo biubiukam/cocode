@@ -679,6 +679,75 @@ describe('TuiApp', () => {
     expect(app.snapshot().composer.images).toEqual([])
   })
 
+  it('pastes a clipboard image through the /paste-image command', async () => {
+    const runtime = fakeRuntime()
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+      capabilities: { ...P0_CAPABILITIES, imageAttachments: true },
+      readClipboardImage: async () => ({
+        data: Uint8Array.of(1, 2, 3),
+        mediaType: 'image/png',
+      }),
+    })
+    await app.start()
+
+    app.dispatch({ type: 'command', line: '/paste-image' })
+
+    await expect.poll(() => app.snapshot().composer.images).toHaveLength(1)
+    expect(app.snapshot().composer.text).toBe('[Image: clipboard-1.png] ')
+  })
+
+  it('turns a pasted image path into an image draft', async () => {
+    const runtime = fakeRuntime()
+    const pastedPath = '/tmp/screenshot.png'
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+      capabilities: { ...P0_CAPABILITIES, imageAttachments: true },
+      readPastedImage: async (path) => {
+        expect(path).toBe(pastedPath)
+        return {
+          data: Uint8Array.of(1, 2, 3),
+          mediaType: 'image/png',
+        }
+      },
+    })
+    await app.start()
+
+    app.dispatch({ type: 'insertPastedInput', text: pastedPath })
+
+    await expect.poll(() => app.snapshot().composer.images).toHaveLength(1)
+    expect(app.snapshot().composer.text).toBe('[Image: screenshot.png] ')
+  })
+
+  it('keeps non-image pasted text as ordinary draft input', async () => {
+    const runtime = fakeRuntime()
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+      capabilities: { ...P0_CAPABILITIES, imageAttachments: true },
+      readPastedImage: async () => {
+        throw new Error('should not read non-image input')
+      },
+    })
+    await app.start()
+
+    app.dispatch({ type: 'insertPastedInput', text: '/tmp/notes.txt' })
+
+    await expect.poll(() => app.snapshot().composer.text).toBe('/tmp/notes.txt')
+    expect(app.snapshot().composer.images).toEqual([])
+  })
+
   it('switches interface language with /lang', async () => {
     const app = createTuiApp({
       runtime: fakeRuntime(),
@@ -1101,6 +1170,79 @@ describe('TuiApp', () => {
       params: { sessionId: 's1', status: 'idle' },
     })
     expect(app.snapshot().status.line).toBe('就绪')
+  })
+
+  it('shows model failures and leaves the running state', async () => {
+    const runtime = fakeRuntime()
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'deepseek-official',
+      model: 'deepseek-v4-flash',
+      sessionId: 's1',
+      locale: 'zh',
+    })
+    await app.start()
+    runtime.emit({
+      method: 'session.status',
+      params: { sessionId: 's1', status: 'running' },
+    })
+
+    runtime.emit({
+      method: 'session.event',
+      params: {
+        sessionId: 's1',
+        event: {
+          type: 'assistant/chunk',
+          seq: 1,
+          time: 1,
+          data: {
+            turn: 1,
+            step: 1,
+            chunk: {
+              type: 'finish',
+              reason: {
+                kind: 'error',
+                failure: {
+                  code: 'UNSUPPORTED_CONTENT',
+                  message: 'The selected model does not support image content.',
+                },
+              },
+            },
+          },
+        },
+      },
+    })
+
+    expect(app.snapshot().agent).toBe('running')
+    expect(app.snapshot().notice).toBeUndefined()
+    runtime.emit({
+      method: 'session.event',
+      params: {
+        sessionId: 's1',
+        event: {
+          type: 'turn/end',
+          seq: 2,
+          time: 2,
+          data: {
+            turn: 1,
+            reason: {
+              kind: 'error',
+              error: {
+                code: 'UNSUPPORTED_CONTENT',
+                message: 'The selected model does not support image content.',
+              },
+            },
+          },
+        },
+      },
+    })
+
+    expect(app.snapshot().agent).toBe('idle')
+    expect(app.snapshot().notice).toEqual({
+      tone: 'error',
+      message: 'The selected model does not support image content.',
+    })
   })
 
   it('sends /compact through the prompt path', async () => {
@@ -1757,6 +1899,22 @@ describe('TuiApp', () => {
     expect(app.snapshot().composer).toMatchObject({ text: 'abc', cursor: 2 })
     app.dispatch({ type: 'deleteBackward' })
     expect(app.snapshot().composer).toMatchObject({ text: 'ac', cursor: 1 })
+  })
+
+  it('selects and replaces draft text through app actions', async () => {
+    const app = createTuiApp({
+      runtime: fakeRuntime(),
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+    })
+    await app.start()
+    app.dispatch({ type: 'setDraft', text: 'hello' })
+    app.dispatch({ type: 'selectAllDraft' })
+    expect(app.snapshot().composer.selection).toEqual({ start: 0, end: 5 })
+    app.dispatch({ type: 'insertDraft', text: 'hi' })
+    expect(app.snapshot().composer).toMatchObject({ text: 'hi', cursor: 2 })
+    expect(app.snapshot().composer.selection).toBeUndefined()
   })
 
   it('appends selected file content when submitting a prompt', async () => {

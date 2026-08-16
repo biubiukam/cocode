@@ -43,4 +43,19 @@ describe('message scroll window', () => {
 
     expect(scrollOffsetForMessage(nodes, 4, 'user:1')).toBeGreaterThan(0)
   })
+
+  it('returns an empty window when compact mode hides every node', () => {
+    const hidden: ConversationNode = {
+      kind: 'notice',
+      id: '1',
+      seq: 1,
+      time: 1,
+      tone: 'info',
+      message: 'turn/start',
+      verboseOnly: true,
+    }
+
+    expect(resolveMessageWindow([hidden], 10).nodes).toEqual([])
+    expect(resolveMessageWindow([hidden], 10, true).nodes).toEqual([hidden])
+  })
 })

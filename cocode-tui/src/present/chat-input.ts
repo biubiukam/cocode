@@ -83,6 +83,37 @@ export function dispatchComposerTab(app: TuiApp, snapshot: TuiSnapshot): boolean
   return false
 }
 
+type ComposerShortcutKey = {
+  ctrl?: boolean
+  meta?: boolean
+}
+
+/** Handle standard text-selection shortcuts before global Ctrl+C routing. */
+export function dispatchComposerShortcut(
+  app: TuiApp,
+  snapshot: TuiSnapshot,
+  input: string,
+  key: ComposerShortcutKey,
+): boolean {
+  if (!key.ctrl && !key.meta) return false
+  switch (input.toLowerCase()) {
+    case 'a':
+      app.dispatch({ type: 'selectAllDraft' })
+      return true
+    case 'c':
+      if (snapshot.composer.selection === undefined) return false
+      app.dispatch({ type: 'copyDraftSelection' })
+      return true
+    case 'x':
+      if (snapshot.composer.selection !== undefined) {
+        app.dispatch({ type: 'cutDraftSelection' })
+      }
+      return true
+    default:
+      return false
+  }
+}
+
 type PickerKey = {
   escape?: boolean
   upArrow?: boolean

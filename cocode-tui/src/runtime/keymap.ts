@@ -91,7 +91,8 @@ export const DEFAULT_BINDINGS: Readonly<Record<CommandId, readonly KeyBinding[]>
   'app.quit': [binding('d', { ctrl: true, emptyOnly: true })],
   'app.redraw': [],
   'model.open': [binding('l', { ctrl: true })],
-  'image.paste': [binding('v', { ctrl: true })],
+  // Some terminals expose macOS Command+V as the meta/alt variant.
+  'image.paste': [binding('v', { ctrl: true }), binding('v', { alt: true })],
   'transcript.toggleVerbose': [binding('o', { ctrl: true })],
   'editor.open': [binding('g', { ctrl: true })],
   'help.toggle': [binding('?', { emptyOnly: true })],

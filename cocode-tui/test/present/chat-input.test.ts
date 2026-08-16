@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { TuiApp, TuiSnapshot } from '../../src/runtime/app.ts'
 import {
+  dispatchComposerShortcut,
   dispatchComposerTab,
   dispatchHelpInput,
   dispatchKeyCommand,
@@ -70,5 +71,30 @@ describe('chat input helpers', () => {
     } as TuiSnapshot
     expect(dispatchComposerTab(app, snapshot)).toBe(false)
     expect(dispatch).not.toHaveBeenCalled()
+  })
+
+  it('routes composer selection shortcuts without stealing unselected Ctrl+C', () => {
+    const dispatch = vi.fn()
+    const app = { dispatch } as unknown as TuiApp
+    const base = {
+      composer: { text: 'hello', selection: { start: 0, end: 5 } },
+    } as TuiSnapshot
+
+    expect(dispatchComposerShortcut(app, base, 'a', { ctrl: true })).toBe(true)
+    expect(dispatchComposerShortcut(app, base, 'c', { meta: true })).toBe(true)
+    expect(dispatchComposerShortcut(app, base, 'x', { ctrl: true })).toBe(true)
+    expect(
+      dispatchComposerShortcut(
+        app,
+        { ...base, composer: { text: 'hello' } } as TuiSnapshot,
+        'c',
+        { ctrl: true },
+      ),
+    ).toBe(false)
+    expect(dispatch.mock.calls).toEqual([
+      [{ type: 'selectAllDraft' }],
+      [{ type: 'copyDraftSelection' }],
+      [{ type: 'cutDraftSelection' }],
+    ])
   })
 })

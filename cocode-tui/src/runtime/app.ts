@@ -32,10 +32,14 @@ import type { ConversationNode } from './nodes/types.ts'
 import {
   backspaceDraft,
   createDraft,
+  deleteDraftSelection,
   insertDraft,
   moveDraftCursor,
   replaceDraftRange,
   replaceDraft,
+  selectAllDraft,
+  selectedDraftRange,
+  selectedDraftText,
   type DraftState,
 } from './draft.ts'
 import { buildPromptBlocks, loadFileContext } from './file-context.ts'
@@ -133,6 +137,7 @@ import {
 } from './session-tree-picker.ts'
 import { buildSessionTree, flattenSessionTree } from './session-tree.ts'
 import { listSessionSummaries } from './sessions-fs.ts'
+import { basename } from 'node:path'
 import {
   clampChecklistSelection,
   closeChecklist,
@@ -140,7 +145,12 @@ import {
   moveChecklistSelection,
   type ChecklistState,
 } from './checklist.ts'
-import { ClipboardImageError, readClipboardImage } from './image-clipboard.ts'
+import {
+  ClipboardImageError,
+  pastedImagePath,
+  readClipboardImage,
+  readImageFile,
+} from './image-clipboard.ts'
 import type { Keymap } from './keymap.ts'
 import { resolveKeymap } from './keymap-config.ts'
 
@@ -150,8 +160,12 @@ export type TuiAction =
   | { type: 'command'; line: string }
   | { type: 'setDraft'; text: string }
   | { type: 'insertDraft'; text: string }
+  | { type: 'insertPastedInput'; text: string }
   | { type: 'deleteBackward' }
-  | { type: 'moveCursor'; delta: number }
+  | { type: 'moveCursor'; delta: number; extendSelection?: boolean }
+  | { type: 'selectAllDraft' }
+  | { type: 'copyDraftSelection' }
+  | { type: 'cutDraftSelection' }
   | { type: 'attachFile'; start: number; end: number; path: string }
   | { type: 'historyPrev' }
   | { type: 'historyNext' }
@@ -239,6 +253,7 @@ export type TuiSnapshot = {
   composer: {
     text: string
     cursor: number
+    selection?: { start: number; end: number }
     placeholder: string
     disabled: boolean
     mask?: boolean
@@ -377,6 +392,7 @@ export type TuiAppOptions = {
     env?: NodeJS.ProcessEnv
   }
   readClipboardImage?: () => Promise<TuiImageInput>
+  readPastedImage?: (path: string) => Promise<TuiImageInput | undefined>
 }
 
 export function createTuiApp(options: TuiAppOptions): TuiApp {
@@ -421,6 +437,7 @@ class TuiAppImpl implements TuiApp {
   private readonly auth: TuiAuthInfo | undefined
   private readonly terminalNotify: NonNullable<TuiAppOptions['terminalNotify']>
   private readonly imageReader: () => Promise<TuiImageInput>
+  private readonly pastedImageReader: (path: string) => Promise<TuiImageInput | undefined>
   private readonly keymap: Keymap
   private imageSerial = 0
   private readonly activeSubagents = new Set<string>()
@@ -475,6 +492,7 @@ class TuiAppImpl implements TuiApp {
     this.terminalNotify =
       options.terminalNotify ?? (process.stdout.isTTY === true ? {} : { mode: 'off' })
     this.imageReader = options.readClipboardImage ?? (() => readClipboardImage())
+    this.pastedImageReader = options.readPastedImage ?? readImageFile
     this.keymap = resolveKeymap()
     this.questions = createQuestionCoordinator({
       emit: () => this.emit(),
@@ -585,6 +603,7 @@ class TuiAppImpl implements TuiApp {
       composer: {
         text: this.capturingByok ? '*'.repeat(this.draft.text.length) : this.draft.text,
         cursor: this.draft.cursor,
+        selection: selectedDraftRange(this.draft),
         placeholder: this.capturingByok
           ? '粘贴 API Key，回车确认'
           : composerPlaceholder(this.agent, this.locale),
@@ -704,6 +723,9 @@ class TuiAppImpl implements TuiApp {
         this.pruneImages()
         this.emit()
         return
+      case 'insertPastedInput':
+        void this.insertPastedInput(action.text)
+        return
       case 'deleteBackward':
         this.draft = backspaceDraft(this.draft)
         this.pendingSkillInvocation = undefined
@@ -713,9 +735,31 @@ class TuiAppImpl implements TuiApp {
         this.emit()
         return
       case 'moveCursor':
-        this.draft = moveDraftCursor(this.draft, action.delta)
+        this.draft = moveDraftCursor(this.draft, action.delta, action.extendSelection)
         this.emit()
         return
+      case 'selectAllDraft':
+        this.draft = selectAllDraft(this.draft)
+        this.emit()
+        return
+      case 'copyDraftSelection': {
+        if (this.capturingByok) return
+        const value = selectedDraftText(this.draft)
+        if (value !== '') this.copyText(value)
+        return
+      }
+      case 'cutDraftSelection': {
+        const value = selectedDraftText(this.draft)
+        if (value === '') return
+        if (!this.capturingByok) this.copyText(value)
+        this.draft = deleteDraftSelection(this.draft)
+        this.pendingSkillInvocation = undefined
+        this.interruptArmed = false
+        this.pruneAttachments()
+        this.pruneImages()
+        this.emit()
+        return
+      }
       case 'attachFile': {
         const token = formatFileMention(action.path)
         this.draft = replaceDraftRange(this.draft, action.start, action.end, `${token} `)
@@ -2289,13 +2333,7 @@ class TuiAppImpl implements TuiApp {
   }
 
   private async pasteImage(): Promise<void> {
-    if (
-      this.capturingByok ||
-      this.agent === 'dead' ||
-      this.exiting ||
-      !this.capabilities.imageAttachments ||
-      this.runtime.saveImages === undefined
-    ) {
+    if (!this.canAttachImages()) {
       this.notice = { tone: 'error', message: text(this.locale, 'imageRuntimeUnavailable') }
       this.emit()
       return
@@ -2309,17 +2347,71 @@ class TuiAppImpl implements TuiApp {
     this.emit()
     try {
       const input = await this.imageReader()
-      const serial = ++this.imageSerial
-      const name = `clipboard-${serial}.${imageExtension(input.mediaType)}`
-      const token = `[Image: ${name}]`
-      this.images = [...this.images, { ...input, id: `image-${serial}`, name, token }]
-      this.draft = insertDraft(this.draft, `${token} `)
-      this.pendingSkillInvocation = undefined
-      this.notice = { tone: 'info', message: text(this.locale, 'imageAttached', { name }) }
+      this.attachDraftImage(input)
     } catch (error) {
       this.notice = { tone: 'error', message: clipboardImageError(this.locale, error) }
     }
     this.emit()
+  }
+
+  private async insertPastedInput(input: string): Promise<void> {
+    const path = pastedImagePath(input, this.cwd)
+    if (path === undefined) {
+      this.insertPlainInput(input)
+      return
+    }
+    if (!this.canAttachImages()) {
+      this.insertPlainInput(input)
+      return
+    }
+    if (this.images.length >= MAX_DRAFT_IMAGES) {
+      this.notice = { tone: 'error', message: text(this.locale, 'imageCountLimit') }
+      this.emit()
+      return
+    }
+    try {
+      const image = await this.pastedImageReader(path)
+      if (image === undefined) {
+        this.insertPlainInput(input)
+        return
+      }
+      this.attachDraftImage(image, basename(path))
+    } catch {
+      this.insertPlainInput(input)
+      return
+    }
+    this.emit()
+  }
+
+  private insertPlainInput(input: string): void {
+    this.draft = insertDraft(this.draft, input)
+    this.pendingSkillInvocation = undefined
+    this.interruptArmed = false
+    this.pruneAttachments()
+    this.pruneImages()
+    this.emit()
+  }
+
+  private attachDraftImage(input: TuiImageInput, preferredName?: string): void {
+    const serial = ++this.imageSerial
+    const name = preferredName === undefined || preferredName === ''
+      ? `clipboard-${serial}.${imageExtension(input.mediaType)}`
+      : preferredName
+    const token = `[Image: ${name}]`
+    this.images = [...this.images, { ...input, id: `image-${serial}`, name, token }]
+    this.draft = insertDraft(this.draft, `${token} `)
+    this.pendingSkillInvocation = undefined
+    this.notice = { tone: 'info', message: text(this.locale, 'imageAttached', { name }) }
+  }
+
+  private canAttachImages(): boolean {
+    return (
+      !this.capturingByok &&
+      this.agent !== 'dead' &&
+      !this.exiting &&
+      this.capabilities.imageAttachments &&
+      this.runtime.saveImages !== undefined
+    )
   }
 
   private runCommand(line: string): void {

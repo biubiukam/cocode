@@ -4,30 +4,50 @@ import stringWidth from 'string-width'
 
 const GRAPHEME_SEGMENTER = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
 
-export type ComposerRow = {
-  before: string
-  cursor?: string
-  after: string
+export type ComposerSpan = {
+  text: string
+  selected?: boolean
+  cursor?: boolean
 }
 
-export function renderComposerRows(text: string, cursor: number): ComposerRow[] {
+export type ComposerRow = {
+  spans: ComposerSpan[]
+}
+
+type ComposerSelection = {
+  start: number
+  end: number
+}
+
+export function renderComposerRows(
+  text: string,
+  cursor: number,
+  selection?: ComposerSelection,
+): ComposerRow[] {
   const safeCursor = Math.max(0, Math.min(cursor, text.length))
+  const safeSelection = normalizeSelection(selection, text.length)
   const rows: ComposerRow[] = []
   let cursorRendered = false
   let offset = 0
+
   for (const line of text.split('\n')) {
     const lineEnd = offset + line.length
-    if (!cursorRendered && safeCursor <= lineEnd) {
-      const position = safeCursor - offset
-      rows.push({
-        before: line.slice(0, position),
-        cursor: line[position] ?? ' ',
-        after: line.slice(position + (position < line.length ? 1 : 0)),
+    const spans: ComposerSpan[] = []
+    for (let index = 0; index < line.length; index += 1) {
+      const absoluteIndex = offset + index
+      const isCursor = !cursorRendered && safeCursor === absoluteIndex
+      appendSpan(spans, {
+        text: line[index] ?? '',
+        ...(isSelected(absoluteIndex, safeSelection) ? { selected: true } : {}),
+        ...(isCursor ? { cursor: true } : {}),
       })
-      cursorRendered = true
-    } else {
-      rows.push({ before: line, after: '' })
+      if (isCursor) cursorRendered = true
     }
+    if (!cursorRendered && safeCursor === lineEnd) {
+      appendSpan(spans, { text: ' ', cursor: true })
+      cursorRendered = true
+    }
+    rows.push({ spans })
     offset = lineEnd + 1
   }
   return rows
@@ -36,63 +56,128 @@ export function renderComposerRows(text: string, cursor: number): ComposerRow[] 
 export function visibleComposerRows(rows: readonly ComposerRow[], maxRows: number): ComposerRow[] {
   const size = Math.max(1, Math.trunc(maxRows))
   if (rows.length <= size) return [...rows]
-  const cursorIndex = Math.max(
-    0,
-    rows.findIndex((row) => row.cursor !== undefined),
-  )
+  const cursorIndex = Math.max(0, rows.findIndex(hasCursor))
   const start = Math.max(0, Math.min(cursorIndex - size + 1, rows.length - size))
   return rows.slice(start, start + size)
 }
 
 export function clipComposerRow(row: ComposerRow, maxCells: number): ComposerRow {
   const width = Math.max(1, Math.trunc(maxCells))
-  if (row.cursor === undefined) {
-    return { before: takeStart(row.before, width), after: '' }
-  }
-  if (stringWidth(row.before + row.cursor + row.after) <= width) return row
+  if (rowWidth(row) <= width) return row
 
-  const cursorWidth = Math.max(1, stringWidth(row.cursor))
+  const cursorIndex = row.spans.findIndex((span) => span.cursor === true)
+  if (cursorIndex < 0) return { spans: clipSpansStart(row.spans, width) }
+
+  const cursor = row.spans[cursorIndex]
+  if (cursor === undefined) return row
+  const before = row.spans.slice(0, cursorIndex)
+  const after = row.spans.slice(cursorIndex + 1)
+  const cursorWidth = Math.max(1, stringWidth(cursor.text))
   const textBudget = Math.max(0, width - cursorWidth)
-  let beforeBudget = Math.min(stringWidth(row.before), Math.ceil(textBudget / 2))
-  let afterBudget = Math.min(stringWidth(row.after), textBudget - beforeBudget)
+  let beforeBudget = Math.min(spansWidth(before), Math.ceil(textBudget / 2))
+  let afterBudget = Math.min(spansWidth(after), textBudget - beforeBudget)
   let remaining = textBudget - beforeBudget - afterBudget
-  const addBefore = Math.min(remaining, stringWidth(row.before) - beforeBudget)
+  const addBefore = Math.min(remaining, spansWidth(before) - beforeBudget)
   beforeBudget += addBefore
   remaining -= addBefore
-  afterBudget += Math.min(remaining, stringWidth(row.after) - afterBudget)
+  afterBudget += Math.min(remaining, spansWidth(after) - afterBudget)
 
   return {
-    before: takeEnd(row.before, beforeBudget),
-    cursor: row.cursor,
-    after: takeStart(row.after, afterBudget),
+    spans: [
+      ...clipSpansEnd(before, beforeBudget),
+      cursor,
+      ...clipSpansStart(after, afterBudget),
+    ],
   }
 }
 
-function takeStart(value: string, maxCells: number): string {
-  if (stringWidth(value) <= maxCells) return value
-  if (maxCells <= 0) return ''
-  if (maxCells === 1) return '…'
-  return takeGraphemes(value, maxCells - 1, false) + '…'
+export function composerRowText(row: ComposerRow): string {
+  return row.spans.map((span) => span.text).join('')
 }
 
-function takeEnd(value: string, maxCells: number): string {
-  if (stringWidth(value) <= maxCells) return value
-  if (maxCells <= 0) return ''
-  if (maxCells === 1) return '…'
-  return '…' + takeGraphemes(value, maxCells - 1, true)
+function hasCursor(row: ComposerRow): boolean {
+  return row.spans.some((span) => span.cursor === true)
 }
 
-function takeGraphemes(value: string, maxCells: number, fromEnd: boolean): string {
-  const graphemes = Array.from(GRAPHEME_SEGMENTER.segment(value), (entry) => entry.segment)
-  if (fromEnd) graphemes.reverse()
-  const visible: string[] = []
+function rowWidth(row: ComposerRow): number {
+  return spansWidth(row.spans)
+}
+
+function spansWidth(spans: readonly ComposerSpan[]): number {
+  return stringWidth(spans.map((span) => span.text).join(''))
+}
+
+function clipSpansStart(spans: readonly ComposerSpan[], maxCells: number): ComposerSpan[] {
+  if (spansWidth(spans) <= maxCells) return [...spans]
+  if (maxCells <= 0) return []
+  if (maxCells === 1) return [{ text: '…' }]
+  return [...takeSpanGraphemes(spans, maxCells - 1, false), { text: '…' }]
+}
+
+function clipSpansEnd(spans: readonly ComposerSpan[], maxCells: number): ComposerSpan[] {
+  if (spansWidth(spans) <= maxCells) return [...spans]
+  if (maxCells <= 0) return []
+  if (maxCells === 1) return [{ text: '…' }]
+  return [{ text: '…' }, ...takeSpanGraphemes(spans, maxCells - 1, true)]
+}
+
+function takeSpanGraphemes(
+  spans: readonly ComposerSpan[],
+  maxCells: number,
+  fromEnd: boolean,
+): ComposerSpan[] {
+  const graphemes = spans.flatMap((span) =>
+    Array.from(GRAPHEME_SEGMENTER.segment(span.text), (entry) => ({
+      text: entry.segment,
+      ...(span.selected === true ? { selected: true } : {}),
+      ...(span.cursor === true ? { cursor: true } : {}),
+    })),
+  )
+  const source = fromEnd ? [...graphemes].reverse() : graphemes
+  const visible: ComposerSpan[] = []
   let cells = 0
-  for (const grapheme of graphemes) {
-    const next = stringWidth(grapheme)
+  for (const grapheme of source) {
+    const next = stringWidth(grapheme.text)
     if (cells + next > maxCells) break
     visible.push(grapheme)
     cells += next
   }
   if (fromEnd) visible.reverse()
-  return visible.join('')
+  return coalesceSpans(visible)
+}
+
+function coalesceSpans(spans: readonly ComposerSpan[]): ComposerSpan[] {
+  return spans.reduce<ComposerSpan[]>((result, span) => {
+    appendSpan(result, span)
+    return result
+  }, [])
+}
+
+function appendSpan(spans: ComposerSpan[], span: ComposerSpan): void {
+  if (span.text === '') return
+  const previous = spans.at(-1)
+  if (
+    previous !== undefined &&
+    previous.selected === span.selected &&
+    previous.cursor !== true &&
+    span.cursor !== true
+  ) {
+    previous.text += span.text
+    return
+  }
+  spans.push({ ...span })
+}
+
+function normalizeSelection(
+  selection: ComposerSelection | undefined,
+  length: number,
+): ComposerSelection | undefined {
+  if (selection === undefined) return undefined
+  const start = Math.max(0, Math.min(Math.trunc(selection.start), length))
+  const end = Math.max(start, Math.min(Math.trunc(selection.end), length))
+  return start === end ? undefined : { start, end }
+}
+
+function isSelected(index: number, selection: ComposerSelection | undefined): boolean {
+  return selection !== undefined && index >= selection.start && index < selection.end
 }

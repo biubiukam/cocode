@@ -3,6 +3,7 @@ import {
   ClipboardImageError,
   clipboardImageCommands,
   detectImageMediaType,
+  pastedImagePath,
   readClipboardImage,
 } from '../../src/runtime/image-clipboard.ts'
 
@@ -39,6 +40,13 @@ describe('image clipboard', () => {
     expect(calls).toHaveLength(2)
   })
 
+  it('recognizes image paths pasted by terminal image integrations', () => {
+    expect(pastedImagePath('/tmp/screenshot.png', '/tmp')).toBe('/tmp/screenshot.png')
+    expect(pastedImagePath('"/tmp/screenshot one.jpg"', '/tmp')).toBe('/tmp/screenshot one.jpg')
+    expect(pastedImagePath('notes.txt', '/tmp')).toBeUndefined()
+    expect(pastedImagePath('/tmp/missing.png\n', '/tmp')).toBe('/tmp/missing.png')
+  })
+
   it('reports an unavailable clipboard implementation', async () => {
     await expect(readClipboardImage({
       platform: 'freebsd',
@@ -47,7 +55,11 @@ describe('image clipboard', () => {
   })
 
   it('defines native readers for macOS, Windows, and Linux', () => {
-    expect(clipboardImageCommands('darwin')[0]?.command).toBe('osascript')
+    const macos = clipboardImageCommands('darwin')[0]
+    expect(macos?.command).toBe('osascript')
+    expect(macos?.args.join('\n')).toContain('public.tiff')
+    expect(macos?.args.join('\n')).toContain('public.file-url')
+    expect(macos?.args.join('\n')).toContain('fileHandleWithStandardOutput.writeData')
     expect(clipboardImageCommands('win32').map((entry) => entry.command)).toEqual([
       'powershell.exe',
       'pwsh',

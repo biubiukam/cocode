@@ -1,6 +1,9 @@
 /** Read raster image bytes from the native clipboard without changing it. */
 
 import { spawn } from 'node:child_process'
+import { readFile } from 'node:fs/promises'
+import { fileURLToPath } from 'node:url'
+import { isAbsolute, resolve } from 'node:path'
 import type { TuiImageInput, TuiImageMediaType } from '@cocode/tui-connection'
 
 export const MAX_CLIPBOARD_IMAGE_BYTES = 5 * 1024 * 1024
@@ -63,6 +66,41 @@ export async function readClipboardImage(options: {
 
   if (!commandAvailable) throw new ClipboardImageError('unavailable')
   throw new ClipboardImageError(unsupported ? 'unsupported' : 'empty')
+}
+
+export async function readImageFile(path: string): Promise<TuiImageInput> {
+  const data = await readFile(path)
+  if (data.length > MAX_CLIPBOARD_IMAGE_BYTES) {
+    throw new ClipboardImageError('too-large')
+  }
+  return imageInput(data)
+}
+
+export function pastedImagePath(input: string, cwd = process.cwd()): string | undefined {
+  let value = input
+    .replace(/^\u001b\[200~/u, '')
+    .replace(/\u001b\[201~$/u, '')
+    .trim()
+  if (value === '') return undefined
+
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    value = value.slice(1, -1)
+  }
+  if (value.startsWith('file://')) {
+    try {
+      value = fileURLToPath(value)
+    } catch {
+      return undefined
+    }
+  } else {
+    value = value.replace(/\\ /gu, ' ')
+  }
+  if (!isAbsolute(value)) value = resolve(cwd, value)
+  if (!/\.(?:png|jpe?g|webp|gif)$/iu.test(value)) return undefined
+  return value
 }
 
 export function clipboardImageCommands(platform: NodeJS.Platform): readonly ClipboardImageCommand[] {
@@ -179,19 +217,68 @@ const BASE64_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/
 
 const MACOS_CLIPBOARD_SCRIPT = String.raw`
 ObjC.import('AppKit')
+ObjC.import('Foundation')
 const pasteboard = $.NSPasteboard.generalPasteboard
+
+function writeOutput(text) {
+  const data = $.NSString.stringWithString(text).dataUsingEncoding($.NSUTF8StringEncoding)
+  $.NSFileHandle.fileHandleWithStandardOutput.writeData(data)
+}
+
+function printImage(mediaType, data) {
+  if (!data) return false
+  const normalized = $.NSData.dataWithData(data)
+  const encoded = ObjC.unwrap(normalized.base64EncodedStringWithOptions(0))
+  if (!encoded) return false
+  writeOutput(mediaType + '\n' + encoded)
+  return true
+}
+
+function convertToPng(data) {
+  if (!data) return null
+  const image = $.NSImage.alloc.initWithData(data)
+  if (!image) return null
+  const tiff = image.TIFFRepresentation
+  if (!tiff) return null
+  const bitmap = $.NSBitmapImageRep.imageRepWithData(tiff)
+  if (!bitmap) return null
+  const png = bitmap.representationUsingTypeProperties($.NSBitmapImageFileTypePNG, $({}))
+  if (!png) return null
+  const normalized = $.NSData.dataWithData(png)
+  return ObjC.unwrap(normalized.base64EncodedStringWithOptions(0))
+}
+
 const formats = [
   ['public.png', 'image/png'],
   ['public.jpeg', 'image/jpeg'],
   ['public.webp', 'image/webp'],
   ['com.compuserve.gif', 'image/gif'],
 ]
+let emitted = false
 for (const [type, mediaType] of formats) {
   const value = pasteboard.dataForType(type)
   if (!value) continue
-  const encoded = ObjC.unwrap(value.base64EncodedStringWithOptions(0))
-  console.log(mediaType + '\n' + encoded)
-  break
+  emitted = printImage(mediaType, value)
+  if (emitted) break
+}
+
+if (!emitted) {
+  const tiff = pasteboard.dataForType('public.tiff')
+  const encoded = convertToPng(tiff)
+  if (encoded) {
+    writeOutput('image/png' + '\n' + encoded)
+    emitted = true
+  }
+}
+
+const fileUrlValue = emitted ? null : pasteboard.stringForType('public.file-url')
+if (!emitted && fileUrlValue) {
+  const fileUrl = $.NSURL.URLWithString(fileUrlValue)
+  if (fileUrl && fileUrl.isFileURL) {
+    const fileData = $.NSData.dataWithContentsOfURL(fileUrl)
+    const encoded = convertToPng(fileData)
+    if (encoded) writeOutput('image/png' + '\n' + encoded)
+  }
 }
 `
 

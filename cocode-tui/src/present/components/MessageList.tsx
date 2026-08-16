@@ -41,7 +41,7 @@ export function MessageList(props: {
       height={props.maxRows}
       overflowY={props.maxRows === undefined ? 'visible' : 'hidden'}
     >
-      {nodes.length === 0 && props.nodes.length === 0 ? (
+      {nodes.length === 0 ? (
         <EmptyState maxRows={props.maxRows} maxColumns={props.maxColumns} locale={props.locale} />
       ) : (
         <Box
