@@ -27,7 +27,6 @@ import { Chat } from './present/chat.tsx'
 import { clearViewport, enterScreen, parseScreenMode } from './present/clear-screen.ts'
 import { resolveUiLocale, text } from './runtime/ui-locale.ts'
 import { detectTerminalEnvironment } from './runtime/platform.ts'
-import { terminalBrandMark } from './present/terminal-farewell.ts'
 
 loadDotenv(resolve(process.cwd(), '.env'))
 
@@ -134,9 +133,7 @@ async function main(): Promise<void> {
     await screen.unmount()
     leaveScreen()
     if (appReady) {
-      process.stdout.write(
-        `\n${terminalBrandMark()}\n\n${text(app.snapshot().locale, 'farewell')}\n`,
-      )
+      process.stdout.write(`\n${text(app.snapshot().locale, 'farewell')}\n`)
     }
     try {
       await releaseLiveInstance(resolved.dshHome)
