@@ -138,7 +138,7 @@ export class LocalHostSupervisorClient implements HostSupervisorClient {
         throw error
       }
     }
-    const serviceEntry = this.options.serviceEntry ?? process.env.COCODE_SUPERVISOR_SERVICE_ENTRY ?? fileURLToPath(new URL('./bin.js', import.meta.url))
+    const serviceEntry = this.options.serviceEntry ?? process.env.COCODE_SUPERVISOR_SERVICE_ENTRY ?? resolveLocalServiceEntry()
     const node = this.options.nodeExecutable ?? resolveNodeExecutable()
     const child = spawn(node, [serviceEntry, 'service', '--state-dir', directory], {
       detached: true,
@@ -153,6 +153,14 @@ export class LocalHostSupervisorClient implements HostSupervisorClient {
     }
     throw new Error(`Host Supervisor did not become ready: ${String(lastError)}`)
   }
+}
+
+function resolveLocalServiceEntry(): string {
+  const url = new URL('./bin.js', import.meta.url)
+  if (url.protocol !== 'file:') {
+    throw new Error(`Host Supervisor service entry is unavailable from a bundled module URL (${url.protocol}).`)
+  }
+  return fileURLToPath(url)
 }
 
 async function stopStaleSupervisor(supervisorPid: number | undefined, hostPid: number | undefined): Promise<void> {

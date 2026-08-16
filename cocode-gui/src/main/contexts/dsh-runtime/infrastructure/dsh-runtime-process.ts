@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs"
 import path from "node:path"
+import { app } from "electron"
 import type {
 	DshRuntimeBootstrapDto,
 	DshRuntimeRequestDto,
@@ -162,6 +163,11 @@ function resolveSupervisorServiceEntry(): string | undefined {
 		)
 		if (existsSync(candidate)) return candidate
 	}
+	if (app.isPackaged) {
+		throw new Error(
+			`Packaged DSH runtime is missing its supervisor entry under ${process.resourcesPath}.`,
+		)
+	}
 	return undefined
 }
 
@@ -170,6 +176,11 @@ function resolveBundledNode(): string | undefined {
 	if (typeof process.resourcesPath === "string") {
 		const candidate = path.join(process.resourcesPath, "cocode-node")
 		if (existsSync(candidate)) return candidate
+	}
+	if (app.isPackaged) {
+		throw new Error(
+			`Packaged DSH runtime is missing its Node executable under ${process.resourcesPath}.`,
+		)
 	}
 	return undefined
 }

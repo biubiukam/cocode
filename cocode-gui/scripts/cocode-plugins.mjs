@@ -45,7 +45,16 @@ export function discoverCocodePlugins(root = pluginsRoot) {
 
 export function buildCocodePlugins() {
 	for (const plugin of discoverCocodePlugins()) {
-		execFileSync("pnpm", ["--filter", plugin.name, "build"], {
+		rmSync(path.join(plugin.root, "lib"), { recursive: true, force: true })
+		execFileSync(
+			"pnpm",
+			["--filter", plugin.name, "exec", "tsc", "-p", "tsconfig.build.json"],
+			{
+				cwd: repositoryRoot,
+				stdio: "inherit",
+			},
+		)
+		execFileSync("pnpm", ["--filter", plugin.name, "exec", "tsdown"], {
 			cwd: repositoryRoot,
 			stdio: "inherit",
 		})
@@ -160,4 +169,38 @@ function isPackageName(value) {
 		!value.includes("\\") &&
 		!value.split("/").some((segment) => segment === "" || segment === "." || segment === "..")
 	)
+}
+
+const command = process.argv[2]
+if (command === "build") buildCocodePlugins()
+else if (command === "typecheck") {
+	for (const plugin of discoverCocodePlugins()) {
+		execFileSync(
+			"pnpm",
+			["--filter", plugin.name, "exec", "tsc", "--noEmit", "-p", "tsconfig.build.json"],
+			{
+				cwd: repositoryRoot,
+				stdio: "inherit",
+			},
+		)
+	}
+} else if (command === "test") {
+	for (const plugin of discoverCocodePlugins()) {
+		if (!containsTestFiles(plugin.root)) continue
+		execFileSync("pnpm", ["--filter", plugin.name, "exec", "vitest", "run"], {
+			cwd: repositoryRoot,
+			stdio: "inherit",
+		})
+	}
+}
+
+function containsTestFiles(root) {
+	if (!existsSync(root)) return false
+	for (const entry of readdirSync(root, { withFileTypes: true })) {
+		if (entry.name === "node_modules" || entry.name === "lib") continue
+		const absolute = path.join(root, entry.name)
+		if (entry.isDirectory() && containsTestFiles(absolute)) return true
+		if (entry.isFile() && /\.(test|spec)\.[cm]?[jt]sx?$/.test(entry.name)) return true
+	}
+	return false
 }

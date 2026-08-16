@@ -91,6 +91,11 @@ coverage/
 .env.*
 !.env.example
 !.env.*.example
+/cocode-gui/env.list
+/cocode-gui/.env.release
+/cocode-gui/*.p12
+/cocode-gui/*.pfx
+/cocode-gui/*.cer
 
 # Logs
 logs/

@@ -2,6 +2,7 @@ import type { ForgeConfig } from "@electron-forge/shared-types"
 import { spawn } from "node:child_process"
 import fs from "node:fs/promises"
 import path from "node:path"
+import { MakerDMG } from "@electron-forge/maker-dmg"
 import { MakerSquirrel } from "@electron-forge/maker-squirrel"
 import { MakerZIP } from "@electron-forge/maker-zip"
 import { MakerDeb } from "@electron-forge/maker-deb"
@@ -9,10 +10,49 @@ import { MakerRpm } from "@electron-forge/maker-rpm"
 import { VitePlugin } from "@electron-forge/plugin-vite"
 import { FusesPlugin } from "@electron-forge/plugin-fuses"
 import { FuseV1Options, FuseVersion } from "@electron/fuses"
+import packageMetadata from "./package.json"
+import {
+	createDmgConfig,
+	createMacNotarizeOptions,
+	createMacSignOptions,
+	createSquirrelConfig,
+	createWindowsSignOptions,
+	loadReleaseEnvironment,
+	resolveReleaseTarget,
+} from "./scripts/release/release-config"
+import {
+	appendChecksumManifest,
+	notarizeFinalMacArtifacts,
+	normalizeArtifactNames,
+	prepareMacDmgDependencies,
+	verifyMadeArtifacts,
+	verifyPackagedApplication,
+} from "./scripts/release/release-hooks"
+
+loadReleaseEnvironment()
+
+const releaseTarget =
+	process.env.RELEASE_PLATFORM || process.env.RELEASE_ARCH || process.env.RELEASE_REQUIRE_SIGNING
+		? resolveReleaseTarget()
+		: undefined
+const appIcon =
+	releaseTarget?.platform === "win32"
+		? process.env.WINDOWS_ICON_PATH
+		: process.env.MACOS_ICON_PATH
 
 const config: ForgeConfig = {
 	packagerConfig: {
 		asar: false,
+		appBundleId: process.env.ELECTRON_APP_ID ?? "com.cocode.desktop",
+		appCategoryType: "public.app-category.developer-tools",
+		appCopyright:
+			process.env.RELEASE_COPYRIGHT ??
+			`Copyright © ${new Date().getFullYear()} Cocode Contributors`,
+		icon: appIcon,
+		osxSign: createMacSignOptions(),
+		osxNotarize: createMacNotarizeOptions(),
+		windowsSign: createWindowsSignOptions(),
+		...(process.env.FORGE_OUT_DIR ? { outDir: process.env.FORGE_OUT_DIR } : {}),
 		afterExtract: [
 			(buildPath, _electronVersion, platform, _arch, callback) => {
 				const resourcesRoot =
@@ -30,9 +70,21 @@ const config: ForgeConfig = {
 			},
 		],
 	},
-		hooks: {
-			packageAfterCopy: async (_config, buildPath: string) => {
-				const runtimeDependencies = ["better-sqlite3", "node-addon-api"]
+	hooks: {
+		preMake: async () => {
+			prepareMacDmgDependencies()
+		},
+		packageAfterCopy: async (_config, buildPath: string) => {
+			if (
+				process.env.RELEASE_REQUIRE_NATIVE_ARCH_MATCH === "1" &&
+				releaseTarget !== undefined &&
+				process.arch !== releaseTarget.arch
+			) {
+				throw new Error(
+					`Native staging requires ${releaseTarget.arch}, but this process is ${process.arch}.`,
+				)
+			}
+			const runtimeDependencies = ["better-sqlite3", "node-addon-api"]
 
 			await Promise.all(
 				runtimeDependencies.map(async (dependency) => {
@@ -43,18 +95,38 @@ const config: ForgeConfig = {
 				}),
 			)
 
-			await runNodeScript("scripts/stage-dsh-runtime.mjs", [
-				"--destination",
-				path.join(buildPath, "resources", "dsh-runtime"),
+			const resourcesRoot = resolvePackagedResourcesRoot(buildPath)
+			const runtimeArtifact = path.resolve(
+				process.env.COCODE_RUNTIME_ARTIFACT_ROOT ??
+					path.join(process.cwd(), ".cache", "cocode", "release-runtime"),
+			)
+			await runNodeScript("scripts/verify-dsh-runtime.mjs", [
+				"--runtime-root",
+				runtimeArtifact,
 			])
-			await fs.cp(process.execPath, path.join(buildPath, "resources", "cocode-node"))
-			await fs.chmod(path.join(buildPath, "resources", "cocode-node"), 0o755)
+			await fs.rm(path.join(resourcesRoot, "dsh-runtime"), { recursive: true, force: true })
+			await fs.cp(runtimeArtifact, path.join(resourcesRoot, "dsh-runtime"), {
+				recursive: true,
+			})
+			const nodeExecutable = path.join(resourcesRoot, "cocode-node")
+			await fs.cp(process.execPath, nodeExecutable)
+			await fs.chmod(nodeExecutable, 0o755)
+		},
+		postPackage: async (_config, packageResult) => {
+			await verifyPackagedApplication(packageResult)
+		},
+		postMake: async (_config, makeResults) => {
+			const normalized = normalizeArtifactNames(makeResults)
+			await notarizeFinalMacArtifacts(normalized)
+			verifyMadeArtifacts(normalized)
+			return appendChecksumManifest(normalized)
 		},
 	},
 	rebuildConfig: {},
 	makers: [
-		new MakerSquirrel({}),
+		new MakerSquirrel(createSquirrelConfig(packageMetadata.version, process.env), ["win32"]),
 		new MakerZIP({}, ["darwin"]),
+		new MakerDMG(createDmgConfig(), ["darwin"]),
 		new MakerRpm({}),
 		new MakerDeb({}),
 	],
@@ -96,6 +168,16 @@ const config: ForgeConfig = {
 			[FuseV1Options.OnlyLoadAppFromAsar]: false,
 		}),
 	],
+}
+
+function resolvePackagedResourcesRoot(buildPath: string): string {
+	// Forge's packageAfterCopy buildPath points at Resources/app on macOS and
+	// resources/app on the other desktop targets. The runtime must live beside
+	// app, because Electron exposes that parent as process.resourcesPath.
+	if (path.basename(buildPath) === "app") return path.dirname(buildPath)
+	return process.platform === "darwin"
+		? path.join(buildPath, "Contents", "Resources")
+		: path.join(buildPath, "resources")
 }
 
 function runNodeScript(script: string, args: string[]): Promise<void> {
