@@ -125,6 +125,9 @@ async function main(output: NodeJS.WriteStream): Promise<void> {
   clearViewport(output)
   const screen = render(<Chat app={app} mouseSupported={terminal.supportsMouse} />, {
     stdout: output,
+    // App owns Ctrl+C via session.interruptOrQuit; Ink's default exitOnCtrlC
+    // swallows Kitty Ctrl+C without calling handleExit or useInput handlers.
+    exitOnCtrlC: false,
     kittyKeyboard: { mode: 'enabled' },
   })
   let exitStarted = false
@@ -136,6 +139,7 @@ async function main(output: NodeJS.WriteStream): Promise<void> {
     process.stdin.off('end', onInputClosed)
     process.stdin.off('close', onInputClosed)
     process.stdout.off('resize', onResize)
+    process.off('SIGINT', onInterrupt)
     process.off('SIGTERM', onTerminate)
     process.off('SIGHUP', onTerminate)
     await screen.unmount()
@@ -165,9 +169,13 @@ async function main(output: NodeJS.WriteStream): Promise<void> {
   const onTerminate = (): void => {
     if (!exitStarted) app.dispatch({ type: 'quit' })
   }
+  const onInterrupt = (): void => {
+    if (!exitStarted) app.dispatch({ type: 'interruptOrQuit' })
+  }
   process.stdin.once('end', onInputClosed)
   process.stdin.once('close', onInputClosed)
   process.stdout.on('resize', onResize)
+  process.once('SIGINT', onInterrupt)
   process.once('SIGTERM', onTerminate)
   process.once('SIGHUP', onTerminate)
   try {
@@ -224,6 +232,7 @@ function runAuthGate(store: AuthStore, output: NodeJS.WriteStream): Promise<bool
     clearViewport(output)
     screen = render(view(), {
       stdout: output,
+      exitOnCtrlC: false,
       kittyKeyboard: { mode: 'enabled' },
     })
     unsubscribe = store.subscribe(() => {
