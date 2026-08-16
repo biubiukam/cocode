@@ -57,7 +57,8 @@ dist/
 dist-electron/
 build/
 out/
-release/
+/release/
+/cocode-gui/release/
 *.tsbuildinfo
 
 # Cocode package build artifacts

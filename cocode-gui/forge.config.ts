@@ -39,6 +39,11 @@ const appIcon =
 	releaseTarget?.platform === "win32"
 		? process.env.WINDOWS_ICON_PATH
 		: process.env.MACOS_ICON_PATH
+const macSignOptions = releaseTarget?.platform === "win32" ? undefined : createMacSignOptions()
+const macNotarizeOptions =
+	releaseTarget?.platform === "win32" ? undefined : createMacNotarizeOptions()
+const windowsSignOptions =
+	releaseTarget?.platform === "darwin" ? undefined : createWindowsSignOptions()
 
 const config: ForgeConfig = {
 	packagerConfig: {
@@ -49,9 +54,9 @@ const config: ForgeConfig = {
 			process.env.RELEASE_COPYRIGHT ??
 			`Copyright © ${new Date().getFullYear()} Cocode Contributors`,
 		icon: appIcon,
-		osxSign: createMacSignOptions(),
-		osxNotarize: createMacNotarizeOptions(),
-		windowsSign: createWindowsSignOptions(),
+		osxSign: macSignOptions,
+		osxNotarize: macNotarizeOptions,
+		windowsSign: windowsSignOptions,
 		...(process.env.FORGE_OUT_DIR ? { outDir: process.env.FORGE_OUT_DIR } : {}),
 		afterExtract: [
 			(buildPath, _electronVersion, platform, _arch, callback) => {
@@ -124,7 +129,10 @@ const config: ForgeConfig = {
 	},
 	rebuildConfig: {},
 	makers: [
-		new MakerSquirrel(createSquirrelConfig(packageMetadata.version, process.env), ["win32"]),
+		new MakerSquirrel(
+			createSquirrelConfig(packageMetadata.version, process.env, windowsSignOptions),
+			["win32"],
+		),
 		new MakerZIP({}, ["darwin"]),
 		new MakerDMG(createDmgConfig(), ["darwin"]),
 		new MakerRpm({}),
