@@ -76,6 +76,7 @@ export function ConversationSessionHeader({
       className={clsx(css.header, hideChrome && css.headerHidden)}
       aria-hidden={hideChrome || undefined}
     >
+      <div className={css.headerDrag}></div>
       {!hideChrome && (
         <>
           <div className={css.titleRow}>
@@ -86,14 +87,23 @@ export function ConversationSessionHeader({
                   return (
                     <span key={summary.id} className={css.crumbSeg}>
                       {index > 0 && <span className={css.crumbSep}>/</span>}
-                      <button
-                        type="button"
-                        className={clsx(css.crumb, last && css.crumbCurrent)}
-                        disabled={last}
-                        onClick={() => { open(summary.id) }}
-                      >
-                        {summary.displayTitle}
-                      </button>
+                      {/* Current crumb renders as text, not a disabled button:
+                          Chromium suppresses text selection inside buttons. */}
+                      {last
+                        ? (
+                          <span className={clsx(css.crumb, css.crumbCurrent)}>
+                            {summary.displayTitle}
+                          </span>
+                        )
+                        : (
+                          <button
+                            type="button"
+                            className={css.crumb}
+                            onClick={() => { open(summary.id) }}
+                          >
+                            {summary.displayTitle}
+                          </button>
+                        )}
                     </span>
                   )
                 })}

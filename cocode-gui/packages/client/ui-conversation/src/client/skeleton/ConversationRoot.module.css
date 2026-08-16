@@ -30,7 +30,7 @@
   flex: none;
   padding: 7px 28px 7px 20px;
   border-bottom: 1px solid transparent;
-  -webkit-app-region: drag;
+  height: 46px;
 }
 
 .header::after {
@@ -45,6 +45,16 @@
   pointer-events: none;
 }
 
+.headerDrag {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  -webkit-app-region: drag;
+}
+
 /* Blank hero/settling: keep the strict Session header mounted without taking
    column space; the root-owned scrollport and composer remain below it. */
 .headerHidden {
@@ -55,7 +65,12 @@
   display: flex;
   align-items: center;
   gap: 0;
-  min-height: 32px;
+  height: 46px;
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 10;
+  padding: 7px 28px 7px 20px;
 }
 
 .titleCluster {
@@ -91,6 +106,7 @@
 }
 
 .crumb {
+  display: inline-block;
   max-width: 220px;
   overflow: hidden;
   padding: 4px 8px;
@@ -105,14 +121,18 @@
   cursor: pointer;
 }
 
-.crumb:hover:not(:disabled) {
+.crumb:hover:not(.crumbCurrent) {
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
+/* The current crumb is plain text (no button wrapper), so the title stays
+   drag-selectable; the surrounding no-drag .crumbs region keeps the window
+   drag gesture from hijacking the selection. */
 .crumbCurrent {
   font-weight: 500;
   color: var(--dsw-alias-label-primary);
-  cursor: default;
+  cursor: text;
+  user-select: text;
 }
 
 .headerActions {
@@ -382,6 +402,18 @@
 .root[data-phase='hero'] .scrollBody {
   justify-content: center;
   overflow-y: auto;
+  position: relative;
+}
+
+.scrollBodyDrag {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  width: 100%;
+  height: 40px;
   -webkit-app-region: drag;
 }
 

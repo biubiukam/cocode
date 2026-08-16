@@ -10,8 +10,8 @@
   --dsh-sidebar-inline-padding: 12px;
   display: flex;
   flex-direction: column;
-  height: 100%;
-  padding: 6px var(--dsh-sidebar-inline-padding);
+  height: calc(100% - 40px);
+  padding: 0 var(--dsh-sidebar-inline-padding) 6px var(--dsh-sidebar-inline-padding);
   box-sizing: border-box;
   background: var(--dsw-specific-sidebar-fill);
   color: var(--dsw-alias-label-primary);
@@ -90,7 +90,7 @@
   }
   
   .titlebarDragRegion {
-    height: 16px;
+    height: 40px;
     display: block;
     -webkit-app-region: drag;
   }
@@ -180,8 +180,8 @@
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
-  height: 60px;
-  padding: 8px 0 8px 4px;
+  height: 40px;
+  padding: 0 0 8px 4px;
   box-sizing: border-box;
   overflow: hidden;
 }
@@ -347,10 +347,10 @@
 }
 
 /* Product footer actions may own the unified account/provider menu. When one
-   is present, keep Settings mounted as the modal controller but hide its
-   duplicate trigger; the footer action activates that controller directly.
-   A slot-error placeholder is not a real action and must not hide Settings. */
-.footArea:has(.footerActions > :not([data-slot-error])) .settingsArea {
+   is present, keep the Settings shell mounted so its full-viewport panel can
+   still render, but hide only the duplicate trigger. A slot-error placeholder
+   is not a real action and must not hide Settings. */
+.footArea:has(.footerActions > :not([data-slot-error])) .settingsArea [data-dsh-settings-trigger] {
 	display: none;
 }
 

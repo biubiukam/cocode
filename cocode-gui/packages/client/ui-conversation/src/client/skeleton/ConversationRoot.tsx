@@ -215,6 +215,7 @@ export function ConversationRoot({
     <div className={css.root} data-phase={phase}>
       {renderSlot('conversation.session.header', {})}
       <div className={css.scrollBody} data-conversation-scroll="">
+        <div className={css.scrollBodyDrag}></div>
         {renderSlot('conversation.session', {})}
         {composerSeat}
       </div>
