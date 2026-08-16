@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { join, resolve } from 'node:path'
 import {
   canReuseOlderSupervisor,
   canonicalizeScope,
@@ -75,7 +76,7 @@ test('resolveHostScope applies the same environment-derived scope for every clie
   const scope = resolveHostScope(env)
   assert.deepEqual(resolveHostRuntimeEnv(env), {
     COCODE_LLM_PROVIDERS: env.COCODE_LLM_PROVIDERS.trim(),
-    COCODE_VISION_CONFIG: '/tmp/cocode-account/vision.yaml',
+    COCODE_VISION_CONFIG: join(resolve('/tmp/cocode-account'), 'vision.yaml'),
   })
   assert.equal(scope.dshHome, '/tmp/cocode-dsh')
   assert.equal(scope.profile, 'web')

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { join, resolve } from 'node:path'
 import { probeRuntimeCapabilities } from '../../packages/connection/src/capability.ts'
 import {
   createTuiRuntime,
@@ -30,7 +31,7 @@ describe('runtime capability negotiation', () => {
     }
 
     expect(resolveHostRuntimeEnv(env)).toEqual({
-      COCODE_VISION_CONFIG: '/tmp/cocode-account/vision.yaml',
+      COCODE_VISION_CONFIG: join(resolve('/tmp/cocode-account'), 'vision.yaml'),
     })
   })
 
