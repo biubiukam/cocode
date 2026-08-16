@@ -32,7 +32,9 @@ gui-web:
 	cd cocode-gui && pnpm run dev:web
 
 tui:
-	@test -f cocode-tui/node_modules/.bin/tsx || $(MAKE) install-tui
+	@test -f cocode-tui/node_modules/.bin/tsx \
+		-a -e cocode-tui/node_modules/@cocode/host-supervisor \
+		|| $(MAKE) install-tui
 	cd cocode-tui && pnpm run dev
 
 dsh:
