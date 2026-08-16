@@ -15,11 +15,13 @@ import {
   Button, IconCloseFill14, IconPersonalizationOutline16,
   IconProjectAddOutline16, IconSearchOutline16, Menu, Modal, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import type {
-  SessionId, SessionListState, SessionSearchResultItem, WorkspaceId, WorkspaceView,
+import {
+  indexSubagentDescendants, type SessionId, type SessionListState,
+  type SessionSearchResultItem, type WorkspaceId, type WorkspaceView,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { WorkspaceBrowserProps } from './contract/slots.ts'
 import type { SessionNode, SessionOrderBy } from './tree.ts'
+import { sessionArchiveEligible } from './archive.ts'
 import { deriveFlat, deriveGroups, deriveSearchResults, UNGROUPED_KEY } from './tree.ts'
 import { ProjectRowItem, SearchResultItem, SessionNodeItem } from './rows/Rows.tsx'
 import { FLAT_SESSION_ORDER_KEY } from './stores.ts'
@@ -216,7 +218,7 @@ function workspaceGroupHalf(e: { clientY: number; currentTarget: HTMLElement }):
 type SessionTreeProps = Pick<
   WorkspaceBrowserProps,
   'useSessions' | 'startSession' | 'open' | 'forkSession'
-  | 'insertWorkspaceBefore' | 'insertSessionBefore' | 't'
+  | 'insertWorkspaceBefore' | 'insertSessionBefore' | 'archiveSession' | 't'
 > & {
   workspaces: readonly WorkspaceView[]
   /** Explicit persisted zero-or-five-session state by Workspace group. */
@@ -249,11 +251,13 @@ type SessionTreeProps = Pick<
 function SessionTree({
   useSessions, startSession, open, forkSession, workspaces, archivedSessionIds,
   onRenameRequest, onDeleteRequest, onSessionRename, onSessionArchive,
-  insertWorkspaceBefore, insertSessionBefore, orderBy,
+  insertWorkspaceBefore, insertSessionBefore, archiveSession, orderBy,
   groupExpansion, setGroupExpanded,
   sessionOrderByAccount, sessionUpdatedAtByAccount, syncSessionOrderAccount, setSessionOrder, t,
 }: SessionTreeProps) {
   const list = useSessions(s => s)
+  const listRef = useRef(list)
+  listRef.current = list
   const current = list.current
   const [expandedSessionGroups, setExpandedSessionGroups] = useState<string[]>([])
   // Transient drag marker state; the selected mode owns the resulting order.
@@ -261,6 +265,7 @@ function SessionTree({
   const sessionDropCommitted = useRef(false)
   const [workspaceDrag, setWorkspaceDrag] = useState<WorkspaceDragState | null>(null)
   const workspaceDropCommitted = useRef(false)
+  const [archivingWorkspaceIds, setArchivingWorkspaceIds] = useState<ReadonlySet<WorkspaceId>>(new Set())
   const previousOrderBy = useRef(orderBy)
   const nativeDragActive = drag !== null || workspaceDrag !== null
   useNativeDragAcceptance(nativeDragActive)
@@ -276,6 +281,35 @@ function SessionTree({
     () => Object.entries(groupExpansion).filter(([, expanded]) => expanded).map(([key]) => key),
     [groupExpansion],
   )
+  const archiveReadWorkspaceSessions = async (
+    workspaceId: WorkspaceId,
+    candidateIds: readonly SessionId[],
+  ): Promise<void> => {
+    if (candidateIds.length === 0 || archivingWorkspaceIds.has(workspaceId)) return
+    setArchivingWorkspaceIds(currentIds => new Set(currentIds).add(workspaceId))
+    const failures: { sessionId: SessionId; reason: unknown }[] = []
+    try {
+      for (const sessionId of candidateIds) {
+        const latest = listRef.current
+        const summary = latest.byId[sessionId]
+        if (summary === undefined) continue
+        const descendants = indexSubagentDescendants(latest.byId)
+        if (!sessionArchiveEligible(summary, descendants)) continue
+        try {
+          await archiveSession(sessionId)
+        } catch (reason) {
+          failures.push({ sessionId, reason })
+        }
+      }
+    } finally {
+      setArchivingWorkspaceIds(currentIds => {
+        const next = new Set(currentIds)
+        next.delete(workspaceId)
+        return next
+      })
+    }
+    if (failures.length > 0) console.warn('workspace session archive partially rejected:', failures)
+  }
   const ungroupedSessionIds = useMemo(() => {
     const accounted = new Set(workspaces.flatMap(workspace => workspace.sessionIds))
     return list.ids.filter(id => list.byId[id] !== undefined && !accounted.has(id))
@@ -471,6 +505,15 @@ function SessionTree({
                     /* v8 ignore next -- narrowing guard: the actions object exists only for real-workspace groups. */
                       if (group.workspaceId !== undefined) onRenameRequest(group.workspaceId, group.label)
                     },
+                    archiveReadSessions: () => {
+                    /* v8 ignore next -- narrowing guard: the actions object exists only for real-workspace groups. */
+                      if (group.workspaceId !== undefined) {
+                        void archiveReadWorkspaceSessions(group.workspaceId, group.archivableSessionIds)
+                      }
+                    },
+                    archiveReadSessionsDisabled: group.archivableSessionIds.length === 0
+                      || archivingWorkspaceIds.has(group.workspaceId),
+                    archiveReadSessionsPending: archivingWorkspaceIds.has(group.workspaceId),
                     delete: () => {
                     /* v8 ignore next -- narrowing guard: the actions object exists only for real-workspace groups. */
                       if (group.workspaceId !== undefined) onDeleteRequest(group.workspaceId, group.label)
@@ -1136,6 +1179,7 @@ export function WorkspaceBrowser({
             : (
               <SessionTree
                 useSessions={useSessions}
+                archiveSession={archiveSession}
                 onSessionRename={onSessionRename}
                 onSessionArchive={onSessionArchive}
                 forkSession={forkSession}

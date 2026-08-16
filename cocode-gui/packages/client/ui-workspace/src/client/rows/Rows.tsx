@@ -112,7 +112,13 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, t }: 
   onToggle: () => void
   onCreate: () => void
   /** Real-Workspace actions; absent for the ungrouped bucket (no menu shown). */
-  actions?: { rename: () => void; delete: () => void } | undefined
+  actions?: {
+    rename: () => void
+    archiveReadSessions: () => void
+    archiveReadSessionsDisabled: boolean
+    archiveReadSessionsPending: boolean
+    delete: () => void
+  } | undefined
   /** Present only for real Workspace rows in the grouped view. */
   drag?: WorkspaceRowDragProps | undefined
   t: RowTranslate
@@ -124,6 +130,15 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, t }: 
   const [menuOpen, setMenuOpen] = useState(false)
   const workspaceMenuItems = [
     { id: 'rename', label: t('rename'), icon: <IconEditOutline16 /> },
+    {
+      id: 'archive-read-sessions',
+      label: actions?.archiveReadSessionsPending === true
+        ? t('menu.archiveReadSessions.pending')
+        : t('menu.archiveReadSessions'),
+      icon: <IconArchiveOutline20 size={16} />,
+      disabled: actions?.archiveReadSessionsDisabled === true,
+    },
+    { type: 'separator' as const, id: 'delete-separator' },
     { id: 'delete', label: t('delete.workspace'), icon: <IconTrashOutline16 />, danger: true },
   ]
   const ownRow = (
@@ -161,9 +176,10 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, t }: 
               setMenuOpen(false)
               // Unknown ids leave before the dispatch: a future menu row must
               // not inherit the destructive branch as an else fallback.
-              /* v8 ignore next -- workspaceMenuItems carries exactly these two rows today. */
-              if (id !== 'rename' && id !== 'delete') return
+              /* v8 ignore next -- workspaceMenuItems carries exactly these action rows today. */
+              if (id !== 'rename' && id !== 'archive-read-sessions' && id !== 'delete') return
               if (id === 'rename') actions.rename()
+              else if (id === 'archive-read-sessions') actions.archiveReadSessions()
               else actions.delete()
             }}
             portal
