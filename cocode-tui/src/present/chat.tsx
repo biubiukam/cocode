@@ -1014,7 +1014,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
         app.dispatch({ type: 'plugins.setQuery', query: pluginState.query.slice(0, -1) })
         return
       }
-      if (input !== '' && !key.ctrl && !key.meta) {
+      if (input !== '' && !key.ctrl && !key.meta && !key.super) {
         app.dispatch({ type: 'plugins.setQuery', query: `${pluginState.query}${input}` })
       }
       return
@@ -1036,7 +1036,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
         app.dispatch({ type: 'model.setQuery', query: snap.modelPicker?.query.slice(0, -1) ?? '' })
         return
       }
-      if (input !== '' && !key.ctrl && !key.meta) {
+      if (input !== '' && !key.ctrl && !key.meta && !key.super) {
         app.dispatch({ type: 'model.setQuery', query: `${snap.modelPicker?.query ?? ''}${input}` })
       }
       return
@@ -1087,7 +1087,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
         setCommandPaletteOpen(false)
         return
       }
-      if (input !== '' && !key.ctrl && !key.meta && !key.shift) {
+      if (input !== '' && !key.ctrl && !key.meta && !key.super && !key.shift) {
         setCommandPaletteQuery((query) => `${query}${input}`)
         setCommandPaletteIndex(0)
       }
@@ -1165,7 +1165,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
         })
         return
       }
-      if (input !== '' && !key.ctrl) {
+      if (input !== '' && !key.ctrl && !key.super) {
         app.dispatch({
           type: 'skills.setQuery',
           query: (skillsState?.query ?? '') + input,
@@ -1190,7 +1190,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
       }
       return
     }
-    if (snap.composer.disabled && !key.ctrl && input !== 'c') {
+    if (snap.composer.disabled && !key.ctrl && !key.super && input !== 'c') {
       if (key.escape || (key.ctrl && input === 'c')) {
         app.dispatch({ type: 'quit' })
       }
@@ -1217,7 +1217,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
         })
         return
       }
-      if (input !== '' && !key.ctrl) {
+      if (input !== '' && !key.ctrl && !key.super) {
         app.dispatch({
           type: 'resume.setQuery',
           query: snap.resumePicker.query + input,
@@ -1246,7 +1246,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
         })
         return
       }
-      if (input !== '' && !key.ctrl) {
+      if (input !== '' && !key.ctrl && !key.super) {
         app.dispatch({
           type: 'sessionTree.setQuery',
           query: snap.sessionTreePicker.query + input,
@@ -1279,7 +1279,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
         })
         return
       }
-      if (input !== '' && !key.ctrl && !key.meta) {
+      if (input !== '' && !key.ctrl && !key.meta && !key.super) {
         app.dispatch({
           type: 'queue.setQuery',
           query: snap.queuePicker.query + input,
@@ -1317,7 +1317,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
         setHistoryIndex(0)
         return
       }
-      if (input !== '' && !key.ctrl) {
+      if (input !== '' && !key.ctrl && !key.super) {
         setHistoryQuery((query) => query + input)
         setHistoryIndex(0)
       }
@@ -1375,12 +1375,12 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
         })
         return
       }
-      if (input === 'm' && !key.ctrl && !key.meta && !key.shift) {
+      if (input === 'm' && !key.ctrl && !key.meta && !key.super && !key.shift) {
         setMessageActionMenuOpen(true)
         setMessageActionIndex(0)
         return
       }
-      if (input === 'c' && !key.ctrl && !key.meta && !key.shift && selectedMessageId !== null) {
+      if (input === 'c' && !key.ctrl && !key.meta && !key.super && !key.shift && selectedMessageId !== null) {
         app.dispatch({ type: 'copyNode', nodeKey: selectedMessageId })
         return
       }
@@ -1479,6 +1479,11 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
       return
     }
 
+    if (key.super) {
+      dispatchComposerShortcut(app, snap, input, key)
+      return
+    }
+
     const matched = matchKey(
       {
         raw: input,
@@ -1562,6 +1567,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     if (
       input.length > 1 &&
       !key.ctrl &&
+      !key.super &&
       !key.meta &&
       !key.shift
     ) {

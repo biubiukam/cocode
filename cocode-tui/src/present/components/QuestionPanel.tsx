@@ -38,7 +38,7 @@ export function QuestionPanel(props: {
   const inputFocused = focus === inputIndex
   const customLines = custom.split('\n')
   const visibleCustomLines = customLines.slice(-3)
-  const lastPointerId = useRef<number>()
+  const lastPointerId = useRef<number | undefined>(undefined)
   const tabs = props.state.tabs ?? [fallbackTab(props.state)]
   const prompt = questionPrompt(props.state.question, text(props.locale, 'questionUnavailable'))
 
@@ -153,7 +153,7 @@ export function QuestionPanel(props: {
       props.dispatch({ type: 'question.answer', selected: [option.label] })
       return
     }
-    if (inputFocused && input !== '' && !key.ctrl && !key.meta) {
+    if (inputFocused && input !== '' && !key.ctrl && !key.meta && !key.super) {
       setCustom((value) => value + input)
       setDirty(true)
     }

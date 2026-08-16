@@ -17,7 +17,7 @@ export function ApprovalPanel(props: {
 }) {
   const [hoveredAction, setHoveredAction] = useState<ReturnType<typeof approvalActionAtRow>>()
   const [inputReady, setInputReady] = useState(false)
-  const lastPointerId = useRef<number>()
+  const lastPointerId = useRef<number | undefined>(undefined)
 
   useEffect(() => {
     setInputReady(false)

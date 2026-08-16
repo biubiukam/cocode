@@ -117,7 +117,9 @@ async function main(): Promise<void> {
   })
 
   clearViewport()
-  const screen = render(<Chat app={app} mouseSupported={terminal.supportsMouse} />)
+  const screen = render(<Chat app={app} mouseSupported={terminal.supportsMouse} />, {
+    kittyKeyboard: { mode: 'auto' },
+  })
   let exitStarted = false
   let appReady = false
   const finish = async (): Promise<void> => {
@@ -215,7 +217,9 @@ function runAuthGate(store: AuthStore): Promise<boolean> {
     process.once('SIGHUP', onTerminate)
 
     clearViewport()
-    screen = render(view())
+    screen = render(view(), {
+      kittyKeyboard: { mode: 'auto' },
+    })
     unsubscribe = store.subscribe(() => {
       const snapshot = store.snapshot()
       if (snapshot.phase === 'ready') {
