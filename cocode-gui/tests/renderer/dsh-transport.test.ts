@@ -58,6 +58,24 @@ test("rewrites sidebar WebSockets to the DSH sidecar", () => {
 		),
 		"ws://127.0.0.1:43127/sidebar/ws/terminal?sessionId=s1",
 	)
+	assert.equal(
+		rewriteDshWebSocketUrl(
+			"ws://localhost:5173/api/events.host",
+			"http://localhost:5173",
+			"http://localhost:5173/index.html",
+			"http://127.0.0.1:43127",
+		),
+		"ws://127.0.0.1:43127/api/events.host",
+	)
+	assert.equal(
+		rewriteDshWebSocketUrl(
+			"wss://example.com/api/events.host",
+			"http://localhost:5173",
+			"http://localhost:5173/index.html",
+			"http://127.0.0.1:43127",
+		),
+		"wss://example.com/api/events.host",
+	)
 })
 
 test("rewrites the client-hmr SSE endpoint to the DSH sidecar", () => {

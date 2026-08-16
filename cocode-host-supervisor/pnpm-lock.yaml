@@ -89,6 +89,9 @@ importers:
       ws:
         specifier: ^8.18.0
         version: 8.21.3
+      yaml:
+        specifier: ^2.9.0
+        version: 2.9.0
     devDependencies:
       '@types/node':
         specifier: ^22.20.1

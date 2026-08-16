@@ -94,6 +94,7 @@ pnpm dsh web          # GUI 联调
 - **配置**：可变项走环境变量（见各目录 `.env.example`），禁止硬编码 harness 路径、模型、API Key。
 - **密钥**：`.env` 不入库；key 只走 harness credentials。
 - **模型可见 ⟺ 可重建**：UI 呈现态不进 session log。
+- **构建产物不入库**：`cocode-gui/packages/cocode/*/lib/` 由 `pnpm build:cocode-plugins` 生成，只本地存在，不提交/推送。
 - **pnpm store**：用默认全局 store（macOS：`~/Library/pnpm/store`）。禁止 `--store-dir .pnpm-store`，不要在仓库内创建 `.pnpm-store/`。
 - **文件末尾**：恰好一个 trailing newline。
 

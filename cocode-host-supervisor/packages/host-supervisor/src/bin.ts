@@ -1,8 +1,6 @@
 import { runSupervisorService } from './service.js'
-import { homedir } from 'node:os'
-import { resolve } from 'node:path'
 import { createHostSupervisorClient } from './client.js'
-import type { HostLease } from './protocol.js'
+import { hostKey, resolveHostRuntimeEnv, resolveHostScope, type HostLease } from './protocol.js'
 
 const args = process.argv.slice(2)
 if (args[0] === 'service') {
@@ -11,20 +9,12 @@ if (args[0] === 'service') {
   if (!directory) throw new Error('cocode-host-supervisor service requires --state-dir')
   await runSupervisorService(directory)
 } else if (args[0] === 'doctor') {
-  const home = process.env.DSH_HOME?.trim() || resolve(homedir(), '.dsh')
-  const profile = process.env.DSH_PROFILE?.trim() || 'web'
-  const scope = {
-    dshHome: home,
-    profile,
-    hostConfigFingerprint: process.env.COCODE_HOST_CONFIG_FINGERPRINT?.trim() || 'cocode-web-jsonrpc-v1',
-    runtimeChannel: process.env.COCODE_RUNTIME_CHANNEL === 'preview' || process.env.COCODE_RUNTIME_CHANNEL === 'dev'
-      ? process.env.COCODE_RUNTIME_CHANNEL
-      : 'stable',
-  } as const
+  const scope = resolveHostScope(process.env)
+  const runtimeEnv = resolveHostRuntimeEnv(process.env)
   const checks: Array<[string, boolean]> = [
     ['package', true],
-    ['DSH_HOME', home !== ''],
-    ['profile', profile !== ''],
+    ['DSH_HOME', scope.dshHome !== ''],
+    ['profile', scope.profile !== ''],
   ]
   let lease: HostLease | undefined
   try {
@@ -33,6 +23,7 @@ if (args[0] === 'service') {
       clientKind: 'standalone-tui',
       requiredServices: ['web', 'jsonrpc'],
       minProtocolRevision: '1.0',
+      runtimeEnv,
     })
     const descriptor = lease.descriptor
     checks.push(
@@ -44,6 +35,7 @@ if (args[0] === 'service') {
       ['Host protocol', descriptor.hostProtocolRevision.startsWith('1.')],
       ['capabilities', ['session', 'event', 'workspace'].every((capability) => descriptor.capabilities.includes(capability))],
       ['DSH_HOME/profile', descriptor.dshHome === scope.dshHome && descriptor.profile === scope.profile],
+      ['Host scope', descriptor.hostKey === hostKey(scope)],
       ['runtime version', descriptor.runtimeVersion !== ''],
       ['lease create/release', true],
     )

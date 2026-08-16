@@ -71,6 +71,34 @@ export const SUPERVISOR_BUILD_REVISION = 'runtime-lifecycle-v4'
 export const HOST_PROTOCOL_REVISION = '1.0'
 export const LEASE_TTL_MS = 30_000
 
+/**
+ * Resolve the non-secret runtime configuration that must be identical for
+ * every client sharing a Host. Keep this next to the scope canonicalization so
+ * GUI, TUI, and standalone diagnostics cannot accidentally derive different
+ * Host keys from the same process environment.
+ */
+export function resolveHostRuntimeEnv(env: NodeJS.ProcessEnv): HostRuntimeEnv {
+  const providers = env.COCODE_LLM_PROVIDERS?.trim()
+  return providers === undefined || providers === ''
+    ? {}
+    : { COCODE_LLM_PROVIDERS: providers }
+}
+
+export function resolveHostScope(env: NodeJS.ProcessEnv = process.env): HostScope {
+  const runtimeEnv = resolveHostRuntimeEnv(env)
+  const baseFingerprint = env.COCODE_HOST_CONFIG_FINGERPRINT?.trim() || 'cocode-web-jsonrpc-v1'
+  return canonicalizeScope({
+    dshHome: env.DSH_HOME?.trim() || `${homedir()}/.dsh`,
+    profile: env.DSH_PROFILE?.trim() || 'web',
+    hostConfigFingerprint: Object.keys(runtimeEnv).length === 0
+      ? baseFingerprint
+      : `${baseFingerprint}:${fingerprint(runtimeEnv)}`,
+    runtimeChannel: env.COCODE_RUNTIME_CHANNEL === 'preview' || env.COCODE_RUNTIME_CHANNEL === 'dev'
+      ? env.COCODE_RUNTIME_CHANNEL
+      : 'stable',
+  })
+}
+
 export function canonicalizeScope(scope: HostScope): HostScope {
   const dshHome = resolve(scope.dshHome.trim() || `${homedir()}/.dsh`)
   const profile = scope.profile.trim() || 'web'
