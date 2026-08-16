@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { DEFAULT_BINDINGS } from '../../src/runtime/keymap.ts'
 import { resolveKeymap } from '../../src/runtime/keymap-config.ts'
 import { describe, expect, it, vi } from 'vitest'
@@ -198,6 +198,7 @@ describe.sequential('Chat multi-viewport render contract', () => {
 
       await vi.advanceTimersByTimeAsync(700)
       await chat.write('\u001b')
+      await vi.advanceTimersByTimeAsync(100)
       expect(chat.dispatches).toContainEqual({ type: 'approval.cancel' })
     } finally {
       await chat.close()
@@ -267,8 +268,15 @@ describe.sequential('Chat multi-viewport render contract', () => {
     expect(testCase).toBeDefined()
     const chat = await renderChatContract(testCase!)
     try {
-      const expected = await readFile(new URL(`./goldens/${fileName}`, import.meta.url), 'utf8')
-      expect(normalizeGolden(chat.frame)).toBe(expected)
+      // Goldens are reviewed by eye; COCODE_UPDATE_GOLDEN=1 regenerates them so
+      // an intentional visual change is a readable diff instead of hand editing.
+      const path = new URL(`./goldens/${fileName}`, import.meta.url)
+      const actual = normalizeGolden(chat.frame)
+      if (process.env.COCODE_UPDATE_GOLDEN === '1') {
+        await writeFile(path, actual)
+      } else {
+        expect(actual).toBe(await readFile(path, 'utf8'))
+      }
     } finally {
       await chat.close()
       expect(vi.getTimerCount()).toBe(0)

@@ -9,6 +9,7 @@ import { cycleGateOption, GATE_OPTIONS } from './auth-options.ts'
 import { theme } from './theme.ts'
 import { WhaleLogo } from './components/WhaleLogo.tsx'
 import { isMouseInput } from './mouse.ts'
+import { terminalViewport } from './terminal-output.ts'
 import { HORIZONTAL_WHALE_MIN_COLUMNS } from './whale-animation.ts'
 
 export function AuthGate(props: {
@@ -20,11 +21,12 @@ export function AuthGate(props: {
   const [draft, setDraft] = useState('')
   const [focused, setFocused] = useState(0)
   const { stdout } = useStdout()
+  const { columns: terminalColumns } = terminalViewport(stdout)
   const picking = snapshot.phase === 'gate' || snapshot.phase === 'failed'
   const logoSize =
-    stdout.columns < HORIZONTAL_WHALE_MIN_COLUMNS
+    terminalColumns < HORIZONTAL_WHALE_MIN_COLUMNS
       ? 'inline'
-      : stdout.columns < 72
+      : terminalColumns < 72
         ? 'medium'
         : 'large'
 
@@ -93,7 +95,7 @@ export function AuthGate(props: {
     <Box flexDirection="column" padding={1}>
       <WhaleLogo size={logoSize} />
       <Box marginTop={1} gap={1}>
-        <Text color={theme.brand} bold>
+        <Text color={theme.accent} bold>
           cocode
         </Text>
         <Text color={theme.mute}>terminal agent</Text>
@@ -119,7 +121,7 @@ export function AuthGate(props: {
       {snapshot.phase === 'device' && snapshot.device !== undefined ? (
         <Box marginTop={1} flexDirection="column">
           <Text color={theme.text}>请在浏览器里确认这串代码：</Text>
-          <Text color={theme.brand} bold>
+          <Text color={theme.accent} bold>
             {snapshot.device.userCode}
           </Text>
           <Text color={theme.mute}>{snapshot.device.verificationUriComplete}</Text>
@@ -133,7 +135,7 @@ export function AuthGate(props: {
       ) : null}
       {snapshot.error !== undefined ? (
         <Box marginTop={1}>
-          <Text color={theme.error}>{snapshot.error}</Text>
+          <Text color={theme.danger}>{snapshot.error}</Text>
         </Box>
       ) : null}
       <Box marginTop={1}>
@@ -144,7 +146,7 @@ export function AuthGate(props: {
 }
 
 function GateRow(props: { focused: boolean; label: string; hint: string }) {
-  const color = props.focused ? theme.brand : theme.dim
+  const color = props.focused ? theme.accent : theme.dim
   const mark = props.focused ? '>' : ' '
   return (
     <Text color={color} bold={props.focused}>

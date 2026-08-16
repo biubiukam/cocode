@@ -5,6 +5,9 @@ import {
 } from '../../runtime/permission-picker.ts'
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
 import { listWindowStart } from '../list-window.ts'
+import { glyphs } from '../glyphs.ts'
+import { selectionStyle } from '../selection.ts'
+import { PANEL_BORDER } from '../layout.ts'
 import { theme } from '../theme.ts'
 
 export function PermissionPicker(props: {
@@ -26,8 +29,8 @@ export function PermissionPicker(props: {
     <Box
       flexDirection="column"
       marginTop={1}
-      borderStyle="round"
-      borderColor={theme.brand}
+      borderStyle={PANEL_BORDER}
+      borderColor={theme.border}
       paddingX={1}
     >
       <Text color={theme.text} bold wrap="truncate-end">
@@ -48,13 +51,16 @@ export function PermissionPicker(props: {
           return (
             <Text
               key={mode}
-              color={active ? theme.text : theme.mute}
-              inverse={active}
+              {...selectionStyle(active)}
               wrap="truncate-end"
             >
-              {active ? '›' : ' '}{' '}
-              <Text color={pending ? theme.pending : active ? theme.text : theme.dim}>
-                {pending ? '…' : mode === props.state.current ? '✓' : ' '}
+              {active ? glyphs.optionActive : glyphs.optionInactive}{' '}
+              <Text color={pending ? theme.warning : active ? theme.text : theme.dim}>
+                {pending
+                  ? glyphs.waitingMark
+                  : mode === props.state.current
+                  ? glyphs.checkDone
+                  : ' '}
               </Text>{' '}
               {mode}
             </Text>
@@ -63,7 +69,7 @@ export function PermissionPicker(props: {
       )}
       {below > 0 ? <Text color={theme.mute}>↓ {below}</Text> : null}
       {props.state.pending !== undefined ? (
-        <Text color={theme.pending} wrap="truncate-end">
+        <Text color={theme.warning} wrap="truncate-end">
           {text(props.locale, 'permissionApplying')}
         </Text>
       ) : null}

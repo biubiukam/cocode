@@ -7,6 +7,9 @@ import {
 } from '../../runtime/plugin-picker.ts'
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
 import { listWindowStart } from '../list-window.ts'
+import { glyphs } from '../glyphs.ts'
+import { selectionStyle } from '../selection.ts'
+import { PANEL_BORDER } from '../layout.ts'
 import { theme } from '../theme.ts'
 
 export function PluginsPicker(props: {
@@ -28,8 +31,8 @@ export function PluginsPicker(props: {
     <Box
       flexDirection="column"
       marginTop={1}
-      borderStyle="round"
-      borderColor={theme.brand}
+      borderStyle={PANEL_BORDER}
+      borderColor={theme.border}
       paddingX={1}
     >
       <Text color={theme.text} bold wrap="truncate-end">
@@ -56,16 +59,19 @@ export function PluginsPicker(props: {
             : plugin.enabled
               ? text(props.locale, 'pluginsEnabled')
               : text(props.locale, 'pluginsDisabled')
-          const stateIcon = pending ? '…' : plugin.enabled ? '✓' : '−'
+          const stateIcon = pending
+            ? glyphs.waitingMark
+            : plugin.enabled
+            ? glyphs.checkDone
+            : glyphs.canceledMark
           return (
             <Text
               key={plugin.entryId}
-              color={active ? theme.text : theme.mute}
-              inverse={active}
+              {...selectionStyle(active)}
               wrap="truncate-end"
             >
-              {active ? '›' : ' '}{' '}
-              <Text color={pending ? theme.pending : plugin.enabled ? theme.success : theme.mute}>
+              {active ? glyphs.optionActive : glyphs.optionInactive}{' '}
+              <Text color={pending ? theme.warning : plugin.enabled ? theme.success : theme.mute}>
                 {stateIcon}
               </Text>{' '}
               {plugin.moduleName}{' '}
@@ -81,7 +87,7 @@ export function PluginsPicker(props: {
       ) : null}
       {props.state.status !== undefined ? (
         <Text
-          color={props.state.status.tone === 'error' ? theme.error : theme.info}
+          color={props.state.status.tone === 'error' ? theme.danger : theme.accent}
           wrap="truncate-end"
         >
           {props.state.status.message}

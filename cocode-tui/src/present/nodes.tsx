@@ -14,6 +14,8 @@ import type { UiLocale } from '../runtime/ui-locale.ts'
 export type NodeRenderOptions = {
   expanded?: boolean
   selected?: boolean
+  /** Belongs to the turn above it, so the rail runs on without a gap. */
+  attached?: boolean
   locale?: UiLocale
   maxColumns?: number
   expandedLevel?: 0 | 1 | 2
@@ -59,6 +61,8 @@ const views: Record<string, NodeView> = {
       <ToolCard
         node={node}
         verbose={verbose || options.expanded === true}
+        selected={options.selected === true}
+        attached={options.attached === true}
         locale={options.locale ?? 'en'}
         maxColumns={options.maxColumns}
       />

@@ -65,12 +65,12 @@ export function StatusLine(props: {
         </Text>
         <Box flexShrink={0}>
           {props.status.focusMode ? (
-            <Text color={theme.info} wrap="truncate-end">
+            <Text color={theme.accent} wrap="truncate-end">
               {text(props.locale, 'focusStatusOn')}
             </Text>
           ) : null}
           {props.status.subagents !== undefined && props.status.subagents.running > 0 ? (
-            <Text color={theme.info} wrap="truncate-end">
+            <Text color={theme.accent} wrap="truncate-end">
               {' · '}
               {text(props.locale, 'subagentsRunning', {
                 count: String(props.status.subagents.running),
@@ -85,7 +85,7 @@ export function StatusLine(props: {
             </Text>
           ) : null}
           {props.status.queueCount > 0 ? (
-            <Text color={theme.info} wrap="truncate-end">
+            <Text color={theme.accent} wrap="truncate-end">
               {' · '}
               {text(props.locale, 'queueCount', { count: String(props.status.queueCount) })}
             </Text>
@@ -113,7 +113,7 @@ function Notice(props: {
   maxRows?: number
   scrollOffset?: number
 }) {
-  const color = props.notice.tone === 'error' ? theme.error : theme.info
+  const color = props.notice.tone === 'error' ? theme.danger : theme.accent
   const mark = props.notice.tone === 'error' ? '!' : '·'
   const maxRows = Math.max(1, Math.trunc(props.maxRows ?? noticeRows(props.notice.message)))
   const scrollOffset = Math.max(0, Math.trunc(props.scrollOffset ?? 0))

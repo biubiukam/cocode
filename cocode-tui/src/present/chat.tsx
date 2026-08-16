@@ -95,7 +95,8 @@ import type { InspectorMouseInput } from './inspector-scroll.ts'
 import {
   useInspectorResize,
 } from './inspector-resize.ts'
-import { compactColumns } from './panel-layout.ts'
+import { compactColumns, paintColumns } from './panel-layout.ts'
+import { terminalViewport } from './terminal-output.ts'
 import { ReviewPicker } from './components/ReviewPicker.tsx'
 import { ApprovalPanel } from './components/ApprovalPanel.tsx'
 import { QueuePicker } from './components/QueuePicker.tsx'
@@ -173,9 +174,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
   const [inspectorMouseInput, setInspectorMouseInput] = useState<InspectorMouseInput>()
   const mouseClickId = useRef(0)
   const { stdout } = useStdout()
-  const viewportRows =
-    (stdout as NodeJS.WriteStream & { cocodeViewportRows?: number }).cocodeViewportRows ??
-    stdout.rows
+  const { columns: terminalColumns, rows: viewportRows } = terminalViewport(stdout)
   const { isRawModeSupported, setRawMode } = useStdin()
 
   const toggleSelectedMessageDetails = () => {
@@ -399,16 +398,16 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     [allCommandPaletteItems, commandPaletteQuery],
   )
   const actionMenuItems = commandPaletteOpen ? commandPaletteItems : messageActionItems
-  const projectedMode = compactColumns(stdout.columns)
+  const projectedMode = compactColumns(terminalColumns)
   const inspectorResize = useInspectorResize({
-    terminalColumns: stdout.columns,
+    terminalColumns,
     visible: projectedMode === 'wide',
     defaultWidth: INSPECTOR_WIDTH,
   })
   const projectedInspectorLayout = inspectorResize.layout
   const projectedMainColumns = projectedMode === 'wide'
     ? projectedInspectorLayout.mainColumns
-    : stdout.columns
+    : paintColumns(terminalColumns)
   const mainChecklistRows = checklistStripRows(
     snap.status.todos.length,
     projectedMode === 'wide' ? CHECKLIST_STRIP_MAX_ITEMS : 2,
@@ -430,7 +429,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     hasImages: composerImageRows === 1,
   })
   const layout = calculateChatLayout({
-    viewport: { columns: stdout.columns, rows: viewportRows },
+    viewport: { columns: terminalColumns, rows: viewportRows },
     viewportRows,
     composerRows,
     composerInputRows: composerVisibleInputRows,
@@ -1742,8 +1741,8 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
 
   if (layout.tooSmall) {
     return (
-      <Box flexDirection="column" height={viewportRows} overflowY="hidden">
-        <Text color={theme.brand} bold wrap="truncate-end">
+      <Box flexDirection="column" width={layout.paintColumns} height={viewportRows} overflowY="hidden">
+        <Text color={theme.accent} bold wrap="truncate-end">
           cocode · {text(snap.locale, 'terminalTooSmall')}
         </Text>
         {viewportRows > 1 ? (
@@ -1948,13 +1947,13 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
   )
 
   return (
-    <Box flexDirection="row" height={viewportRows}>
+    <Box flexDirection="row" width={layout.paintColumns} height={viewportRows}>
       <Box
         flexDirection="column"
         height={viewportRows}
-        width={wideInspector ? mainColumns : undefined}
+        width={mainColumns}
         minWidth={0}
-        flexGrow={wideInspector ? 0 : 1}
+        flexGrow={0}
       >
         <Header
           header={snap.header}
@@ -1987,12 +1986,12 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
           noticeScrollOffset={noticeScrollOffset}
         />
         {editorBusy ? (
-          <Text color={theme.info} wrap="truncate-end">
+          <Text color={theme.accent} wrap="truncate-end">
             {text(snap.locale, 'editorOpening')}
           </Text>
         ) : null}
         {editorError !== undefined ? (
-          <Text color={theme.error} wrap="truncate-end">
+          <Text color={theme.danger} wrap="truncate-end">
             {editorError}
           </Text>
         ) : null}

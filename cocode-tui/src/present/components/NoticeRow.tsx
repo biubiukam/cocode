@@ -3,7 +3,7 @@ import type { NoticeNode } from '../../runtime/nodes/types.ts'
 import { theme } from '../theme.ts'
 
 export function NoticeRow(props: { node: NoticeNode }) {
-  const color = props.node.tone === 'error' ? theme.error : theme.info
+  const color = props.node.tone === 'error' ? theme.danger : theme.accent
   const mark = props.node.tone === 'error' ? '!' : 'i'
   return (
     <Box marginTop={1} paddingLeft={1}>

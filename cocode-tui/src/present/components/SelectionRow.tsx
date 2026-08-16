@@ -1,4 +1,6 @@
 import { Text } from 'ink'
+import { glyphs } from '../glyphs.ts'
+import { selectionStyle } from '../selection.ts'
 import { theme } from '../theme.ts'
 
 export function SelectionRow(props: {
@@ -7,23 +9,18 @@ export function SelectionRow(props: {
   description?: string
   shortcut?: string
 }) {
+  const style = selectionStyle(props.active)
+  const detailColor = props.active ? theme.dim : theme.mute
   return (
-    <Text
-      color={props.active ? theme.text : theme.dim}
-      inverse={props.active}
-      bold={props.active}
-      wrap="truncate-end"
-    >
+    <Text {...style} wrap="truncate-end">
       <Text color={props.active ? theme.accent : theme.mute}>
-        {props.active ? '▸' : '·'}
+        {props.active ? glyphs.optionActive : glyphs.optionInactive}
       </Text>{' '}
       {props.label}
       {props.description !== undefined ? (
-        <Text color={props.active ? theme.text : theme.mute}> · {props.description}</Text>
+        <Text color={detailColor}> · {props.description}</Text>
       ) : null}
-      {props.shortcut !== undefined ? (
-        <Text color={props.active ? theme.text : theme.mute}>  {props.shortcut}</Text>
-      ) : null}
+      {props.shortcut !== undefined ? <Text color={detailColor}>  {props.shortcut}</Text> : null}
     </Text>
   )
 }

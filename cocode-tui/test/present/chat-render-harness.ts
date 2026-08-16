@@ -83,7 +83,7 @@ export function assertViewportWidth(
 ): void {
   const overflow = frameLines(frame)
     .map((line, index) => ({ line, index, width: visibleWidth(line) }))
-    .filter(({ width }) => width > testCase.viewport.columns)
+    .filter(({ width }) => width >= testCase.viewport.columns)
   if (overflow.length === 0) return
   const details = overflow
     .map(({ line, index, width }) =>

@@ -3,6 +3,7 @@ import { Box, Text } from 'ink'
 import type { ReactNode } from 'react'
 import { memo, useMemo, useRef } from 'react'
 import stringWidth from 'string-width'
+import { glyphs } from '../glyphs.ts'
 import { theme } from '../theme.ts'
 
 export type MarkdownBlock =
@@ -139,18 +140,20 @@ function MarkdownBlockView(props: { block: MarkdownBlock; maxColumns?: number })
   const { block } = props
   if (block.kind === 'heading') {
     return (
-      <Text color={theme.brand} bold>
-        {'#'.repeat(Math.min(block.depth, 3))} {renderInline(block.text)}
+      <Text color={theme.text} bold>
+        <Text color={theme.mute}>{'#'.repeat(Math.min(block.depth, 3))}</Text>{' '}
+        {renderInline(block.text)}
       </Text>
     )
   }
+  // A rail costs one column and no rows; a box border costs two of each, which
+  // a narrow terminal cannot spare. The design system draws code as a sunken
+  // surface, and a surface is exactly what a terminal cannot provide.
   if (block.kind === 'code') {
     return (
-      <Box borderStyle="single" borderColor={theme.border} paddingX={1}>
-        <Text color={theme.tool}>
-          {block.lang ? `${block.lang}\n` : ''}
-          {block.text}
-        </Text>
+      <Box flexDirection="column">
+        {block.lang ? <Text color={theme.mute}>{block.lang}</Text> : null}
+        <RailedLines text={block.text} color={theme.dim} />
       </Box>
     )
   }
@@ -158,8 +161,10 @@ function MarkdownBlockView(props: { block: MarkdownBlock; maxColumns?: number })
     return (
       <Box flexDirection="column">
         {block.items.map((item, index) => (
-          <Text key={`${index}:${item}`} color={theme.assistant}>
-            <Text color={theme.brand}>{block.ordered ? `${index + 1}.` : '•'}</Text>{' '}
+          <Text key={`${index}:${item}`} color={theme.text}>
+            <Text color={theme.mute}>
+              {block.ordered ? `${index + 1}.` : glyphs.listBullet}
+            </Text>{' '}
             {renderInline(item)}
           </Text>
         ))}
@@ -167,17 +172,31 @@ function MarkdownBlockView(props: { block: MarkdownBlock; maxColumns?: number })
     )
   }
   if (block.kind === 'quote') {
-    return <Text color={theme.dim}>│ {renderInline(block.text)}</Text>
+    return <RailedLines text={block.text} color={theme.dim} />
   }
   if (block.kind === 'table') {
     return (
-      <Text color={theme.assistant} wrap="truncate-end">
+      <Text color={theme.text} wrap="truncate-end">
         {renderTable(block.header, block.rows, props.maxColumns)}
       </Text>
     )
   }
-  if (block.kind === 'rule') return <Text color={theme.border}>{'─'.repeat(24)}</Text>
-  return <Text color={theme.assistant}>{renderInline(block.text)}</Text>
+  if (block.kind === 'rule') return <Text color={theme.border}>{glyphs.rule.repeat(24)}</Text>
+  return <Text color={theme.text}>{renderInline(block.text)}</Text>
+}
+
+/** Left rail repeated per line, so a multi-line block reads as one region. */
+function RailedLines(props: { text: string; color: string }) {
+  return (
+    <Box flexDirection="column">
+      {props.text.replace(/\r\n?/g, '\n').split('\n').map((line, index) => (
+        <Text key={`${index}:${line}`}>
+          <Text color={theme.border}>{glyphs.quoteRail} </Text>
+          <Text color={props.color}>{line}</Text>
+        </Text>
+      ))}
+    </Box>
+  )
 }
 
 function renderInline(text: string): ReactNode {
@@ -196,14 +215,14 @@ function renderInline(text: string): ReactNode {
       )
     } else if (value.startsWith('`')) {
       nodes.push(
-        <Text key={`${index}:code`} color={theme.info}>
+        <Text key={`${index}:code`} color={theme.accent}>
           {value.slice(1, -1)}
         </Text>,
       )
     } else if (value.startsWith('[')) {
       const labelEnd = value.indexOf('](')
       nodes.push(
-        <Text key={`${index}:link`} color={theme.info}>
+        <Text key={`${index}:link`} color={theme.accent}>
           {value.slice(1, labelEnd)}
         </Text>,
       )
@@ -220,6 +239,13 @@ function renderInline(text: string): ReactNode {
   return nodes
 }
 
+/**
+ * Columns are separated by whitespace and the header by a single rule, matching
+ * the design system's table (§4.6), which has no vertical lines and no outer
+ * frame. Dropping them also returns four columns per table to the content.
+ */
+export const TABLE_COLUMN_GAP = '  '
+
 export function renderTable(
   header: readonly string[],
   rows: readonly (readonly string[])[],
@@ -228,20 +254,15 @@ export function renderTable(
   const columnCount = Math.max(header.length, ...rows.map((row) => row.length), 1)
   const allRows = [header, ...rows]
   const widths = tableColumnWidths(allRows, columnCount, maxColumns)
-  const line = (row: readonly string[]) => {
-    const cells = rowLines(row, widths)
-    return cells.map((lineCells) =>
-      `│ ${lineCells.map((cell, index) => padCell(cell, widths[index] ?? 1)).join(' │ ')} │`,
+  const line = (row: readonly string[]) =>
+    rowLines(row, widths).map((lineCells) =>
+      lineCells
+        .map((cell, index) => padCell(cell, widths[index] ?? 1))
+        .join(TABLE_COLUMN_GAP)
+        .trimEnd(),
     )
-  }
-  const divider = `├${widths.map((width) => `─${'─'.repeat(width)}─`).join('┼')}┤`
-  return [
-    `┌${widths.map((width) => `─${'─'.repeat(width)}─`).join('┬')}┐`,
-    ...line(header),
-    divider,
-    ...rows.flatMap(line),
-    `└${widths.map((width) => `─${'─'.repeat(width)}─`).join('┴')}┘`,
-  ].join('\n')
+  const divider = widths.map((width) => glyphs.rule.repeat(width)).join(TABLE_COLUMN_GAP)
+  return [...line(header), divider, ...rows.flatMap(line)].join('\n')
 }
 
 const TABLE_CELL_CAP = 48
@@ -252,7 +273,7 @@ function tableColumnWidths(
   columnCount: number,
   maxColumns: number,
 ): number[] {
-  const separators = 4 + Math.max(0, columnCount - 1) * 3
+  const separators = Math.max(0, columnCount - 1) * TABLE_COLUMN_GAP.length
   const available = Math.max(columnCount, Math.max(1, maxColumns) - separators)
   const preferred = Array.from({ length: columnCount }, (_, column) => {
     const contentWidth = Math.max(

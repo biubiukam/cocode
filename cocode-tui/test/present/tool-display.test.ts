@@ -77,7 +77,7 @@ describe('tool display helpers', () => {
       name: '工具',
       statusLabel: '运行中',
       elapsed: '2s',
-      tone: 'info',
+      tone: 'accent',
     })
     expect(projectToolSummary({ ...running, status: 'success' }, 'en', 80, 3_500).elapsed)
       .toBeUndefined()

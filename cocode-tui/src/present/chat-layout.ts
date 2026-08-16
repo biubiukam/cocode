@@ -7,7 +7,12 @@ import { REWIND_WINDOW_SIZE } from '../runtime/rewind-picker.ts'
 import { SKILLS_WINDOW_SIZE } from '../runtime/skills-picker.ts'
 import { PERMISSION_PICKER_WINDOW_SIZE } from '../runtime/permission-picker.ts'
 import { listWindowStart } from './list-window.ts'
-import { compactColumns, resolveInspectorLayout, type InspectorLayout } from './panel-layout.ts'
+import {
+  compactColumns,
+  paintColumns,
+  resolveInspectorLayout,
+  type InspectorLayout,
+} from './panel-layout.ts'
 
 export const CHAT_HEADER_ROWS = 2
 const STATUS_ROWS = 2
@@ -94,6 +99,8 @@ export type ChatLayoutInput = {
 
 export type ChatLayout = {
   mode: 'tiny' | 'compact' | 'wide'
+  /** Painted columns; always one cell narrower than the real viewport. */
+  paintColumns: number
   mainColumns: number
   inspector?: InspectorLayout
   rows: {
@@ -124,11 +131,12 @@ export function calculateChatLayout(input: ChatLayoutInput): ChatLayout {
   const viewportColumns = nonNegativeInteger(
     input.viewport?.columns ?? input.viewportColumns ?? 120,
   )
+  const paintedColumns = paintColumns(viewportColumns)
   const mode = compactColumns(viewportColumns)
   const inspector = mode === 'wide'
     ? resolveInspectorLayout(viewportColumns, input.inspectorPreferredWidth ?? 30)
     : undefined
-  const mainColumns = inspector?.mainColumns ?? Math.max(1, viewportColumns)
+  const mainColumns = inspector?.mainColumns ?? paintedColumns
   const composerAttachmentRows = input.attachmentRows === undefined
     ? optionalRow(input.hasAttachments)
     : nonNegativeInteger(input.attachmentRows)
@@ -174,6 +182,7 @@ export function calculateChatLayout(input: ChatLayoutInput): ChatLayout {
 
   return {
     mode,
+    paintColumns: paintedColumns,
     mainColumns,
     inspector,
     rows: {

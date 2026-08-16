@@ -1,4 +1,4 @@
-[header] render-contract                                       session fixture-⌄
+[header] render-contract                                      session fixture-⌄
 
 
 
@@ -6,11 +6,11 @@
 
 
 
-            1001110100001110100          █████ █████ █████ █████ ████  █████
-        0011101000011101001110100  111   █     █   █ █     █   █ █   █ █
-     1110●00001110100111010000111010011  █     █   █ █     █   █ █   █ ███
-       00111010011101000011101001  010   █     █   █ █     █   █ █   █ █
-            1101000011101001110          █████ █████ █████ █████ ████  █████
+           1001110100001110100          █████ █████ █████ █████ ████  █████
+       0011101000011101001110100  111   █     █   █ █     █   █ █   █ █
+    1110●00001110100111010000111010011  █     █   █ █     █   █ █   █ ███
+      00111010011101000011101001  010   █     █   █ █     █   █ █   █ █
+           1101000011101001110          █████ █████ █████ █████ ████  █████
                                 cocode is ready
                   Ask a question or describe a task to start.
 
@@ -18,6 +18,7 @@
 
 ● [status] ready
 
-Enter send · ↑ history · pgup / pgdn scroll · shift+↑ messages · ? help
 Build · fixture-model
 > [composer] describe a task
+
+Enter send · ↑ history · pgup / pgdn scroll · shift+↑ messages · ? help

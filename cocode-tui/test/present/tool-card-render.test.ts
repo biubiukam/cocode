@@ -103,11 +103,11 @@ describe('ToolCard rendering', () => {
     )
     expect(rendered).toMatchInlineSnapshot(`
       {
-        "diff": "   ↳ ✓ apply_patch · done · src/main.ts · +3/-1",
-        "read": "   ↳ ✓ read · done · src/main.ts",
-        "search": "   ↳ ✓ search · done · TODO",
-        "terminal": "   ↳ ✓ terminal · done · git status --short",
-        "unknown": "   ↳ ✓ tool · done · completed safely",
+        "diff": "│ ✓ apply_patch · done · src/main.ts · +3/-1",
+        "read": "│ ✓ read · done · src/main.ts",
+        "search": "│ ✓ search · done · TODO",
+        "terminal": "│ ✓ terminal · done · git status --short",
+        "unknown": "│ ✓ tool · done · completed safely",
       }
     `)
   })

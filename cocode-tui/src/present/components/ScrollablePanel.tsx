@@ -41,9 +41,11 @@ export function ScrollablePanel(props: ScrollablePanelProps) {
   const showIndicators = metrics.overflowing && props.height >= 3
   return (
     <Box flexDirection="column" height={Math.max(1, Math.trunc(props.height))} overflowY="hidden">
+      {/* The row is kept even with nothing hidden, so scrolling does not shift
+          the content; only the hint itself is withheld. */}
       {showIndicators ? (
         <Text color={theme.mute} wrap="truncate-end">
-          ↑ {props.upHint ?? ''} · {metrics.offset}
+          {metrics.offset > 0 ? `↑ ${props.upHint ?? ''} · ${String(metrics.offset)}` : ''}
         </Text>
       ) : null}
       <Box flexDirection="column" height={metrics.viewportRows} overflowY="hidden">
@@ -58,7 +60,9 @@ export function ScrollablePanel(props: ScrollablePanelProps) {
       </Box>
       {showIndicators ? (
         <Text color={theme.mute} wrap="truncate-end">
-          ↓ {props.downHint ?? ''} · {metrics.maxOffset - metrics.offset}
+          {metrics.maxOffset > metrics.offset
+            ? `↓ ${props.downHint ?? ''} · ${String(metrics.maxOffset - metrics.offset)}`
+            : ''}
         </Text>
       ) : null}
     </Box>

@@ -21,6 +21,15 @@ describe('terminal output', () => {
     expect(output.rows).toBe(25)
     expect(output.cocodeViewportRows).toBe(24)
   })
+
+  it('reserves one column for Ink so full-width frames do not auto-wrap', () => {
+    const target = new CaptureStream()
+    Object.assign(target, { columns: 120, rows: 30 })
+    const output = createTerminalOutput(target as unknown as NodeJS.WriteStream)
+
+    expect(output.columns).toBe(119)
+    expect(output.cocodeTerminalColumns).toBe(120)
+  })
 })
 
 class CaptureStream extends Writable {

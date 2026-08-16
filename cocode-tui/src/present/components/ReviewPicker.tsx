@@ -3,6 +3,9 @@ import { parseDiffSummary, type DiffLine, type DiffSummary } from '../../runtime
 import type { GitReview, ReviewScope } from '../../runtime/git-review.ts'
 import type { ReviewPickerState } from '../../runtime/review-picker.ts'
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
+import { glyphs } from '../glyphs.ts'
+import { selectionStyle } from '../selection.ts'
+import { PANEL_BORDER } from '../layout.ts'
 import { theme } from '../theme.ts'
 
 const DEFAULT_PREVIEW_ROWS = 16
@@ -118,8 +121,8 @@ export function ReviewPicker(props: {
     <Box
       flexDirection="column"
       marginTop={1}
-      borderStyle="round"
-      borderColor={theme.brand}
+      borderStyle={PANEL_BORDER}
+      borderColor={theme.border}
       paddingX={1}
     >
       <Text color={theme.text} bold wrap="truncate-end">
@@ -128,7 +131,7 @@ export function ReviewPicker(props: {
       </Text>
       {state.phase === 'scope' ? <ScopeList state={state} locale={props.locale} /> : null}
       {state.phase === 'loading' ? (
-        <Text color={theme.info} wrap="truncate-end">
+        <Text color={theme.accent} wrap="truncate-end">
           {text(props.locale, 'reviewLoading')}
         </Text>
       ) : null}
@@ -150,11 +153,10 @@ function ScopeList(props: {
         return (
           <Text
             key={scope}
-            inverse={active}
-            color={active ? theme.text : theme.mute}
+            {...selectionStyle(active)}
             wrap="truncate-end"
           >
-            {active ? '›' : ' '} {scopeLabel(scope, props.locale)}
+            {active ? glyphs.optionActive : glyphs.optionInactive} {scopeLabel(scope, props.locale)}
           </Text>
         )
       })}
@@ -171,7 +173,7 @@ function Preview(props: {
   const preview = buildReviewPreview(review, props.maxRows)
   return (
     <>
-      <Text color={theme.info} wrap="truncate-end">
+      <Text color={theme.accent} wrap="truncate-end">
         {text(props.locale, 'reviewSummary', {
           files: String(review.files.length),
           additions: String(review.additions),
@@ -217,7 +219,7 @@ function Preview(props: {
           {text(props.locale, 'reviewOmittedFiles', { count: String(review.omittedFiles.length) })}
         </Text>
       ) : null}
-      <Text color={theme.brand} wrap="truncate-end">
+      <Text color={theme.accent} wrap="truncate-end">
         {text(props.locale, 'reviewConfirm')}
       </Text>
     </>
@@ -230,9 +232,9 @@ function DiffLineText(props: { line: DiffLine }) {
     line.kind === 'add'
       ? theme.success
       : line.kind === 'remove'
-      ? theme.error
+      ? theme.danger
       : line.kind === 'hunk'
-      ? theme.info
+      ? theme.accent
       : line.kind === 'header'
       ? theme.text
       : theme.dim

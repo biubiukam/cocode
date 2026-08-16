@@ -1,11 +1,13 @@
 import { Box, Text } from 'ink'
-import { useEffect, useState } from 'react'
 import type { AssistantNode } from '../../runtime/nodes/types.ts'
 import { Markdown, StreamingMarkdown } from './Markdown.tsx'
+import { MessageRail } from './MessageRail.tsx'
 import { formatReasoning } from '../text-format.ts'
+import { glyphs } from '../glyphs.ts'
+import { messageContentColumns } from '../layout.ts'
 import { theme } from '../theme.ts'
-import type { UiLocale } from '../../runtime/ui-locale.ts'
-import { assistantContentColumns } from '../assistant-layout.ts'
+import { useSpinnerFrame } from '../use-spinner.ts'
+import { text, type UiLocale } from '../../runtime/ui-locale.ts'
 
 export function AssistantRow(props: {
   node: AssistantNode
@@ -16,7 +18,7 @@ export function AssistantRow(props: {
   expandedLevel?: 0 | 1 | 2
 }) {
   const { node, verbose } = props
-  const markdownColumns = assistantContentColumns(props.maxColumns)
+  const contentColumns = messageContentColumns(props.maxColumns)
   const reasoning = formatReasoning(
     node.reasoning,
     verbose,
@@ -25,48 +27,35 @@ export function AssistantRow(props: {
     props.expandedLevel ?? (verbose ? 2 : 0),
   )
   const thinkingActive = node.streaming && node.thinking !== false && node.text === ''
-  const [frame, setFrame] = useState(0)
-
-  useEffect(() => {
-    setFrame(0)
-    if (!thinkingActive) return
-    const timer = setInterval(() => setFrame((current) => (current + 1) % 4), 140)
-    return () => clearInterval(timer)
-  }, [thinkingActive])
+  const spinner = useSpinnerFrame(glyphs.spinner, thinkingActive)
+  // The rail is the only always-visible signal that a reply is still arriving,
+  // so streaming tints the line rather than adding a row of metadata.
+  const railColor = props.selected === true || node.streaming ? theme.accent : theme.mute
   return (
-    <Box
-      flexDirection="row"
-      marginTop={1}
+    <MessageRail
+      color={railColor}
+      emphasis={props.selected === true}
       width={props.maxColumns}
-      minWidth={0}
     >
-      <Text color={props.selected ? theme.success : theme.mute}>
-        {props.selected ? '▌' : ' '}
-      </Text>
-      <Box
-        flexDirection="column"
-        paddingLeft={1}
-        minWidth={0}
-        width={assistantContentColumns(props.maxColumns)}
-      >
-        {reasoning !== undefined ? (
-          <Text color={theme.mute} wrap="wrap">
-            {thinkingActive ? `${['◐', '◓', '◑', '◒'][frame] ?? '◐'} ` : ''}
-            {reasoning}
-          </Text>
-        ) : thinkingActive ? (
-          <Text color={theme.running}>{['◐', '◓', '◑', '◒'][frame] ?? '◐'} thinking…</Text>
-        ) : null}
-        {node.text !== '' ? (
-          <Box flexDirection="column">
-            {node.streaming ? (
-              <StreamingMarkdown text={node.text} maxColumns={markdownColumns} />
-            ) : (
-              <Markdown text={node.text} maxColumns={markdownColumns} />
-            )}
-          </Box>
-        ) : null}
-      </Box>
-    </Box>
+      {reasoning !== undefined ? (
+        <Text color={theme.mute} wrap="wrap">
+          {thinkingActive ? `${spinner} ` : ''}
+          {reasoning}
+        </Text>
+      ) : thinkingActive ? (
+        <Text color={theme.accent}>
+          {spinner} {text(props.locale, 'agentThinking')}
+        </Text>
+      ) : null}
+      {node.text !== '' ? (
+        <Box flexDirection="column">
+          {node.streaming ? (
+            <StreamingMarkdown text={node.text} maxColumns={contentColumns} />
+          ) : (
+            <Markdown text={node.text} maxColumns={contentColumns} />
+          )}
+        </Box>
+      ) : null}
+    </MessageRail>
   )
 }

@@ -10,7 +10,7 @@ import {
   extractPartialJsonStringArgument,
   truncatePlanProgress,
 } from '../runtime/nodes/tool-view.ts'
-import { ASSISTANT_CONTENT_CHROME } from './assistant-layout.ts'
+import { BODY_INDENT, MESSAGE_CHROME } from './layout.ts'
 
 export function visibleTail(
   nodes: readonly ConversationNode[],
@@ -54,11 +54,11 @@ export function estimateNodeRows(
   const detailed = verbose || expanded
   switch (node.kind) {
     case 'user':
-      return 2 + Math.max(1, lineCount(node.text, contentColumns(maxColumns, 2)))
+      return 2 + Math.max(1, lineCount(node.text, contentColumns(maxColumns, MESSAGE_CHROME)))
     case 'context': {
       if (!detailed) return 0
       if (!expanded && verbose) return 2
-      const columns = contentColumns(maxColumns, 2)
+      const columns = contentColumns(maxColumns, MESSAGE_CHROME)
       if (node.sections.length === 0) return 2 + lineCount(node.text, columns)
       return 2 + node.sections.reduce(
         (rows, section, index) =>
@@ -73,7 +73,7 @@ export function estimateNodeRows(
         node.streaming && node.thinking !== false,
         node.thinkingDurationMs,
       )
-      const columns = contentColumns(maxColumns, ASSISTANT_CONTENT_CHROME)
+      const columns = contentColumns(maxColumns, MESSAGE_CHROME)
       const thinkingIndicator =
         node.streaming && node.thinking !== false && node.text === '' && reasoning === undefined ? 1 : 0
       return 2 + lineCount(reasoning, columns) + thinkingIndicator + lineCount(node.text, columns)
@@ -87,9 +87,12 @@ export function estimateNodeRows(
       const planRows =
         plan === undefined
           ? 0
-          : lineCount(truncatePlanProgress(plan), contentColumns(maxColumns, 6)) + 1
+          : lineCount(
+              truncatePlanProgress(plan),
+              contentColumns(maxColumns, MESSAGE_CHROME + BODY_INDENT),
+            ) + 1
       if (!detailed) return 2 + planRows
-      const columns = contentColumns(maxColumns, 4)
+      const columns = contentColumns(maxColumns, MESSAGE_CHROME)
       return (
         2 +
         planRows +

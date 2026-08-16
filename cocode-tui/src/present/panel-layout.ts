@@ -31,12 +31,20 @@ export type InspectorLayout = {
   startColumn: number
 }
 
+/**
+ * Usable paint width. The last terminal cell is left empty so a full-width
+ * Ink line plus newline cannot trigger TTY auto-wrap.
+ */
+export function paintColumns(terminalColumns: number): number {
+  return Math.max(1, normalizeColumns(terminalColumns) - 1)
+}
+
 /** Resolve the horizontal projection shared by the chat layout and resizer. */
 export function resolveInspectorLayout(
   terminalColumns: number,
   preferredWidth: number,
 ): InspectorLayout {
-  const columns = normalizeColumns(terminalColumns)
+  const columns = paintColumns(terminalColumns)
   const maxWidth = Math.max(
     1,
     Math.min(INSPECTOR_MAX_WIDTH, columns - INSPECTOR_MIN_MAIN_COLUMNS - 1),

@@ -6,6 +6,9 @@ import {
 } from '../../runtime/skills-picker.ts'
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
 import { listWindowStart } from '../list-window.ts'
+import { glyphs } from '../glyphs.ts'
+import { selectionStyle } from '../selection.ts'
+import { PANEL_BORDER } from '../layout.ts'
 import { theme } from '../theme.ts'
 
 export function SkillsPicker(props: {
@@ -27,8 +30,8 @@ export function SkillsPicker(props: {
     <Box
       flexDirection="column"
       marginTop={1}
-      borderStyle="round"
-      borderColor={theme.brand}
+      borderStyle={PANEL_BORDER}
+      borderColor={theme.border}
       paddingX={1}
     >
       <Text color={theme.text} bold wrap="truncate-end">
@@ -54,11 +57,10 @@ export function SkillsPicker(props: {
           return (
             <Text
               key={skill.name}
-              color={active ? theme.text : theme.mute}
-              inverse={active}
+              {...selectionStyle(active)}
               wrap="truncate-end"
             >
-              {active ? '›' : ' '} /{skill.name}{' '}
+              {active ? glyphs.optionActive : glyphs.optionInactive} /{skill.name}{' '}
               <Text color={active ? theme.text : theme.dim}>· {skill.description}</Text>
             </Text>
           )

@@ -7,6 +7,7 @@ import {
 import type { SessionTodo } from '../../runtime/session-state.ts'
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
 import { listWindowStart } from '../list-window.ts'
+import { PANEL_BORDER } from '../layout.ts'
 import { theme } from '../theme.ts'
 import { ChecklistItem } from './ChecklistItem.tsx'
 
@@ -29,8 +30,8 @@ export function ChecklistPanel(props: {
     <Box
       flexDirection="column"
       marginTop={1}
-      borderStyle="round"
-      borderColor={theme.brand}
+      borderStyle={PANEL_BORDER}
+      borderColor={theme.border}
       paddingX={1}
     >
       <Text color={theme.text} bold wrap="truncate-end">

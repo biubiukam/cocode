@@ -6,6 +6,9 @@ import {
 } from '../../runtime/model-picker.ts'
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
 import { listWindowStart } from '../list-window.ts'
+import { glyphs } from '../glyphs.ts'
+import { selectionStyle } from '../selection.ts'
+import { PANEL_BORDER } from '../layout.ts'
 import { theme } from '../theme.ts'
 
 export function ModelPicker(props: {
@@ -26,7 +29,7 @@ export function ModelPicker(props: {
   const below = Math.max(0, items.length - start - visible.length)
 
   return (
-    <Box flexDirection="column" marginTop={1} borderStyle="round" borderColor={theme.brand} paddingX={1}>
+    <Box flexDirection="column" marginTop={1} borderStyle={PANEL_BORDER} borderColor={theme.border} paddingX={1}>
       <Text color={theme.text} bold wrap="truncate-end">
         {text(props.locale, 'modelCatalogTitle')}{' '}
         <Text color={theme.mute}>· {text(props.locale, 'modelCatalogHint')}</Text>
@@ -48,11 +51,10 @@ export function ModelPicker(props: {
           return (
             <Text
               key={`${item.providerId}:${item.model.id}`}
-              color={active ? theme.text : theme.mute}
-              inverse={active}
+              {...selectionStyle(active)}
               wrap="truncate-end"
             >
-              {active ? '›' : ' '} {current ? '✓' : ' '} {item.model.name}{' '}
+              {active ? glyphs.optionActive : glyphs.optionInactive} {current ? glyphs.checkDone : ' '} {item.model.name}{' '}
               <Text color={active ? theme.text : theme.dim}>
                 · {item.providerName} · {item.model.id}
               </Text>

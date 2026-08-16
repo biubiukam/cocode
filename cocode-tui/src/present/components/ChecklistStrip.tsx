@@ -2,6 +2,7 @@ import { Box, Text } from 'ink'
 import type { SessionTodo } from '../../runtime/session-state.ts'
 import { checklistCounts } from '../../runtime/checklist.ts'
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
+import { PANEL_BORDER } from '../layout.ts'
 import { theme } from '../theme.ts'
 import { ChecklistItem } from './ChecklistItem.tsx'
 
@@ -29,7 +30,7 @@ export function ChecklistStrip(props: {
       flexShrink={0}
       flexDirection="column"
       marginTop={1}
-      borderStyle="round"
+      borderStyle={PANEL_BORDER}
       borderColor={theme.border}
       paddingX={1}
     >

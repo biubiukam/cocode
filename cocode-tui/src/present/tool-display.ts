@@ -1,6 +1,8 @@
 import stringWidth from 'string-width'
 import type { ToolNode } from '../runtime/nodes/types.ts'
 import { toolViewPrimaryDetail } from '../runtime/nodes/tool-view.ts'
+import { glyphs } from './glyphs.ts'
+import { MESSAGE_CHROME } from './layout.ts'
 import { theme } from './theme.ts'
 import { sanitizeSingleLine } from './text-format.ts'
 
@@ -10,7 +12,7 @@ export type ToolSummary = {
   name: string
   primaryDetail?: string
   elapsed?: string
-  tone: 'info' | 'success' | 'error'
+  tone: 'accent' | 'success' | 'danger'
 }
 
 export type ToolDisplayState = {
@@ -25,20 +27,20 @@ export function toolDisplayState(
 ): ToolDisplayState {
   if (node.status === 'running') {
     return {
-      mark: theme.pendingIcon,
-      color: theme.pending,
+      mark: glyphs.runningMark,
+      color: theme.accent,
       label: locale === 'zh' ? '运行中' : 'running',
     }
   }
   if (node.status === 'error') {
     return {
-      mark: theme.errorIcon,
-      color: theme.error,
+      mark: glyphs.errorMark,
+      color: theme.danger,
       label: locale === 'zh' ? '失败' : 'error',
     }
   }
   return {
-    mark: theme.successIcon,
+    mark: glyphs.successMark,
     color: theme.success,
     label: locale === 'zh' ? '完成' : 'done',
   }
@@ -51,18 +53,18 @@ export function projectToolSummary(
   now: number,
 ): ToolSummary {
   const state = toolDisplayState(node, locale)
-  const tone = node.status === 'error' ? 'error' : node.status === 'success' ? 'success' : 'info'
+  const tone = node.status === 'error' ? 'danger' : node.status === 'success' ? 'success' : 'accent'
   const fallbackName = locale === 'zh' ? '工具' : 'tool'
   const rawName = sanitizeSingleLine(node.name) || fallbackName
   const primary = selectPrimaryDetail(node)
   const width = Math.max(1, Math.trunc(columns))
   const elapsedCandidate = node.status === 'running' ? formatElapsed(node.time, now) : undefined
-  const chromeWidth = stringWidth(`↳ ${state.mark}  · ${state.label}`)
+  const chromeWidth = MESSAGE_CHROME + stringWidth(`${state.mark}  · ${state.label}`)
   const primaryReserve =
     primary === undefined ? 0 : stringWidth(' · ') + Math.min(16, stringWidth(primary))
   const nameBudget = Math.max(1, Math.min(32, width - chromeWidth - primaryReserve))
   const name = truncateCellWidth(rawName, nameBudget)
-  const baseWidth = stringWidth(`↳ ${state.mark} ${name} · ${state.label}`)
+  const baseWidth = MESSAGE_CHROME + stringWidth(`${state.mark} ${name} · ${state.label}`)
   const detailReserve = primary === undefined ? 0 : stringWidth(' · …')
   const elapsed =
     elapsedCandidate !== undefined &&

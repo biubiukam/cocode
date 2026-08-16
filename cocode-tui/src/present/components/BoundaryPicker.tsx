@@ -2,6 +2,9 @@ import { Box, Text } from 'ink'
 import { REWIND_WINDOW_SIZE, type RewindPickerState } from '../../runtime/rewind-picker.ts'
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
 import { listWindowStart } from '../list-window.ts'
+import { glyphs } from '../glyphs.ts'
+import { selectionStyle } from '../selection.ts'
+import { PANEL_BORDER } from '../layout.ts'
 import { theme } from '../theme.ts'
 
 export function BoundaryPicker(props: {
@@ -26,8 +29,8 @@ export function BoundaryPicker(props: {
     <Box
       flexDirection="column"
       marginTop={1}
-      borderStyle="round"
-      borderColor={props.state.confirming ? theme.accent : theme.brand}
+      borderStyle={PANEL_BORDER}
+      borderColor={props.state.confirming ? theme.warning : theme.border}
       paddingX={1}
     >
       <Text color={theme.text} bold wrap="truncate-end">
@@ -49,11 +52,10 @@ export function BoundaryPicker(props: {
           return (
             <Text
               key={`${item.id}:${item.seq}`}
-              color={active ? theme.text : theme.mute}
-              inverse={active}
+              {...selectionStyle(active)}
               wrap="truncate-end"
             >
-              {active ? '›' : ' '} {formatItem(item.text)}
+              {active ? glyphs.optionActive : glyphs.optionInactive} {formatItem(item.text)}
             </Text>
           )
         })

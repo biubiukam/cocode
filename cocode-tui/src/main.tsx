@@ -12,7 +12,8 @@ import { displayError } from './runtime/errors/index.ts'
 import { startErrorMessage } from './runtime/app-view.ts'
 import { P0_CAPABILITIES } from './runtime/capabilities.ts'
 import { resolveSessionRoot } from './runtime/sessions-root.ts'
-import { setTheme } from './present/theme.ts'
+import { DEFAULT_THEME, setTheme } from './present/theme.ts'
+import { setGlyphs, supportsUnicode } from './present/glyphs.ts'
 import {
   createAuthStore,
   saveByokKey,
@@ -42,6 +43,11 @@ if (process.stdin.isTTY !== true || process.stdout.isTTY !== true) {
 }
 
 async function main(output: NodeJS.WriteStream): Promise<void> {
+  // Color depth and glyph coverage are fixed for the life of the session, so
+  // they are resolved once here rather than probed at every render.
+  setGlyphs(supportsUnicode())
+  setTheme(DEFAULT_THEME)
+
   const launch = parseLaunchFromEnv()
 
   const leaveScreen = enterScreen(parseScreenMode(process.env.COCODE_TUI_SCREEN), output)

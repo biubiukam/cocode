@@ -184,6 +184,12 @@ describe('chat layout rows', () => {
               layout.rows.footer,
           ).toBe(rows)
         }
+        const painted = layout.inspector === undefined
+          ? layout.mainColumns
+          : layout.mainColumns + layout.inspector.width + 1
+        expect(layout.paintColumns).toBe(Math.max(1, columns - 1))
+        expect(painted).toBe(layout.paintColumns)
+        if (columns > 1) expect(painted).toBeLessThan(columns)
       }
     }
   })

@@ -5,12 +5,12 @@ import stringWidth from 'string-width'
 import { describe, expect, it } from 'vitest'
 import type { AssistantNode } from '../../src/runtime/nodes/types.ts'
 import { AssistantRow } from '../../src/present/components/AssistantRow.tsx'
-import { assistantContentColumns } from '../../src/present/assistant-layout.ts'
+import { messageContentColumns } from '../../src/present/layout.ts'
 
 describe('AssistantRow rendering', () => {
   it('keeps the assistant body two cells from the message track', () => {
-    expect(assistantContentColumns(40)).toBe(38)
-    expect(assistantContentColumns(undefined)).toBeUndefined()
+    expect(messageContentColumns(40)).toBe(38)
+    expect(messageContentColumns(undefined)).toBeUndefined()
   })
 
   it('wraps expanded reasoning to the provided message width', async () => {
@@ -57,7 +57,9 @@ describe('AssistantRow rendering', () => {
       .filter((line) => line.includes('The user') || line.includes('Done.') || line.includes('list.'))
 
     expect(lines.length).toBeGreaterThan(0)
-    expect(lines.some((line) => /^ {2}Done\./.test(line))).toBe(true)
+    // The rail runs down every wrapped line, not just the first.
+    expect(lines.every((line) => /^[│▌] /.test(line))).toBe(true)
+    expect(lines.some((line) => /^│ Done\./.test(line))).toBe(true)
     expect(Math.max(...lines.map((line) => stringWidth(line)))).toBeLessThanOrEqual(40)
   })
 })

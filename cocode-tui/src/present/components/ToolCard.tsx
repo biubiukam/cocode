@@ -1,6 +1,8 @@
 import { Box, Text } from 'ink'
 import type { ToolNode } from '../../runtime/nodes/types.ts'
 import { formatToolResult } from '../text-format.ts'
+import { BODY_INDENT, messageContentColumns } from '../layout.ts'
+import { MessageRail } from './MessageRail.tsx'
 import { theme } from '../theme.ts'
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
 import {
@@ -18,14 +20,12 @@ export function ToolCard(props: {
   verbose: boolean
   locale: UiLocale
   maxColumns?: number
+  selected?: boolean
+  attached?: boolean
 }) {
   const { node, verbose } = props
-  const summary = projectToolSummary(
-    node,
-    props.locale,
-    Math.max(1, (props.maxColumns ?? 120) - 3),
-    Date.now(),
-  )
+  const summary = projectToolSummary(node, props.locale, props.maxColumns ?? 120, Date.now())
+  const contentColumns = messageContentColumns(props.maxColumns)
   const result = formatToolResult(node.result, verbose)
   const diffSummary = node.view?.kind === 'diff' ? node.view.summary : undefined
   const toolName = node.name.trim() === '' ? 'tool' : node.name
@@ -39,65 +39,59 @@ export function ToolCard(props: {
     ? extractPartialJsonStringArgument(node.args, 'question')
     : undefined
   return (
-    <Box
-      flexDirection="column"
-      marginTop={1}
-      paddingLeft={3}
+    // Same rail as the assistant reply that called this tool.
+    <MessageRail
+      color={
+        props.selected === true || node.status === 'running' ? theme.accent : theme.mute
+      }
+      emphasis={props.selected === true}
+      attached={props.attached === true}
       width={props.maxColumns}
-      minWidth={0}
     >
-      <Text color={theme[summary.tone]} wrap="truncate-end">
-        <Text color={theme.mute}>↳ </Text>
-        {summary.mark} <Text bold>{summary.name}</Text> · {summary.statusLabel}
-        {summary.elapsed ? ` · ${summary.elapsed}` : ''}
-        {summary.primaryDetail ? ` · ${summary.primaryDetail}` : ''}
-      </Text>
-      {planProgress !== undefined ? (
-        <Box flexDirection="column" paddingLeft={2}>
-          <Text color={theme.info} wrap="truncate-end">
-            {text(props.locale, node.streaming ? 'planStreaming' : 'planReady')}
-          </Text>
-          {node.streaming ? (
-            <StreamingMarkdown
-              text={planProgress}
-              maxColumns={props.maxColumns}
-            />
-          ) : (
-            <Markdown
-              text={planProgress}
-              maxColumns={props.maxColumns}
-            />
-          )}
-        </Box>
-      ) : null}
-      {isQuestionRunning ? (
-        <Box flexDirection="column" paddingLeft={2}>
-          <Text color={theme.info} wrap="truncate-end">
-            {text(props.locale, node.streaming ? 'questionStreaming' : 'questionReady')}
-          </Text>
-          {questionProgress === undefined ? null : (
-            <Text color={theme.text} wrap="truncate-end">
-              {questionProgress}
-            </Text>
-          )}
-        </Box>
-      ) : null}
-      {verbose && node.args !== '' && planProgress === undefined && !isQuestionRunning ? (
-        <Text color={theme.mute}> args {node.args}</Text>
-      ) : null}
-      {verbose && diffSummary === undefined && result !== undefined ? (
-        <Text color={theme.tool}> {result}</Text>
-      ) : null}
-      {verbose && diffSummary !== undefined ? (
-        <DiffLines summary={diffSummary} />
-      ) : null}
-      {verbose && node.error ? (
-        <Text color={theme.error} wrap="truncate-end">
-          {' '}
-          {toolErrorSummary(node.error) ?? node.error.code}
+      <Box flexDirection="column" minWidth={0}>
+        <Text color={theme[summary.tone]} wrap="truncate-end">
+          {summary.mark} <Text bold>{summary.name}</Text> · {summary.statusLabel}
+          {summary.elapsed ? ` · ${summary.elapsed}` : ''}
+          {summary.primaryDetail ? ` · ${summary.primaryDetail}` : ''}
         </Text>
-      ) : null}
-    </Box>
+        {planProgress !== undefined ? (
+          <Box flexDirection="column" paddingLeft={BODY_INDENT}>
+            <Text color={theme.accent} wrap="truncate-end">
+              {text(props.locale, node.streaming ? 'planStreaming' : 'planReady')}
+            </Text>
+            {node.streaming ? (
+              <StreamingMarkdown text={planProgress} maxColumns={contentColumns} />
+            ) : (
+              <Markdown text={planProgress} maxColumns={contentColumns} />
+            )}
+          </Box>
+        ) : null}
+        {isQuestionRunning ? (
+          <Box flexDirection="column" paddingLeft={BODY_INDENT}>
+            <Text color={theme.accent} wrap="truncate-end">
+              {text(props.locale, node.streaming ? 'questionStreaming' : 'questionReady')}
+            </Text>
+            {questionProgress === undefined ? null : (
+              <Text color={theme.text} wrap="truncate-end">
+                {questionProgress}
+              </Text>
+            )}
+          </Box>
+        ) : null}
+        {verbose && node.args !== '' && planProgress === undefined && !isQuestionRunning ? (
+          <Text color={theme.mute}>args {node.args}</Text>
+        ) : null}
+        {verbose && diffSummary === undefined && result !== undefined ? (
+          <Text color={theme.dim}>{result}</Text>
+        ) : null}
+        {verbose && diffSummary !== undefined ? <DiffLines summary={diffSummary} /> : null}
+        {verbose && node.error ? (
+          <Text color={theme.danger} wrap="truncate-end">
+            {toolErrorSummary(node.error) ?? node.error.code}
+          </Text>
+        ) : null}
+      </Box>
+    </MessageRail>
   )
 }
 
@@ -116,7 +110,7 @@ function DiffLines(props: {
                 line.kind === 'add'
                   ? theme.success
                   : line.kind === 'remove'
-                  ? theme.error
+                  ? theme.danger
                   : theme.dim
               }
               wrap="truncate-end"

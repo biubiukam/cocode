@@ -4,6 +4,9 @@ import stringWidth from 'string-width'
 import type { TuiQuestionSnapshot, TuiAction } from '../../runtime/app.ts'
 import { parseMarkdownBlocks, renderTable } from './Markdown.tsx'
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
+import { glyphs } from '../glyphs.ts'
+import { selectionStyle } from '../selection.ts'
+import { PANEL_BORDER } from '../layout.ts'
 import { theme } from '../theme.ts'
 import type { TuiMousePointer } from '../mouse.ts'
 
@@ -34,21 +37,26 @@ export function buildPlanPreview(markdown: string, maxColumns = 80): readonly Pl
       appendWrapped(lines, 'body', block.text, width)
     } else if (block.kind === 'list') {
       block.items.forEach((item, index) => {
-        appendWrapped(lines, 'bullet', `${block.ordered ? `${index + 1}.` : '•'} ${item}`, width)
+        appendWrapped(
+          lines,
+          'bullet',
+          `${block.ordered ? `${index + 1}.` : glyphs.listBullet} ${item}`,
+          width,
+        )
       })
     } else if (block.kind === 'code') {
       if (block.lang !== undefined) appendWrapped(lines, 'code', `[${block.lang}]`, width)
       for (const codeLine of block.text.split(/\r?\n/)) {
-        appendWrapped(lines, 'code', `│ ${codeLine}`, width)
+        appendWrapped(lines, 'code', `${glyphs.quoteRail} ${codeLine}`, width)
       }
     } else if (block.kind === 'quote') {
-      appendWrapped(lines, 'quote', `│ ${block.text}`, width)
+      appendWrapped(lines, 'quote', `${glyphs.quoteRail} ${block.text}`, width)
     } else if (block.kind === 'table') {
       for (const tableLine of renderTable(block.header, block.rows, width).split('\n')) {
         appendWrapped(lines, 'code', tableLine, width)
       }
     } else if (block.kind === 'rule') {
-      lines.push({ kind: 'rule', text: '─'.repeat(Math.min(24, width)) })
+      lines.push({ kind: 'rule', text: glyphs.rule.repeat(Math.min(24, width)) })
     } else if (block.kind === 'text') {
       appendWrapped(lines, 'body', block.text, width)
     }
@@ -188,11 +196,11 @@ export function PlanReviewPanel(props: {
     <Box
       flexDirection="column"
       marginTop={1}
-      borderStyle="round"
-      borderColor={theme.info}
+      borderStyle={PANEL_BORDER}
+      borderColor={theme.border}
       paddingX={1}
     >
-      <Text color={theme.info} bold wrap="truncate-end">
+      <Text color={theme.accent} bold wrap="truncate-end">
         {text(props.locale, 'planReviewTitle')}{' '}
         <Text color={theme.mute}>
           · {props.state.position}/{props.state.total} · {text(props.locale, 'planReviewHint')}
@@ -215,8 +223,9 @@ export function PlanReviewPanel(props: {
         const active = selected === index
         return (
           <Box key={option.label} flexDirection="column">
-            <Text color={active ? theme.text : theme.mute} inverse={active} wrap="truncate-end">
-              {active ? '›' : ' '} {active ? '●' : '○'} {option.label}
+            <Text {...selectionStyle(active)} wrap="truncate-end">
+              {active ? glyphs.optionActive : glyphs.optionInactive}{' '}
+              {active ? glyphs.checkActive : glyphs.checkTodo} {option.label}
             </Text>
             {option.description !== undefined ? (
               <Text color={theme.dim} wrap="truncate-end">
@@ -237,14 +246,14 @@ export function PlanReviewPanel(props: {
 function PlanLine(props: { line: PlanPreviewLine }) {
   const color =
     props.line.kind === 'heading'
-      ? theme.brand
+      ? theme.accent
       : props.line.kind === 'bullet'
       ? theme.text
       : props.line.kind === 'code' || props.line.kind === 'quote'
       ? theme.dim
       : props.line.kind === 'rule'
       ? theme.border
-      : theme.assistant
+      : theme.text
   return (
     <Text color={color} bold={props.line.kind === 'heading'} wrap="truncate-end">
       {props.line.text}

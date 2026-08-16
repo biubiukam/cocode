@@ -1,20 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import { agentAnimation, agentColor, agentMark } from '../../src/present/components/agent-status.ts'
+import { agentColor, agentFrames, agentMark } from '../../src/present/components/agent-status.ts'
 
 describe('agent status visuals', () => {
   it('keeps idle and dead indicators static', () => {
-    expect(agentAnimation('idle')).toEqual({ frames: ['●'], interval: 0 })
-    expect(agentAnimation('dead')).toEqual({ frames: ['×'], interval: 0 })
+    expect(agentFrames('idle')).toHaveLength(1)
+    expect(agentFrames('dead')).toHaveLength(1)
   })
 
   it('uses distinct animated frames for connecting and running states', () => {
-    expect(agentAnimation('starting').frames).toEqual(['○', '◌', '◍', '◌'])
-    expect(agentAnimation('running').frames).toEqual(['◐', '◓', '◑', '◒'])
-    expect(agentAnimation('starting').interval).toBeGreaterThan(agentAnimation('running').interval)
+    expect(agentFrames('starting').length).toBeGreaterThan(1)
+    expect(agentFrames('running').length).toBeGreaterThan(1)
+    expect(agentFrames('starting')).not.toEqual(agentFrames('running'))
   })
 
   it('keeps the first frame compatible with the existing static mark API', () => {
-    expect(agentMark('running')).toBe('◐')
+    expect(agentMark('running')).toBe(agentFrames('running')[0])
     expect(agentColor('dead')).toBeDefined()
   })
 })

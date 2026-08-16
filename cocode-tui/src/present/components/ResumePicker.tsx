@@ -7,6 +7,9 @@ import {
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
 import { listWindowStart } from '../list-window.ts'
 import { resumeItemPreview } from '../resume-preview.ts'
+import { glyphs } from '../glyphs.ts'
+import { selectionStyle } from '../selection.ts'
+import { PANEL_BORDER } from '../layout.ts'
 import { theme } from '../theme.ts'
 
 export function ResumePicker(props: {
@@ -29,8 +32,8 @@ export function ResumePicker(props: {
     <Box
       flexDirection="column"
       marginTop={1}
-      borderStyle="round"
-      borderColor={theme.brand}
+      borderStyle={PANEL_BORDER}
+      borderColor={theme.border}
       paddingX={1}
     >
       <Text color={theme.text} bold wrap="truncate-end">
@@ -57,11 +60,10 @@ export function ResumePicker(props: {
           return (
             <Text
               key={item.id}
-              color={active ? theme.text : theme.mute}
-              inverse={active}
+              {...selectionStyle(active)}
               wrap="truncate-end"
             >
-              {active ? '›' : ' '} {current ? '✓' : ' '} {item.id.slice(0, 12)}{' '}
+              {active ? glyphs.optionActive : glyphs.optionInactive} {current ? glyphs.checkDone : ' '} {item.id.slice(0, 12)}{' '}
               <Text color={active ? theme.text : theme.dim}>
                 · {formatTimestamp(item.createdAt, props.locale)} ·{' '}
                 {resumeItemPreview(item, props.locale)}

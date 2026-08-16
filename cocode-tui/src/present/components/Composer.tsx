@@ -9,6 +9,7 @@ import {
   renderComposerRows,
   visibleComposerRows,
 } from '../composer-layout.ts'
+import { glyphs } from '../glyphs.ts'
 import { theme } from '../theme.ts'
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
 import {
@@ -45,7 +46,7 @@ export function Composer(props: {
     model: props.model,
     columns: props.maxColumns,
   })
-  const titleColor = !composer.mask && props.planMode ? theme.info : theme.brand
+  const titleColor = !composer.mask && props.planMode ? theme.accent : theme.accent
   const rows = empty
     ? []
     : visibleComposerRows(
@@ -71,13 +72,13 @@ export function Composer(props: {
     <Box flexDirection="column" width="100%">
       {/* Native IME follows Ink's hardware cursor on the draft row. */}
       {composer.attachments.length > 0 ? (
-        <Text color={theme.info} wrap="truncate-end">
+        <Text color={theme.accent} wrap="truncate-end">
           {text(props.locale, 'attached')} ·{' '}
           {composer.attachments.map(formatFileMention).join(' · ')}
         </Text>
       ) : null}
       {composer.images.length > 0 ? (
-        <Text color={theme.info} wrap="truncate-end">
+        <Text color={theme.accent} wrap="truncate-end">
           image · {composer.images.map((image) => image.name).join(' · ')}
         </Text>
       ) : null}
@@ -107,7 +108,7 @@ export function Composer(props: {
               ) : null}
               <Box minWidth={0} flexShrink={1}>
                 <Text
-                  color={composer.disabled ? theme.mute : theme.brand}
+                  color={composer.disabled ? theme.mute : theme.accent}
                   underline={!composer.disabled}
                   wrap="truncate-end"
                 >
@@ -126,7 +127,7 @@ export function Composer(props: {
       <Box flexDirection="column">
         {empty ? (
           <Box width="100%" height={1} overflowY="hidden">
-            <Text color={composer.disabled ? theme.mute : theme.brand}>{'> '}</Text>
+            <Text color={composer.disabled ? theme.mute : theme.accent}>{'> '}</Text>
             <Text color={theme.mute} wrap="truncate-end">
               {composer.placeholder}
             </Text>
@@ -134,8 +135,8 @@ export function Composer(props: {
         ) : (
           rows.map((row, index) => (
             <Box key={index} width="100%" height={1} overflowY="hidden">
-              <Text color={composer.disabled ? theme.mute : theme.brand}>
-                {index === 0 ? '> ' : '│ '}
+              <Text color={composer.disabled ? theme.mute : theme.accent}>
+                {index === 0 ? '> ' : `${glyphs.rail} `}
               </Text>
               {row.spans.map((span, spanIndex) => (
                 <Text
