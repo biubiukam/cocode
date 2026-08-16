@@ -9,7 +9,7 @@
 // without a portal.
 
 import { cloneElement, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { FocusEventHandler, MouseEventHandler, MutableRefObject, ReactElement, Ref } from 'react'
+import type { FocusEvent, FocusEventHandler, MouseEvent, MouseEventHandler, MutableRefObject, ReactElement, Ref } from 'react'
 import css from './Tooltip.module.css'
 
 /** Bubble placement relative to the anchor. */
@@ -20,6 +20,7 @@ interface AnchorProps {
   ref?: Ref<HTMLElement> | undefined
   onMouseEnter?: MouseEventHandler | undefined
   onMouseLeave?: MouseEventHandler | undefined
+  onClick?: MouseEventHandler | undefined
   onFocus?: FocusEventHandler | undefined
   onBlur?: FocusEventHandler | undefined
 }
@@ -143,14 +144,24 @@ export function Tooltip({ label, side = 'right', delayMs = 0, disabled = false, 
     if (!triggers.current.hover && !triggers.current.focus) setPos(null)
   }
 
+  // Activation is the end of a tooltip interaction. In particular, native
+  // pickers can return with the trigger still focused and the pointer still
+  // parked over it, so neither blur nor mouseleave is guaranteed to fire.
+  const dismissAfterActivation = () => {
+    cancelShow()
+    triggers.current.hover = false
+    setPos(null)
+  }
+
   return (
     <>
       {cloneElement(children, {
         ref: mergedRef,
-        onMouseEnter: (e) => { children.props.onMouseEnter?.(e); triggers.current.hover = true; showAfterHoverDelay() },
-        onMouseLeave: (e) => { children.props.onMouseLeave?.(e); triggers.current.hover = false; cancelShow(); setPos(null) },
-        onFocus: (e) => { children.props.onFocus?.(e); triggers.current.focus = true; cancelShow(); show() },
-        onBlur: (e) => { children.props.onBlur?.(e); triggers.current.focus = false; hide() },
+        onMouseEnter: (e: MouseEvent<HTMLElement>) => { children.props.onMouseEnter?.(e); triggers.current.hover = true; showAfterHoverDelay() },
+        onMouseLeave: (e: MouseEvent<HTMLElement>) => { children.props.onMouseLeave?.(e); triggers.current.hover = false; cancelShow(); setPos(null) },
+        onClick: (e: MouseEvent<HTMLElement>) => { children.props.onClick?.(e); dismissAfterActivation() },
+        onFocus: (e: FocusEvent<HTMLElement>) => { children.props.onFocus?.(e); triggers.current.focus = true; cancelShow(); show() },
+        onBlur: (e: FocusEvent<HTMLElement>) => { children.props.onBlur?.(e); triggers.current.focus = false; hide() },
       })}
       {pos !== null && (
         <span
