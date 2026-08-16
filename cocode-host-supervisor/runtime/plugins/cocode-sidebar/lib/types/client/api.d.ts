@@ -1,4 +1,4 @@
-import type { BrowserProbeResult } from './browser.ts';
+import type { BrowserEngineStatus } from '../browser/protocol.ts';
 /** One wire failure. */
 export declare class SidebarApiError extends Error {
     readonly code: string;
@@ -155,9 +155,17 @@ export declare const api: {
         value?: unknown;
         revision?: number;
     }>;
-    /** Probe a URL's response headers (the sidebar browser's embeddability
-     *  check; see the host's browser.probe route). */
-    browserProbe: (url: string, signal?: AbortSignal) => Promise<BrowserProbeResult>;
+    /** Current readiness of the Chromium build the sidebar browser drives. */
+    browserEngine: (signal?: AbortSignal) => Promise<BrowserEngineStatus>;
+    /**
+     * Download the Chromium build. Resolves once it is ready and rejects with
+     * the installer's own failure, so the first-run panel can show it verbatim.
+     */
+    browserInstall: () => Promise<BrowserEngineStatus>;
+    /** Release a browser tab's page (the user closed the sidebar tab). */
+    browserClose: (scope: SessionScope, tabId: string) => Promise<{
+        closed: boolean;
+    }>;
 };
 /** Absolute URL of the media route for one path (images only). */
 export declare function mediaUrl(scope: SessionScope, path: string): string;

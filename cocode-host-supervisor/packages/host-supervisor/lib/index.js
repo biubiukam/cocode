@@ -3,6 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
 var SUPERVISOR_PROTOCOL_REVISION = "1.0";
+var SUPERVISOR_BUILD_REVISION = "runtime-plugin-resolution-v2";
 var HOST_PROTOCOL_REVISION = "1.0";
 var LEASE_TTL_MS = 3e4;
 function canonicalizeScope(scope) {
@@ -254,9 +255,24 @@ var LocalHostSupervisorClient = class {
   }
   async connectOrStart(directory) {
     const endpoint = endpointFor(directory);
+    let existing;
     try {
-      return await openLineConnection(endpoint);
+      existing = await openLineConnection(endpoint);
     } catch {
+    }
+    if (existing !== void 0) {
+      try {
+        const doctor = await existing.request("doctor");
+        if (doctor.supervisorBuildRevision === SUPERVISOR_BUILD_REVISION) return existing;
+        existing.close();
+        if ((doctor.leaseCount ?? 0) > 0) {
+          throw new Error("Host Supervisor is running an older build while active clients still hold leases; release them before upgrading.");
+        }
+        await stopStaleSupervisor(doctor.pid, doctor.descriptor?.hostPid);
+      } catch (error) {
+        existing.close();
+        throw error;
+      }
     }
     const serviceEntry = this.options.serviceEntry ?? process.env.COCODE_SUPERVISOR_SERVICE_ENTRY ?? fileURLToPath(new URL("./bin.js", import.meta.url));
     const node = this.options.nodeExecutable ?? resolveNodeExecutable();
@@ -279,6 +295,29 @@ var LocalHostSupervisorClient = class {
     throw new Error(`Host Supervisor did not become ready: ${String(lastError)}`);
   }
 };
+async function stopStaleSupervisor(supervisorPid, hostPid) {
+  if (hostPid !== void 0 && isProcessAlive(hostPid)) await terminateProcess(hostPid, "DSH Host");
+  if (supervisorPid !== void 0 && isProcessAlive(supervisorPid)) await terminateProcess(supervisorPid, "Host Supervisor");
+}
+async function terminateProcess(pid, label) {
+  try {
+    process.kill(pid, "SIGTERM");
+  } catch (error) {
+    if (error.code !== "ESRCH") throw new Error(`Unable to stop stale ${label} (${pid}): ${String(error)}`);
+  }
+  const deadline = Date.now() + 2e3;
+  while (Date.now() < deadline && isProcessAlive(pid)) await new Promise((resolve3) => setTimeout(resolve3, 100));
+  if (isProcessAlive(pid)) throw new Error(`Stale ${label} (${pid}) did not exit after SIGTERM.`);
+}
+function isProcessAlive(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error.code === "EPERM";
+  }
+}
 function createHostSupervisorClient(options) {
   return new LocalHostSupervisorClient(options);
 }
@@ -288,6 +327,31 @@ function resolveNodeExecutable() {
   const npmNode = process.env.npm_node_execpath?.trim();
   if (npmNode) return npmNode;
   return process.execPath.includes("Electron") || process.execPath.endsWith("electron") ? "node" : process.execPath;
+}
+
+// packages/host-supervisor/src/runtime.ts
+function addRuntimePluginDependencies(manifest, pluginManifests) {
+  const dependencies = { ...manifest.dependencies ?? {} };
+  for (const plugin of pluginManifests) {
+    if (typeof plugin.name !== "string" || plugin.name.length === 0) continue;
+    dependencies[plugin.name] = typeof plugin.version === "string" && plugin.version.length > 0 ? plugin.version : "*";
+  }
+  return { ...manifest, dependencies };
+}
+function createRuntimePatch(jsonRpcPluginUrl, jsonRpcEndpoint, pluginEntries) {
+  return [
+    "- insert:",
+    "    - id: cocode-host-jsonrpc",
+    `      name: ${JSON.stringify(jsonRpcPluginUrl)}`,
+    "      config:",
+    `        endpoint: ${JSON.stringify(jsonRpcEndpoint)}`,
+    `        protocolRevision: "1.0"`,
+    ...pluginEntries.flatMap(({ name }) => [
+      `    - id: ${name}`,
+      `      name: ${JSON.stringify(name)}`
+    ]),
+    ""
+  ].join("\n");
 }
 
 // packages/host-supervisor/src/socket-jsonrpc-client.ts
@@ -320,10 +384,13 @@ export {
   HOST_PROTOCOL_REVISION,
   LEASE_TTL_MS,
   LocalHostSupervisorClient,
+  SUPERVISOR_BUILD_REVISION,
   SUPERVISOR_PROTOCOL_REVISION,
+  addRuntimePluginDependencies,
   canonicalizeScope,
   connectJsonRpc,
   createHostSupervisorClient,
+  createRuntimePatch,
   fingerprint,
   hostKey,
   isHostDescriptorCompatible,

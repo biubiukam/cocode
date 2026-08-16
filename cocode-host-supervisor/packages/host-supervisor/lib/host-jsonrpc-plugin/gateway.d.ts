@@ -1,5 +1,5 @@
 import { CompanionTransport } from './transport.js';
-import type { CompanionCapabilities, InitializeParams, PromptParams, RuntimeContext } from './types.js';
+import type { CompanionCapabilities, ImageAttachmentRef, InitializeParams, PromptParams, RuntimeContext } from './types.js';
 /** Cocode-owned stdio gateway. It consumes Harness services without importing Harness runtime packages. */
 export declare class TuiCompanionGateway {
     private readonly ctx;
@@ -42,6 +42,9 @@ export declare class TuiCompanionGateway {
     prompt(params: PromptParams): Promise<{
         messageId: string;
     }>;
+    saveImages(params: Record<string, unknown>): Promise<{
+        attachments: ImageAttachmentRef[];
+    }>;
     listSessions(params?: {
         cwd?: string;
     }): Promise<{
@@ -82,6 +85,10 @@ export declare class TuiCompanionGateway {
         sessionId: string;
     }): Promise<{
         skills: Record<string, unknown>[];
+    }>;
+    listModels(): Promise<{
+        groups: Record<string, unknown>[];
+        failures: Record<string, unknown>[];
     }>;
     respondQuestion(params: Record<string, unknown>): Promise<Record<string, never>>;
     respondApproval(params: Record<string, unknown>): Promise<Record<string, never>>;

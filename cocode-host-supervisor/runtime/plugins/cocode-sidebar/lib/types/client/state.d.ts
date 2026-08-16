@@ -1,14 +1,3 @@
-/**
- * Per-session sidebar state: the panel geometry, the split-pane workbench
- * tree, open tabs, and the explorer expansion set. One state instance per
- * conversation id, persisted to localStorage under `dsh-sidebar:v1:<id>` so
- * a reload restores the exact layout of the session it belongs to — switching
- * conversations swaps the whole state (memory + isolation).
- *
- * The split tree is a recursive structure: a leaf holds a tab group, a split
- * divides the space row- or column-wise with fractional sizes. All tree
- * operations are pure functions over the node, unit-tested in tests/state.spec.ts.
- */
 import { type SidebarPrefs } from '../prefs-shared.ts';
 /**
  * Tab type identifier. Builtins register their ids (explorer / git / editor
@@ -99,7 +88,7 @@ export declare const BOTTOM_DEFAULT = 220;
 /** A fresh default state: one explorer tab in one pane, open per the caller's
  * preference. `width` is the caller's preferred panel width (default
  * PANEL_DEFAULT) and `panelOpen` whether the panel starts expanded (default
- * true); the store seeds new sessions from the user's side card prefs.
+ * false); the store seeds new sessions from the user's side card prefs.
  * `seedExplorer` places the default explorer tab — the store passes false
  * when the user disabled the explorer tab type in settings, so a fresh
  * session starts with an empty pane instead of a tab they turned off. */
@@ -164,7 +153,8 @@ export declare function moveTabToEdge(state: SidebarState, fromPane: string, tab
  * child; removing the last leaf yields an empty leaf.
  */
 export declare function removeLeafAt(node: SplitNode, paneId: string): SplitNode;
-/** Close a tab; an emptied leaf is removed (unless it is the only pane). */
+/** Close a tab; an emptied leaf is removed (unless it is the only pane).
+ *  Closing the final tab in either tree also collapses its panel. */
 export declare function closeTab(state: SidebarState, paneId: string, tabId: string): SidebarState;
 /** Activate a tab in its pane (the pane's own tree). */
 export declare function activateTab(state: SidebarState, paneId: string, tabId: string): SidebarState;
@@ -255,6 +245,22 @@ export declare function reconcileAgentTerminals(state: SidebarState, agentTermin
     uuid: string;
     title: string;
 }>): SidebarState;
+/** Whether a tab id belongs to a browser page the model opened. */
+export declare function isAgentBrowserTabId(tabId: string): boolean;
+/**
+ * Mirror the host's live list of host-opened browser pages into tabs: pages
+ * the model opened, and popups (`window.open` / OAuth) the current page
+ * opened. User-created `browser:N` tabs stay client-owned — reconciling
+ * those would delete a fresh tab the moment it was created.
+ * @param state - the current per-session sidebar state.
+ * @param agentTabs - the live host-opened browser tabs from the host.
+ * @returns the next state (or the same reference when nothing changed).
+ */
+export declare function reconcileAgentBrowserTabs(state: SidebarState, agentTabs: ReadonlyArray<{
+    tabId: string;
+    title: string;
+    url: string;
+}>): SidebarState;
 /** Immutable snapshot handed to React (replaced only on real changes). */
 export interface SidebarSnapshot {
     sessionId: string | undefined;
@@ -287,6 +293,9 @@ export declare class SidebarStore {
     /** Per-session persist debounce timers (v0.12.0+: one per session, so a
      *  targeted open never cancels another session's pending write). */
     private readonly persistTimers;
+    /** The first persisted session shown after a page load starts collapsed.
+     *  Other sessions still restore their own saved visibility normally. */
+    private hasSelectedInitialSession;
     /** User-facing side card prefs seeding brand-new session states (defaults until the settings RPC resolves). */
     private prefs;
     /**

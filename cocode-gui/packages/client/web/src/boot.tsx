@@ -45,6 +45,7 @@ import { APP_SHELL_ID } from './app-shell.ts'
 import { AppRoot } from './AppRoot.tsx'
 import { getStaticModules } from './seed.ts'
 import { STATE_LABELS, createLoaderStatusStore, createSignal } from './loader-status.ts'
+import { assertCocodeSlotRegistrations, type CocodeSlotInspector } from './cocode-composition-health.ts'
 import './base.css'
 
 /** Module transport hook the shell passes through (jsdom tests replace the <script> path). */
@@ -234,5 +235,19 @@ export class AppWebEntry {
     if (failures.length > 0) {
       throw new Error(`web boot: ${String(failures.length)} entr${failures.length === 1 ? 'y' : 'ies'} did not activate\n${failures.join('\n')}`)
     }
+    this.assertCocodeSlots()
+  }
+
+  /**
+   * Verify the product-owned composition after all loader entries settle.
+   * Keeping this check at the renderer boundary turns a missing account
+   * footer into an actionable boot error instead of silently hiding Settings.
+   */
+  private assertCocodeSlots(): void {
+    const slots = this.ctx.get('slots') as unknown as CocodeSlotInspector | undefined
+    if (slots === undefined || typeof slots.entries !== 'function') {
+      throw new Error('web boot: slot registry is unavailable')
+    }
+    assertCocodeSlotRegistrations(slots)
   }
 }

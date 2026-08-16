@@ -7,6 +7,15 @@ export type RuntimeSlot = {
     patch: string;
     jsonRpcEndpoint: string;
 };
+export type RuntimePluginEntry = {
+    name: string;
+    entry: string;
+};
+type RuntimePackageManifest = {
+    name?: string;
+    version?: string;
+    dependencies?: Record<string, string>;
+};
 export declare function resolveDshPackage(): {
     root: string;
     entry: string;
@@ -14,3 +23,11 @@ export declare function resolveDshPackage(): {
     buildId?: string;
 };
 export declare function prepareRuntimeSlot(scope: HostScope, jsonRpcEndpoint: string, pluginPath: string): RuntimeSlot;
+export declare function addRuntimePluginDependencies(manifest: RuntimePackageManifest, pluginManifests: readonly RuntimePackageManifest[]): RuntimePackageManifest;
+/**
+ * Render the DSH overlay patch. Cocode plugins must be registered by their
+ * package name so DSH can resolve each package manifest and its `dsh.client`
+ * declaration while constructing the Web boot manifest.
+ */
+export declare function createRuntimePatch(jsonRpcPluginUrl: string, jsonRpcEndpoint: string, pluginEntries: readonly RuntimePluginEntry[]): string;
+export {};

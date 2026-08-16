@@ -4,6 +4,11 @@ import {
 	extractDshBootManifest,
 	extractDshThemePreference,
 } from "../../../src/main/contexts/dsh-runtime/infrastructure/dsh-runtime-bootstrap"
+import {
+	assertRequiredCocodeWebEndpoints,
+	assertRequiredCocodeWebEntries,
+} from "../../../src/main/contexts/dsh-runtime/infrastructure/dsh-runtime-health"
+import { assertCocodeSlotRegistrations } from "../../../packages/client/web/src/cocode-composition-health"
 
 describe("extractDshBootManifest", () => {
 	it("parses the host-injected manifest with nested entry data", () => {
@@ -67,5 +72,65 @@ describe("extractDshThemePreference", () => {
 
 	it("falls back to system for older sidecar pages", () => {
 		assert.equal(extractDshThemePreference("<html></html>"), "system")
+	})
+})
+
+describe("Cocode Web runtime health", () => {
+	const boot = {
+		rev: "test",
+		entries: [
+			{ id: "cocode-sidebar", url: "/plugins/cocode-sidebar/client.js", rev: "a" },
+			{ id: "cocode-account", url: "/plugins/cocode-account/client.js", rev: "b" },
+			{ id: "cocode-shortcuts", url: "/plugins/cocode-shortcuts/client.js", rev: "c" },
+		],
+	} as const
+
+	it("requires all Desktop-owned Cocode entries", () => {
+		assertRequiredCocodeWebEntries(boot)
+		assert.throws(
+			() => assertRequiredCocodeWebEntries({ ...boot, entries: boot.entries.slice(0, 2) }),
+			/missing boot entry: cocode-shortcuts/,
+		)
+	})
+
+	it("checks every advertised plugin endpoint", async () => {
+		const requested: string[] = []
+		await assertRequiredCocodeWebEndpoints("http://127.0.0.1:3080", boot, async (input) => {
+			requested.push(String(input))
+			return new Response("ok", { status: 200 })
+		})
+		assert.deepEqual(requested.sort(), [
+			"http://127.0.0.1:3080/plugins/cocode-account/client.js",
+			"http://127.0.0.1:3080/plugins/cocode-shortcuts/client.js",
+			"http://127.0.0.1:3080/plugins/cocode-sidebar/client.js",
+		])
+	})
+
+	it("reports a broken client route", async () => {
+		await assert.rejects(
+			() => assertRequiredCocodeWebEndpoints("http://127.0.0.1:3080", boot, async (input) => {
+				const id = String(input).includes("cocode-account") ? 404 : 200
+				return new Response("", { status: id })
+			}),
+			/Cocode Web client entry cocode-account is not reachable: GET \/plugins\/cocode-account\/client\.js returned HTTP 404/,
+		)
+	})
+})
+
+describe("Cocode slot health", () => {
+	it("requires the Settings shell and account footer action", () => {
+		assertCocodeSlotRegistrations({
+			entries: (key) => key === "sidebar.settings"
+				? [{ options: { id: "ui-settings-general" } }]
+				: [{ options: { id: "cocode-account" } }],
+		})
+		assert.throws(
+			() => assertCocodeSlotRegistrations({ entries: () => [] }),
+			/sidebar\.settings did not register/,
+		)
+		assert.throws(
+			() => assertCocodeSlotRegistrations({ entries: (key) => key === "sidebar.settings" ? [{ options: { id: "settings" } }] : [] }),
+			/cocode-account did not register sidebar\.footer\.action/,
+		)
 	})
 })

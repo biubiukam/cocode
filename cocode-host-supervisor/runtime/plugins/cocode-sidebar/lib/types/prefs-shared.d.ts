@@ -75,13 +75,25 @@ export interface SidebarPrefs {
      */
     htmlViewerDefaultUnsafe: boolean;
     /**
-     * Whether the browser tab drops its sandboxed iframe. Sandbox ON (the
-     * default) keeps browsed sites in an opaque origin with no GUI access;
-     * turning it OFF runs any visited site with the GUI's own origin — it
-     * can read session data and act as the logged-in GUI. Only for trusted
-     * sites; the setting copy warns.
+     * Whether the model-facing browser tools (browser_tabs / open / snapshot /
+     * act / close) are injected into the model's toolset. Off by default: the
+     * agent can drive the same pages — and the same logged-in sessions — the
+     * user sees, so the capability stays dormant until it is explicitly
+     * granted. Turning it off closes every page the model opened.
      */
-    browserNoSandbox: boolean;
+    agentBrowserTools: boolean;
+    /**
+     * Give the agent its own cookie jar instead of the user's logged-in
+     * profile. Off by default (shared logins); on for untrusted autonomous
+     * browsing.
+     */
+    agentBrowserIsolated: boolean;
+    /**
+     * Run Chromium with a visible window. The sidebar still shows the
+     * screencast; this is the escape hatch for sites that refuse headless
+     * traffic.
+     */
+    browserHeaded: boolean;
     /**
      * Whether clicking an http(s) EXTERNAL link in the GUI (chat messages,
      * tool rows, prose mentions) opens the sidebar browser instead of a new

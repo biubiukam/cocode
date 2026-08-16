@@ -8,6 +8,7 @@ import type {
 import { isDshHttpPath } from "../../../../contracts/dsh-runtime-path"
 import { parseDshRuntimeBootstrap } from "../../../../contracts/schemas/dsh-runtime.schema"
 import { extractDshBootManifest, extractDshThemePreference } from "./dsh-runtime-bootstrap"
+import { assertRequiredCocodeWebEndpoints } from "./dsh-runtime-health"
 import { resolveDshHome } from "./dsh-home"
 import {
 	createHostSupervisorClient,
@@ -68,11 +69,13 @@ export class DshRuntimeProcess {
 			)
 		}
 		const html = await response.text()
-		return parseDshRuntimeBootstrap({
+		const bootstrap = parseDshRuntimeBootstrap({
 			origin: new URL(runtimeUrl).origin,
 			boot: extractDshBootManifest(html),
 			themePreference: extractDshThemePreference(html),
 		})
+		await assertRequiredCocodeWebEndpoints(bootstrap.origin, bootstrap.boot)
+		return bootstrap
 	}
 
 	public async request(

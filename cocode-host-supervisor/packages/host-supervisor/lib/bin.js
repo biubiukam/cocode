@@ -14,6 +14,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
 var SUPERVISOR_PROTOCOL_REVISION = "1.0";
+var SUPERVISOR_BUILD_REVISION = "runtime-plugin-resolution-v2";
 var HOST_PROTOCOL_REVISION = "1.0";
 var LEASE_TTL_MS = 3e4;
 function canonicalizeScope(scope) {
@@ -232,21 +233,10 @@ function prepareRuntimeSlot(scope, jsonRpcEndpoint, pluginPath) {
       pluginEntries.push({ name: entry2.name, entry: join2(target, "lib", "index.js") });
     }
   }
+  registerRuntimePluginsInDshManifest(slot, pluginEntries);
   restoreNodePtyHelper(slot);
   const patch = join2(slot, "cocode-host.patch.yml");
-  const rows = [
-    "- insert:",
-    "    - id: cocode-host-jsonrpc",
-    `      name: ${JSON.stringify(pathToFileURL(pluginTarget).href)}`,
-    "      config:",
-    `        endpoint: ${JSON.stringify(jsonRpcEndpoint)}`,
-    `        protocolRevision: "1.0"`,
-    ...pluginEntries.flatMap(({ name, entry: entry2 }, index) => [
-      `    - id: cocode-plugin-${index}`,
-      `      name: ${JSON.stringify(pathToFileURL(entry2).href)}`
-    ]),
-    ""
-  ].join("\n");
+  const rows = createRuntimePatch(pathToFileURL(pluginTarget).href, jsonRpcEndpoint, pluginEntries);
   writeFileSync(patch, rows);
   writeFileSync(join2(slot, "active.json"), `${JSON.stringify({
     schemaVersion: 1,
@@ -260,6 +250,40 @@ function prepareRuntimeSlot(scope, jsonRpcEndpoint, pluginPath) {
   }, null, 2)}
 `);
   return { root: slot, entry, version: dsh.version, ...dsh.buildId === void 0 ? {} : { buildId: dsh.buildId }, patch, jsonRpcEndpoint };
+}
+function registerRuntimePluginsInDshManifest(slot, pluginEntries) {
+  const manifestPath = join2(slot, "node_modules", "@deepseek-ai", "dsh", "package.json");
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  const pluginManifests = pluginEntries.map(({ name }) => {
+    const pluginManifestPath = join2(slot, "node_modules", ...name.split("/"), "package.json");
+    return JSON.parse(readFileSync(pluginManifestPath, "utf8"));
+  });
+  const next = addRuntimePluginDependencies(manifest, pluginManifests);
+  writeFileSync(manifestPath, `${JSON.stringify(next, null, 2)}
+`);
+}
+function addRuntimePluginDependencies(manifest, pluginManifests) {
+  const dependencies = { ...manifest.dependencies ?? {} };
+  for (const plugin of pluginManifests) {
+    if (typeof plugin.name !== "string" || plugin.name.length === 0) continue;
+    dependencies[plugin.name] = typeof plugin.version === "string" && plugin.version.length > 0 ? plugin.version : "*";
+  }
+  return { ...manifest, dependencies };
+}
+function createRuntimePatch(jsonRpcPluginUrl, jsonRpcEndpoint, pluginEntries) {
+  return [
+    "- insert:",
+    "    - id: cocode-host-jsonrpc",
+    `      name: ${JSON.stringify(jsonRpcPluginUrl)}`,
+    "      config:",
+    `        endpoint: ${JSON.stringify(jsonRpcEndpoint)}`,
+    `        protocolRevision: "1.0"`,
+    ...pluginEntries.flatMap(({ name }) => [
+      `    - id: ${name}`,
+      `      name: ${JSON.stringify(name)}`
+    ]),
+    ""
+  ].join("\n");
 }
 function restoreNodePtyHelper(root) {
   for (const helper of [
@@ -430,7 +454,12 @@ var SupervisorService = class {
     if (!this.host || !isHostDescriptorCompatible(this.host.descriptor, this.scope, request)) {
       if (this.host && this.leases.size > 0) throw new Error("existing Host is incompatible while leases are active");
       if (this.host) await this.stopHost();
-      await this.startHost(request);
+      try {
+        await this.startHost(request);
+      } catch (error) {
+        this.stop();
+        throw error;
+      }
     }
     const id = leaseId();
     const expiresAt = new Date(Date.now() + LEASE_TTL_MS).toISOString();
@@ -594,7 +623,7 @@ ${output}`));
     }
   }
   doctor() {
-    return { supervisorProtocolRevision: SUPERVISOR_PROTOCOL_REVISION, scope: this.scope, descriptor: this.readDescriptor(), leaseCount: this.leases.size, pid: process.pid };
+    return { supervisorProtocolRevision: SUPERVISOR_PROTOCOL_REVISION, supervisorBuildRevision: SUPERVISOR_BUILD_REVISION, scope: this.scope, descriptor: this.readDescriptor(), leaseCount: this.leases.size, pid: process.pid };
   }
   stop() {
     if (this.stopped) return;
@@ -800,9 +829,24 @@ var LocalHostSupervisorClient = class {
   }
   async connectOrStart(directory) {
     const endpoint = endpointFor(directory);
+    let existing;
     try {
-      return await openLineConnection(endpoint);
+      existing = await openLineConnection(endpoint);
     } catch {
+    }
+    if (existing !== void 0) {
+      try {
+        const doctor = await existing.request("doctor");
+        if (doctor.supervisorBuildRevision === SUPERVISOR_BUILD_REVISION) return existing;
+        existing.close();
+        if ((doctor.leaseCount ?? 0) > 0) {
+          throw new Error("Host Supervisor is running an older build while active clients still hold leases; release them before upgrading.");
+        }
+        await stopStaleSupervisor(doctor.pid, doctor.descriptor?.hostPid);
+      } catch (error) {
+        existing.close();
+        throw error;
+      }
     }
     const serviceEntry = this.options.serviceEntry ?? process.env.COCODE_SUPERVISOR_SERVICE_ENTRY ?? fileURLToPath2(new URL("./bin.js", import.meta.url));
     const node = this.options.nodeExecutable ?? resolveNodeExecutable();
@@ -825,6 +869,29 @@ var LocalHostSupervisorClient = class {
     throw new Error(`Host Supervisor did not become ready: ${String(lastError)}`);
   }
 };
+async function stopStaleSupervisor(supervisorPid, hostPid) {
+  if (hostPid !== void 0 && isProcessAlive2(hostPid)) await terminateProcess(hostPid, "DSH Host");
+  if (supervisorPid !== void 0 && isProcessAlive2(supervisorPid)) await terminateProcess(supervisorPid, "Host Supervisor");
+}
+async function terminateProcess(pid, label) {
+  try {
+    process.kill(pid, "SIGTERM");
+  } catch (error) {
+    if (error.code !== "ESRCH") throw new Error(`Unable to stop stale ${label} (${pid}): ${String(error)}`);
+  }
+  const deadline = Date.now() + 2e3;
+  while (Date.now() < deadline && isProcessAlive2(pid)) await new Promise((resolve5) => setTimeout(resolve5, 100));
+  if (isProcessAlive2(pid)) throw new Error(`Stale ${label} (${pid}) did not exit after SIGTERM.`);
+}
+function isProcessAlive2(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error.code === "EPERM";
+  }
+}
 function createHostSupervisorClient(options) {
   return new LocalHostSupervisorClient(options);
 }

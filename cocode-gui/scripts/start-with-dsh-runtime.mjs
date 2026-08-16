@@ -316,12 +316,15 @@ function ensureRuntimeStaged(destination) {
 function createRuntimeFingerprint() {
 	const repositoryRoot = process.cwd()
 	return JSON.stringify({
-		version: 2,
+		version: 3,
 		platform: process.platform,
 		arch: process.arch,
 		runtime: [
 			fileSignature(
 				path.join(repositoryRoot, "node_modules", "@cocode", "host-supervisor", "package.json"),
+			),
+			directorySignature(
+				path.resolve(repositoryRoot, "../cocode-host-supervisor/packages/host-supervisor/lib"),
 			),
 			fileSignature(
 				path.join(repositoryRoot, "node_modules", "@deepseek-ai", "dsh", "package.json"),
@@ -351,8 +354,8 @@ function pluginFingerprintEntries(root) {
 				fileSignature(path.join(pluginRoot, "package.json")),
 				fileSignature(path.join(pluginRoot, "tsconfig.build.json")),
 				fileSignature(path.join(pluginRoot, "tsdown.config.ts")),
-				fileSignature(path.join(pluginRoot, "lib", "index.js")),
-				directorySignature(path.join(pluginRoot, "src"), new Set(["client"])),
+				directorySignature(path.join(pluginRoot, "src")),
+				directorySignature(path.join(pluginRoot, "lib")),
 			]
 		})
 }

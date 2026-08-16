@@ -8,6 +8,7 @@ import {
 	readdirSync,
 	realpathSync,
 } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import process from 'node:process'
@@ -24,6 +25,8 @@ const supervisorRoot = path.dirname(supervisorManifest)
 const supervisorPackage = JSON.parse(readFileSync(supervisorManifest, 'utf8'))
 const supervisorRequire = createRequire(supervisorManifest)
 const dshManifest = supervisorRequire.resolve('@deepseek-ai/dsh/package.json')
+
+verifyWorkspacePluginArtifacts(supervisorRoot)
 
 rmSync(destination, { recursive: true, force: true })
 mkdirSync(destination, { recursive: true })
@@ -150,6 +153,52 @@ function materializeBundledPlugins(root) {
 		mkdirSync(path.dirname(target), { recursive: true })
 		cpSync(source, target, { recursive: true, dereference: true })
 	}
+}
+
+/**
+ * In the workspace the Supervisor package is linked, so its committed runtime
+ * artifacts must match the GUI plugin build that the current Desktop uses.
+ * Published installs have no sibling GUI source and intentionally skip this
+ * check.
+ */
+function verifyWorkspacePluginArtifacts(supervisorRoot) {
+	const workspacePlugins = path.resolve(process.cwd(), 'packages', 'cocode')
+	if (!existsSync(workspacePlugins)) return
+	const bundledPlugins = path.join(supervisorRoot, 'runtime', 'plugins')
+	for (const entry of readDirectory(workspacePlugins)) {
+		const source = path.join(workspacePlugins, entry)
+		const bundled = path.join(bundledPlugins, entry)
+		if (!existsSync(path.join(source, 'package.json'))) continue
+		for (const artifact of ['lib/index.js', 'lib/client.js']) {
+			const sourceFile = path.join(source, artifact)
+			const bundledFile = path.join(bundled, artifact)
+			if (!existsSync(sourceFile) || !existsSync(bundledFile)) continue
+			if (sha256(sourceFile) !== sha256(bundledFile)) {
+				throw new Error(
+					`Stale Supervisor runtime plugin ${entry}/${artifact}. Run pnpm run build:cocode-plugins before staging the DSH runtime.`,
+				)
+			}
+		}
+		const sourceManifest = JSON.parse(readFileSync(path.join(source, 'package.json'), 'utf8'))
+		const bundledManifestPath = path.join(bundled, 'package.json')
+		if (!existsSync(bundledManifestPath)) {
+			throw new Error(`Supervisor runtime plugin ${entry} is missing package.json.`)
+		}
+		const bundledManifest = JSON.parse(readFileSync(bundledManifestPath, 'utf8'))
+		if (
+			bundledManifest.name !== sourceManifest.name ||
+			bundledManifest.version !== sourceManifest.version ||
+			JSON.stringify(bundledManifest.dsh) !== JSON.stringify(sourceManifest.dsh)
+		) {
+			throw new Error(
+				`Stale Supervisor runtime manifest for ${entry}. Run pnpm run build:cocode-plugins before staging the DSH runtime.`,
+			)
+		}
+	}
+}
+
+function sha256(file) {
+	return createHash('sha256').update(readFileSync(file)).digest('hex')
 }
 
 function restoreNodePtyHelper(root) {

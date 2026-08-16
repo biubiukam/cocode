@@ -191,10 +191,13 @@ var TuiCompanionGateway = class {
   }
   /** Advertise only services that are actually present in this composition. */
   capabilities() {
+    const llm = this.ctx.get("llm");
     return {
       protocolVersion: 1,
       promptModes: ["normal", "queue", "steer"],
       skills: this.ctx.get("skills") !== void 0,
+      modelList: typeof llm?.listProviders === "function" && typeof llm.listModels === "function",
+      imageAttachments: this.ctx.get("attachments") !== void 0,
       approval: this.ctx.get("approval") !== void 0,
       permissionMode: this.ctx.get("permissionPresets") !== void 0,
       planMode: this.ctx.get("planMode") !== void 0,
@@ -225,7 +228,9 @@ var TuiCompanionGateway = class {
     this.assertInitialized();
     const record = await this.getOrCreateSession(params.sessionId);
     this.assertLive(params.sessionId, record);
-    const message = createUserMessage(params.contentBlocks);
+    const vision = this.ctx.get("cocodeVision");
+    const contentBlocks = vision === void 0 ? params.contentBlocks : await vision.prepareBlocks(params.contentBlocks);
+    const message = createUserMessage(contentBlocks);
     switch (params.mode ?? "normal") {
       case "normal":
       case "queue":
@@ -238,6 +243,28 @@ var TuiCompanionGateway = class {
         throw new Error(`session/prompt has unsupported mode: ${String(params.mode)}`);
     }
     return { messageId: message.id };
+  }
+  async saveImages(params) {
+    this.assertInitialized();
+    const store = this.ctx.get("attachments");
+    if (store === void 0) {
+      throw new Error("image attachment capability is unavailable: attachment storage is not configured");
+    }
+    if (!Array.isArray(params.images) || params.images.length === 0) {
+      throw new TypeError("attachment/saveImages requires at least one image");
+    }
+    if (params.images.length > store.imageLimits.maxImagesPerMessage) {
+      throw new Error(`image count exceeds ${store.imageLimits.maxImagesPerMessage}`);
+    }
+    const images = params.images.map(
+      (image, index) => parseImageInput(image, index, store.imageLimits.maxImageBytes, store.imageLimits.mediaTypes)
+    );
+    const totalBytes = images.reduce((total, image) => total + image.data.byteLength, 0);
+    if (totalBytes > store.imageLimits.maxMessageImageBytes) {
+      throw new Error(`image bytes exceed ${store.imageLimits.maxMessageImageBytes}`);
+    }
+    await Promise.all(images.map((image) => store.validateImage(image)));
+    return { attachments: await Promise.all(images.map((image) => store.saveImage(image))) };
   }
   async listSessions(params = {}) {
     const persistence = this.ctx.get("sessionPersistence");
@@ -413,9 +440,41 @@ var TuiCompanionGateway = class {
       skills: skills.filter((skill) => skill.invocation?.userInvocable !== false).map((skill) => ({
         name: skill.name,
         description: skill.description,
-        ...skill.whenToUse === void 0 ? {} : { whenToUse: skill.whenToUse }
+        ...skill.whenToUse === void 0 ? {} : { whenToUse: skill.whenToUse },
+        ...skill.source === void 0 ? {} : { source: skill.source }
       }))
     };
+  }
+  async listModels() {
+    const llm = this.ctx.get("llm");
+    if (typeof llm?.listProviders !== "function" || typeof llm.listModels !== "function") {
+      throw new Error("model/list capability is unavailable: llm is not configured");
+    }
+    const service = llm;
+    const groups = [];
+    const failures = [];
+    for (const provider of service.listProviders()) {
+      const name2 = provider.name ?? provider.id;
+      try {
+        const models = await service.listModels(provider.id);
+        groups.push({
+          id: provider.id,
+          name: name2,
+          models: models.map((model) => ({
+            id: model.id,
+            name: model.name ?? model.id,
+            ...model.description === void 0 ? {} : { description: model.description }
+          }))
+        });
+      } catch (error) {
+        failures.push({
+          id: provider.id,
+          name: name2,
+          message: safeModelCatalogError(error)
+        });
+      }
+    }
+    return { groups, failures };
   }
   async respondQuestion(params) {
     const requestId = stringValue(params.requestId);
@@ -423,6 +482,10 @@ var TuiCompanionGateway = class {
     if (requestId === void 0 || pending === void 0)
       throw new Error(`unknown question request: ${String(params.requestId)}`);
     this.pendingQuestions.delete(requestId);
+    if (params.cancelled === true) {
+      pending.reject(new Error("ask_user_question was interrupted before the user answered"));
+      return {};
+    }
     try {
       const answer = parseQuestionAnswer(params.answer);
       validateQuestionAnswer(pending.questions, answer);
@@ -470,6 +533,11 @@ var TuiCompanionGateway = class {
       case "cocode/skills/list":
       case "skills/list":
         return this.listSkills(params);
+      case "cocode/model/list":
+      case "model/list":
+        return this.listModels();
+      case "cocode/attachment/saveImages":
+        return this.saveImages(params);
       case "cocode/permission/mode":
       case "permission/mode":
         return this.permissionMode(params);
@@ -658,6 +726,14 @@ var TuiCompanionGateway = class {
     return {};
   }
 };
+function safeModelCatalogError(error) {
+  const message = error instanceof Error ? error.message : String(error);
+  const redacted = message.replace(/https?:\/\/[^\s]+/gi, "[redacted endpoint]").replace(
+    /\b(?:api[-_ ]?key|access[-_ ]?token|authorization|auth|token|secret|password)\s*[:=]\s*(?:Bearer\s+)?[^\s,;]+/gi,
+    "[redacted]"
+  ).replace(/\b(?:sk-|sk_|ck_(?:live|test)_)[A-Za-z0-9_-]+/g, "[redacted]").replace(/[\r\n]+/g, " ").trim();
+  return redacted.length > 240 ? `${redacted.slice(0, 237)}...` : redacted;
+}
 function createUserMessage(content) {
   const message = {
     id: randomUUID(),
@@ -667,6 +743,35 @@ function createUserMessage(content) {
   };
   return deepFreeze(message);
 }
+function parseImageInput(value, index, maxBytes, mediaTypes) {
+  if (!isRecord2(value) || typeof value.data !== "string" || !isImageMediaType(value.mediaType)) {
+    throw new TypeError(`attachment/saveImages image ${index + 1} is invalid`);
+  }
+  if (!mediaTypes.includes(value.mediaType)) {
+    throw new Error(`attachment/saveImages does not accept ${value.mediaType}`);
+  }
+  const data = decodeBase64(value.data, maxBytes);
+  const name2 = typeof value.name === "string" && value.name.trim() !== "" ? value.name.trim() : void 0;
+  return {
+    data,
+    mediaType: value.mediaType,
+    ...name2 === void 0 ? {} : { name: name2 }
+  };
+}
+function decodeBase64(value, maxBytes) {
+  if (value === "" || value.length > Math.ceil(maxBytes / 3) * 4 + 4 || !BASE64_PATTERN.test(value)) {
+    throw new Error("attachment/saveImages contains invalid base64 data");
+  }
+  const data = Buffer.from(value, "base64");
+  if (data.byteLength > maxBytes || data.toString("base64") !== value) {
+    throw new Error("attachment/saveImages contains invalid base64 data");
+  }
+  return data;
+}
+function isImageMediaType(value) {
+  return value === "image/png" || value === "image/jpeg" || value === "image/webp" || value === "image/gif";
+}
+var BASE64_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
 function deepFreeze(value) {
   if (value !== null && typeof value === "object") {
     Object.freeze(value);

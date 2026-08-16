@@ -19,6 +19,16 @@ export interface SidebarConfig {
     terminalsPerSession?: number;
     /** How long a disconnected terminal process survives awaiting a reconnect. */
     reconnectGraceMs?: number;
+    /** Live browser pages one conversation may hold open. */
+    browserTabsPerSession?: number;
+    /** Chromium profile name; one persistent cookie jar and login state per name. */
+    browserProfile?: string;
+    /**
+     * Run Chromium with a visible window instead of headless. The sidebar still
+     * renders the screencast; this is the escape hatch for sites that refuse
+     * headless traffic outright.
+     */
+    browserHeaded?: boolean;
 }
 /** Schemastery schema for the plugin configuration. */
 export declare const Config: z<SidebarConfig>;
@@ -29,6 +39,9 @@ export interface ResolvedSidebarConfig {
     listLimit: number;
     terminalsPerSession: number;
     reconnectGraceMs: number;
+    browserTabsPerSession: number;
+    browserProfile: string;
+    browserHeaded: boolean;
 }
 /**
  * Apply direct-call defaults after Loader schema validation has normally run.

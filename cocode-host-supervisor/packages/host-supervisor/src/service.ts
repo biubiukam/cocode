@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { endpointFor, descriptorPath, leaseDirectory, lockPath, scopePath } from './paths.js'
 import { listenLineServer } from './ipc.js'
-import { canonicalizeScope, HOST_PROTOCOL_REVISION, hostKey, isHostDescriptorCompatible, leaseId as makeLeaseId, LEASE_TTL_MS, SUPERVISOR_PROTOCOL_REVISION, type AcquireHostRequest, type HostDescriptor, type HostScope } from './protocol.js'
+import { canonicalizeScope, HOST_PROTOCOL_REVISION, hostKey, isHostDescriptorCompatible, leaseId as makeLeaseId, LEASE_TTL_MS, SUPERVISOR_BUILD_REVISION, SUPERVISOR_PROTOCOL_REVISION, type AcquireHostRequest, type HostDescriptor, type HostScope } from './protocol.js'
 import { prepareRuntimeSlot } from './runtime.js'
 
 type LeaseRecord = { leaseId: string; clientKind: string; pid: number; createdAt: string; expiresAt: string }
@@ -106,7 +106,14 @@ class SupervisorService {
     if (!this.host || !isHostDescriptorCompatible(this.host.descriptor, this.scope, request)) {
       if (this.host && this.leases.size > 0) throw new Error('existing Host is incompatible while leases are active')
       if (this.host) await this.stopHost()
-      await this.startHost(request)
+      try {
+        await this.startHost(request)
+      } catch (error) {
+        // A failed first boot must not leave a Supervisor holding the scope
+        // lock forever. The next client should be able to start fresh code.
+        this.stop()
+        throw error
+      }
     }
     const id = makeLeaseId()
     const expiresAt = new Date(Date.now() + LEASE_TTL_MS).toISOString()
@@ -202,7 +209,7 @@ class SupervisorService {
   private persistLease(record: LeaseRecord): void { writeFileSync(join(leaseDirectory(this.directory), `${record.leaseId}.json`), JSON.stringify(record) + '\n', { mode: 0o600 }) }
   private writeDescriptor(descriptor: HostDescriptor): void { const temp = `${descriptorPath(this.directory)}.${process.pid}.tmp`; writeFileSync(temp, JSON.stringify(descriptor, null, 2) + '\n', { mode: 0o600 }); renameSync(temp, descriptorPath(this.directory)) }
   private readDescriptor(): HostDescriptor | null { try { return JSON.parse(readFileSync(descriptorPath(this.directory), 'utf8')) as HostDescriptor } catch { return null } }
-  private doctor(): Record<string, unknown> { return { supervisorProtocolRevision: SUPERVISOR_PROTOCOL_REVISION, scope: this.scope, descriptor: this.readDescriptor(), leaseCount: this.leases.size, pid: process.pid } }
+  private doctor(): Record<string, unknown> { return { supervisorProtocolRevision: SUPERVISOR_PROTOCOL_REVISION, supervisorBuildRevision: SUPERVISOR_BUILD_REVISION, scope: this.scope, descriptor: this.readDescriptor(), leaseCount: this.leases.size, pid: process.pid } }
   private stop(): void {
     if (this.stopped) return
     this.stopped = true

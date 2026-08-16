@@ -50,6 +50,7 @@ export interface HostSupervisorClient {
     release(leaseId: string): Promise<void>;
 }
 export declare const SUPERVISOR_PROTOCOL_REVISION = "1.0";
+export declare const SUPERVISOR_BUILD_REVISION = "runtime-plugin-resolution-v2";
 export declare const HOST_PROTOCOL_REVISION = "1.0";
 export declare const LEASE_TTL_MS = 30000;
 export declare function canonicalizeScope(scope: HostScope): HostScope;

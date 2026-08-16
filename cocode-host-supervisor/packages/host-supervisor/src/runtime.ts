@@ -7,6 +7,14 @@ import { hostKey, type HostScope } from './protocol.js'
 
 export type RuntimeSlot = { root: string; entry: string; version: string; buildId?: string; patch: string; jsonRpcEndpoint: string }
 
+export type RuntimePluginEntry = { name: string; entry: string }
+
+type RuntimePackageManifest = {
+  name?: string
+  version?: string
+  dependencies?: Record<string, string>
+}
+
 export function resolveDshPackage(): { root: string; entry: string; version: string; buildId?: string } {
   const require = createRequire(import.meta.url)
   const entry = require.resolve('@deepseek-ai/dsh/lib/bin.js')
@@ -40,7 +48,7 @@ export function prepareRuntimeSlot(scope: HostScope, jsonRpcEndpoint: string, pl
   }
   const pluginTarget = join(slot, 'cocode-host-jsonrpc-plugin.mjs')
   cpSync(pluginPath, pluginTarget)
-  const pluginEntries: Array<{ name: string; entry: string }> = []
+  const pluginEntries: RuntimePluginEntry[] = []
   if (existsSync(pluginRoot)) {
     for (const entry of readdirSync(pluginRoot, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue
@@ -51,21 +59,10 @@ export function prepareRuntimeSlot(scope: HostScope, jsonRpcEndpoint: string, pl
       pluginEntries.push({ name: entry.name, entry: join(target, 'lib', 'index.js') })
     }
   }
+  registerRuntimePluginsInDshManifest(slot, pluginEntries)
   restoreNodePtyHelper(slot)
   const patch = join(slot, 'cocode-host.patch.yml')
-  const rows = [
-    '- insert:',
-    '    - id: cocode-host-jsonrpc',
-    `      name: ${JSON.stringify(pathToFileURL(pluginTarget).href)}`,
-    '      config:',
-    `        endpoint: ${JSON.stringify(jsonRpcEndpoint)}`,
-    `        protocolRevision: "1.0"`,
-    ...pluginEntries.flatMap(({ name, entry }, index) => [
-      `    - id: cocode-plugin-${index}`,
-      `      name: ${JSON.stringify(pathToFileURL(entry).href)}`,
-    ]),
-    '',
-  ].join('\n')
+  const rows = createRuntimePatch(pathToFileURL(pluginTarget).href, jsonRpcEndpoint, pluginEntries)
   writeFileSync(patch, rows)
   writeFileSync(join(slot, 'active.json'), `${JSON.stringify({
     schemaVersion: 1,
@@ -78,6 +75,62 @@ export function prepareRuntimeSlot(scope: HostScope, jsonRpcEndpoint: string, pl
     plugins: pluginEntries,
   }, null, 2)}\n`)
   return { root: slot, entry, version: dsh.version, ...(dsh.buildId === undefined ? {} : { buildId: dsh.buildId }), patch, jsonRpcEndpoint }
+}
+
+/**
+ * Make out-of-tree Cocode plugins part of DSH's installation dependency
+ * closure. DSH uses that closure to populate DSH_HOME/profiles/node_modules;
+ * without these declarations, bare plugin names in the patch are resolved
+ * relative to the profile and cannot see the immutable runtime slot.
+ */
+function registerRuntimePluginsInDshManifest(slot: string, pluginEntries: readonly RuntimePluginEntry[]): void {
+  const manifestPath = join(slot, 'node_modules', '@deepseek-ai', 'dsh', 'package.json')
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as RuntimePackageManifest
+  const pluginManifests = pluginEntries.map(({ name }) => {
+    const pluginManifestPath = join(slot, 'node_modules', ...name.split('/'), 'package.json')
+    return JSON.parse(readFileSync(pluginManifestPath, 'utf8')) as RuntimePackageManifest
+  })
+  const next = addRuntimePluginDependencies(manifest, pluginManifests)
+  writeFileSync(manifestPath, `${JSON.stringify(next, null, 2)}\n`)
+}
+
+export function addRuntimePluginDependencies(
+  manifest: RuntimePackageManifest,
+  pluginManifests: readonly RuntimePackageManifest[],
+): RuntimePackageManifest {
+  const dependencies = { ...(manifest.dependencies ?? {}) }
+  for (const plugin of pluginManifests) {
+    if (typeof plugin.name !== 'string' || plugin.name.length === 0) continue
+    dependencies[plugin.name] = typeof plugin.version === 'string' && plugin.version.length > 0
+      ? plugin.version
+      : '*'
+  }
+  return { ...manifest, dependencies }
+}
+
+/**
+ * Render the DSH overlay patch. Cocode plugins must be registered by their
+ * package name so DSH can resolve each package manifest and its `dsh.client`
+ * declaration while constructing the Web boot manifest.
+ */
+export function createRuntimePatch(
+  jsonRpcPluginUrl: string,
+  jsonRpcEndpoint: string,
+  pluginEntries: readonly RuntimePluginEntry[],
+): string {
+  return [
+    '- insert:',
+    '    - id: cocode-host-jsonrpc',
+    `      name: ${JSON.stringify(jsonRpcPluginUrl)}`,
+    '      config:',
+    `        endpoint: ${JSON.stringify(jsonRpcEndpoint)}`,
+    `        protocolRevision: "1.0"`,
+    ...pluginEntries.flatMap(({ name }) => [
+      `    - id: ${name}`,
+      `      name: ${JSON.stringify(name)}`,
+    ]),
+    '',
+  ].join('\n')
 }
 
 function restoreNodePtyHelper(root: string): void {

@@ -43,6 +43,7 @@
   },
   "dependencies": {
     "node-pty": "^1.1.0",
+    "playwright-core": "^1.62.1",
     "schemastery": "^3.18.0",
     "ws": "^8.18.0"
   }

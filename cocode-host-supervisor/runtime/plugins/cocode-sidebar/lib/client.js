@@ -8,9 +8,13 @@ window.__ModuleLoader__.load({
 		let react_dom_client = require("react-dom/client");
 		let _deepseek_ai_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-primitives");
 		let react_jsx_runtime = require("react/jsx-runtime");
+		/** Tabs the sidebar must reconcile from the host list (agent + popup). */
+		function isReconciledBrowserTabId(tabId) {
+			return tabId.startsWith("browser:agent-") || tabId.startsWith("browser:popup-");
+		}
 		/** Fallback prefs used whenever the settings document is unreachable or malformed. */
 		const SIDEBAR_PREFS_DEFAULTS = {
-			openByDefault: true,
+			openByDefault: false,
 			defaultWidthPercent: 30,
 			autoOpenSubagent: true,
 			autoOpenJobs: true,
@@ -21,7 +25,9 @@ window.__ModuleLoader__.load({
 			interceptOpenPath: true,
 			htmlViewerNoSandbox: false,
 			htmlViewerDefaultUnsafe: false,
-			browserNoSandbox: false,
+			agentBrowserTools: false,
+			agentBrowserIsolated: false,
+			browserHeaded: false,
 			browserInterceptLinks: true,
 			tabsEnabled: {},
 			viewersEnabled: {},
@@ -104,11 +110,11 @@ window.__ModuleLoader__.load({
 		/** A fresh default state: one explorer tab in one pane, open per the caller's
 		* preference. `width` is the caller's preferred panel width (default
 		* PANEL_DEFAULT) and `panelOpen` whether the panel starts expanded (default
-		* true); the store seeds new sessions from the user's side card prefs.
+		* false); the store seeds new sessions from the user's side card prefs.
 		* `seedExplorer` places the default explorer tab — the store passes false
 		* when the user disabled the explorer tab type in settings, so a fresh
 		* session starts with an empty pane instead of a tab they turned off. */
-		function makeDefaultState(width = 400, panelOpen = true, seedExplorer = true) {
+		function makeDefaultState(width = 400, panelOpen = false, seedExplorer = true) {
 			const leaf = {
 				kind: "leaf",
 				id: uid("pane"),
@@ -365,7 +371,8 @@ window.__ModuleLoader__.load({
 				children
 			};
 		}
-		/** Close a tab; an emptied leaf is removed (unless it is the only pane). */
+		/** Close a tab; an emptied leaf is removed (unless it is the only pane).
+		*  Closing the final tab in either tree also collapses its panel. */
 		function closeTab(state, paneId, tabId) {
 			const key = treeOf(state, paneId);
 			let emptied = false;
@@ -374,9 +381,12 @@ window.__ModuleLoader__.load({
 				if (leaf.active === tabId) leaf.active = leaf.tabs[leaf.tabs.length - 1]?.id ?? null;
 				if (leaf.tabs.length === 0) emptied = true;
 			});
+			const nextSplits = emptied ? removeLeafAt(splits, paneId) : splits;
+			const closedLastTab = allLeaves(nextSplits).every((leaf) => leaf.tabs.length === 0);
 			return {
 				...state,
-				[key]: emptied ? removeLeafAt(splits, paneId) : splits
+				[key]: nextSplits,
+				...closedLastTab ? key === "bottomSplits" ? { bottomOpen: false } : { panelOpen: false } : {}
 			};
 		}
 		/** Activate a tab in its pane (the pane's own tree). */
@@ -679,6 +689,41 @@ window.__ModuleLoader__.load({
 			}
 			return next;
 		}
+		/**
+		* Mirror the host's live list of host-opened browser pages into tabs: pages
+		* the model opened, and popups (`window.open` / OAuth) the current page
+		* opened. User-created `browser:N` tabs stay client-owned — reconciling
+		* those would delete a fresh tab the moment it was created.
+		* @param state - the current per-session sidebar state.
+		* @param agentTabs - the live host-opened browser tabs from the host.
+		* @returns the next state (or the same reference when nothing changed).
+		*/
+		function reconcileAgentBrowserTabs(state, agentTabs) {
+			const existing = allLeaves(state.splits).concat(allLeaves(state.bottomSplits)).flatMap((leaf) => leaf.tabs).filter((tab) => isReconciledBrowserTabId(tab.id));
+			const serverIds = new Set(agentTabs.map((tab) => tab.tabId));
+			const toAdd = agentTabs.filter((tab) => !existing.some((open) => open.id === tab.tabId));
+			const toRemove = existing.filter((tab) => !serverIds.has(tab.id));
+			if (toAdd.length === 0 && toRemove.length === 0) return state;
+			let splits = state.splits;
+			for (const tab of toRemove) {
+				const leaf = leafWithTab(splits, tab.id);
+				if (leaf !== void 0) splits = closeTab({
+					...state,
+					splits
+				}, leaf.id, tab.id).splits;
+			}
+			let next = {
+				...state,
+				splits
+			};
+			for (const tab of toAdd) next = openTabInActivePane(next, {
+				id: tab.tabId,
+				type: "browser",
+				title: tab.title === "" ? tab.url : tab.title,
+				path: tab.url === "" ? void 0 : tab.url
+			});
+			return next;
+		}
 		const STORAGE_PREFIX = "dsh-sidebar:v1";
 		/** Default panel width for one viewport: the prefs percent of the window,
 		* clamped to the panel floor (a tiny percent must stay usable) and to the
@@ -686,14 +731,17 @@ window.__ModuleLoader__.load({
 		function defaultWidthFor(viewport, percent) {
 			return Math.min(viewport, Math.max(280, Math.round(viewport * percent / 100)));
 		}
-		function loadState(sessionId, prefs) {
+		function loadState(sessionId, prefs, restorePanelOpen = true) {
 			try {
 				const raw = localStorage.getItem(`${STORAGE_PREFIX}:${sessionId}`);
 				if (raw !== null) {
 					const parsed = JSON.parse(raw);
 					nextIdCounter = maxCounterId(parsed);
 					const sanitized = sanitizeState(parsed);
-					if (sanitized !== void 0) return sanitized;
+					if (sanitized !== void 0) return restorePanelOpen ? sanitized : {
+						...sanitized,
+						panelOpen: false
+					};
 				}
 			} catch {}
 			const viewport = typeof window !== "undefined" ? window.innerWidth : void 0;
@@ -830,6 +878,9 @@ window.__ModuleLoader__.load({
 			/** Per-session persist debounce timers (v0.12.0+: one per session, so a
 			*  targeted open never cancels another session's pending write). */
 			persistTimers = /* @__PURE__ */ new Map();
+			/** The first persisted session shown after a page load starts collapsed.
+			*  Other sessions still restore their own saved visibility normally. */
+			hasSelectedInitialSession = false;
 			/** User-facing side card prefs seeding brand-new session states (defaults until the settings RPC resolves). */
 			prefs = { ...SIDEBAR_PREFS_DEFAULTS };
 			/**
@@ -861,9 +912,19 @@ window.__ModuleLoader__.load({
 				else {
 					let state = this.bySession.get(sessionId);
 					if (state === void 0) {
-						state = loadState(sessionId, this.prefs);
+						state = loadState(sessionId, this.prefs, this.hasSelectedInitialSession);
 						this.bySession.set(sessionId, state);
-					} else nextIdCounter = maxCounterId(state);
+					} else {
+						nextIdCounter = maxCounterId(state);
+						if (!this.hasSelectedInitialSession && state.panelOpen) {
+							state = {
+								...state,
+								panelOpen: false
+							};
+							this.bySession.set(sessionId, state);
+						}
+					}
+					this.hasSelectedInitialSession = true;
 					this.snapshot = {
 						sessionId,
 						state,
@@ -1562,11 +1623,26 @@ window.__ModuleLoader__.load({
 			browserGo: "前往",
 			browserBack: "后退",
 			browserForward: "前进",
-			browserStart: "输入网址开始浏览（沙箱模式）",
+			browserStart: "输入网址开始浏览",
+			browserStop: "停止",
 			browserBlockedScheme: "已阻止：仅支持 http/https 链接",
-			browserBlockedLoopback: "已阻止：不允许在浏览器中访问本机或内部地址",
+			browserBlockedSelf: "已阻止：不能在侧边栏浏览器中打开 Cocode 界面自身",
 			browserInvalid: "无效的网址",
-			browserNoSandboxWarning: "沙箱已关闭：当前页面与界面同源，拥有完整会话权限（可在设置中恢复）",
+			browserKeyboard: "网页键盘输入",
+			browserAgentDriving: "Agent 正在操作此页面",
+			browserDownloaded: "已下载 {name}",
+			browserDownloadCancel: "取消下载",
+			browserProfile: "配置 {name}",
+			browserGrantGeo: "允许定位",
+			browserGrantNotify: "允许通知",
+			browserGrantClipboard: "允许剪贴板",
+			browserDialogAccept: "确定",
+			browserDialogDismiss: "取消",
+			browserEngineMissing: "需要下载浏览器内核",
+			browserEngineMissingDesc: "侧边栏浏览器使用独立的 Chromium 运行网页，首次使用需要下载（约 150 MB），下载后所有会话共用",
+			browserEngineInstall: "下载并启用",
+			browserEngineInstalling: "正在下载 Chromium…",
+			browserEngineFailed: "浏览器内核不可用",
 			htmlNoSandboxWarning: "沙箱已关闭：此 HTML 与界面同源，可读取会话文件与内部接口（可在设置中恢复）",
 			sandboxStatusOn: "沙箱模式：已启用 · 页面无法访问界面数据与本地文件，登录态与第三方 Cookie 可能不可用",
 			sandboxUnlock: "临时解锁（不安全）",
@@ -1575,14 +1651,15 @@ window.__ModuleLoader__.load({
 			settingsHtmlDefaultUnsafeDesc: "开启后，每次打开 HTML 文件时预览默认处于非沙箱状态（与界面同源，可读取会话文件与内部接口）；可在状态行临时恢复沙箱",
 			settingsHtmlSandboxTitle: "关闭 HTML 预览沙箱（不安全）",
 			settingsHtmlSandboxDesc: "关闭后，预览的 HTML 将与界面同源运行，可读取会话文件、本地存储并调用内部接口。仅对完全可信的文件开启",
-			settingsBrowserSandboxTitle: "关闭浏览器沙箱（不安全）",
-			settingsBrowserSandboxDesc: "关闭后，访问的任何网站都将与界面同源运行，可读取会话数据并冒充你的登录状态。仅对完全可信的站点开启",
+			settingsBrowserToolsTitle: "允许 Agent 操作浏览器（不安全）",
+			settingsBrowserToolsDesc: "开启后，Agent 可以打开网页、读取页面内容并点击输入——包括你已登录的站点，操作会实时显示在侧边栏中。仅在你愿意让它代表你操作时开启",
+			settingsBrowserIsolatedTitle: "Agent 使用独立登录态",
+			settingsBrowserIsolatedDesc: "开启后，Agent 打开的页面不继承你已登录的 Cookie，适合不受信任的自主浏览",
+			settingsBrowserHeadedTitle: "弹出真实 Chromium 窗口",
+			settingsBrowserHeadedDesc: "给会被无头模式拦截的站点用。侧栏仍显示画面；下次打开页面后生效",
 			settingsBrowserLinksTitle: "聊天区外链在侧边栏打开",
 			settingsBrowserLinksDesc: "开启后，点击聊天或界面中的 http/https 外链时在侧边栏浏览器中打开，不再弹出新窗口；Ctrl/Cmd 点击可临时放行",
-			browserOpenExternal: "在浏览器中打开",
-			browserEmbedBlocked: "{host} 拒绝了嵌入请求",
-			browserEmbedBlockedDesc: "该站点通过 X-Frame-Options / frame-ancestors 禁止在其它页面中显示，无法在侧边栏内加载。可在浏览器中直接打开",
-			browserEmbedAnyway: "仍然加载",
+			browserOpenExternal: "在系统浏览器中打开",
 			subagent: "任务管理",
 			openSubagent: "任务管理",
 			subagentMainAgent: "主代理",
@@ -1773,11 +1850,26 @@ window.__ModuleLoader__.load({
 			browserGo: "Go",
 			browserBack: "Back",
 			browserForward: "Forward",
-			browserStart: "Enter a URL to start browsing (sandbox mode)",
+			browserStart: "Enter a URL to start browsing",
+			browserStop: "Stop",
 			browserBlockedScheme: "Blocked: only http/https URLs are allowed",
-			browserBlockedLoopback: "Blocked: local and internal addresses cannot be browsed here",
+			browserBlockedSelf: "Blocked: the Cocode interface itself cannot be opened here",
 			browserInvalid: "Invalid URL",
-			browserNoSandboxWarning: "Sandbox off: the current page runs with full GUI privileges (re-enable in settings)",
+			browserKeyboard: "Page keyboard input",
+			browserAgentDriving: "The agent is driving this page",
+			browserDownloaded: "Downloaded {name}",
+			browserDownloadCancel: "Cancel download",
+			browserProfile: "profile {name}",
+			browserGrantGeo: "Allow location",
+			browserGrantNotify: "Allow notifications",
+			browserGrantClipboard: "Allow clipboard",
+			browserDialogAccept: "OK",
+			browserDialogDismiss: "Cancel",
+			browserEngineMissing: "A browser engine is needed",
+			browserEngineMissingDesc: "The sidebar browser runs pages in its own Chromium. The first use downloads it (about 150 MB); every conversation then shares the same copy.",
+			browserEngineInstall: "Download and enable",
+			browserEngineInstalling: "Downloading Chromium…",
+			browserEngineFailed: "The browser engine is unavailable",
 			htmlNoSandboxWarning: "Sandbox off: this HTML runs with full GUI privileges (re-enable in settings)",
 			sandboxStatusOn: "Sandbox mode: on · pages cannot access the GUI's data or local files; logins and third-party cookies may not work",
 			sandboxUnlock: "Temporarily disable (unsafe)",
@@ -1786,14 +1878,15 @@ window.__ModuleLoader__.load({
 			settingsHtmlDefaultUnsafeDesc: "When on, every newly opened HTML preview starts in the unsandboxed state (same origin as the GUI — it can read session files and internal APIs); the status row still offers a one-tap restore",
 			settingsHtmlSandboxTitle: "Disable HTML preview sandbox (unsafe)",
 			settingsHtmlSandboxDesc: "With the sandbox off, previewed HTML runs with the same origin as the GUI: it can read session files, local storage and call internal APIs. Only enable for fully trusted files",
-			settingsBrowserSandboxTitle: "Disable browser sandbox (unsafe)",
-			settingsBrowserSandboxDesc: "With the sandbox off, any visited site runs with the same origin as the GUI: it can read session data and act as your logged-in session. Only enable for fully trusted sites",
+			settingsBrowserToolsTitle: "Let the agent drive the browser (unsafe)",
+			settingsBrowserToolsDesc: "When on, the agent can open pages, read their content, and click and type — including on sites you are already signed into. Every action is visible live in the sidebar. Only enable when you are willing to let it act on your behalf",
+			settingsBrowserIsolatedTitle: "Give the agent its own login state",
+			settingsBrowserIsolatedDesc: "When on, pages the agent opens do not inherit your cookies — use this for untrusted autonomous browsing",
+			settingsBrowserHeadedTitle: "Show a real Chromium window",
+			settingsBrowserHeadedDesc: "Escape hatch for sites that block headless traffic. The sidebar still shows the screencast; takes effect on the next page",
 			settingsBrowserLinksTitle: "Open chat external links in the sidebar",
 			settingsBrowserLinksDesc: "When on, clicking an http/https external link in the chat or GUI opens the sidebar browser instead of a new window; Ctrl/Cmd+click always bypasses",
-			browserOpenExternal: "Open in browser",
-			browserEmbedBlocked: "{host} refused to be embedded",
-			browserEmbedBlockedDesc: "The site forbids being displayed inside other pages (X-Frame-Options / frame-ancestors), so it cannot load in the sidebar. Open it directly in your browser instead.",
-			browserEmbedAnyway: "Load anyway",
+			browserOpenExternal: "Open in the system browser",
 			subagent: "Tasks",
 			openSubagent: "Tasks",
 			subagentMainAgent: "Main agent",
@@ -1994,7 +2087,7 @@ window.__ModuleLoader__.load({
 		}
 		//#endregion
 		//#region \0dsh-css:src/client/sidebar.module.css.mjs
-		const css$3 = ".F5DBzq_toggleCluster{z-index:55;-webkit-app-region:no-drag;flex-direction:row;gap:4px;display:flex;position:fixed;top:3px;right:10px}.F5DBzq_panel:not(.F5DBzq_panelHidden) .F5DBzq_tabBar{padding-right:72px}.F5DBzq_toggleButton{width:28px;height:28px;color:var(--dsw-alias-label-secondary);cursor:pointer;transition:background var(--ds-transition-duration-slow) var(--ds-ease-in-out), color var(--ds-transition-duration-slow) var(--ds-ease-in-out);background:0 0;border:none;border-radius:50%;justify-content:center;align-items:center;display:flex}.F5DBzq_toggleButton:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.F5DBzq_toggleButton:disabled{opacity:.4;cursor:default}.F5DBzq_panel{z-index:50;background:var(--dsw-specific-sidebar-fill);border-left:1px solid var(--dsw-alias-border-l2);transition:transform var(--ds-transition-duration-slow) var(--ds-ease-in-out), width var(--ds-transition-duration-slow) var(--ds-ease-in-out);flex-direction:column;display:flex;position:fixed;top:0;bottom:0;right:0}.F5DBzq_panelHidden{pointer-events:none;visibility:hidden;transition:transform var(--ds-transition-duration-slow) var(--ds-ease-in-out), width var(--ds-transition-duration-slow) var(--ds-ease-in-out), visibility 0s linear var(--ds-transition-duration-slow);transform:translate(102%)}.F5DBzq_panel[data-dragging]{transition:none}.F5DBzq_panelResize{cursor:col-resize;z-index:2;touch-action:none;width:8px;position:absolute;top:0;bottom:0;left:-4px}.F5DBzq_panelResizeActive{background:var(--dsw-alias-interactive-bg-hover-accent)}.F5DBzq_panelBody{flex:1;min-width:0;min-height:0;display:flex}.F5DBzq_bottomPanel{z-index:50;background:var(--dsw-specific-sidebar-fill);border-top:1px solid var(--dsw-alias-border-l2);transition:transform var(--ds-transition-duration-slow) var(--ds-ease-in-out), height var(--ds-transition-duration-slow) var(--ds-ease-in-out);flex-direction:column;display:flex;position:fixed;bottom:0}.F5DBzq_bottomPanelHidden{pointer-events:none;visibility:hidden;transition:transform var(--ds-transition-duration-slow) var(--ds-ease-in-out), height var(--ds-transition-duration-slow) var(--ds-ease-in-out), visibility 0s linear var(--ds-transition-duration-slow);transform:translateY(102%)}.F5DBzq_bottomPanel[data-dragging]{transition:none}.F5DBzq_bottomResize{cursor:row-resize;z-index:2;touch-action:none;height:8px;position:absolute;top:-4px;left:0;right:0}.F5DBzq_bottomResizeActive{background:var(--dsw-alias-interactive-bg-hover-accent)}.F5DBzq_bottomClose{z-index:4;width:28px;height:28px;color:var(--dsw-alias-label-secondary);cursor:pointer;background:0 0;border:none;border-radius:50%;flex:none;justify-content:center;align-items:center;padding:0;display:inline-flex;position:absolute;top:3px;right:6px}.F5DBzq_bottomClose:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.F5DBzq_bottomPanel .F5DBzq_tabBar{padding-right:40px}.F5DBzq_cornerHandle{z-index:52;cursor:nwse-resize;touch-action:none;width:12px;height:12px;position:fixed}.F5DBzq_cornerHandle:hover,.F5DBzq_cornerHandle[data-dragging]{background:var(--dsw-alias-interactive-bg-hover-accent)}.F5DBzq_iconButton{width:28px;height:28px;color:var(--dsw-alias-label-secondary);cursor:pointer;background:0 0;border:none;border-radius:50%;flex:none;justify-content:center;align-items:center;padding:0;display:inline-flex}.F5DBzq_iconButton:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.F5DBzq_iconButton:disabled{opacity:.4;cursor:default}.F5DBzq_workbench,.F5DBzq_split{flex:1;min-width:0;min-height:0;display:flex}.F5DBzq_splitRow{flex-direction:row}.F5DBzq_splitCol{flex-direction:column}.F5DBzq_splitChild{display:flex;position:relative;overflow:hidden}.F5DBzq_divider{z-index:3;touch-action:none;flex:none;position:relative}.F5DBzq_dividerRow:after,.F5DBzq_dividerCol:after{content:\"\";background:var(--dsw-alias-border-l2);transition:background var(--ds-transition-duration-slow) var(--ds-ease-in-out);position:absolute}.F5DBzq_dividerRow{cursor:col-resize;width:7px;margin:0 -2px}.F5DBzq_dividerRow:after{width:1px;top:0;bottom:0;left:50%;transform:translate(-50%)}.F5DBzq_dividerCol{cursor:row-resize;height:7px;margin:-2px 0}.F5DBzq_dividerCol:after{height:1px;top:50%;left:0;right:0;transform:translateY(-50%)}.F5DBzq_divider:hover:after,.F5DBzq_dividerActive:after{background:var(--dsw-alias-interactive-bg-hover-accent)}.F5DBzq_pane{background:var(--dsw-alias-bg-base);flex-direction:column;flex:1;min-width:0;min-height:0;display:flex;position:relative}.F5DBzq_paneDrop{outline:1px solid var(--dsw-alias-interactive-bg-hover-accent);outline-offset:-1px}.F5DBzq_dropOverlay{z-index:6;pointer-events:none;background:var(--dsw-alias-interactive-bg-hover-accent);opacity:.5;position:absolute}.F5DBzq_dropLeft{width:25%;top:0;bottom:0;left:0}.F5DBzq_dropRight{width:25%;top:0;bottom:0;right:0}.F5DBzq_dropUp{height:25%;top:0;left:0;right:0}.F5DBzq_dropDown{height:25%;bottom:0;left:0;right:0}.F5DBzq_dropCenter{outline:2px dashed var(--dsw-alias-interactive-bg-hover-accent);outline-offset:-2px;background:0 0;inset:25%}.F5DBzq_paneContent{flex-direction:column;flex:1;min-height:0;display:flex;overflow:hidden}.F5DBzq_paneTab{flex-direction:column;flex:1;min-height:0;display:flex}.F5DBzq_paneTabHidden{display:none}.F5DBzq_paneEmptyCards{flex:1;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));align-content:start;gap:8px;min-height:0;padding:12px;display:grid;overflow:hidden}.F5DBzq_paneCard{border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);min-width:0;color:var(--dsw-alias-label-secondary);font:var(--dsw-font-xxs-strong-12);cursor:pointer;text-align:center;border-radius:8px;flex-direction:column;justify-content:center;align-items:center;gap:6px;padding:12px 8px;display:flex}.F5DBzq_paneCard:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary);border-color:var(--dsw-alias-border-l2)}.F5DBzq_paneCard:disabled{opacity:.45;cursor:default}.F5DBzq_tabBar{border-bottom:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);flex:none;align-items:stretch;height:34px;display:flex}.F5DBzq_tabBarDrop{outline:1px dashed var(--dsw-alias-interactive-bg-hover-accent);outline-offset:-1px}.F5DBzq_tabList{scrollbar-width:none;flex:1;min-width:0;display:flex;overflow-x:auto}.F5DBzq_tabList::-webkit-scrollbar{display:none}.F5DBzq_tab{min-width:64px;max-width:160px;font:var(--dsw-font-xxs-12);color:var(--dsw-alias-label-secondary);border-right:1px solid var(--dsw-alias-border-l1);cursor:pointer;user-select:none;background:0 0;flex:none;align-items:center;gap:4px;padding:0 4px 0 10px;display:flex}.F5DBzq_tab:hover{background:var(--dsw-alias-interactive-bg-hover)}.F5DBzq_tabActive{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-interactive-bg-active)}.F5DBzq_tabTitle{text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;overflow:hidden}.F5DBzq_tabBadge{min-width:16px;height:15px;font:var(--dsw-font-xxxs-strong-11);background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-brand-primary);border-radius:8px;flex:none;justify-content:center;align-items:center;padding:0 4px;display:inline-flex}.F5DBzq_tabClose{width:18px;height:18px;color:var(--dsw-alias-label-tertiary);cursor:pointer;background:0 0;border:none;border-radius:4px;flex:none;justify-content:center;align-items:center;padding:0;display:inline-flex}.F5DBzq_tabClose:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.F5DBzq_tabBarPlus{background:var(--dsw-alias-bg-layer-1);width:22px;height:22px;color:var(--dsw-alias-label-tertiary);cursor:pointer;border:none;border-radius:5px;flex:none;justify-content:center;align-self:center;align-items:center;margin:0 6px;padding:0;display:inline-flex;position:sticky;right:0}.F5DBzq_tabBarPlus:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.F5DBzq_explorer{flex-direction:column;flex:1;min-height:0;display:flex}.F5DBzq_explorerHeader{flex:none;justify-content:space-between;align-items:center;gap:8px;height:36px;padding:0 8px 0 12px;display:flex}.F5DBzq_explorerRoot{font:var(--dsw-font-s-14);color:var(--dsw-alias-label-secondary);text-overflow:ellipsis;white-space:nowrap;overflow:hidden}.F5DBzq_explorerBody{flex:1;min-height:0;padding:2px 6px 8px;overflow-y:auto}.F5DBzq_explorerRow{width:100%;height:34px;font:var(--dsw-font-s-14);color:var(--dsw-alias-label-primary);text-align:left;cursor:pointer;white-space:nowrap;animation:F5DBzq_dsh-row-in .15s var(--ds-ease-in-out);background:0 0;border:none;border-radius:8px;align-items:center;gap:6px;padding:0 8px;display:flex}.F5DBzq_explorerRow:hover{background:var(--dsw-alias-interactive-bg-hover)}.F5DBzq_explorerDir{font:var(--dsw-font-s-strong-14)}.F5DBzq_explorerHidden{opacity:.45}.F5DBzq_explorerName{text-overflow:ellipsis;overflow:hidden}.F5DBzq_explorerRef{border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);height:20px;color:var(--dsw-alias-label-tertiary);font:var(--dsw-font-xxxs-strong-11);cursor:pointer;border-radius:999px;flex:none;align-items:center;padding:0 8px;display:none}.F5DBzq_explorerRef:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.F5DBzq_explorerRow:hover .F5DBzq_explorerRef,.F5DBzq_explorerRow:focus-within .F5DBzq_explorerRef{display:inline-flex}.F5DBzq_explorerCopied{font:var(--dsw-font-xxxs-11);color:var(--dsw-alias-label-tertiary);flex:none}.F5DBzq_explorerError{font:var(--dsw-font-xxs-12);color:var(--dsw-alias-state-error-primary);cursor:default}@keyframes F5DBzq_dsh-row-in{0%{opacity:0}}.F5DBzq_explorerEmpty{font:var(--dsw-font-xxs-12);color:var(--dsw-alias-label-tertiary);text-align:center;padding:16px}.F5DBzq_editor{flex-direction:column;flex:1;min-height:0;display:flex}.F5DBzq_editorHeader{border-bottom:1px solid var(--dsw-alias-border-l1);flex:none;align-items:center;gap:6px;padding:4px 8px;display:flex}.F5DBzq_editorTitle{min-width:0;font:var(--dsw-font-xxs-strong-12);color:var(--dsw-alias-label-secondary);text-overflow:ellipsis;white-space:nowrap;flex:1;overflow:hidden}.F5DBzq_editorStatus{font:var(--dsw-font-xxxs-11);color:var(--dsw-alias-label-tertiary)}.F5DBzq_editorStatusError{color:var(--dsw-alias-state-error-primary)}.F5DBzq_dirtyDot{background:var(--dsw-alias-state-warn-primary);border-radius:50%;flex:none;width:7px;height:7px}.F5DBzq_editorPlaceholder{font:var(--dsw-font-xxs-12);color:var(--dsw-alias-label-tertiary);text-align:center;flex:1;justify-content:center;align-items:center;padding:16px;display:flex}.F5DBzq_orphanedType{opacity:.7;overflow-wrap:anywhere;margin-top:8px;font-size:12px;display:block}.F5DBzq_editorBinary{text-align:center;flex-direction:column;flex:1;justify-content:center;align-items:center;gap:12px;padding:24px 16px;display:flex}.F5DBzq_editorBinaryNotice{font:var(--dsw-font-xxs-12);color:var(--dsw-alias-label-tertiary)}.F5DBzq_editorDownloadLink{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font:var(--dsw-font-xxs-strong-12);cursor:pointer;transition:background var(--ds-transition-duration-slow) var(--ds-ease-in-out), border-color var(--ds-transition-duration-slow) var(--ds-ease-in-out);border-radius:6px;align-items:center;gap:6px;padding:6px 14px;text-decoration:none;display:inline-flex}.F5DBzq_editorDownloadLink:hover{background:var(--dsw-alias-interactive-bg-hover);border-color:var(--dsw-alias-border-l2)}.F5DBzq_editorError{font:var(--dsw-font-xxs-12);color:var(--dsw-alias-state-error-primary);padding:12px 16px}.F5DBzq_editorBanner{font:var(--dsw-font-xxxs-11);color:var(--dsw-alias-state-warn-label);background:var(--dsw-alias-state-warn-tertiary);flex:none;padding:4px 12px}.F5DBzq_sandboxStatus{font:var(--dsw-font-xxxs-11);flex:none;align-items:center;gap:8px;padding:4px 10px;display:flex}.F5DBzq_sandboxStatusOn{color:var(--dsw-alias-label-secondary);background:var(--dsw-alias-bg-layer-1);border-bottom:1px solid var(--dsw-alias-border-l1)}.F5DBzq_sandboxStatusOff{color:var(--dsw-alias-state-error-primary);background:color-mix(in srgb, var(--dsw-alias-state-error-primary) 10%, transparent);border-bottom:1px solid color-mix(in srgb, var(--dsw-alias-state-error-primary) 45%, transparent)}.F5DBzq_sandboxDot{background:var(--dsw-alias-state-success-primary);border-radius:50%;flex:none;width:6px;height:6px}.F5DBzq_sandboxStatusOff .F5DBzq_sandboxDot{background:var(--dsw-alias-state-error-primary)}.F5DBzq_sandboxStatusText{text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;overflow:hidden}.F5DBzq_sandboxAction{border:1px solid var(--dsw-alias-border-l2);font:inherit;color:inherit;cursor:pointer;background:0 0;border-radius:6px;flex:none;padding:2px 8px}.F5DBzq_sandboxAction:hover{background:var(--dsw-alias-interactive-bg-hover)}.F5DBzq_editorHtml{background:var(--dsw-alias-bg-base);border:none;flex:1;width:100%;min-height:0}.F5DBzq_browser{flex-direction:column;flex:1;min-height:0;display:flex}.F5DBzq_browserBar{border-bottom:1px solid var(--dsw-alias-border-l1);flex:none;align-items:center;gap:4px;padding:6px 8px;display:flex}.F5DBzq_browserInput{border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);min-width:0;height:28px;color:var(--dsw-alias-label-primary);font:var(--dsw-font-xxs-12);border-radius:6px;flex:1;padding:0 10px}.F5DBzq_browserInput:focus{border-color:var(--dsw-alias-state-business-primary);outline:none}.F5DBzq_browserMessage{font:var(--dsw-font-xxxs-11);color:var(--dsw-alias-state-warn-label);background:var(--dsw-alias-state-warn-tertiary);flex:none;padding:4px 12px}.F5DBzq_browserFrame{background:var(--dsw-alias-bg-base);border:none;flex:1;width:100%;min-height:0}.F5DBzq_browserStart{text-align:center;min-height:0;font:var(--dsw-font-xs-13);color:var(--dsw-alias-label-tertiary);flex:1;justify-content:center;align-items:center;padding:20px;display:flex}.F5DBzq_browserBlocked{text-align:center;min-height:0;color:var(--dsw-alias-state-warn-primary);flex-direction:column;flex:1;justify-content:center;align-items:center;gap:6px;padding:24px;display:flex}.F5DBzq_browserBlockedTitle{font:var(--dsw-font-xxs-strong-12);color:var(--dsw-alias-label-primary)}.F5DBzq_browserBlockedDesc{max-width:280px;font:var(--dsw-font-xxxs-11);color:var(--dsw-alias-label-secondary)}.F5DBzq_browserBlockedActions{gap:8px;margin-top:6px;display:flex}.F5DBzq_browserBlockedButton{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:var(--dsw-font-xxxs-11);cursor:pointer;border-radius:6px;padding:4px 12px}.F5DBzq_browserBlockedButton:hover{background:var(--dsw-alias-interactive-bg-hover)}.F5DBzq_editorCm{background:0 0;flex:1;min-height:0;overflow:hidden}.F5DBzq_editorCmHidden{display:none}.F5DBzq_editorCm .cm-editor{height:100%}.F5DBzq_editorCm .cm-editor.cm-focused{outline:none}.F5DBzq_editorModeToggle{border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);border-radius:6px;flex:none;align-items:center;gap:2px;padding:2px;display:inline-flex}.F5DBzq_editorModeButton{color:var(--dsw-alias-label-tertiary);font:var(--dsw-font-xxxs-11);cursor:pointer;background:0 0;border:none;border-radius:4px;padding:2px 8px}.F5DBzq_editorModeButton:hover{color:var(--dsw-alias-label-primary)}.F5DBzq_editorModeActive{background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary)}.F5DBzq_editorImageWrap{flex:1;justify-content:center;align-items:center;min-height:0;padding:12px;display:flex;overflow:auto}.F5DBzq_editorImage{object-fit:contain;max-width:100%;max-height:100%}.F5DBzq_editorMd{min-height:0;font:var(--dsw-font-xs-13);flex:1;padding:10px 14px;overflow-y:auto}.F5DBzq_selectionPopup{z-index:60;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);height:28px;color:var(--dsw-alias-label-primary);font:var(--dsw-font-xxxs-strong-11);white-space:nowrap;cursor:pointer;border-radius:6px;align-items:center;padding:0 10px;display:inline-flex;position:fixed;transform:translate(-50%,calc(-100% - 8px))}.F5DBzq_selectionPopup:hover{background:var(--dsw-alias-interactive-bg-hover)}.F5DBzq_editorPdf{background:var(--dsw-alias-bg-base);flex-direction:column;flex:1;min-height:0;display:flex}.F5DBzq_editorPdfToolbar{border-bottom:1px solid var(--dsw-alias-border-l1);flex:none;justify-content:flex-end;padding:6px 8px;display:flex}.F5DBzq_editorPdfStage{flex:1;min-height:0;display:flex;position:relative}.F5DBzq_editorPdfFrame{background:var(--dsw-alias-bg-base);border:none;flex:1;width:100%;min-height:0}.F5DBzq_editorPdfFrameBlocked{pointer-events:none}.F5DBzq_editorPdfDragShield{z-index:4;pointer-events:none;background:0 0;position:absolute;inset:0}.F5DBzq_editorPdfDragShieldActive{pointer-events:auto}body[data-dsh-tab-dragging] .F5DBzq_editorPdfFrame{pointer-events:none!important}body[data-dsh-tab-dragging] .F5DBzq_editorPdfDragShield{pointer-events:auto!important}.F5DBzq_terminalWrap{background:var(--dsw-alias-bg-base);flex-direction:column;flex:1;min-height:0;display:flex;position:relative}.F5DBzq_terminal{flex:1;min-height:0;padding:6px 4px 6px 8px}.F5DBzq_terminal .xterm{height:100%}.F5DBzq_terminalBanner{font:var(--dsw-font-xxxs-11);color:var(--dsw-alias-state-warn-label);background:var(--dsw-alias-state-warn-tertiary);flex-wrap:wrap;flex:none;align-items:center;gap:8px;padding:3px 10px;display:flex}.F5DBzq_terminalBannerUrl{word-break:break-all;opacity:.85;flex-basis:100%;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}.F5DBzq_boundaryError{z-index:50;background:var(--dsw-alias-bg-layer-1);border-left:1px solid var(--dsw-alias-border-l2);font:var(--dsw-font-xxs-12);color:var(--dsw-alias-state-error-primary);flex-direction:column;align-items:flex-start;gap:8px;padding:16px;display:flex;position:fixed;top:0;bottom:0;right:0;overflow:auto}.F5DBzq_terminalRetry{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary);font:var(--dsw-font-xxxs-strong-11);cursor:pointer;border-radius:999px;flex:none;padding:1px 8px}.F5DBzq_terminalRetry:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.F5DBzq_tabBoundaryError{min-height:0;font:var(--dsw-font-xxs-12);color:var(--dsw-alias-state-error-primary);flex-direction:column;flex:1;align-items:flex-start;gap:8px;padding:12px 16px;display:flex;overflow:auto}.F5DBzq_git{flex-direction:column;flex:1;min-width:0;min-height:0;display:flex;overflow:hidden auto}.F5DBzq_gitHeader{flex:none;align-items:center;gap:8px;height:36px;padding:0 8px 0 12px;display:flex}.F5DBzq_gitBranchSelect{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-base);min-width:0;height:26px;color:var(--dsw-alias-label-primary);font:var(--dsw-font-xxs-12);border-radius:6px;flex:1;padding:0 6px}.F5DBzq_gitSection{border-top:1px solid var(--dsw-alias-border-l1)}.F5DBzq_gitSectionHeader{font:var(--dsw-font-xxxs-strong-11);color:var(--dsw-alias-label-tertiary);text-transform:uppercase;justify-content:space-between;align-items:center;padding:6px 12px 4px;display:flex}.F5DBzq_gitLink{font:var(--dsw-font-xxxs-11);color:var(--dsw-alias-state-business-primary);cursor:pointer;background:0 0;border:none;padding:0}.F5DBzq_gitLink:hover:not(:disabled){text-decoration:underline}.F5DBzq_gitLink:disabled{opacity:.4;cursor:default}.F5DBzq_gitRow{min-height:34px;animation:F5DBzq_dsh-row-in .15s var(--ds-ease-in-out);border-radius:8px;align-items:center;gap:6px;margin:0 6px;padding:0 8px;display:flex}.F5DBzq_gitRow:hover{background:var(--dsw-alias-interactive-bg-hover)}.F5DBzq_gitRowSelected{background:var(--dsw-alias-interactive-bg-active)}.F5DBzq_gitRowMain{cursor:pointer;text-align:left;background:0 0;border:none;flex:1;align-items:center;gap:8px;min-width:0;padding:3px 0;display:flex}.F5DBzq_gitBadge{width:20px;height:16px;font:var(--dsw-font-xxxs-strong-11);background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-secondary);border-radius:4px;flex:none;justify-content:center;align-items:center;display:inline-flex}.F5DBzq_gitName{text-overflow:ellipsis;white-space:nowrap;min-width:0;font:var(--dsw-font-s-14);color:var(--dsw-alias-label-primary);flex:1;overflow:hidden}.F5DBzq_gitEmpty{font:var(--dsw-font-xxs-12);color:var(--dsw-alias-label-tertiary);padding:4px 12px 8px}.F5DBzq_gitPlaceholder{font:var(--dsw-font-xxs-12);color:var(--dsw-alias-label-tertiary);text-align:center;padding:16px}.F5DBzq_gitError{font:var(--dsw-font-xxs-12);color:var(--dsw-alias-state-error-primary);white-space:pre-wrap;padding:8px 12px}.F5DBzq_gitDiff{border-top:1px solid var(--dsw-alias-border-l1);padding:8px}.F5DBzq_gitDiffTab{flex-direction:column;flex:1;min-width:0;min-height:0;display:flex;overflow:hidden auto}.F5DBzq_gitDiffTabHeader{border-bottom:1px solid var(--dsw-alias-border-l1);flex:none;align-items:center;gap:8px;height:36px;padding:0 8px 0 12px;display:flex}.F5DBzq_gitDiffTabTitle{text-overflow:ellipsis;white-space:nowrap;min-width:0;font:var(--dsw-font-xxs-strong-12);color:var(--dsw-alias-label-primary);flex:1;overflow:hidden}.F5DBzq_gitDiffFile{align-items:baseline;gap:6px;padding:8px 2px 2px;display:flex}.F5DBzq_gitDiffFilePath{font:var(--dsw-font-xxs-strong-12);color:var(--dsw-alias-label-primary);text-overflow:ellipsis;white-space:nowrap;overflow:hidden}.F5DBzq_gitDiffFileOld{font:var(--dsw-font-xxxs-11);color:var(--dsw-alias-label-tertiary);text-overflow:ellipsis;white-space:nowrap;flex:none;max-width:40%;overflow:hidden}.F5DBzq_gitDiffFileTag{border:1px solid var(--dsw-alias-border-l2);font:var(--dsw-font-xxxs-strong-11);color:var(--dsw-alias-label-secondary);border-radius:999px;flex:none;padding:0 6px}.F5DBzq_gitDiffHunk{font:var(--dsw-font-markdown-code-block-small);color:var(--dsw-alias-label-tertiary);gap:8px;padding:3px 2px;display:flex}.F5DBzq_gitDiffHunkHeader{color:var(--dsw-alias-label-secondary);flex:none}.F5DBzq_gitDiffHunkSection{text-overflow:ellipsis;white-space:nowrap;overflow:hidden}.F5DBzq_gitDiffLine{font:var(--dsw-font-markdown-code-block-small);white-space:pre-wrap;overflow-wrap:anywhere;align-items:stretch;min-width:0;line-height:20px;display:flex}.F5DBzq_gitDiffNum{text-align:right;width:36px;color:var(--dsw-alias-label-tertiary);user-select:none;flex:none;padding-right:8px}.F5DBzq_gitDiffCode{flex:1;min-width:0;overflow:visible}.F5DBzq_gitDiffCtx{color:var(--dsw-alias-label-primary)}.F5DBzq_gitDiffDel{color:var(--dsw-alias-state-error-primary);background:color-mix(in srgb, var(--dsw-alias-state-error-primary) 12%, transparent)}.F5DBzq_gitDiffAdd{color:var(--dsw-alias-state-success-primary);background:color-mix(in srgb, var(--dsw-alias-state-success-primary) 12%, transparent)}.F5DBzq_gitDiffMeta{padding-left:2px}.F5DBzq_gitDiffMetaText{font:var(--dsw-font-xxxs-11);color:var(--dsw-alias-label-tertiary);font-style:italic}.F5DBzq_gitDiffExpand{width:100%;font:var(--dsw-font-xxs-12);color:var(--dsw-alias-state-business-primary);cursor:pointer;text-align:center;background:0 0;border:none;margin:4px 0;display:block}.F5DBzq_gitDiffExpand:hover{background:var(--dsw-alias-interactive-bg-hover)}.F5DBzq_gitConfirmDesc{font:var(--dsw-font-s-14);color:var(--dsw-alias-label-primary);white-space:pre-wrap;margin:0}.F5DBzq_gitCommit{border-top:1px solid var(--dsw-alias-border-l1);align-items:center;gap:6px;padding:8px 12px;display:flex}.F5DBzq_gitCommitInput{flex:1;min-width:0}.F5DBzq_gitCommitButton{background:var(--dsw-alias-button-primary-fill);height:26px;color:var(--dsw-alias-label-primary-inverted);font:var(--dsw-font-xxs-strong-12);cursor:pointer;border:none;border-radius:6px;flex:none;padding:0 12px}.F5DBzq_gitCommitButton:hover:not(:disabled){background:var(--dsw-alias-button-primary-hover)}.F5DBzq_gitCommitButton:disabled{opacity:.45;cursor:default}.F5DBzq_gitLogRow{cursor:pointer;border-radius:8px;flex-direction:column;gap:2px;padding:5px 12px;display:flex}.F5DBzq_gitLogRow:hover{background:var(--dsw-alias-interactive-bg-hover)}.F5DBzq_gitLogLine1{align-items:baseline;gap:8px;min-width:0;display:flex}.F5DBzq_gitLogHash{font:var(--dsw-font-markdown-code-block-small);color:var(--dsw-alias-label-tertiary);flex:none}.F5DBzq_gitLogLine2{flex-wrap:wrap;align-items:center;gap:6px;min-width:0;display:flex}.F5DBzq_gitLogRef{border:1px solid var(--dsw-alias-border-l2);font:var(--dsw-font-xxxs-strong-11);color:var(--dsw-alias-state-business-primary);white-space:nowrap;border-radius:999px;flex:none;padding:0 5px}.F5DBzq_gitLogSubject{text-overflow:ellipsis;white-space:nowrap;min-width:0;font:var(--dsw-font-s-14);color:var(--dsw-alias-label-primary);flex:1;overflow:hidden}.F5DBzq_gitLogMeta{font:var(--dsw-font-xxxs-11);color:var(--dsw-alias-label-tertiary)}.F5DBzq_gitLogMore{border:1px solid var(--dsw-alias-border-l2);width:calc(100% - 24px);font:var(--dsw-font-xxs-12);color:var(--dsw-alias-label-secondary);cursor:pointer;background:0 0;border-radius:6px;margin:4px 12px 8px;padding:6px 0;display:block}.F5DBzq_gitLogMore:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.F5DBzq_gitLogMore:disabled{opacity:.5;cursor:default}.F5DBzq_producedRow{flex-wrap:wrap;align-items:center;gap:8px;padding:4px 0;display:flex}.F5DBzq_producedLabel{font:var(--dsw-font-xxs-12);color:var(--dsw-alias-label-tertiary)}.F5DBzq_producedChip{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);max-width:200px;color:var(--dsw-alias-label-secondary);font:var(--dsw-font-xxs-12);cursor:pointer;border-radius:999px;align-items:center;gap:4px;padding:2px 8px;display:inline-flex;overflow:hidden}.F5DBzq_producedChip:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.F5DBzq_producedChip span{text-overflow:ellipsis;white-space:nowrap;overflow:hidden}.F5DBzq_producedMore{font:var(--dsw-font-xxs-12);color:var(--dsw-alias-label-tertiary)}.F5DBzq_toggleButton:focus-visible,.F5DBzq_bottomClose:focus-visible,.F5DBzq_iconButton:focus-visible,.F5DBzq_tab:focus-visible,.F5DBzq_tabClose:focus-visible,.F5DBzq_tabBarPlus:focus-visible,.F5DBzq_paneCard:focus-visible,.F5DBzq_explorerRow:focus-visible,.F5DBzq_explorerRef:focus-visible,.F5DBzq_gitRowMain:focus-visible,.F5DBzq_gitLink:focus-visible,.F5DBzq_gitCommitButton:focus-visible,.F5DBzq_gitLogRow:focus-visible,.F5DBzq_gitLogMore:focus-visible,.F5DBzq_gitDiffExpand:focus-visible,.F5DBzq_terminalRetry:focus-visible,.F5DBzq_editorModeButton:focus-visible,.F5DBzq_editorDownloadLink:focus-visible,.F5DBzq_editorPptxButton:focus-visible,.F5DBzq_editorDocxZoomRange:focus-visible{outline:2px solid var(--dsw-alias-interactive-bg-hover-accent);outline-offset:-1px}@media (prefers-reduced-motion:reduce){.F5DBzq_panel,.F5DBzq_panelHidden,.F5DBzq_bottomPanel,.F5DBzq_bottomPanelHidden,.F5DBzq_toggleCluster,.F5DBzq_toggleButton,.F5DBzq_tab,.F5DBzq_tabBarPlus,.F5DBzq_paneCard,.F5DBzq_explorerRow,.F5DBzq_gitRow,.F5DBzq_divider,.F5DBzq_dividerRow:after,.F5DBzq_dividerCol:after{transition:none;animation:none}}@media (width<=767px){.F5DBzq_panel:not(.F5DBzq_panelHidden) .F5DBzq_tabBar{padding-right:40px}.F5DBzq_tab{min-width:48px;max-width:128px}}";
+		const css$3 = ".F5DBzq_toggleCluster{z-index:55;-webkit-app-region:no-drag;flex-direction:row;gap:4px;display:flex;position:fixed;top:9px;right:10px}.F5DBzq_panel:not(.F5DBzq_panelHidden) .F5DBzq_tabBar{padding-right:72px}.F5DBzq_toggleButton{width:28px;height:28px;color:var(--dsw-alias-label-secondary);cursor:pointer;transition:background var(--ds-transition-duration-slow) var(--ds-ease-in-out), color var(--ds-transition-duration-slow) var(--ds-ease-in-out);background:0 0;border:none;border-radius:50%;justify-content:center;align-items:center;display:flex}.F5DBzq_toggleButton:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.F5DBzq_toggleButton:disabled{opacity:.4;cursor:default}.F5DBzq_panel{z-index:50;background:var(--dsw-specific-sidebar-fill);border-left:1px solid var(--dsw-alias-border-l2);transition:transform var(--ds-transition-duration-slow) var(--ds-ease-in-out), width var(--ds-transition-duration-slow) var(--ds-ease-in-out);flex-direction:column;display:flex;position:fixed;top:0;bottom:0;right:0}.F5DBzq_panelHidden{pointer-events:none;visibility:hidden;transition:transform var(--ds-transition-duration-slow) var(--ds-ease-in-out), width var(--ds-transition-duration-slow) var(--ds-ease-in-out), visibility 0s linear var(--ds-transition-duration-slow);transform:translate(102%)}.F5DBzq_panel[data-dragging]{transition:none}.F5DBzq_panelResize{cursor:col-resize;z-index:2;touch-action:none;width:8px;position:absolute;top:0;bottom:0;left:-4px}.F5DBzq_panelResizeActive{background:var(--dsw-alias-interactive-bg-hover-accent)}.F5DBzq_panelBody{flex:1;min-width:0;min-height:0;display:flex}.F5DBzq_bottomPanel{z-index:50;background:var(--dsw-specific-sidebar-fill);border-top:1px solid var(--dsw-alias-border-l2);transition:transform var(--ds-transition-duration-slow) var(--ds-ease-in-out), height var(--ds-transition-duration-slow) var(--ds-ease-in-out);flex-direction:column;display:flex;position:fixed;bottom:0}.F5DBzq_bottomPanelHidden{pointer-events:none;visibility:hidden;transition:transform var(--ds-transition-duration-slow) var(--ds-ease-in-out), height var(--ds-transition-duration-slow) var(--ds-ease-in-out), visibility 0s linear var(--ds-transition-duration-slow);transform:translateY(102%)}.F5DBzq_bottomPanel[data-dragging]{transition:none}.F5DBzq_bottomResize{cursor:row-resize;z-index:2;touch-action:none;height:8px;position:absolute;top:-4px;left:0;right:0}.F5DBzq_bottomResizeActive{background:var(--dsw-alias-interactive-bg-hover-accent)}.F5DBzq_bottomClose{z-index:4;width:28px;height:28px;color:var(--dsw-alias-label-secondary);cursor:pointer;background:0 0;border:none;border-radius:50%;flex:none;justify-content:center;align-items:center;padding:0;display:inline-flex;position:absolute;top:9px;right:6px}.F5DBzq_bottomClose:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.F5DBzq_bottomPanel .F5DBzq_tabBar{padding-right:40px}.F5DBzq_cornerHandle{z-index:52;cursor:nwse-resize;touch-action:none;width:12px;height:12px;position:fixed}.F5DBzq_cornerHandle:hover,.F5DBzq_cornerHandle[data-dragging]{background:var(--dsw-alias-interactive-bg-hover-accent)}.F5DBzq_iconButton{width:28px;height:28px;color:var(--dsw-alias-label-secondary);cursor:pointer;background:0 0;border:none;border-radius:50%;flex:none;justify-content:center;align-items:center;padding:0;display:inline-flex}.F5DBzq_iconButton:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.F5DBzq_iconButton:disabled{opacity:.4;cursor:default}.F5DBzq_workbench,.F5DBzq_split{flex:1;min-width:0;min-height:0;display:flex}.F5DBzq_splitRow{flex-direction:row}.F5DBzq_splitCol{flex-direction:column}.F5DBzq_splitChild{display:flex;position:relative;overflow:hidden}.F5DBzq_divider{z-index:3;touch-action:none;flex:none;position:relative}.F5DBzq_dividerRow:after,.F5DBzq_dividerCol:after{content:\"\";background:var(--dsw-alias-border-l2);transition:background var(--ds-transition-duration-slow) var(--ds-ease-in-out);position:absolute}.F5DBzq_dividerRow{cursor:col-resize;width:7px;margin:0 -2px}.F5DBzq_dividerRow:after{width:1px;top:0;bottom:0;left:50%;transform:translate(-50%)}.F5DBzq_dividerCol{cursor:row-resize;height:7px;margin:-2px 0}.F5DBzq_dividerCol:after{height:1px;top:50%;left:0;right:0;transform:translateY(-50%)}.F5DBzq_divider:hover:after,.F5DBzq_dividerActive:after{background:var(--dsw-alias-interactive-bg-hover-accent)}.F5DBzq_pane{background:var(--dsw-alias-bg-base);flex-direction:column;flex:1;min-width:0;min-height:0;display:flex;position:relative}.F5DBzq_paneDrop{outline:1px solid var(--dsw-alias-interactive-bg-hover-accent);outline-offset:-1px}.F5DBzq_dropOverlay{z-index:6;pointer-events:none;background:var(--dsw-alias-interactive-bg-hover-accent);opacity:.5;position:absolute}.F5DBzq_dropLeft{width:25%;top:0;bottom:0;left:0}.F5DBzq_dropRight{width:25%;top:0;bottom:0;right:0}.F5DBzq_dropUp{height:25%;top:0;left:0;right:0}.F5DBzq_dropDown{height:25%;bottom:0;left:0;right:0}.F5DBzq_dropCenter{outline:2px dashed var(--dsw-alias-interactive-bg-hover-accent);outline-offset:-2px;background:0 0;inset:25%}.F5DBzq_paneContent{flex-direction:column;flex:1;min-height:0;display:flex;overflow:hidden}.F5DBzq_paneTab{flex-direction:column;flex:1;min-height:0;display:flex}.F5DBzq_paneTabHidden{display:none}.F5DBzq_paneEmptyCards{flex:1;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));align-content:start;gap:8px;min-height:0;padding:12px;display:grid;overflow:hidden}.F5DBzq_paneCard{border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);min-width:0;color:var(--dsw-alias-label-secondary);font:var(--dsw-font-xxs-strong-12);cursor:pointer;text-align:center;border-radius:8px;flex-direction:column;justify-content:center;align-items:center;gap:6px;padding:12px 8px;display:flex}.F5DBzq_paneCard:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary);border-color:var(--dsw-alias-border-l2)}.F5DBzq_paneCard:disabled{opacity:.45;cursor:default}.F5DBzq_tabBar{border-bottom:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);flex:none;align-items:stretch;height:46px;padding:8px 0;display:flex}.F5DBzq_tabBarDrop{outline:1px dashed var(--dsw-alias-interactive-bg-hover-accent);outline-offset:-1px}.F5DBzq_tabList{scrollbar-width:none;flex:1;align-items:center;gap:2px;min-width:0;padding:0 12px;display:flex;overflow-x:auto}.F5DBzq_tabList::-webkit-scrollbar{display:none}.F5DBzq_tab{min-width:76px;max-width:220px;height:30px;font:var(--dsw-font-xxs-12);color:var(--dsw-alias-label-secondary);cursor:pointer;user-select:none;transition:background var(--ds-transition-duration-slow) var(--ds-ease-in-out), color var(--ds-transition-duration-slow) var(--ds-ease-in-out), border-color var(--ds-transition-duration-slow) var(--ds-ease-in-out);background:0 0;border:1px solid #0000;border-radius:16px;flex:none;align-items:center;gap:6px;padding:0 8px;display:flex}.F5DBzq_tab:hover{background:var(--dsw-alias-interactive-bg-hover)}.F5DBzq_tabActive{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-interactive-bg-active);border-color:#0000}.F5DBzq_tabTitle{text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;overflow:hidden}.F5DBzq_tabBadge{min-width:16px;height:15px;font:var(--dsw-font-xxxs-strong-11);background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-brand-primary);border-radius:8px;flex:none;justify-content:center;align-items:center;padding:0 4px;display:inline-flex}.F5DBzq_tabClose{width:18px;height:18px;color:var(--dsw-alias-label-tertiary);cursor:pointer;background:0 0;border:none;border-radius:4px;flex:none;justify-content:center;align-items:center;padding:0;display:inline-flex}.F5DBzq_tabClose:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.F5DBzq_tabBarPlus{background:var(--dsw-alias-bg-layer-1);width:32px;height:32px;color:var(--dsw-alias-label-tertiary);cursor:pointer;border:none;border-radius:10px;flex:none;justify-content:center;align-self:center;align-items:center;margin:0 4px;padding:0;display:inline-flex;position:sticky;right:0}.F5DBzq_tabBarPlus:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.F5DBzq_explorer{flex-direction:column;flex:1;min-height:0;display:flex}.F5DBzq_explorerHeader{flex:none;justify-content:space-between;align-items:center;gap:8px;height:36px;padding:0 8px 0 12px;display:flex}.F5DBzq_explorerRoot{font:var(--dsw-font-s-14);color:var(--dsw-alias-label-secondary);text-overflow:ellipsis;white-space:nowrap;overflow:hidden}.F5DBzq_explorerBody{flex:1;min-height:0;padding:2px 6px 8px;overflow-y:auto}.F5DBzq_explorerRow{width:100%;height:34px;font:var(--dsw-font-s-14);color:var(--dsw-alias-label-primary);text-align:left;cursor:pointer;white-space:nowrap;animation:F5DBzq_dsh-row-in .15s var(--ds-ease-in-out);background:0 0;border:none;border-radius:8px;align-items:center;gap:6px;padding:0 8px;display:flex}.F5DBzq_explorerRow:hover{background:var(--dsw-alias-interactive-bg-hover)}.F5DBzq_explorerDir{font:var(--dsw-font-s-strong-14)}.F5DBzq_explorerHidden{opacity:.45}.F5DBzq_explorerName{text-overflow:ellipsis;overflow:hidden}.F5DBzq_explorerRef{border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);height:20px;color:var(--dsw-alias-label-tertiary);font:var(--dsw-font-xxxs-strong-11);cursor:pointer;border-radius:999px;flex:none;align-items:center;padding:0 8px;display:none}.F5DBzq_explorerRef:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.F5DBzq_explorerRow:hover .F5DBzq_explorerRef,.F5DBzq_explorerRow:focus-within .F5DBzq_explorerRef{display:inline-flex}.F5DBzq_explorerCopied{font:var(--dsw-font-xxxs-11);color:var(--dsw-alias-label-tertiary);flex:none}.F5DBzq_explorerError{font:var(--dsw-font-xxs-12);color:var(--dsw-alias-state-error-primary);cursor:default}@keyframes F5DBzq_dsh-row-in{0%{opacity:0}}.F5DBzq_explorerEmpty{font:var(--dsw-font-xxs-12);color:var(--dsw-alias-label-tertiary);text-align:center;padding:16px}.F5DBzq_editor{flex-direction:column;flex:1;min-height:0;display:flex}.F5DBzq_editorHeader{border-bottom:1px solid var(--dsw-alias-border-l1);flex:none;align-items:center;gap:6px;padding:4px 8px;display:flex}.F5DBzq_editorTitle{min-width:0;font:var(--dsw-font-xxs-strong-12);color:var(--dsw-alias-label-secondary);text-overflow:ellipsis;white-space:nowrap;flex:1;overflow:hidden}.F5DBzq_editorStatus{font:var(--dsw-font-xxxs-11);color:var(--dsw-alias-label-tertiary)}.F5DBzq_editorStatusError{color:var(--dsw-alias-state-error-primary)}.F5DBzq_dirtyDot{background:var(--dsw-alias-state-warn-primary);border-radius:50%;flex:none;width:7px;height:7px}.F5DBzq_editorPlaceholder{font:var(--dsw-font-xxs-12);color:var(--dsw-alias-label-tertiary);text-align:center;flex:1;justify-content:center;align-items:center;padding:16px;display:flex}.F5DBzq_orphanedType{opacity:.7;overflow-wrap:anywhere;margin-top:8px;font-size:12px;display:block}.F5DBzq_editorBinary{text-align:center;flex-direction:column;flex:1;justify-content:center;align-items:center;gap:12px;padding:24px 16px;display:flex}.F5DBzq_editorBinaryNotice{font:var(--dsw-font-xxs-12);color:var(--dsw-alias-label-tertiary)}.F5DBzq_editorDownloadLink{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font:var(--dsw-font-xxs-strong-12);cursor:pointer;transition:background var(--ds-transition-duration-slow) var(--ds-ease-in-out), border-color var(--ds-transition-duration-slow) var(--ds-ease-in-out);border-radius:6px;align-items:center;gap:6px;padding:6px 14px;text-decoration:none;display:inline-flex}.F5DBzq_editorDownloadLink:hover{background:var(--dsw-alias-interactive-bg-hover);border-color:var(--dsw-alias-border-l2)}.F5DBzq_editorError{font:var(--dsw-font-xxs-12);color:var(--dsw-alias-state-error-primary);padding:12px 16px}.F5DBzq_editorBanner{font:var(--dsw-font-xxxs-11);color:var(--dsw-alias-state-warn-label);background:var(--dsw-alias-state-warn-tertiary);flex:none;padding:4px 12px}.F5DBzq_sandboxStatus{font:var(--dsw-font-xxxs-11);flex:none;align-items:center;gap:8px;padding:4px 10px;display:flex}.F5DBzq_sandboxStatusOn{color:var(--dsw-alias-label-secondary);background:var(--dsw-alias-bg-layer-1);border-bottom:1px solid var(--dsw-alias-border-l1)}.F5DBzq_sandboxStatusOff{color:var(--dsw-alias-state-error-primary);background:color-mix(in srgb, var(--dsw-alias-state-error-primary) 10%, transparent);border-bottom:1px solid color-mix(in srgb, var(--dsw-alias-state-error-primary) 45%, transparent)}.F5DBzq_sandboxDot{background:var(--dsw-alias-state-success-primary);border-radius:50%;flex:none;width:6px;height:6px}.F5DBzq_sandboxStatusOff .F5DBzq_sandboxDot{background:var(--dsw-alias-state-error-primary)}.F5DBzq_sandboxStatusText{text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;overflow:hidden}.F5DBzq_sandboxAction{border:1px solid var(--dsw-alias-border-l2);font:inherit;color:inherit;cursor:pointer;background:0 0;border-radius:6px;flex:none;padding:2px 8px}.F5DBzq_sandboxAction:hover{background:var(--dsw-alias-interactive-bg-hover)}.F5DBzq_editorHtml{background:var(--dsw-alias-bg-base);border:none;flex:1;width:100%;min-height:0}.F5DBzq_browser{flex-direction:column;flex:1;min-height:0;display:flex}.F5DBzq_browserBar{border-bottom:1px solid var(--dsw-alias-border-l1);flex:none;align-items:center;gap:4px;padding:6px 8px;display:flex}.F5DBzq_browserInput{border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);min-width:0;height:28px;color:var(--dsw-alias-label-primary);font:var(--dsw-font-xxs-12);border-radius:6px;flex:1;padding:0 10px}.F5DBzq_browserInput:focus{border-color:var(--dsw-alias-state-business-primary);outline:none}.F5DBzq_browserMessage{font:var(--dsw-font-xxxs-11);color:var(--dsw-alias-state-warn-label);background:var(--dsw-alias-state-warn-tertiary);flex:none;padding:4px 12px}.F5DBzq_browserStage{background:var(--dsw-alias-bg-base);flex:1;min-height:0;position:relative;overflow:hidden}.F5DBzq_browserCanvas{object-fit:contain;width:100%;height:100%;display:block}.F5DBzq_browserKeyboard{resize:none;opacity:0;pointer-events:none;caret-color:#0000;border:none;width:100%;height:100%;padding:0;position:absolute;inset:0}.F5DBzq_browserKeyboard:focus{outline:none}.F5DBzq_browserHint{text-align:center;font:var(--dsw-font-xs-13);color:var(--dsw-alias-label-tertiary);pointer-events:none;justify-content:center;align-items:center;padding:20px;display:flex;position:absolute;inset:0}.F5DBzq_browserAgentBar{font:var(--dsw-font-xxxs-11);color:var(--dsw-alias-state-business-primary);background:var(--dsw-alias-state-business-tertiary);flex:none;padding:4px 12px}.F5DBzq_browserPreedit{z-index:2;max-width:calc(100% - 24px);font:var(--dsw-font-xs-13);color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-elevated);pointer-events:none;border-radius:4px;padding:2px 8px;position:absolute;bottom:12px;left:12px}.F5DBzq_browserPerms{flex-wrap:wrap;flex:none;gap:6px;padding:4px 12px;display:flex}.F5DBzq_browserPermChip{font:var(--dsw-font-xxxs-11);color:var(--dsw-alias-label-secondary);background:var(--dsw-alias-fill-tertiary);cursor:pointer;border:0;border-radius:999px;padding:2px 8px}.F5DBzq_browserDialog{background:#00000052;justify-content:center;align-items:center;padding:16px;display:flex;position:absolute;inset:0}.F5DBzq_browserDialogCard{border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);border-radius:10px;flex-direction:column;gap:10px;width:100%;max-width:320px;padding:16px;display:flex}.F5DBzq_browserStart{text-align:center;min-height:0;font:var(--dsw-font-xs-13);color:var(--dsw-alias-label-tertiary);flex:1;justify-content:center;align-items:center;padding:20px;display:flex}.F5DBzq_browserBlocked{text-align:center;min-height:0;color:var(--dsw-alias-state-warn-primary);flex-direction:column;flex:1;justify-content:center;align-items:center;gap:6px;padding:24px;display:flex}.F5DBzq_browserBlockedTitle{font:var(--dsw-font-xxs-strong-12);color:var(--dsw-alias-label-primary)}.F5DBzq_browserBlockedDesc{max-width:280px;font:var(--dsw-font-xxxs-11);color:var(--dsw-alias-label-secondary)}.F5DBzq_browserBlockedActions{gap:8px;margin-top:6px;display:flex}.F5DBzq_browserBlockedButton{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:var(--dsw-font-xxxs-11);cursor:pointer;border-radius:6px;padding:4px 12px}.F5DBzq_browserBlockedButton:hover{background:var(--dsw-alias-interactive-bg-hover)}.F5DBzq_editorCm{background:0 0;flex:1;min-height:0;overflow:hidden}.F5DBzq_editorCmHidden{display:none}.F5DBzq_editorCm .cm-editor{height:100%}.F5DBzq_editorCm .cm-editor.cm-focused{outline:none}.F5DBzq_editorModeToggle{border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);border-radius:6px;flex:none;align-items:center;gap:2px;padding:2px;display:inline-flex}.F5DBzq_editorModeButton{color:var(--dsw-alias-label-tertiary);font:var(--dsw-font-xxxs-11);cursor:pointer;background:0 0;border:none;border-radius:4px;padding:2px 8px}.F5DBzq_editorModeButton:hover{color:var(--dsw-alias-label-primary)}.F5DBzq_editorModeActive{background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary)}.F5DBzq_editorImageWrap{flex:1;justify-content:center;align-items:center;min-height:0;padding:12px;display:flex;overflow:auto}.F5DBzq_editorImage{object-fit:contain;max-width:100%;max-height:100%}.F5DBzq_editorMd{min-height:0;font:var(--dsw-font-xs-13);flex:1;padding:10px 14px;overflow-y:auto}.F5DBzq_selectionPopup{z-index:60;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);height:28px;color:var(--dsw-alias-label-primary);font:var(--dsw-font-xxxs-strong-11);white-space:nowrap;cursor:pointer;border-radius:6px;align-items:center;padding:0 10px;display:inline-flex;position:fixed;transform:translate(-50%,calc(-100% - 8px))}.F5DBzq_selectionPopup:hover{background:var(--dsw-alias-interactive-bg-hover)}.F5DBzq_editorPdf{background:var(--dsw-alias-bg-base);flex-direction:column;flex:1;min-height:0;display:flex}.F5DBzq_editorPdfToolbar{border-bottom:1px solid var(--dsw-alias-border-l1);flex:none;justify-content:flex-end;padding:6px 8px;display:flex}.F5DBzq_editorPdfStage{flex:1;min-height:0;display:flex;position:relative}.F5DBzq_editorPdfFrame{background:var(--dsw-alias-bg-base);border:none;flex:1;width:100%;min-height:0}.F5DBzq_editorPdfFrameBlocked{pointer-events:none}.F5DBzq_editorPdfDragShield{z-index:4;pointer-events:none;background:0 0;position:absolute;inset:0}.F5DBzq_editorPdfDragShieldActive{pointer-events:auto}body[data-dsh-tab-dragging] .F5DBzq_editorPdfFrame{pointer-events:none!important}body[data-dsh-tab-dragging] .F5DBzq_editorPdfDragShield{pointer-events:auto!important}.F5DBzq_terminalWrap{background:var(--dsw-alias-bg-base);flex-direction:column;flex:1;min-height:0;display:flex;position:relative}.F5DBzq_terminal{flex:1;min-height:0;padding:6px 4px 6px 8px}.F5DBzq_terminal .xterm{height:100%}.F5DBzq_terminalBanner{font:var(--dsw-font-xxxs-11);color:var(--dsw-alias-state-warn-label);background:var(--dsw-alias-state-warn-tertiary);flex-wrap:wrap;flex:none;align-items:center;gap:8px;padding:3px 10px;display:flex}.F5DBzq_terminalBannerUrl{word-break:break-all;opacity:.85;flex-basis:100%;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}.F5DBzq_boundaryError{z-index:50;background:var(--dsw-alias-bg-layer-1);border-left:1px solid var(--dsw-alias-border-l2);font:var(--dsw-font-xxs-12);color:var(--dsw-alias-state-error-primary);flex-direction:column;align-items:flex-start;gap:8px;padding:16px;display:flex;position:fixed;top:0;bottom:0;right:0;overflow:auto}.F5DBzq_terminalRetry{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary);font:var(--dsw-font-xxxs-strong-11);cursor:pointer;border-radius:999px;flex:none;padding:1px 8px}.F5DBzq_terminalRetry:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.F5DBzq_tabBoundaryError{min-height:0;font:var(--dsw-font-xxs-12);color:var(--dsw-alias-state-error-primary);flex-direction:column;flex:1;align-items:flex-start;gap:8px;padding:12px 16px;display:flex;overflow:auto}.F5DBzq_git{flex-direction:column;flex:1;min-width:0;min-height:0;display:flex;overflow:hidden auto}.F5DBzq_gitHeader{flex:none;align-items:center;gap:8px;height:36px;padding:0 8px 0 12px;display:flex}.F5DBzq_gitBranchSelect{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-base);min-width:0;height:26px;color:var(--dsw-alias-label-primary);font:var(--dsw-font-xxs-12);border-radius:6px;flex:1;padding:0 6px}.F5DBzq_gitSection{border-top:1px solid var(--dsw-alias-border-l1)}.F5DBzq_gitSectionHeader{font:var(--dsw-font-xxxs-strong-11);color:var(--dsw-alias-label-tertiary);text-transform:uppercase;justify-content:space-between;align-items:center;padding:6px 12px 4px;display:flex}.F5DBzq_gitLink{font:var(--dsw-font-xxxs-11);color:var(--dsw-alias-state-business-primary);cursor:pointer;background:0 0;border:none;padding:0}.F5DBzq_gitLink:hover:not(:disabled){text-decoration:underline}.F5DBzq_gitLink:disabled{opacity:.4;cursor:default}.F5DBzq_gitRow{min-height:34px;animation:F5DBzq_dsh-row-in .15s var(--ds-ease-in-out);border-radius:8px;align-items:center;gap:6px;margin:0 6px;padding:0 8px;display:flex}.F5DBzq_gitRow:hover{background:var(--dsw-alias-interactive-bg-hover)}.F5DBzq_gitRowSelected{background:var(--dsw-alias-interactive-bg-active)}.F5DBzq_gitRowMain{cursor:pointer;text-align:left;background:0 0;border:none;flex:1;align-items:center;gap:8px;min-width:0;padding:3px 0;display:flex}.F5DBzq_gitBadge{width:20px;height:16px;font:var(--dsw-font-xxxs-strong-11);background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-secondary);border-radius:4px;flex:none;justify-content:center;align-items:center;display:inline-flex}.F5DBzq_gitName{text-overflow:ellipsis;white-space:nowrap;min-width:0;font:var(--dsw-font-s-14);color:var(--dsw-alias-label-primary);flex:1;overflow:hidden}.F5DBzq_gitEmpty{font:var(--dsw-font-xxs-12);color:var(--dsw-alias-label-tertiary);padding:4px 12px 8px}.F5DBzq_gitPlaceholder{font:var(--dsw-font-xxs-12);color:var(--dsw-alias-label-tertiary);text-align:center;padding:16px}.F5DBzq_gitError{font:var(--dsw-font-xxs-12);color:var(--dsw-alias-state-error-primary);white-space:pre-wrap;padding:8px 12px}.F5DBzq_gitDiff{border-top:1px solid var(--dsw-alias-border-l1);padding:8px}.F5DBzq_gitDiffTab{flex-direction:column;flex:1;min-width:0;min-height:0;display:flex;overflow:hidden auto}.F5DBzq_gitDiffTabHeader{border-bottom:1px solid var(--dsw-alias-border-l1);flex:none;align-items:center;gap:8px;height:36px;padding:0 8px 0 12px;display:flex}.F5DBzq_gitDiffTabTitle{text-overflow:ellipsis;white-space:nowrap;min-width:0;font:var(--dsw-font-xxs-strong-12);color:var(--dsw-alias-label-primary);flex:1;overflow:hidden}.F5DBzq_gitDiffFile{align-items:baseline;gap:6px;padding:8px 2px 2px;display:flex}.F5DBzq_gitDiffFilePath{font:var(--dsw-font-xxs-strong-12);color:var(--dsw-alias-label-primary);text-overflow:ellipsis;white-space:nowrap;overflow:hidden}.F5DBzq_gitDiffFileOld{font:var(--dsw-font-xxxs-11);color:var(--dsw-alias-label-tertiary);text-overflow:ellipsis;white-space:nowrap;flex:none;max-width:40%;overflow:hidden}.F5DBzq_gitDiffFileTag{border:1px solid var(--dsw-alias-border-l2);font:var(--dsw-font-xxxs-strong-11);color:var(--dsw-alias-label-secondary);border-radius:999px;flex:none;padding:0 6px}.F5DBzq_gitDiffHunk{font:var(--dsw-font-markdown-code-block-small);color:var(--dsw-alias-label-tertiary);gap:8px;padding:3px 2px;display:flex}.F5DBzq_gitDiffHunkHeader{color:var(--dsw-alias-label-secondary);flex:none}.F5DBzq_gitDiffHunkSection{text-overflow:ellipsis;white-space:nowrap;overflow:hidden}.F5DBzq_gitDiffLine{font:var(--dsw-font-markdown-code-block-small);white-space:pre-wrap;overflow-wrap:anywhere;align-items:stretch;min-width:0;line-height:20px;display:flex}.F5DBzq_gitDiffNum{text-align:right;width:36px;color:var(--dsw-alias-label-tertiary);user-select:none;flex:none;padding-right:8px}.F5DBzq_gitDiffCode{flex:1;min-width:0;overflow:visible}.F5DBzq_gitDiffCtx{color:var(--dsw-alias-label-primary)}.F5DBzq_gitDiffDel{color:var(--dsw-alias-state-error-primary);background:color-mix(in srgb, var(--dsw-alias-state-error-primary) 12%, transparent)}.F5DBzq_gitDiffAdd{color:var(--dsw-alias-state-success-primary);background:color-mix(in srgb, var(--dsw-alias-state-success-primary) 12%, transparent)}.F5DBzq_gitDiffMeta{padding-left:2px}.F5DBzq_gitDiffMetaText{font:var(--dsw-font-xxxs-11);color:var(--dsw-alias-label-tertiary);font-style:italic}.F5DBzq_gitDiffExpand{width:100%;font:var(--dsw-font-xxs-12);color:var(--dsw-alias-state-business-primary);cursor:pointer;text-align:center;background:0 0;border:none;margin:4px 0;display:block}.F5DBzq_gitDiffExpand:hover{background:var(--dsw-alias-interactive-bg-hover)}.F5DBzq_gitConfirmDesc{font:var(--dsw-font-s-14);color:var(--dsw-alias-label-primary);white-space:pre-wrap;margin:0}.F5DBzq_gitCommit{border-top:1px solid var(--dsw-alias-border-l1);align-items:center;gap:6px;padding:8px 12px;display:flex}.F5DBzq_gitCommitInput{flex:1;min-width:0}.F5DBzq_gitCommitButton{background:var(--dsw-alias-button-primary-fill);height:26px;color:var(--dsw-alias-label-primary-inverted);font:var(--dsw-font-xxs-strong-12);cursor:pointer;border:none;border-radius:6px;flex:none;padding:0 12px}.F5DBzq_gitCommitButton:hover:not(:disabled){background:var(--dsw-alias-button-primary-hover)}.F5DBzq_gitCommitButton:disabled{opacity:.45;cursor:default}.F5DBzq_gitLogRow{cursor:pointer;border-radius:8px;flex-direction:column;gap:2px;padding:5px 12px;display:flex}.F5DBzq_gitLogRow:hover{background:var(--dsw-alias-interactive-bg-hover)}.F5DBzq_gitLogLine1{align-items:baseline;gap:8px;min-width:0;display:flex}.F5DBzq_gitLogHash{font:var(--dsw-font-markdown-code-block-small);color:var(--dsw-alias-label-tertiary);flex:none}.F5DBzq_gitLogLine2{flex-wrap:wrap;align-items:center;gap:6px;min-width:0;display:flex}.F5DBzq_gitLogRef{border:1px solid var(--dsw-alias-border-l2);font:var(--dsw-font-xxxs-strong-11);color:var(--dsw-alias-state-business-primary);white-space:nowrap;border-radius:999px;flex:none;padding:0 5px}.F5DBzq_gitLogSubject{text-overflow:ellipsis;white-space:nowrap;min-width:0;font:var(--dsw-font-s-14);color:var(--dsw-alias-label-primary);flex:1;overflow:hidden}.F5DBzq_gitLogMeta{font:var(--dsw-font-xxxs-11);color:var(--dsw-alias-label-tertiary)}.F5DBzq_gitLogMore{border:1px solid var(--dsw-alias-border-l2);width:calc(100% - 24px);font:var(--dsw-font-xxs-12);color:var(--dsw-alias-label-secondary);cursor:pointer;background:0 0;border-radius:6px;margin:4px 12px 8px;padding:6px 0;display:block}.F5DBzq_gitLogMore:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.F5DBzq_gitLogMore:disabled{opacity:.5;cursor:default}.F5DBzq_producedRow{flex-wrap:wrap;align-items:center;gap:8px;padding:4px 0;display:flex}.F5DBzq_producedLabel{font:var(--dsw-font-xxs-12);color:var(--dsw-alias-label-tertiary)}.F5DBzq_producedChip{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);max-width:200px;color:var(--dsw-alias-label-secondary);font:var(--dsw-font-xxs-12);cursor:pointer;border-radius:999px;align-items:center;gap:4px;padding:2px 8px;display:inline-flex;overflow:hidden}.F5DBzq_producedChip:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.F5DBzq_producedChip span{text-overflow:ellipsis;white-space:nowrap;overflow:hidden}.F5DBzq_producedMore{font:var(--dsw-font-xxs-12);color:var(--dsw-alias-label-tertiary)}.F5DBzq_toggleButton:focus-visible,.F5DBzq_bottomClose:focus-visible,.F5DBzq_iconButton:focus-visible,.F5DBzq_tab:focus-visible,.F5DBzq_tabClose:focus-visible,.F5DBzq_tabBarPlus:focus-visible,.F5DBzq_paneCard:focus-visible,.F5DBzq_explorerRow:focus-visible,.F5DBzq_explorerRef:focus-visible,.F5DBzq_gitRowMain:focus-visible,.F5DBzq_gitLink:focus-visible,.F5DBzq_gitCommitButton:focus-visible,.F5DBzq_gitLogRow:focus-visible,.F5DBzq_gitLogMore:focus-visible,.F5DBzq_gitDiffExpand:focus-visible,.F5DBzq_terminalRetry:focus-visible,.F5DBzq_editorModeButton:focus-visible,.F5DBzq_editorDownloadLink:focus-visible,.F5DBzq_editorPptxButton:focus-visible,.F5DBzq_editorDocxZoomRange:focus-visible{outline:2px solid var(--dsw-alias-interactive-bg-hover-accent);outline-offset:-1px}@media (prefers-reduced-motion:reduce){.F5DBzq_panel,.F5DBzq_panelHidden,.F5DBzq_bottomPanel,.F5DBzq_bottomPanelHidden,.F5DBzq_toggleCluster,.F5DBzq_toggleButton,.F5DBzq_tab,.F5DBzq_tabBarPlus,.F5DBzq_paneCard,.F5DBzq_explorerRow,.F5DBzq_gitRow,.F5DBzq_divider,.F5DBzq_dividerRow:after,.F5DBzq_dividerCol:after{transition:none;animation:none}}@media (width<=767px){.F5DBzq_panel:not(.F5DBzq_panelHidden) .F5DBzq_tabBar{padding-right:40px}.F5DBzq_tab{min-width:48px;max-width:128px}}";
 		const tagId$3 = "cocode-sidebar/sidebar.module.css";
 		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId$3) + "]") === null) {
 			const tag = document.createElement("style");
@@ -2004,170 +2097,179 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var sidebar_module_css_default = {
-			"editorImageWrap": "F5DBzq_editorImageWrap",
-			"bottomResize": "F5DBzq_bottomResize",
-			"editorError": "F5DBzq_editorError",
-			"gitDiffTabTitle": "F5DBzq_gitDiffTabTitle",
-			"gitDiffHunkSection": "F5DBzq_gitDiffHunkSection",
-			"dropUp": "F5DBzq_dropUp",
-			"split": "F5DBzq_split",
-			"explorerHeader": "F5DBzq_explorerHeader",
-			"terminalBanner": "F5DBzq_terminalBanner",
-			"producedMore": "F5DBzq_producedMore",
-			"editorPptxButton": "F5DBzq_editorPptxButton",
-			"terminalRetry": "F5DBzq_terminalRetry",
-			"dividerRow": "F5DBzq_dividerRow",
-			"dropLeft": "F5DBzq_dropLeft",
-			"tabClose": "F5DBzq_tabClose",
-			"editorModeActive": "F5DBzq_editorModeActive",
-			"git": "F5DBzq_git",
-			"gitName": "F5DBzq_gitName",
-			"gitDiff": "F5DBzq_gitDiff",
-			"explorerRow": "F5DBzq_explorerRow",
-			"gitError": "F5DBzq_gitError",
-			"selectionPopup": "F5DBzq_selectionPopup",
-			"terminal": "F5DBzq_terminal",
-			"panelHidden": "F5DBzq_panelHidden",
-			"tabActive": "F5DBzq_tabActive",
-			"sandboxDot": "F5DBzq_sandboxDot",
-			"paneCard": "F5DBzq_paneCard",
-			"explorerCopied": "F5DBzq_explorerCopied",
-			"editorHtml": "F5DBzq_editorHtml",
-			"splitChild": "F5DBzq_splitChild",
-			"editorPdf": "F5DBzq_editorPdf",
-			"gitSectionHeader": "F5DBzq_gitSectionHeader",
-			"editorPdfStage": "F5DBzq_editorPdfStage",
-			"gitEmpty": "F5DBzq_gitEmpty",
-			"panelResize": "F5DBzq_panelResize",
-			"gitDiffFilePath": "F5DBzq_gitDiffFilePath",
-			"gitDiffDel": "F5DBzq_gitDiffDel",
-			"panelBody": "F5DBzq_panelBody",
-			"gitDiffMetaText": "F5DBzq_gitDiffMetaText",
-			"gitRow": "F5DBzq_gitRow",
-			"tab": "F5DBzq_tab",
-			"gitLogRow": "F5DBzq_gitLogRow",
-			"producedChip": "F5DBzq_producedChip",
-			"explorerHidden": "F5DBzq_explorerHidden",
-			"editorPdfFrame": "F5DBzq_editorPdfFrame",
-			"dividerActive": "F5DBzq_dividerActive",
-			"browserBlockedDesc": "F5DBzq_browserBlockedDesc",
-			"browserBlockedButton": "F5DBzq_browserBlockedButton",
-			"gitBranchSelect": "F5DBzq_gitBranchSelect",
-			"explorerRef": "F5DBzq_explorerRef",
-			"browserBar": "F5DBzq_browserBar",
-			"editorModeButton": "F5DBzq_editorModeButton",
-			"editorPdfFrameBlocked": "F5DBzq_editorPdfFrameBlocked",
-			"toggleButton": "F5DBzq_toggleButton",
-			"paneContent": "F5DBzq_paneContent",
-			"editorModeToggle": "F5DBzq_editorModeToggle",
-			"editorPdfDragShieldActive": "F5DBzq_editorPdfDragShieldActive",
-			"explorerBody": "F5DBzq_explorerBody",
-			"editorPdfDragShield": "F5DBzq_editorPdfDragShield",
-			"gitDiffTabHeader": "F5DBzq_gitDiffTabHeader",
-			"editorStatusError": "F5DBzq_editorStatusError",
-			"dropRight": "F5DBzq_dropRight",
-			"producedLabel": "F5DBzq_producedLabel",
-			"sandboxStatusText": "F5DBzq_sandboxStatusText",
-			"gitBadge": "F5DBzq_gitBadge",
-			"workbench": "F5DBzq_workbench",
-			"splitCol": "F5DBzq_splitCol",
-			"explorerEmpty": "F5DBzq_explorerEmpty",
-			"browserFrame": "F5DBzq_browserFrame",
-			"gitDiffFile": "F5DBzq_gitDiffFile",
-			"gitLogLine1": "F5DBzq_gitLogLine1",
-			"panelResizeActive": "F5DBzq_panelResizeActive",
-			"tabTitle": "F5DBzq_tabTitle",
-			"dropDown": "F5DBzq_dropDown",
-			"boundaryError": "F5DBzq_boundaryError",
-			"gitDiffTab": "F5DBzq_gitDiffTab",
-			"gitDiffLine": "F5DBzq_gitDiffLine",
-			"editorTitle": "F5DBzq_editorTitle",
-			"producedRow": "F5DBzq_producedRow",
-			"tabBoundaryError": "F5DBzq_tabBoundaryError",
-			"editorStatus": "F5DBzq_editorStatus",
-			"browserInput": "F5DBzq_browserInput",
-			"gitDiffCtx": "F5DBzq_gitDiffCtx",
-			"tabBar": "F5DBzq_tabBar",
-			"editorImage": "F5DBzq_editorImage",
-			"editorCm": "F5DBzq_editorCm",
-			"gitSection": "F5DBzq_gitSection",
-			"gitDiffMeta": "F5DBzq_gitDiffMeta",
-			"editor": "F5DBzq_editor",
-			"dropCenter": "F5DBzq_dropCenter",
-			"gitCommitInput": "F5DBzq_gitCommitInput",
-			"paneTab": "F5DBzq_paneTab",
-			"dsh-row-in": "F5DBzq_dsh-row-in",
-			"bottomPanel": "F5DBzq_bottomPanel",
-			"dirtyDot": "F5DBzq_dirtyDot",
-			"explorerRoot": "F5DBzq_explorerRoot",
-			"orphanedType": "F5DBzq_orphanedType",
-			"terminalBannerUrl": "F5DBzq_terminalBannerUrl",
-			"dividerCol": "F5DBzq_dividerCol",
-			"gitLogMore": "F5DBzq_gitLogMore",
-			"tabBadge": "F5DBzq_tabBadge",
-			"tabBarDrop": "F5DBzq_tabBarDrop",
-			"explorerError": "F5DBzq_explorerError",
-			"browserMessage": "F5DBzq_browserMessage",
-			"gitRowMain": "F5DBzq_gitRowMain",
-			"gitCommitButton": "F5DBzq_gitCommitButton",
-			"panel": "F5DBzq_panel",
-			"browserStart": "F5DBzq_browserStart",
-			"terminalWrap": "F5DBzq_terminalWrap",
-			"gitDiffFileTag": "F5DBzq_gitDiffFileTag",
-			"dropOverlay": "F5DBzq_dropOverlay",
-			"editorDocxZoomRange": "F5DBzq_editorDocxZoomRange",
-			"paneTabHidden": "F5DBzq_paneTabHidden",
-			"bottomClose": "F5DBzq_bottomClose",
-			"explorer": "F5DBzq_explorer",
-			"toggleCluster": "F5DBzq_toggleCluster",
-			"explorerName": "F5DBzq_explorerName",
-			"browserBlocked": "F5DBzq_browserBlocked",
-			"browserBlockedTitle": "F5DBzq_browserBlockedTitle",
-			"gitLogHash": "F5DBzq_gitLogHash",
-			"editorPlaceholder": "F5DBzq_editorPlaceholder",
-			"gitLogMeta": "F5DBzq_gitLogMeta",
-			"sandboxAction": "F5DBzq_sandboxAction",
-			"paneDrop": "F5DBzq_paneDrop",
-			"browser": "F5DBzq_browser",
-			"sandboxStatus": "F5DBzq_sandboxStatus",
-			"editorPdfToolbar": "F5DBzq_editorPdfToolbar",
-			"gitPlaceholder": "F5DBzq_gitPlaceholder",
-			"gitLogRef": "F5DBzq_gitLogRef",
-			"paneEmptyCards": "F5DBzq_paneEmptyCards",
-			"gitCommit": "F5DBzq_gitCommit",
-			"editorBanner": "F5DBzq_editorBanner",
-			"sandboxStatusOn": "F5DBzq_sandboxStatusOn",
-			"gitRowSelected": "F5DBzq_gitRowSelected",
-			"explorerDir": "F5DBzq_explorerDir",
-			"gitDiffNum": "F5DBzq_gitDiffNum",
-			"editorDownloadLink": "F5DBzq_editorDownloadLink",
-			"editorBinary": "F5DBzq_editorBinary",
-			"editorBinaryNotice": "F5DBzq_editorBinaryNotice",
-			"gitDiffExpand": "F5DBzq_gitDiffExpand",
-			"gitDiffHunkHeader": "F5DBzq_gitDiffHunkHeader",
-			"browserBlockedActions": "F5DBzq_browserBlockedActions",
 			"iconButton": "F5DBzq_iconButton",
-			"pane": "F5DBzq_pane",
-			"tabList": "F5DBzq_tabList",
-			"tabBarPlus": "F5DBzq_tabBarPlus",
-			"editorHeader": "F5DBzq_editorHeader",
-			"gitDiffAdd": "F5DBzq_gitDiffAdd",
+			"sandboxStatusOff": "F5DBzq_sandboxStatusOff",
+			"sandboxAction": "F5DBzq_sandboxAction",
+			"panelHidden": "F5DBzq_panelHidden",
+			"editorTitle": "F5DBzq_editorTitle",
+			"bottomClose": "F5DBzq_bottomClose",
+			"editorHtml": "F5DBzq_editorHtml",
+			"editorDownloadLink": "F5DBzq_editorDownloadLink",
+			"browserDialog": "F5DBzq_browserDialog",
+			"boundaryError": "F5DBzq_boundaryError",
+			"tabBoundaryError": "F5DBzq_tabBoundaryError",
+			"gitEmpty": "F5DBzq_gitEmpty",
+			"panelResizeActive": "F5DBzq_panelResizeActive",
+			"dropDown": "F5DBzq_dropDown",
+			"editorPdfFrameBlocked": "F5DBzq_editorPdfFrameBlocked",
+			"explorerHidden": "F5DBzq_explorerHidden",
+			"splitRow": "F5DBzq_splitRow",
+			"terminal": "F5DBzq_terminal",
+			"explorerCopied": "F5DBzq_explorerCopied",
+			"gitDiff": "F5DBzq_gitDiff",
+			"terminalBannerUrl": "F5DBzq_terminalBannerUrl",
+			"gitRowSelected": "F5DBzq_gitRowSelected",
+			"editorStatusError": "F5DBzq_editorStatusError",
+			"editorModeToggle": "F5DBzq_editorModeToggle",
+			"paneTabHidden": "F5DBzq_paneTabHidden",
+			"bottomResize": "F5DBzq_bottomResize",
+			"splitCol": "F5DBzq_splitCol",
+			"explorerBody": "F5DBzq_explorerBody",
+			"editorPdfDragShieldActive": "F5DBzq_editorPdfDragShieldActive",
+			"gitError": "F5DBzq_gitError",
+			"gitDiffHunkHeader": "F5DBzq_gitDiffHunkHeader",
+			"bottomPanel": "F5DBzq_bottomPanel",
+			"tab": "F5DBzq_tab",
+			"editorStatus": "F5DBzq_editorStatus",
+			"gitRowMain": "F5DBzq_gitRowMain",
+			"bottomPanelHidden": "F5DBzq_bottomPanelHidden",
+			"gitLogLine2": "F5DBzq_gitLogLine2",
+			"toggleButton": "F5DBzq_toggleButton",
+			"editorPdf": "F5DBzq_editorPdf",
+			"selectionPopup": "F5DBzq_selectionPopup",
+			"panel": "F5DBzq_panel",
+			"dropCenter": "F5DBzq_dropCenter",
+			"browserBlockedActions": "F5DBzq_browserBlockedActions",
+			"paneCard": "F5DBzq_paneCard",
+			"browserBlockedButton": "F5DBzq_browserBlockedButton",
+			"editorBanner": "F5DBzq_editorBanner",
+			"dropOverlay": "F5DBzq_dropOverlay",
+			"dividerActive": "F5DBzq_dividerActive",
+			"editorPdfToolbar": "F5DBzq_editorPdfToolbar",
 			"gitDiffHunk": "F5DBzq_gitDiffHunk",
 			"editorMd": "F5DBzq_editorMd",
-			"splitRow": "F5DBzq_splitRow",
+			"gitDiffLine": "F5DBzq_gitDiffLine",
+			"gitDiffExpand": "F5DBzq_gitDiffExpand",
+			"tabBarDrop": "F5DBzq_tabBarDrop",
+			"editorBinary": "F5DBzq_editorBinary",
+			"editorPdfDragShield": "F5DBzq_editorPdfDragShield",
+			"gitRow": "F5DBzq_gitRow",
+			"gitDiffTabHeader": "F5DBzq_gitDiffTabHeader",
+			"gitCommitButton": "F5DBzq_gitCommitButton",
+			"gitLogRow": "F5DBzq_gitLogRow",
+			"gitLogMore": "F5DBzq_gitLogMore",
+			"panelResize": "F5DBzq_panelResize",
+			"editorBinaryNotice": "F5DBzq_editorBinaryNotice",
+			"gitLogHash": "F5DBzq_gitLogHash",
+			"dropLeft": "F5DBzq_dropLeft",
+			"dsh-row-in": "F5DBzq_dsh-row-in",
+			"browserStage": "F5DBzq_browserStage",
+			"browserPreedit": "F5DBzq_browserPreedit",
 			"gitHeader": "F5DBzq_gitHeader",
-			"cornerHandle": "F5DBzq_cornerHandle",
-			"editorCmHidden": "F5DBzq_editorCmHidden",
-			"bottomPanelHidden": "F5DBzq_bottomPanelHidden",
+			"gitName": "F5DBzq_gitName",
+			"browserMessage": "F5DBzq_browserMessage",
+			"producedRow": "F5DBzq_producedRow",
+			"tabTitle": "F5DBzq_tabTitle",
+			"sandboxStatusOn": "F5DBzq_sandboxStatusOn",
+			"browserStart": "F5DBzq_browserStart",
+			"gitCommitInput": "F5DBzq_gitCommitInput",
+			"browserPerms": "F5DBzq_browserPerms",
+			"terminalBanner": "F5DBzq_terminalBanner",
+			"editor": "F5DBzq_editor",
+			"editorPlaceholder": "F5DBzq_editorPlaceholder",
+			"editorImageWrap": "F5DBzq_editorImageWrap",
+			"splitChild": "F5DBzq_splitChild",
+			"browserKeyboard": "F5DBzq_browserKeyboard",
+			"browserPermChip": "F5DBzq_browserPermChip",
+			"editorPdfFrame": "F5DBzq_editorPdfFrame",
+			"dirtyDot": "F5DBzq_dirtyDot",
+			"browserBar": "F5DBzq_browserBar",
+			"explorerName": "F5DBzq_explorerName",
+			"explorerHeader": "F5DBzq_explorerHeader",
+			"gitDiffFileTag": "F5DBzq_gitDiffFileTag",
+			"explorerRef": "F5DBzq_explorerRef",
+			"browserInput": "F5DBzq_browserInput",
+			"gitDiffMetaText": "F5DBzq_gitDiffMetaText",
+			"explorerDir": "F5DBzq_explorerDir",
+			"gitDiffMeta": "F5DBzq_gitDiffMeta",
+			"explorer": "F5DBzq_explorer",
+			"sandboxDot": "F5DBzq_sandboxDot",
+			"sandboxStatusText": "F5DBzq_sandboxStatusText",
+			"tabBar": "F5DBzq_tabBar",
+			"producedLabel": "F5DBzq_producedLabel",
+			"toggleCluster": "F5DBzq_toggleCluster",
+			"paneEmptyCards": "F5DBzq_paneEmptyCards",
 			"gitLink": "F5DBzq_gitLink",
-			"gitDiffCode": "F5DBzq_gitDiffCode",
-			"divider": "F5DBzq_divider",
-			"gitLogLine2": "F5DBzq_gitLogLine2",
-			"bottomResizeActive": "F5DBzq_bottomResizeActive",
+			"dividerCol": "F5DBzq_dividerCol",
+			"pane": "F5DBzq_pane",
+			"dropRight": "F5DBzq_dropRight",
+			"browserBlockedDesc": "F5DBzq_browserBlockedDesc",
+			"gitDiffAdd": "F5DBzq_gitDiffAdd",
+			"editorError": "F5DBzq_editorError",
+			"orphanedType": "F5DBzq_orphanedType",
+			"gitBadge": "F5DBzq_gitBadge",
+			"split": "F5DBzq_split",
+			"gitLogSubject": "F5DBzq_gitLogSubject",
+			"editorModeActive": "F5DBzq_editorModeActive",
+			"gitPlaceholder": "F5DBzq_gitPlaceholder",
+			"gitLogLine1": "F5DBzq_gitLogLine1",
+			"paneTab": "F5DBzq_paneTab",
+			"git": "F5DBzq_git",
+			"sandboxStatus": "F5DBzq_sandboxStatus",
+			"gitDiffFile": "F5DBzq_gitDiffFile",
+			"gitDiffFilePath": "F5DBzq_gitDiffFilePath",
+			"workbench": "F5DBzq_workbench",
+			"gitLogMeta": "F5DBzq_gitLogMeta",
+			"browserHint": "F5DBzq_browserHint",
+			"producedMore": "F5DBzq_producedMore",
+			"browserCanvas": "F5DBzq_browserCanvas",
+			"gitDiffHunkSection": "F5DBzq_gitDiffHunkSection",
+			"paneContent": "F5DBzq_paneContent",
+			"explorerRow": "F5DBzq_explorerRow",
+			"explorerError": "F5DBzq_explorerError",
+			"browser": "F5DBzq_browser",
+			"browserBlocked": "F5DBzq_browserBlocked",
+			"terminalWrap": "F5DBzq_terminalWrap",
+			"editorDocxZoomRange": "F5DBzq_editorDocxZoomRange",
+			"gitLogRef": "F5DBzq_gitLogRef",
 			"gitDiffFileOld": "F5DBzq_gitDiffFileOld",
-			"gitConfirmDesc": "F5DBzq_gitConfirmDesc",
-			"sandboxStatusOff": "F5DBzq_sandboxStatusOff",
-			"gitLogSubject": "F5DBzq_gitLogSubject"
+			"gitDiffCtx": "F5DBzq_gitDiffCtx",
+			"editorCm": "F5DBzq_editorCm",
+			"editorModeButton": "F5DBzq_editorModeButton",
+			"tabList": "F5DBzq_tabList",
+			"browserDialogCard": "F5DBzq_browserDialogCard",
+			"dividerRow": "F5DBzq_dividerRow",
+			"terminalRetry": "F5DBzq_terminalRetry",
+			"bottomResizeActive": "F5DBzq_bottomResizeActive",
+			"gitSection": "F5DBzq_gitSection",
+			"editorPptxButton": "F5DBzq_editorPptxButton",
+			"editorCmHidden": "F5DBzq_editorCmHidden",
+			"browserAgentBar": "F5DBzq_browserAgentBar",
+			"paneDrop": "F5DBzq_paneDrop",
+			"gitDiffNum": "F5DBzq_gitDiffNum",
+			"divider": "F5DBzq_divider",
+			"gitCommit": "F5DBzq_gitCommit",
+			"editorImage": "F5DBzq_editorImage",
+			"gitDiffCode": "F5DBzq_gitDiffCode",
+			"producedChip": "F5DBzq_producedChip",
+			"tabBarPlus": "F5DBzq_tabBarPlus",
+			"browserBlockedTitle": "F5DBzq_browserBlockedTitle",
+			"gitDiffDel": "F5DBzq_gitDiffDel",
+			"tabActive": "F5DBzq_tabActive",
+			"explorerRoot": "F5DBzq_explorerRoot",
+			"editorPdfStage": "F5DBzq_editorPdfStage",
+			"tabClose": "F5DBzq_tabClose",
+			"editorHeader": "F5DBzq_editorHeader",
+			"gitSectionHeader": "F5DBzq_gitSectionHeader",
+			"gitDiffTab": "F5DBzq_gitDiffTab",
+			"gitDiffTabTitle": "F5DBzq_gitDiffTabTitle",
+			"explorerEmpty": "F5DBzq_explorerEmpty",
+			"cornerHandle": "F5DBzq_cornerHandle",
+			"panelBody": "F5DBzq_panelBody",
+			"dropUp": "F5DBzq_dropUp",
+			"tabBadge": "F5DBzq_tabBadge",
+			"gitBranchSelect": "F5DBzq_gitBranchSelect",
+			"gitConfirmDesc": "F5DBzq_gitConfirmDesc"
 		};
 		//#endregion
 		//#region src/client/intercept.tsx
@@ -2374,9 +2476,15 @@ window.__ModuleLoader__.load({
 				patch,
 				...expectedRevision !== void 0 ? { expectedRevision } : {}
 			}),
-			/** Probe a URL's response headers (the sidebar browser's embeddability
-			*  check; see the host's browser.probe route). */
-			browserProbe: (url, signal) => call("browser.probe", { url }, signal)
+			/** Current readiness of the Chromium build the sidebar browser drives. */
+			browserEngine: (signal) => call("browser.engine", {}, signal),
+			/**
+			* Download the Chromium build. Resolves once it is ready and rejects with
+			* the installer's own failure, so the first-run panel can show it verbatim.
+			*/
+			browserInstall: () => call("browser.install", {}),
+			/** Release a browser tab's page (the user closed the sidebar tab). */
+			browserClose: (scope, tabId) => call("browser.close", scopePayload(scope, { tabId }))
 		};
 		/** Absolute URL of the media route for one path (images only). */
 		function mediaUrl(scope, path) {
@@ -4608,57 +4716,57 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var SubagentView_module_css_default = {
-			"jobsList": "jg93Ua_jobsList",
-			"subagentLabel": "jg93Ua_subagentLabel",
-			"subagentLiveArgs": "jg93Ua_subagentLiveArgs",
 			"jobsRowMain": "jg93Ua_jobsRowMain",
-			"subagent": "jg93Ua_subagent",
-			"subagentRowLoading": "jg93Ua_subagentRowLoading",
-			"subagentDot": "jg93Ua_subagentDot",
 			"jobsKind": "jg93Ua_jobsKind",
-			"jobsPane": "jg93Ua_jobsPane",
-			"subagentLive": "jg93Ua_subagentLive",
-			"jobsRow": "jg93Ua_jobsRow",
-			"jobsDot": "jg93Ua_jobsDot",
-			"jobsSecondary": "jg93Ua_jobsSecondary",
 			"subagentRow": "jg93Ua_subagentRow",
-			"subagentRowActive": "jg93Ua_subagentRowActive",
-			"subagentError": "jg93Ua_subagentError",
-			"jobsPaneLabel": "jg93Ua_jobsPaneLabel",
-			"subagentTitle": "jg93Ua_subagentTitle",
-			"jobsPaneError": "jg93Ua_jobsPaneError",
-			"jobsKillArmed": "jg93Ua_jobsKillArmed",
-			"jobsKillError": "jg93Ua_jobsKillError",
-			"jobsRowSettled": "jg93Ua_jobsRowSettled",
-			"jobsPaneStatus": "jg93Ua_jobsPaneStatus",
-			"jobsRowSelected": "jg93Ua_jobsRowSelected",
-			"jobsPaneHeader": "jg93Ua_jobsPaneHeader",
-			"jobsPaneHint": "jg93Ua_jobsPaneHint",
-			"jobsTitle": "jg93Ua_jobsTitle",
-			"subagentHeader": "jg93Ua_subagentHeader",
-			"subagentRowDisabled": "jg93Ua_subagentRowDisabled",
-			"subagentLiveText": "jg93Ua_subagentLiveText",
-			"jobsHeader": "jg93Ua_jobsHeader",
-			"subagentLiveTool": "jg93Ua_subagentLiveTool",
-			"jobsCount": "jg93Ua_jobsCount",
-			"jobsContent": "jg93Ua_jobsContent",
-			"subagentCount": "jg93Ua_subagentCount",
 			"jobsLabel": "jg93Ua_jobsLabel",
-			"jobsPanePre": "jg93Ua_jobsPanePre",
-			"jobsKill": "jg93Ua_jobsKill",
-			"jobs": "jg93Ua_jobs",
-			"jobsLabelLine": "jg93Ua_jobsLabelLine",
+			"jobsRow": "jg93Ua_jobsRow",
+			"subagentEmpty": "jg93Ua_subagentEmpty",
+			"jobsHeader": "jg93Ua_jobsHeader",
+			"jobsKillError": "jg93Ua_jobsKillError",
 			"subagentChildren": "jg93Ua_subagentChildren",
-			"subagentEmptyHint": "jg93Ua_subagentEmptyHint",
-			"subagentContent": "jg93Ua_subagentContent",
+			"subagentBody": "jg93Ua_subagentBody",
+			"jobsPaneLabel": "jg93Ua_jobsPaneLabel",
 			"jobsPaneClose": "jg93Ua_jobsPaneClose",
-			"subagentNode": "jg93Ua_subagentNode",
+			"jobsPanePre": "jg93Ua_jobsPanePre",
+			"subagent": "jg93Ua_subagent",
+			"subagentContent": "jg93Ua_subagentContent",
+			"jobsPaneHeader": "jg93Ua_jobsPaneHeader",
+			"jobsRowSettled": "jg93Ua_jobsRowSettled",
+			"jobsKillArmed": "jg93Ua_jobsKillArmed",
 			"jobsPaneDot": "jg93Ua_jobsPaneDot",
 			"subagentRefresh": "jg93Ua_subagentRefresh",
-			"subagentBody": "jg93Ua_subagentBody",
+			"jobsContent": "jg93Ua_jobsContent",
+			"subagentLiveTool": "jg93Ua_subagentLiveTool",
+			"jobsSecondary": "jg93Ua_jobsSecondary",
+			"subagentErrorRetry": "jg93Ua_subagentErrorRetry",
+			"subagentRowLoading": "jg93Ua_subagentRowLoading",
+			"jobsTitle": "jg93Ua_jobsTitle",
 			"subagentSecondary": "jg93Ua_subagentSecondary",
-			"subagentEmpty": "jg93Ua_subagentEmpty",
-			"subagentErrorRetry": "jg93Ua_subagentErrorRetry"
+			"jobsPaneHint": "jg93Ua_jobsPaneHint",
+			"jobsRowSelected": "jg93Ua_jobsRowSelected",
+			"jobsPane": "jg93Ua_jobsPane",
+			"subagentCount": "jg93Ua_subagentCount",
+			"jobsDot": "jg93Ua_jobsDot",
+			"jobs": "jg93Ua_jobs",
+			"subagentHeader": "jg93Ua_subagentHeader",
+			"jobsPaneStatus": "jg93Ua_jobsPaneStatus",
+			"subagentTitle": "jg93Ua_subagentTitle",
+			"jobsPaneError": "jg93Ua_jobsPaneError",
+			"subagentLiveText": "jg93Ua_subagentLiveText",
+			"jobsKill": "jg93Ua_jobsKill",
+			"subagentRowDisabled": "jg93Ua_subagentRowDisabled",
+			"subagentLabel": "jg93Ua_subagentLabel",
+			"subagentRowActive": "jg93Ua_subagentRowActive",
+			"subagentLive": "jg93Ua_subagentLive",
+			"subagentNode": "jg93Ua_subagentNode",
+			"jobsCount": "jg93Ua_jobsCount",
+			"subagentEmptyHint": "jg93Ua_subagentEmptyHint",
+			"subagentDot": "jg93Ua_subagentDot",
+			"subagentError": "jg93Ua_subagentError",
+			"jobsLabelLine": "jg93Ua_jobsLabelLine",
+			"subagentLiveArgs": "jg93Ua_subagentLiveArgs",
+			"jobsList": "jg93Ua_jobsList"
 		};
 		//#endregion
 		//#region src/client/SubagentView.tsx
@@ -5406,39 +5514,12 @@ window.__ModuleLoader__.load({
 			});
 		}
 		//#endregion
-		//#region src/client/browser.ts
+		//#region src/browser/url.ts
 		/**
-		* Decide whether a site can render inside the sidebar iframe. The signals
-		* are exactly the ones the BROWSER enforces when it refuses an iframe load:
-		* X-Frame-Options DENY/SAMEORIGIN, or a frame-ancestors directive that does
-		* not allow `*` ('self' here means the SITE's own origin — never ours, so
-		* it also blocks the sidebar). A site we could not reach yields 'unknown'
-		* and the plain iframe stays.
+		* Schemes that must never reach the page, even without `//`. Host:port
+		* lookalikes (`example.com:8080`) are deliberately absent — they parse as
+		* hosts below and get an https:// prefix.
 		*/
-		function embeddabilityOf(probe) {
-			if (probe.reachable !== true) return "unknown";
-			const xfo = probe.xFrameOptions?.trim().toUpperCase();
-			if (xfo === "DENY" || xfo === "SAMEORIGIN") return "blocked";
-			if (probe.frameAncestors !== void 0 && !probe.frameAncestors.some((source) => source === "*")) return "blocked";
-			return "embeddable";
-		}
-		/** A loopback hostname (localhost, IPv6 ::1, 127.0.0.0/8, 0.0.0.0). */
-		function isLoopbackHostname(hostname) {
-			const host = hostname.replace(/^\[|\]$/g, "").toLowerCase();
-			if (host === "localhost" || host === "::1" || host === "0.0.0.0") return true;
-			const parts = host.split(".");
-			return parts.length === 4 && parts[0] === "127" && parts.every((part) => /^\d{1,3}$/.test(part) && Number(part) <= 255);
-		}
-		/**
-		* Normalize one address-bar input against the navigation policy.
-		* @param input - raw user text.
-		* @param selfOrigin - the GUI's own origin (window.location.origin). The GUI
-		* itself may be browsed in the sidebar (the sandbox keeps it opaque), so it
-		* is let through BEFORE the loopback check — its host is normally loopback.
-		*/
-		/** Schemes that must never reach the iframe, even without `//` (javascript:,
-		*  data:, file:, ...). Host:port lookalikes (example.com:8080) are NOT here —
-		*  they parse as hosts below. */
 		const FORBIDDEN_SCHEMES = /* @__PURE__ */ new Set([
 			"javascript",
 			"data",
@@ -5460,8 +5541,17 @@ window.__ModuleLoader__.load({
 			"edge",
 			"opera",
 			"resource",
-			"view-source"
+			"view-source",
+			"devtools"
 		]);
+		/**
+		* Normalize one address-bar input against the navigation policy.
+		*
+		* @param input - Raw user text or a URL reported by the page.
+		* @param selfOrigin - The GUI server's own origin, refused so the automation
+		* profile never drives the Cocode UI itself. Pass `undefined` when unknown
+		* (the host derives it from the request Host header).
+		*/
 		function normalizeBrowserUrl(input, selfOrigin) {
 			const trimmed = input.trim();
 			if (trimmed === "") return { kind: "invalid" };
@@ -5487,177 +5577,410 @@ window.__ModuleLoader__.load({
 				kind: "blocked",
 				reason: "scheme"
 			};
-			try {
+			if (selfOrigin !== void 0 && selfOrigin !== "") try {
 				if (url.origin === new URL(selfOrigin).origin) return {
-					kind: "ok",
-					url: url.href
+					kind: "blocked",
+					reason: "self"
 				};
 			} catch {}
-			if (isLoopbackHostname(url.hostname)) return {
-				kind: "blocked",
-				reason: "loopback"
-			};
 			return {
 				kind: "ok",
 				url: url.href
 			};
 		}
 		//#endregion
-		//#region src/client/SandboxStatusBar.tsx
+		//#region src/client/browser-viewport.ts
+		/** Reconnect delay after the socket drops. */
+		const RECONNECT_MS = 2e3;
+		/** CDP modifier bits, which do not match any DOM constant. */
+		const ALT = 1;
+		const CONTROL = 2;
+		const META = 4;
+		const SHIFT = 8;
 		/**
-		* The live sandbox status row of the two built-in web surfaces (HTML
-		* preview and the browser tab): a green "sandbox on" state with a one-tap
-		* TEMPORARY unlock, or a RED "sandbox off" state (global setting or the
-		* temporary unlock) with a restore action.
-		*
-		* The temporary unlock is component state only — it never writes the
-		* global side card setting (`htmlViewerNoSandbox` / `browserNoSandbox`);
-		* it lasts until the surface unmounts (tab switch / file switch) or the
-		* user restores the sandbox from the row. When the global setting already
-		* drops the sandbox, no unlock/restore action is offered (changing the
-		* global setting is the settings page's job) — the red warning stands.
+		* Split one binary frame into its JSON header and the JPEG bytes. The layout
+		* is a 4-byte big-endian header length, the UTF-8 header, then the payload
+		* (see the host's `encodeFrame`).
 		*/
-		function SandboxStatusBar(props) {
-			const { sandboxed, local, dangerCopy, onUnlock, onRestore } = props;
-			if (sandboxed) {
-				const copy = t("sandboxStatusOn");
-				return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-					className: clsx(sidebar_module_css_default.sandboxStatus, sidebar_module_css_default.sandboxStatusOn),
-					children: [
-						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { className: sidebar_module_css_default.sandboxDot }),
-						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-							className: sidebar_module_css_default.sandboxStatusText,
-							title: copy,
-							children: copy
-						}),
-						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-							type: "button",
-							className: sidebar_module_css_default.sandboxAction,
-							onClick: onUnlock,
-							children: t("sandboxUnlock")
-						})
-					]
-				});
+		function decodeFrame(buffer) {
+			if (buffer.byteLength < 4) return void 0;
+			const metaLength = new DataView(buffer).getUint32(0);
+			if (metaLength + 4 > buffer.byteLength) return void 0;
+			try {
+				return {
+					header: JSON.parse(new TextDecoder().decode(new Uint8Array(buffer, 4, metaLength))),
+					jpeg: new Blob([new Uint8Array(buffer, 4 + metaLength)], { type: "image/jpeg" })
+				};
+			} catch {
+				return;
 			}
-			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-				className: clsx(sidebar_module_css_default.sandboxStatus, sidebar_module_css_default.sandboxStatusOff),
-				children: [
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { className: sidebar_module_css_default.sandboxDot }),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-						className: sidebar_module_css_default.sandboxStatusText,
-						title: dangerCopy,
-						children: dangerCopy
-					}),
-					local && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-						type: "button",
-						className: sidebar_module_css_default.sandboxAction,
-						onClick: onRestore,
-						children: t("sandboxRestore")
-					})
-				]
-			});
+		}
+		/** A reconnecting connection to one browser tab's viewport channel. */
+		var BrowserConnection = class {
+			query;
+			handlers;
+			socket = null;
+			retry;
+			closed = false;
+			constructor(query, handlers) {
+				this.query = query;
+				this.handlers = handlers;
+				this.connect();
+			}
+			connect() {
+				if (this.closed) return;
+				const url = new URL(desktopRuntimeUrl("/sidebar/ws/browser"), location.origin);
+				url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+				url.search = new URLSearchParams({
+					sessionId: this.query.sessionId,
+					tab: this.query.tabId
+				}).toString();
+				const socket = new WebSocket(url.toString());
+				socket.binaryType = "arraybuffer";
+				this.socket = socket;
+				socket.onopen = () => {
+					this.handlers.connected(true);
+				};
+				socket.onmessage = (event) => {
+					this.receive(event.data);
+				};
+				socket.onclose = () => {
+					this.handlers.connected(false);
+					if (this.closed) return;
+					this.retry = setTimeout(() => {
+						this.connect();
+					}, RECONNECT_MS);
+				};
+				socket.onerror = () => {
+					socket.close();
+				};
+			}
+			receive(data) {
+				if (typeof data !== "string") {
+					const decoded = decodeFrame(data);
+					if (decoded !== void 0) this.handlers.frame(decoded.header, decoded.jpeg);
+					return;
+				}
+				let frame;
+				try {
+					frame = JSON.parse(data);
+				} catch {
+					return;
+				}
+				switch (frame.t) {
+					case "state":
+						this.handlers.state(frame.state);
+						return;
+					case "engine":
+						this.handlers.engine(frame.status);
+						return;
+					case "dialog":
+						this.handlers.dialog(frame.dialog);
+						return;
+					case "download":
+						this.handlers.download(frame.name, frame.path);
+						return;
+					case "copy":
+						this.handlers.copy(frame.text);
+						return;
+					case "error":
+						this.handlers.error(frame.code, frame.message);
+						return;
+				}
+			}
+			/** Send one frame; silently dropped while the socket is down. */
+			send(frame) {
+				if (this.socket?.readyState === WebSocket.OPEN) this.socket.send(JSON.stringify(frame));
+			}
+			/** Stop reconnecting and drop the socket. */
+			dispose() {
+				this.closed = true;
+				if (this.retry !== void 0) clearTimeout(this.retry);
+				this.socket?.close();
+				this.socket = null;
+			}
+		};
+		/** The modifier flags of any DOM event, as CDP's bitmask. */
+		function modifiersOf(event) {
+			return (event.altKey ? ALT : 0) | (event.ctrlKey ? CONTROL : 0) | (event.metaKey ? META : 0) | (event.shiftKey ? SHIFT : 0);
+		}
+		/** CDP's button names, indexed by the DOM's numeric button. */
+		const BUTTONS = [
+			"left",
+			"middle",
+			"right"
+		];
+		/**
+		* Map a pointer position on the canvas element into CSS pixels of the remote
+		* page. The two are normally 1:1 — the host resizes the page to the canvas —
+		* but a click landing between a resize and its first frame must still hit
+		* the right place, so the ratio is applied rather than assumed.
+		*/
+		function pointOf(event, rect, page) {
+			const scaleX = rect.width === 0 ? 1 : page.cssWidth / rect.width;
+			const scaleY = rect.height === 0 ? 1 : page.cssHeight / rect.height;
+			return {
+				x: Math.round((event.clientX - rect.left) * scaleX),
+				y: Math.round((event.clientY - rect.top) * scaleY)
+			};
+		}
+		/** Build one mouse frame from a DOM pointer event. */
+		function mouseFrameOf(kind, event, point) {
+			return {
+				t: "mouse",
+				kind,
+				x: point.x,
+				y: point.y,
+				button: kind === "move" ? "none" : BUTTONS[event.button] ?? "left",
+				buttons: event.buttons,
+				clickCount: kind === "move" ? 0 : event.detail || 1,
+				modifiers: modifiersOf(event)
+			};
+		}
+		/** Build one wheel frame, normalizing the browser's three delta modes to pixels. */
+		function wheelFrameOf(event, point) {
+			const scale = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 800 : 1;
+			return {
+				t: "mouse",
+				kind: "wheel",
+				x: point.x,
+				y: point.y,
+				button: "none",
+				buttons: 0,
+				deltaX: -event.deltaX * scale,
+				deltaY: -event.deltaY * scale,
+				modifiers: modifiersOf(event)
+			};
+		}
+		/**
+		* The printable text a keypress produces, or undefined for a control key.
+		* A key held with Ctrl or Meta is a shortcut, never text — sending both
+		* would insert the character AND fire the shortcut.
+		*/
+		function textOf$1(event) {
+			if (event.ctrlKey || event.metaKey) return void 0;
+			if (event.key === "Enter") return "\r";
+			if (event.key === "Tab") return "	";
+			return [...event.key].length === 1 ? event.key : void 0;
+		}
+		/** Build one key frame from a DOM keyboard event. */
+		function keyFrameOf(kind, event) {
+			return {
+				t: "key",
+				kind,
+				key: event.key,
+				code: event.code,
+				keyCode: event.keyCode,
+				modifiers: modifiersOf(event),
+				text: kind === "down" ? textOf$1(event) : void 0
+			};
+		}
+		/**
+		* Keys the viewport must swallow so the surrounding GUI does not react to
+		* them: they belong to the remote page, which is the thing the user is
+		* looking at.
+		*/
+		const CAPTURED_KEYS = /* @__PURE__ */ new Set([
+			"Tab",
+			"Backspace",
+			" ",
+			"ArrowUp",
+			"ArrowDown",
+			"ArrowLeft",
+			"ArrowRight",
+			"Home",
+			"End",
+			"PageUp",
+			"PageDown",
+			"Enter"
+		]);
+		/** Whether a keydown belongs to the page rather than to the GUI around it. */
+		function shouldCapture(event) {
+			if (event.metaKey || event.ctrlKey) return false;
+			return CAPTURED_KEYS.has(event.key) || [...event.key].length === 1;
 		}
 		//#endregion
 		//#region src/client/BrowserView.tsx
 		/**
-		* The built-in browser tab: an address bar plus a sandboxed iframe.
+		* The browser tab: a toolbar over a live view of a real Chromium page.
 		*
-		* Security model (see browser.ts + the sandbox tokens below): the iframe is
-		* ALWAYS sandboxed without `allow-same-origin` (opaque origin — the visited
-		* page can never sit on the GUI's origin, read its storage, or reach
-		* /sidebar/api) and without `allow-top-navigation` (a page must not hijack
-		* the GUI). The address bar only accepts http(s) and refuses loopback /
-		* the GUI's own origin. The side card setting "关闭浏览器沙箱" drops the
-		* sandbox attribute entirely for fully trusted sites — the visited page then
-		* runs with the GUI's own origin and full session access, so a persistent
-		* warning bar renders while it is off.
+		* There is no iframe here. The page runs in a Chromium the harness owns, and
+		* what the canvas shows is its screencast — which is why the panel can open
+		* sites that refuse embedding, keep logins across restarts, and let the agent
+		* drive the very page the user is watching. Input travels the other way over
+		* the same socket, so the panel behaves like a browser rather than a preview.
 		*
-		* The URL is persisted onto the tab (path/title via the patchTab reducer)
-		* so a reload restores the visited page; the back/forward stack only tracks
-		* address-bar navigations (in-frame link clicks are cross-origin and
-		* invisible — a documented limitation).
+		* Text input goes through a transparent textarea layered over the canvas.
+		* That is what makes an IME work: composing per-keystroke would render
+		* candidates against the LOCAL document and send garbage to the remote page,
+		* so only the committed string is forwarded.
 		*/
-		/**
-		* The browser iframe sandbox tokens. NO allow-same-origin (opaque origin —
-		* no GUI storage/API access), NO allow-top-navigation (a browsed page must
-		* not hijack the GUI). allow-forms/allow-popups/allow-downloads/allow-modals
-		* keep login flows working; allow-popups-to-escape-sandbox lets OAuth
-		* popups open as normal tabs (they are cross-origin to the GUI either way).
-		*/
-		const BROWSER_IFRAME_SANDBOX = "allow-scripts allow-forms allow-popups allow-downloads allow-modals allow-popups-to-escape-sandbox";
+		/** Debounce of the viewport resize push (a drag fires dozens per second). */
+		const RESIZE_DEBOUNCE_MS = 120;
 		function BrowserView(props) {
-			const { store, tab } = props;
-			const [url, setUrl] = (0, react.useState)(tab.path);
+			const { store, tab, scope, visible } = props;
 			const [input, setInput] = (0, react.useState)(tab.path ?? "");
-			/** Blocked/invalid hint shown under the address bar (null = none). */
+			const [state, setState] = (0, react.useState)(null);
+			const [engine, setEngine] = (0, react.useState)({ state: "ready" });
+			const [dialog, setDialog] = (0, react.useState)(null);
 			const [message, setMessage] = (0, react.useState)(null);
-			/** Address-bar navigation history (in-frame clicks are not tracked). */
-			const [history, setHistory] = (0, react.useState)(tab.path !== void 0 ? [tab.path] : []);
-			const [cursor, setCursor] = (0, react.useState)(tab.path !== void 0 ? 0 : -1);
-			/** Bumped on reload to remount the iframe (also remounts on sandbox flip). */
-			const [reloadKey, setReloadKey] = (0, react.useState)(0);
-			/** TEMPORARY sandbox unlock for THIS surface only (never writes the global
-			*  side card setting; lasts until the tab unmounts or the user restores). */
-			const [localUnlock, setLocalUnlock] = (0, react.useState)(false);
-			const noSandbox = store.getPrefs().browserNoSandbox === true || localUnlock;
-			/** A site that refuses to be embedded (X-Frame-Options / frame-ancestors):
-			*  the probe verdict shown instead of the blank iframe. */
-			const [embedBlocked, setEmbedBlocked] = (0, react.useState)(null);
-			/** The user asked to load the refused site anyway (keeps the plain iframe). */
-			const [forceEmbed, setForceEmbed] = (0, react.useState)(false);
+			const [preedit, setPreedit] = (0, react.useState)("");
+			const [downloadName, setDownloadName] = (0, react.useState)(null);
+			const [connected, setConnected] = (0, react.useState)(false);
+			const canvasRef = (0, react.useRef)(null);
+			const inputRef = (0, react.useRef)(null);
+			const connectionRef = (0, react.useRef)(null);
+			/** CSS size of the remote page, for mapping pointer coordinates. */
+			const pageSizeRef = (0, react.useRef)({
+				cssWidth: 1280,
+				cssHeight: 800
+			});
+			/** Newest frame wins: an older decode must not overwrite a newer paint. */
+			const paintedSeqRef = (0, react.useRef)(0);
+			const send = (0, react.useCallback)((frame) => {
+				connectionRef.current?.send(frame);
+			}, []);
 			(0, react.useEffect)(() => {
-				if (url === void 0) return;
-				let cancelled = false;
-				setEmbedBlocked(null);
-				setForceEmbed(false);
-				api.browserProbe(url).then((probe) => {
-					if (!cancelled && embeddabilityOf(probe) === "blocked") setEmbedBlocked(url);
-				}).catch(() => {});
+				const connection = new BrowserConnection({
+					sessionId: scope.sessionId,
+					tabId: tab.id
+				}, {
+					frame: (header, jpeg) => {
+						pageSizeRef.current = {
+							cssWidth: header.cssWidth,
+							cssHeight: header.cssHeight
+						};
+						createImageBitmap(jpeg).then((bitmap) => {
+							const canvas = canvasRef.current;
+							if (canvas === null || header.seq < paintedSeqRef.current) {
+								bitmap.close();
+								return;
+							}
+							paintedSeqRef.current = header.seq;
+							if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) {
+								canvas.width = bitmap.width;
+								canvas.height = bitmap.height;
+							}
+							canvas.getContext("2d")?.drawImage(bitmap, 0, 0);
+							bitmap.close();
+						}).catch(() => {});
+					},
+					state: (next) => {
+						setState(next);
+						setInput((current) => document.activeElement === inputRef.current ? current : next.url);
+						persist(next);
+					},
+					engine: setEngine,
+					dialog: setDialog,
+					download: (name) => {
+						setDownloadName(name);
+						setMessage(t("browserDownloaded", { name }));
+					},
+					copy: (text) => {
+						navigator.clipboard?.writeText(text);
+					},
+					error: (_code, text) => {
+						setMessage(text);
+					},
+					connected: setConnected
+				});
+				connectionRef.current = connection;
 				return () => {
-					cancelled = true;
+					connection.dispose();
+					connectionRef.current = null;
 				};
-			}, [url]);
-			const persist = (nextUrl) => {
-				let host = nextUrl;
+			}, [scope.sessionId, tab.id]);
+			/** Mirror the live URL onto the tab so a GUI reload restores the page. */
+			const persist = (next) => {
+				if (next.url === "" || next.url === "about:blank") return;
+				let host = next.url;
 				try {
-					host = new URL(nextUrl).hostname;
+					host = new URL(next.url).hostname;
 				} catch {}
-				store.reduce((state) => patchTab(state, tab.id, {
-					path: nextUrl,
-					title: host
+				store.reduce((current) => patchTab(current, tab.id, {
+					path: next.url,
+					title: next.title === "" ? host : next.title
 				}));
 			};
+			(0, react.useEffect)(() => {
+				const canvas = canvasRef.current;
+				if (canvas === null || !visible) return;
+				let timer;
+				const push = () => {
+					const rect = canvas.getBoundingClientRect();
+					if (rect.width < 1 || rect.height < 1) return;
+					send({
+						t: "viewport",
+						width: Math.round(rect.width),
+						height: Math.round(rect.height),
+						dpr: window.devicePixelRatio
+					});
+				};
+				const observer = new ResizeObserver(() => {
+					if (timer !== void 0) clearTimeout(timer);
+					timer = setTimeout(push, RESIZE_DEBOUNCE_MS);
+				});
+				observer.observe(canvas);
+				push();
+				return () => {
+					observer.disconnect();
+					if (timer !== void 0) clearTimeout(timer);
+				};
+			}, [visible, send]);
+			(0, react.useEffect)(() => {
+				if (!connected) return;
+				send({
+					t: "watch",
+					on: visible
+				});
+			}, [
+				connected,
+				visible,
+				send
+			]);
+			(0, react.useEffect)(() => {
+				if (!connected || tab.path === void 0 || tab.path === "" || state !== null) return;
+				send({
+					t: "open",
+					url: tab.path
+				});
+			}, [
+				connected,
+				tab.path,
+				state,
+				send
+			]);
 			const navigateTo = (raw) => {
 				const result = normalizeBrowserUrl(raw, window.location.origin);
-				if (result.kind === "ok") {
-					const next = result.url;
-					setUrl(next);
-					setInput(next);
-					setMessage(null);
-					setHistory((previous) => [...previous.slice(0, cursor + 1), next]);
-					setCursor((previous) => previous + 1);
-					setReloadKey((key) => key + 1);
-					persist(next);
+				if (result.kind === "invalid") {
+					setMessage(t("browserInvalid"));
 					return;
 				}
-				setMessage(result.kind === "invalid" ? t("browserInvalid") : result.reason === "scheme" ? t("browserBlockedScheme") : t("browserBlockedLoopback"));
+				if (result.kind === "blocked") {
+					setMessage(result.reason === "scheme" ? t("browserBlockedScheme") : t("browserBlockedSelf"));
+					return;
+				}
+				setMessage(null);
+				setInput(result.url);
+				send({
+					t: "open",
+					url: result.url
+				});
 			};
-			const goBack = () => {
-				if (cursor <= 0) return;
-				const next = history[cursor - 1];
-				setCursor(cursor - 1);
-				setUrl(next);
-				setInput(next);
-				setReloadKey((key) => key + 1);
+			const pointFrom = (event) => {
+				const canvas = canvasRef.current;
+				if (canvas === null) return {
+					x: 0,
+					y: 0
+				};
+				return pointOf(event, canvas.getBoundingClientRect(), pageSizeRef.current);
 			};
-			const goForward = () => {
-				if (cursor >= history.length - 1) return;
-				const next = history[cursor + 1];
-				setCursor(cursor + 1);
-				setUrl(next);
-				setInput(next);
-				setReloadKey((key) => key + 1);
+			const onKeyDown = (event) => {
+				if (event.nativeEvent.isComposing) return;
+				if (shouldCapture(event.nativeEvent)) event.preventDefault();
+				send(keyFrameOf("down", event.nativeEvent));
 			};
+			const engineBlocked = engine.state !== "ready";
 			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 				className: sidebar_module_css_default.browser,
 				children: [
@@ -5669,8 +5992,13 @@ window.__ModuleLoader__.load({
 								className: sidebar_module_css_default.iconButton,
 								"aria-label": t("browserBack"),
 								title: t("browserBack"),
-								disabled: cursor <= 0,
-								onClick: goBack,
+								disabled: state?.canGoBack !== true,
+								onClick: () => {
+									send({
+										t: "nav",
+										to: "back"
+									});
+								},
 								children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconChevronLeftOutline14, {})
 							}),
 							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
@@ -5678,21 +6006,32 @@ window.__ModuleLoader__.load({
 								className: sidebar_module_css_default.iconButton,
 								"aria-label": t("browserForward"),
 								title: t("browserForward"),
-								disabled: cursor >= history.length - 1,
-								onClick: goForward,
+								disabled: state?.canGoForward !== true,
+								onClick: () => {
+									send({
+										t: "nav",
+										to: "forward"
+									});
+								},
 								children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconChevronRightOutline14, {})
 							}),
 							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
 								type: "button",
 								className: sidebar_module_css_default.iconButton,
-								"aria-label": t("refresh"),
-								title: t("refresh"),
+								"aria-label": state?.loading === true ? t("browserStop") : t("refresh"),
+								title: state?.loading === true ? t("browserStop") : t("refresh"),
 								onClick: () => {
-									setReloadKey((key) => key + 1);
+									send({
+										t: "nav",
+										to: state?.loading === true ? "stop" : "reload"
+									});
 								},
 								children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconRefreshOutline14, {})
 							}),
 							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("input", {
+								ref: (element) => {
+									if (element !== null) element.dataset.role = "address";
+								},
 								className: sidebar_module_css_default.browserInput,
 								value: input,
 								placeholder: t("browserPlaceholder"),
@@ -5719,91 +6058,258 @@ window.__ModuleLoader__.load({
 								className: sidebar_module_css_default.iconButton,
 								"aria-label": t("browserOpenExternal"),
 								title: t("browserOpenExternal"),
-								disabled: url === void 0,
+								disabled: state === null,
 								onClick: () => {
-									if (url !== void 0) window.open(url, "_blank", "noopener");
+									if (state !== null) window.open(state.url, "_blank", "noopener");
 								},
 								children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconRightUpOutline16, { size: 15 })
 							})
 						]
 					}),
-					message !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+					state?.owner === "agent" && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+						className: sidebar_module_css_default.browserAgentBar,
+						children: [t("browserAgentDriving"), state.profile !== "" && ` · ${t("browserProfile", { name: state.profile })}`]
+					}),
+					message !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 						className: sidebar_module_css_default.browserMessage,
-						children: message
+						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+							onClick: () => {
+								setMessage(null);
+							},
+							children: message
+						}), downloadName !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+							type: "button",
+							className: sidebar_module_css_default.browserBlockedButton,
+							onClick: () => {
+								send({ t: "download-cancel" });
+								setDownloadName(null);
+								setMessage(null);
+							},
+							children: t("browserDownloadCancel")
+						})]
 					}),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)(SandboxStatusBar, {
-						sandboxed: !noSandbox,
-						local: localUnlock,
-						dangerCopy: t("browserNoSandboxWarning"),
-						onUnlock: () => {
-							setLocalUnlock(true);
-						},
-						onRestore: () => {
-							setLocalUnlock(false);
-						}
+					state !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+						className: sidebar_module_css_default.browserPerms,
+						children: [
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+								type: "button",
+								className: sidebar_module_css_default.browserPermChip,
+								onClick: () => {
+									send({
+										t: "permission",
+										name: "geolocation",
+										grant: true
+									});
+								},
+								children: t("browserGrantGeo")
+							}),
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+								type: "button",
+								className: sidebar_module_css_default.browserPermChip,
+								onClick: () => {
+									send({
+										t: "permission",
+										name: "notifications",
+										grant: true
+									});
+								},
+								children: t("browserGrantNotify")
+							}),
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+								type: "button",
+								className: sidebar_module_css_default.browserPermChip,
+								onClick: () => {
+									send({
+										t: "permission",
+										name: "clipboard-read",
+										grant: true
+									});
+								},
+								children: t("browserGrantClipboard")
+							})
+						]
 					}),
-					url === void 0 ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-						className: sidebar_module_css_default.browserStart,
-						children: t("browserStart")
-					}) : embedBlocked !== null && !forceEmbed ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(BrowserEmbedBlocked, {
-						url: embedBlocked,
-						onOpenInBrowser: () => {
-							window.open(embedBlocked, "_blank", "noopener");
-						},
-						onLoadAnyway: () => {
-							setForceEmbed(true);
-						}
-					}) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)("iframe", {
-						className: sidebar_module_css_default.browserFrame,
-						src: url,
-						sandbox: noSandbox ? void 0 : BROWSER_IFRAME_SANDBOX,
-						referrerPolicy: "no-referrer",
-						allow: "",
-						title: url
-					}, `${reloadKey}:${noSandbox ? "ns" : "sb"}`)
+					engineBlocked ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(BrowserEnginePrompt, {
+						status: engine,
+						url: input
+					}) : /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+						className: sidebar_module_css_default.browserStage,
+						children: [
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("canvas", {
+								ref: canvasRef,
+								className: sidebar_module_css_default.browserCanvas,
+								onMouseDown: (event) => {
+									inputRef.current?.focus();
+									send(mouseFrameOf("down", event.nativeEvent, pointFrom(event)));
+								},
+								onMouseUp: (event) => {
+									send(mouseFrameOf("up", event.nativeEvent, pointFrom(event)));
+								},
+								onMouseMove: (event) => {
+									send(mouseFrameOf("move", event.nativeEvent, pointFrom(event)));
+								},
+								onWheel: (event) => {
+									send(wheelFrameOf(event.nativeEvent, pointFrom(event)));
+								},
+								onContextMenu: (event) => {
+									event.preventDefault();
+								}
+							}),
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("textarea", {
+								ref: inputRef,
+								className: sidebar_module_css_default.browserKeyboard,
+								"aria-label": t("browserKeyboard"),
+								value: "",
+								spellCheck: false,
+								autoCapitalize: "off",
+								autoCorrect: "off",
+								onChange: () => {},
+								onKeyDown,
+								onKeyUp: (event) => {
+									if (event.nativeEvent.isComposing) return;
+									send(keyFrameOf("up", event.nativeEvent));
+								},
+								onCompositionUpdate: (event) => {
+									setPreedit(event.data);
+								},
+								onCompositionEnd: (event) => {
+									setPreedit("");
+									if (event.data !== "") send({
+										t: "insert",
+										text: event.data
+									});
+								},
+								onPaste: (event) => {
+									event.preventDefault();
+									const text = event.clipboardData.getData("text/plain");
+									if (text !== "") send({
+										t: "insert",
+										text
+									});
+								},
+								onCopy: (event) => {
+									event.preventDefault();
+									send({ t: "copy" });
+								}
+							}),
+							preedit !== "" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+								className: sidebar_module_css_default.browserPreedit,
+								children: preedit
+							}),
+							state === null && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+								className: sidebar_module_css_default.browserHint,
+								children: t("browserStart")
+							}),
+							dialog !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsx)(BrowserDialogPrompt, {
+								dialog,
+								onAnswer: (accept, text) => {
+									send({
+										t: "dialog",
+										accept,
+										text
+									});
+								}
+							})
+						]
+					})
 				]
 			});
 		}
 		/**
-		* The embed-refusal panel: shown when the probed site forbids being
-		* displayed inside other pages (X-Frame-Options / frame-ancestors) — the
-		* iframe would only show the browser's "refused to connect" blank. Explains
-		* the reason and offers the real-browser open plus a load-anyway escape.
-		* Exported so the copy and the actions are testable without a DOM.
+		* The first-run panel. Chromium is a few hundred megabytes, so it is fetched
+		* on demand rather than shipped — the user is told exactly what is about to
+		* happen instead of watching an unexplained spinner.
 		*/
-		function BrowserEmbedBlocked(props) {
-			const { url, onOpenInBrowser, onLoadAnyway } = props;
-			let host = url;
-			try {
-				host = new URL(url).hostname;
-			} catch {}
+		function BrowserEnginePrompt(props) {
+			const { status, url } = props;
+			const [busy, setBusy] = (0, react.useState)(false);
+			const [failure, setFailure] = (0, react.useState)(null);
+			const installing = status.state === "installing" || busy;
 			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 				className: sidebar_module_css_default.browserBlocked,
 				children: [
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconWarningOutline16, { size: 16 }),
 					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 						className: sidebar_module_css_default.browserBlockedTitle,
-						children: t("browserEmbedBlocked", { host })
+						children: status.state === "error" ? t("browserEngineFailed") : t("browserEngineMissing")
 					}),
 					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 						className: sidebar_module_css_default.browserBlockedDesc,
-						children: t("browserEmbedBlockedDesc")
+						children: installing ? status.message ?? t("browserEngineInstalling") : failure ?? status.message ?? t("browserEngineMissingDesc")
 					}),
 					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 						className: sidebar_module_css_default.browserBlockedActions,
 						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
 							type: "button",
 							className: sidebar_module_css_default.browserBlockedButton,
-							onClick: onOpenInBrowser,
-							children: t("browserOpenExternal")
-						}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+							disabled: installing,
+							onClick: () => {
+								setBusy(true);
+								setFailure(null);
+								api.browserInstall().catch((error) => {
+									setFailure(error instanceof Error ? error.message : String(error));
+								}).finally(() => {
+									setBusy(false);
+								});
+							},
+							children: installing ? t("browserEngineInstalling") : t("browserEngineInstall")
+						}), url !== void 0 && url !== "" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
 							type: "button",
 							className: sidebar_module_css_default.browserBlockedButton,
-							onClick: onLoadAnyway,
-							children: t("browserEmbedAnyway")
+							onClick: () => {
+								const result = normalizeBrowserUrl(url, window.location.origin);
+								if (result.kind === "ok") window.open(result.url, "_blank", "noopener");
+							},
+							children: t("browserOpenExternal")
 						})]
 					})
 				]
+			});
+		}
+		/**
+		* A native `alert` / `confirm` / `prompt` freezes the remote renderer until
+		* it is answered, so it is surfaced as a real blocking overlay rather than
+		* left to time out invisibly.
+		*/
+		function BrowserDialogPrompt(props) {
+			const { dialog, onAnswer } = props;
+			const [text, setText] = (0, react.useState)(dialog.defaultValue ?? "");
+			return /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+				className: sidebar_module_css_default.browserDialog,
+				children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+					className: sidebar_module_css_default.browserDialogCard,
+					children: [
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+							className: sidebar_module_css_default.browserBlockedTitle,
+							children: dialog.message
+						}),
+						dialog.kind === "prompt" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("input", {
+							className: sidebar_module_css_default.browserInput,
+							value: text,
+							autoFocus: true,
+							onChange: (event) => {
+								setText(event.target.value);
+							}
+						}),
+						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+							className: sidebar_module_css_default.browserBlockedActions,
+							children: [dialog.kind !== "alert" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+								type: "button",
+								className: sidebar_module_css_default.browserBlockedButton,
+								onClick: () => {
+									onAnswer(false);
+								},
+								children: t("browserDialogDismiss")
+							}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+								type: "button",
+								className: sidebar_module_css_default.browserBlockedButton,
+								onClick: () => {
+									onAnswer(true, dialog.kind === "prompt" ? text : void 0);
+								},
+								children: t("browserDialogAccept")
+							})]
+						})
+					]
+				})
 			});
 		}
 		//#endregion
@@ -5814,7 +6320,7 @@ window.__ModuleLoader__.load({
 		* the same {@link BetterSidebarService} external plugins use — eating its
 		* own dogfood. The terminal descriptor owns its quota (`TERMINAL_LIMIT`)
 		* and mints `terminal:<n>` ids through `createTab`; the browser mints
-		* `browser:<n>` the same way (no quota).
+		* `browser:<n>` the same way and owns the same per-session quota.
 		*/
 		/**
 		* Lazy wrapper over the terminal view: xterm (and its stylesheet) is fetched
@@ -5832,6 +6338,9 @@ window.__ModuleLoader__.load({
 		/** Count UI-owned terminals (agent:` tabs excluded — they are the model's). */
 		function uiTerminalCount(state) {
 			return allLeaves(state.splits).flatMap((leaf) => leaf.tabs).filter((tab) => tab.type === "terminal" && !isAgentTabId(tab.id)).length;
+		}
+		function uiBrowserCount(state) {
+			return allLeaves(state.splits).concat(allLeaves(state.bottomSplits)).flatMap((leaf) => leaf.tabs).filter((tab) => tab.type === "browser").length;
 		}
 		/** The 7 built-in tab descriptors. */
 		function builtinTabs(ctx) {
@@ -5962,23 +6471,40 @@ window.__ModuleLoader__.load({
 					title: () => t("browser"),
 					icon: (size) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)(IconGlobeOutline16, { size }),
 					order: 50,
-					settings: { toggles: [{
-						key: "browserNoSandbox",
-						title: () => t("settingsBrowserSandboxTitle"),
-						desc: () => t("settingsBrowserSandboxDesc")
-					}, {
-						key: "browserInterceptLinks",
-						title: () => t("settingsBrowserLinksTitle"),
-						desc: () => t("settingsBrowserLinksDesc")
-					}] },
-					createTab: (state) => ({
-						tab: {
-							id: `browser:${state.nextBrowser}`,
-							type: "browser",
-							title: t("browser")
+					available: (_ctx, _scope, state) => uiBrowserCount(state) < 3,
+					settings: { toggles: [
+						{
+							key: "agentBrowserTools",
+							title: () => t("settingsBrowserToolsTitle"),
+							desc: () => t("settingsBrowserToolsDesc")
 						},
-						patch: { nextBrowser: state.nextBrowser + 1 }
-					}),
+						{
+							key: "agentBrowserIsolated",
+							title: () => t("settingsBrowserIsolatedTitle"),
+							desc: () => t("settingsBrowserIsolatedDesc")
+						},
+						{
+							key: "browserHeaded",
+							title: () => t("settingsBrowserHeadedTitle"),
+							desc: () => t("settingsBrowserHeadedDesc")
+						},
+						{
+							key: "browserInterceptLinks",
+							title: () => t("settingsBrowserLinksTitle"),
+							desc: () => t("settingsBrowserLinksDesc")
+						}
+					] },
+					createTab: (state) => {
+						if (uiBrowserCount(state) >= 3) return null;
+						return {
+							tab: {
+								id: `browser:${state.nextBrowser}`,
+								type: "browser",
+								title: t("browser")
+							},
+							patch: { nextBrowser: state.nextBrowser + 1 }
+						};
+					},
 					component: (props) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)(BrowserView, { ...props })
 				},
 				{
@@ -6899,6 +7425,56 @@ window.__ModuleLoader__.load({
 				};
 			}, [sessionId, store]);
 			/**
+			* The same contract for browser pages the MODEL opened: the host pushes the
+			* live list, the sidebar mirrors it into tabs. The user should never have
+			* to ask what the agent is browsing — the page just appears, live, next to
+			* the conversation, and they can take it over by clicking in it.
+			*/
+			(0, react.useEffect)(() => {
+				if (sessionId === void 0) return;
+				let socket = null;
+				let retry;
+				let closed = false;
+				let failures = 0;
+				const connect = () => {
+					if (closed) return;
+					const url = new URL(desktopRuntimeUrl("/sidebar/ws/browser-tabs"), location.origin);
+					url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+					url.search = new URLSearchParams({ sessionId }).toString();
+					socket = new WebSocket(url.toString());
+					socket.onmessage = (event) => {
+						if (typeof event.data !== "string") return;
+						try {
+							const list = JSON.parse(event.data);
+							if (!Array.isArray(list)) return;
+							store.reduce((s) => ctx.betterSidebar?.isTabEnabled("browser") === false ? s : reconcileAgentBrowserTabs(s, list));
+						} catch {}
+					};
+					socket.onclose = () => {
+						if (closed) return;
+						failures += 1;
+						if (failures >= FAILURE_LIMIT) {
+							console.error("[dsh-better-sidebar] browser-tabs connection failed; stopping reconnect loop", sessionId);
+							return;
+						}
+						retry = window.setTimeout(connect, 2e3);
+					};
+					socket.onerror = () => {
+						socket?.close();
+					};
+				};
+				connect();
+				return () => {
+					closed = true;
+					window.clearTimeout(retry);
+					socket?.close();
+				};
+			}, [
+				sessionId,
+				store,
+				ctx
+			]);
+			/**
 			* Subagent auto-activation: the moment the current conversation spawns its
 			* FIRST direct subagent (a 0 → N transition on the list feed), the "auto
 			* open" pref is on, and the Subagent tab type is enabled in settings,
@@ -7180,6 +7756,10 @@ window.__ModuleLoader__.load({
 							cwd
 						}, tabId).catch(() => {});
 					}
+					if (tab?.type === "browser" && sessionId !== void 0) api.browserClose({
+						sessionId,
+						cwd
+					}, tabId).catch(() => {});
 				},
 				activateTab: (paneId, tabId) => {
 					ctx.betterSidebar?.activateTab(tabId, sessionId === void 0 ? void 0 : {
@@ -7642,7 +8222,9 @@ window.__ModuleLoader__.load({
 				interceptOpenPath: typeof record.interceptOpenPath === "boolean" ? record.interceptOpenPath : SIDEBAR_PREFS_DEFAULTS.interceptOpenPath,
 				htmlViewerNoSandbox: typeof record.htmlViewerNoSandbox === "boolean" ? record.htmlViewerNoSandbox : SIDEBAR_PREFS_DEFAULTS.htmlViewerNoSandbox,
 				htmlViewerDefaultUnsafe: typeof record.htmlViewerDefaultUnsafe === "boolean" ? record.htmlViewerDefaultUnsafe : SIDEBAR_PREFS_DEFAULTS.htmlViewerDefaultUnsafe,
-				browserNoSandbox: typeof record.browserNoSandbox === "boolean" ? record.browserNoSandbox : SIDEBAR_PREFS_DEFAULTS.browserNoSandbox,
+				agentBrowserTools: typeof record.agentBrowserTools === "boolean" ? record.agentBrowserTools : SIDEBAR_PREFS_DEFAULTS.agentBrowserTools,
+				agentBrowserIsolated: typeof record.agentBrowserIsolated === "boolean" ? record.agentBrowserIsolated : SIDEBAR_PREFS_DEFAULTS.agentBrowserIsolated,
+				browserHeaded: typeof record.browserHeaded === "boolean" ? record.browserHeaded : SIDEBAR_PREFS_DEFAULTS.browserHeaded,
 				browserInterceptLinks: typeof record.browserInterceptLinks === "boolean" ? record.browserInterceptLinks : SIDEBAR_PREFS_DEFAULTS.browserInterceptLinks,
 				tabsEnabled: booleanMapOf(record.tabsEnabled),
 				viewersEnabled: booleanMapOf(record.viewersEnabled),
@@ -7749,54 +8331,54 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var SideCardSection_module_css_default = {
-			"pluginEmpty": "JTnrxq_pluginEmpty",
-			"pluginEntryActions": "JTnrxq_pluginEntryActions",
-			"percentInput": "JTnrxq_percentInput",
-			"row": "JTnrxq_row",
-			"popupRows": "JTnrxq_popupRows",
-			"pluginList": "JTnrxq_pluginList",
-			"addCard": "JTnrxq_addCard",
-			"title": "JTnrxq_title",
-			"pluginModal": "JTnrxq_pluginModal",
 			"error": "JTnrxq_error",
-			"cardTitle": "JTnrxq_cardTitle",
+			"group": "JTnrxq_group",
 			"grid": "JTnrxq_grid",
+			"cardOn": "JTnrxq_cardOn",
+			"cardMain": "JTnrxq_cardMain",
+			"row": "JTnrxq_row",
+			"groupHeading": "JTnrxq_groupHeading",
+			"popupRow": "JTnrxq_popupRow",
 			"pluginTopicBtn": "JTnrxq_pluginTopicBtn",
-			"switch": "JTnrxq_switch",
-			"count": "JTnrxq_count",
 			"cardCheck": "JTnrxq_cardCheck",
 			"switchTrack": "JTnrxq_switchTrack",
-			"suffix": "JTnrxq_suffix",
-			"control": "JTnrxq_control",
-			"section": "JTnrxq_section",
-			"pluginEntry": "JTnrxq_pluginEntry",
-			"groupHeading": "JTnrxq_groupHeading",
-			"desc": "JTnrxq_desc",
-			"pluginName": "JTnrxq_pluginName",
-			"switchThumb": "JTnrxq_switchThumb",
-			"cardDesc": "JTnrxq_cardDesc",
-			"cardMain": "JTnrxq_cardMain",
-			"card": "JTnrxq_card",
-			"pluginEntries": "JTnrxq_pluginEntries",
-			"cardOn": "JTnrxq_cardOn",
-			"pluginEntryHead": "JTnrxq_pluginEntryHead",
-			"popupDialog": "JTnrxq_popupDialog",
-			"rowText": "JTnrxq_rowText",
-			"popupRow": "JTnrxq_popupRow",
-			"cardWithGear": "JTnrxq_cardWithGear",
-			"done": "JTnrxq_done",
-			"pluginDesc": "JTnrxq_pluginDesc",
-			"intro": "JTnrxq_intro",
-			"cardTop": "JTnrxq_cardTop",
-			"group": "JTnrxq_group",
-			"switchInput": "JTnrxq_switchInput",
-			"pluginJumpBtn": "JTnrxq_pluginJumpBtn",
-			"pluginInstall": "JTnrxq_pluginInstall",
-			"typedInput": "JTnrxq_typedInput",
-			"cardGear": "JTnrxq_cardGear",
+			"title": "JTnrxq_title",
 			"cardIconChip": "JTnrxq_cardIconChip",
+			"rowText": "JTnrxq_rowText",
+			"desc": "JTnrxq_desc",
+			"percentInput": "JTnrxq_percentInput",
+			"popupDialog": "JTnrxq_popupDialog",
+			"section": "JTnrxq_section",
+			"switchInput": "JTnrxq_switchInput",
+			"intro": "JTnrxq_intro",
+			"cardTitle": "JTnrxq_cardTitle",
+			"control": "JTnrxq_control",
+			"switchThumb": "JTnrxq_switchThumb",
+			"popupRows": "JTnrxq_popupRows",
+			"done": "JTnrxq_done",
+			"pluginEntries": "JTnrxq_pluginEntries",
+			"switch": "JTnrxq_switch",
+			"pluginModal": "JTnrxq_pluginModal",
+			"pluginEntry": "JTnrxq_pluginEntry",
+			"card": "JTnrxq_card",
+			"cardTop": "JTnrxq_cardTop",
+			"pluginEntryActions": "JTnrxq_pluginEntryActions",
+			"pluginDesc": "JTnrxq_pluginDesc",
 			"pluginCopyBtn": "JTnrxq_pluginCopyBtn",
-			"typedInputNumber": "JTnrxq_typedInputNumber"
+			"cardGear": "JTnrxq_cardGear",
+			"suffix": "JTnrxq_suffix",
+			"pluginEntryHead": "JTnrxq_pluginEntryHead",
+			"cardDesc": "JTnrxq_cardDesc",
+			"pluginEmpty": "JTnrxq_pluginEmpty",
+			"typedInputNumber": "JTnrxq_typedInputNumber",
+			"pluginInstall": "JTnrxq_pluginInstall",
+			"pluginJumpBtn": "JTnrxq_pluginJumpBtn",
+			"pluginName": "JTnrxq_pluginName",
+			"count": "JTnrxq_count",
+			"typedInput": "JTnrxq_typedInput",
+			"addCard": "JTnrxq_addCard",
+			"cardWithGear": "JTnrxq_cardWithGear",
+			"pluginList": "JTnrxq_pluginList"
 		};
 		//#endregion
 		//#region src/client/add-plugin-modal.tsx

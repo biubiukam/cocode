@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { endpointFor, leaseDirectory, scopeDirectory, scopePath, supervisorHome } from './paths.js'
-import { canonicalizeScope, LEASE_TTL_MS, type AcquireHostRequest, type HostDescriptor, type HostLease, type HostScope, type HostSupervisorClient } from './protocol.js'
+import { canonicalizeScope, LEASE_TTL_MS, SUPERVISOR_BUILD_REVISION, type AcquireHostRequest, type HostDescriptor, type HostLease, type HostScope, type HostSupervisorClient } from './protocol.js'
 import { openLineConnection, type LinePeer } from './ipc.js'
 
 export type SupervisorClientOptions = {
@@ -100,7 +100,27 @@ export class LocalHostSupervisorClient implements HostSupervisorClient {
 
   private async connectOrStart(directory: string): Promise<LinePeer> {
     const endpoint = endpointFor(directory)
-    try { return await openLineConnection(endpoint) } catch { /* start below */ }
+    let existing: LinePeer | undefined
+    try { existing = await openLineConnection(endpoint) } catch { /* start below */ }
+    if (existing !== undefined) {
+      try {
+        const doctor = await existing.request<{
+          supervisorBuildRevision?: string
+          leaseCount?: number
+          pid?: number
+          descriptor?: HostDescriptor | null
+        }>('doctor')
+        if (doctor.supervisorBuildRevision === SUPERVISOR_BUILD_REVISION) return existing
+        existing.close()
+        if ((doctor.leaseCount ?? 0) > 0) {
+          throw new Error('Host Supervisor is running an older build while active clients still hold leases; release them before upgrading.')
+        }
+        await stopStaleSupervisor(doctor.pid, doctor.descriptor?.hostPid)
+      } catch (error) {
+        existing.close()
+        throw error
+      }
+    }
     const serviceEntry = this.options.serviceEntry ?? process.env.COCODE_SUPERVISOR_SERVICE_ENTRY ?? fileURLToPath(new URL('./bin.js', import.meta.url))
     const node = this.options.nodeExecutable ?? resolveNodeExecutable()
     const child = spawn(node, [serviceEntry, 'service', '--state-dir', directory], {
@@ -115,6 +135,30 @@ export class LocalHostSupervisorClient implements HostSupervisorClient {
       try { return await openLineConnection(endpoint) } catch (error) { lastError = error; await new Promise((resolve) => setTimeout(resolve, 100)) }
     }
     throw new Error(`Host Supervisor did not become ready: ${String(lastError)}`)
+  }
+}
+
+async function stopStaleSupervisor(supervisorPid: number | undefined, hostPid: number | undefined): Promise<void> {
+  if (hostPid !== undefined && isProcessAlive(hostPid)) await terminateProcess(hostPid, 'DSH Host')
+  if (supervisorPid !== undefined && isProcessAlive(supervisorPid)) await terminateProcess(supervisorPid, 'Host Supervisor')
+}
+
+async function terminateProcess(pid: number, label: string): Promise<void> {
+  try { process.kill(pid, 'SIGTERM') } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw new Error(`Unable to stop stale ${label} (${pid}): ${String(error)}`)
+  }
+  const deadline = Date.now() + 2_000
+  while (Date.now() < deadline && isProcessAlive(pid)) await new Promise((resolve) => setTimeout(resolve, 100))
+  if (isProcessAlive(pid)) throw new Error(`Stale ${label} (${pid}) did not exit after SIGTERM.`)
+}
+
+function isProcessAlive(pid: number): boolean {
+  if (!Number.isInteger(pid) || pid <= 0) return false
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'EPERM'
   }
 }
 
