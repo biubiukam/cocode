@@ -467,7 +467,7 @@
   flex: none;
   display: flex;
   align-items: stretch;
-  height: 32px;
+  height: 56px;
   padding: 12px 0;
   border-bottom: 1px solid var(--dsw-alias-border-l1);
   background: var(--dsw-alias-bg-layer-1);
