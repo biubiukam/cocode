@@ -94,6 +94,13 @@ type UiKey =
   | 'skillsEmpty'
   | 'skillsUnavailable'
   | 'skillReady'
+  | 'pluginsTitle'
+  | 'pluginsHint'
+  | 'pluginsQuery'
+  | 'pluginsEmpty'
+  | 'pluginsEnabled'
+  | 'pluginsDisabled'
+  | 'pluginsToggling'
   | 'questionTitle'
   | 'questionHint'
   | 'questionCustom'
@@ -331,6 +338,13 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     skillsEmpty: 'No user-invocable skills found.',
     skillsUnavailable: 'Skills are unavailable in this runtime.',
     skillReady: 'Skill /{name} is ready in the composer.',
+    pluginsTitle: 'Runtime plugins',
+    pluginsHint: 'type to filter · ↑↓ select · enter/space toggle · esc close',
+    pluginsQuery: 'filter: {query}',
+    pluginsEmpty: 'No plugins match the current filter.',
+    pluginsEnabled: 'enabled',
+    pluginsDisabled: 'disabled',
+    pluginsToggling: 'updating…',
     questionTitle: 'Question',
     questionHint: '↑↓ move · ←→ switch',
     questionCustom: 'Type another answer',
@@ -567,6 +581,13 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     skillsEmpty: '当前运行时没有可调用的技能。',
     skillsUnavailable: '当前运行时未配置 Skills。',
     skillReady: '技能 /{name} 已写入输入区。',
+    pluginsTitle: '运行时插件',
+    pluginsHint: '输入过滤 · ↑↓ 选择 · 回车/空格切换 · Esc 关闭',
+    pluginsQuery: '筛选：{query}',
+    pluginsEmpty: '没有匹配的插件。',
+    pluginsEnabled: '已启用',
+    pluginsDisabled: '已禁用',
+    pluginsToggling: '正在更新…',
     questionTitle: '需要确认',
     questionHint: '↑↓ 移动 · ←→ 切换问题',
     questionCustom: '输入其他答案',

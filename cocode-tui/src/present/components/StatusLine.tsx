@@ -9,6 +9,8 @@ export function noticeLines(message: string): string[] {
   return message.split('\n')
 }
 
+export const NOTICE_MAX_ROWS = 6
+
 export function noticeRows(message: string, maxColumns = 80): number {
   const columns = Math.max(1, Math.trunc(maxColumns))
   return noticeLines(message).reduce((rows, line) => {
@@ -16,11 +18,17 @@ export function noticeRows(message: string, maxColumns = 80): number {
   }, 0)
 }
 
+export function visibleNoticeRows(message: string, maxColumns = 80): number {
+  return Math.min(NOTICE_MAX_ROWS, noticeRows(message, maxColumns))
+}
+
 export function StatusLine(props: {
   status: TuiSnapshot['status']
   agent: TuiSnapshot['agent']
   notice?: TuiSnapshot['notice']
   locale: UiLocale
+  noticeRows?: number
+  noticeScrollOffset?: number
 }) {
   const notice = props.notice
   const telemetry = props.status.telemetry
@@ -107,7 +115,13 @@ export function StatusLine(props: {
           {telemetryBits.join(' · ')}
         </Text>
       ) : null}
-      {notice ? <Notice notice={notice} /> : null}
+      {notice ? (
+        <Notice
+          notice={notice}
+          maxRows={props.noticeRows}
+          scrollOffset={props.noticeScrollOffset}
+        />
+      ) : null}
     </Box>
   )
 }
@@ -118,16 +132,22 @@ function formatMetric(value: number): string {
 
 function Notice(props: {
   notice: NonNullable<TuiSnapshot['notice']>
+  maxRows?: number
+  scrollOffset?: number
 }) {
   const color = props.notice.tone === 'error' ? theme.error : theme.info
   const mark = props.notice.tone === 'error' ? '!' : '·'
+  const maxRows = Math.max(1, Math.trunc(props.maxRows ?? noticeRows(props.notice.message)))
+  const scrollOffset = Math.max(0, Math.trunc(props.scrollOffset ?? 0))
   return (
-    <Box flexDirection="column">
-      {noticeLines(props.notice.message).map((line, index) => (
-        <Text key={`${String(index)}:${line}`} color={color}>
-          {index === 0 ? `${mark} ` : '  '}{line}
-        </Text>
-      ))}
+    <Box height={maxRows} overflowY="hidden">
+      <Box flexDirection="column" marginTop={-scrollOffset}>
+        {noticeLines(props.notice.message).map((line, index) => (
+          <Text key={`${String(index)}:${line}`} color={color}>
+            {index === 0 ? `${mark} ` : '  '}{line}
+          </Text>
+        ))}
+      </Box>
     </Box>
   )
 }

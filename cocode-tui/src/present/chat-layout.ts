@@ -3,6 +3,7 @@
 import { RESUME_WINDOW_SIZE } from '../runtime/resume-picker.ts'
 import { REWIND_WINDOW_SIZE } from '../runtime/rewind-picker.ts'
 import { SKILLS_WINDOW_SIZE } from '../runtime/skills-picker.ts'
+import { PLUGIN_PICKER_WINDOW_SIZE } from '../runtime/plugin-picker.ts'
 import { CHECKLIST_WINDOW_SIZE } from '../runtime/checklist.ts'
 import { listWindowStart } from './list-window.ts'
 
@@ -39,6 +40,9 @@ export type ChatLayoutInput = {
   rewindConfirming?: boolean
   skillsItems?: number
   skillsSelected?: number
+  pluginItems?: number
+  pluginSelected?: number
+  pluginStatus?: boolean
   questionRows?: number
   approvalRows?: number
   reviewRows?: number
@@ -80,6 +84,7 @@ export function calculateChatLayout(input: ChatLayoutInput): ChatLayout {
     checklistRows(input.checklistItems, input.checklistSelected) +
     rewindRows(input.rewindItems, input.rewindSelected, input.rewindConfirming) +
     skillsRows(input.skillsItems, input.skillsSelected) +
+    pluginRows(input.pluginItems, input.pluginSelected, input.pluginStatus) +
     questionRows(input.questionRows) +
     questionRows(input.approvalRows) +
     reviewRows(input.reviewRows) +
@@ -147,6 +152,7 @@ function minimumOverlayHeight(input: ChatLayoutInput): number {
   if (input.checklistItems !== undefined) return MIN_OVERLAY_ROWS
   if (input.rewindItems !== undefined) return MIN_REWIND_OVERLAY_ROWS
   if (input.skillsItems !== undefined) return MIN_OVERLAY_ROWS
+  if (input.pluginItems !== undefined) return MIN_OVERLAY_ROWS
   if (input.questionRows !== undefined) return MIN_OVERLAY_ROWS
   if (input.approvalRows !== undefined) return MIN_OVERLAY_ROWS
   if (input.reviewRows !== undefined) return MIN_OVERLAY_ROWS
@@ -192,6 +198,15 @@ function skillsRows(items: number | undefined, selected = 0): number {
   const start = listWindowStart(selected, count, SKILLS_WINDOW_SIZE)
   const indicators = optionalRow(start > 0) + optionalRow(count - start - visible > 0)
   return visible + indicators + 6
+}
+
+function pluginRows(items: number | undefined, selected = 0, status = false): number {
+  if (items === undefined) return 0
+  const count = nonNegativeInteger(items)
+  const visible = Math.max(1, Math.min(count, PLUGIN_PICKER_WINDOW_SIZE))
+  const start = listWindowStart(selected, count, PLUGIN_PICKER_WINDOW_SIZE)
+  const indicators = optionalRow(start > 0) + optionalRow(count - start - visible > 0)
+  return visible + indicators + 6 + optionalRow(status)
 }
 
 function questionRows(rows: number | undefined): number {

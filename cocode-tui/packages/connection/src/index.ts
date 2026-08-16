@@ -9,6 +9,8 @@ export type {
   SkillEntry,
   TuiCommandDescriptor,
   TuiCommandExecution,
+  TuiPluginEntry,
+  TuiPluginFiberPhase,
   TuiQuestionAnswer,
   TuiQuestionAnswerItem,
   TuiQuestionItem,

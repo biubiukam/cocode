@@ -61,6 +61,13 @@ function createContext(options = {}) {
         }
       }
       if (name === 'cocodeVision') return options.vision
+      if (name === 'loader') {
+        return options.loader ?? {
+          entries() {
+            return []
+          },
+        }
+      }
       return undefined
     },
     on() {
@@ -166,4 +173,54 @@ test('uses exact model capabilities when a native vision model is not listed', a
   await gateway.prompt({ sessionId: 's1', contentBlocks: [imageBlock] })
 
   assert.deepEqual(followed[0]?.content, [imageBlock])
+})
+
+test('lists non-group loader entries with enablement and fiber phase', async () => {
+  const entries = [
+    { id: 'active-plugin', options: { name: '@deepseek-ai/dsh-tools' }, fiber: { state: 2 } },
+    { id: 'disabled-plugin', disabled: true, options: { name: '@deepseek-ai/dsh-web' }, fiber: { state: 4 } },
+    { id: 'group', options: { name: 'group', group: true }, fiber: { state: 2 } },
+  ]
+  const { ctx } = createContext({
+    loader: {
+      * entries() {
+        yield* entries
+      },
+    },
+  })
+  const gateway = createGateway(ctx)
+  await initialize(gateway)
+
+  assert.deepEqual(gateway.capabilities().plugins, true)
+  assert.deepEqual(gateway.capabilities().pluginsMutate, true)
+  assert.deepEqual(gateway.listPlugins(), {
+    plugins: [
+      {
+        entryId: 'active-plugin',
+        moduleName: '@deepseek-ai/dsh-tools',
+        enabled: true,
+        fiberPhase: 'active',
+      },
+      {
+        entryId: 'disabled-plugin',
+        moduleName: '@deepseek-ai/dsh-web',
+        enabled: false,
+        fiberPhase: null,
+      },
+    ],
+  })
+
+  entries[0].update = async ({ disabled }) => {
+    entries[0].disabled = disabled
+    entries[0].fiber = disabled ? { state: 4 } : { state: 2 }
+  }
+  assert.deepEqual(
+    await gateway.setPluginEnabled({ entryId: 'active-plugin', enabled: false }),
+    {
+      entryId: 'active-plugin',
+      moduleName: '@deepseek-ai/dsh-tools',
+      enabled: false,
+      fiberPhase: null,
+    },
+  )
 })

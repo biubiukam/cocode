@@ -33,6 +33,25 @@ CLI 会把当前目录作为 Agent 工作区。需要隔离凭据时设置 `COCO
 后续启动会复用本机配置。`cocode --help`、`--version` 和 `--doctor` 不要求
 TTY，可以用于安装脚本和故障排查。
 
+## 源码开发启动
+
+在仓库根目录运行：
+
+```sh
+make dev tui
+```
+
+启动前会自动检查 Node.js 版本、TUI 依赖和同级 Host Supervisor。缺少依赖时执行
+安装；Host Supervisor 的源码或构建配置比 `lib/index.js` 更新时重新构建。只检查而不启动
+TUI 时运行：
+
+```sh
+make tui-preflight
+```
+
+TUI 仍然要求真实 TTY；管道、重定向和 CI 环境不会进入交互界面。需要排查 Host、JSON-RPC
+服务或 lease 时，在依赖和构建完成后运行 `cd cocode-tui && pnpm run build && node bin/cocode-tui.mjs --doctor`。
+
 ## 启动前
 
 不需要安装 Desktop，也不需要额外的 runtime checkout。第一个 TUI 或 Desktop
@@ -91,6 +110,7 @@ TTY，可以用于安装脚本和故障排查。
 - 发送时会在消息末尾附加选中文件内容，目录则附加受限的目录列表；文件必须位于当前工作区内。
 - Host 提供可由用户调用的 Skill 时，`/skills` 会打开可搜索的工作区技能目录；选择后向输入区插入 `/技能名 `，可以继续编辑 prompt 再发送。可由用户调用的 Skill 也会出现在 `/` 命令菜单中，执行时通过 `session.prompt` 文本路径发送。目录为空时不会显示该命令。
 - Host 提供 human-command registry 时，注册的命令会直接出现在 `/` 命令菜单中，并通过 `commands/execute` 在当前 Agent 上执行，不会伪装成模型 prompt。当前基础 composition 提供 `/goal`，支持 `/goal`、`/goal <目标>`、`/goal clear`、`/goal edit <目标>`、`/goal pause` 和 `/goal resume`；命令结果由 Host 直接返回。
+- Host 提供插件清单能力时，`/plugins`、`/plugins list` 和 `/plugins status` 会打开可搜索的插件菜单，显示当前 Loader 中每个非 group 插件的模块名、`entryId`、启用状态和加载阶段。输入关键词可匹配模块名、`entryId` 或状态；使用 `↑`/`↓` 选择，回车或空格切换启用/禁用，`Esc` 关闭。Host 同时提供修改能力时，也可以使用 `/plugins enable <entryId>` 或 `/plugins disable <entryId>` 直接操作；安装和卸载仍未开放。
 - Agent 调用 `ask_user_question` 时，会先在消息区流式显示正在生成的问题；完整请求到达后，输入区切换为问卷面板。使用 `↑` `↓` 移动，空格勾选多个选项，`Tab` 切换到自定义答案，回车回答，`Backspace` 或 `Delete` 删除自定义输入，`Esc` 取消。批量问题和并发请求按 FIFO 顺序显示。
 
 工具输出会按显示模式截断；未被投影缓存淘汰时，原始内容仍保留在节点状态，完整事件始终保存在 session log 中。对话区空间不足时，输入区保持可见。
@@ -137,6 +157,7 @@ TTY，可以用于安装脚本和故障排查。
 | `/tokens` / `/cost`            | 查看最近一次 token、缓存和 context 用量                              |
 | `/resume`                      | 打开当前工作区的 session 选择器并回放选中会话                        |
 | `/skills`                      | 浏览当前工作区中可由用户调用的技能                                   |
+| `/plugins`                     | 打开可搜索的 DeepSeek 插件菜单；需要 Host 广告 `plugins` 能力             |
 | `/goal`                        | 使用 Host 的目标命令查看或修改当前目标；参数语法由 Host 注册表提供       |
 | `/feedback <文本>`             | 记录当前会话反馈；需要 Host 挂载 feedback 命令                         |
 | `/permission <preset>`         | 直接切换 Host 权限 preset；需要 Host 挂载 permission 命令               |
@@ -171,6 +192,8 @@ TTY，可以用于安装脚本和故障排查。
 只有 Host 的 `skills/list` 返回真实目录后，TUI 才会启用 `/skills`。如果 Host composition 没有挂载技能 provider，命令会保持隐藏；探测失败或目录为空不会被展示成可用能力。
 
 Host 的 `commands` 能力由 `cocode/capabilities` 广告。TUI 只展示 Host 返回的命令描述，并把完整命令行交给 `commands/execute`；命令不存在或执行失败时显示错误，不会改走普通 prompt。
+
+Host 的 `plugins` 能力由 `cocode/capabilities` 广告。TUI 通过 `cocode/plugins/list` 读取 Loader 的实时条目，通过 `cocode/plugins/set-enabled` 修改当前 Loader 条目；没有对应能力时，相关命令不会伪装成成功。插件菜单支持搜索和连续切换，当前修改只作用于运行中的 Loader，不写入 profile 文件；安装和卸载需要后续的 profile 管理 wire。
 
 Host 默认挂载 Cocode 自己的 `cocode-vision` 插件，并启用 `autoRead`。发送的 `image` block 会先转换为视觉证据，再交给当前文本模型；同时保留原始附件引用，支持原生视觉模型继续读取。视觉 provider 有两种：`cocode` 使用 Cocode 服务，默认视觉模型为 `gpt-luna`；`user` 使用用户配置的 OpenAI-compatible endpoint。用户配置可以写入 `$COCODE_HOME/vision.yaml`（默认 `~/.cocode/vision.yaml`），可参考 [vision.yaml.example](./vision.yaml.example)。`COCODE_VISION_PROVIDER`、`COCODE_VISION_USER_MODEL` 等环境变量优先级更高。账号切换到 Cocode 后，插件会自动复用账号生成的 `COCODE_LLM_PROVIDERS.cocode-cloud` endpoint 和 credential reference，不使用 cloud model 列表的首项。凭证只填写引用名，实际值由 Host credentials service 管理，不进入 session log 或 TUI 设置。
 

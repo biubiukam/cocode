@@ -40,6 +40,16 @@ describe('chat layout rows', () => {
     })
   })
 
+  it('does not make a small terminal fail because of a long notice', () => {
+    const layout = calculateChatLayout({
+      viewportRows: 29,
+      composerLines: 1,
+      noticeRows: 6,
+    })
+    expect(layout.tooSmall).toBe(false)
+    expect(layout.minimumRows).toBe(17)
+  })
+
   it('reserves the main-area checklist without pushing the composer away', () => {
     expect(
       calculateChatLayout({
@@ -72,6 +82,9 @@ describe('chat layout rows', () => {
     ['windowed checklist', { checklistItems: 12, checklistSelected: 6 }, 25],
     ['rewind results', { rewindItems: 4 }, 21],
     ['windowed rewind', { rewindItems: 12, rewindSelected: 6 }, 25],
+    ['plugin picker', { pluginItems: 4, pluginSelected: 1 }, 21],
+    ['windowed plugin picker', { pluginItems: 12, pluginSelected: 6 }, 27],
+    ['plugin picker with status', { pluginItems: 4, pluginStatus: true }, 22],
     ['model switch', { modelSwitchRows: 6 }, 17],
   ] as const)('covers the %s overlay height', (_name, overlay, reservedRows) => {
     const layout = calculateChatLayout({

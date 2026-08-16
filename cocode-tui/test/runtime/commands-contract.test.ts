@@ -49,6 +49,7 @@ describe('builtin command contract', () => {
       permissionMode: true,
       planMode: true,
       fork: true,
+      plugins: true,
     }
     expect(registry.find('resume', all)?.name).toBe('resume')
     expect(registry.find('sessions', all)?.name).toBe('sessions')
@@ -57,6 +58,7 @@ describe('builtin command contract', () => {
     expect(registry.find('plan', all)?.name).toBe('plan')
     expect(registry.find('fork', all)?.name).toBe('fork')
     expect(registry.find('clone', all)?.name).toBe('clone')
+    expect(registry.find('plugins', all)?.name).toBe('plugins')
 
     expect(registry.find('resume', { ...all, open: false })).toBeUndefined()
     expect(registry.find('sessions', { ...all, sessionList: 'jsonl' })).toBeUndefined()
@@ -64,6 +66,7 @@ describe('builtin command contract', () => {
     expect(registry.find('permissions', { ...all, permissionMode: false })).toBeUndefined()
     expect(registry.find('plan', { ...all, planMode: false })).toBeUndefined()
     expect(registry.find('fork', { ...all, fork: false })).toBeUndefined()
+    expect(registry.find('plugins', { ...all, plugins: false })).toBeUndefined()
   })
 
   it('filters slash menu input without matching ordinary text', () => {

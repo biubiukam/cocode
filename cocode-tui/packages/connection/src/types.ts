@@ -57,6 +57,21 @@ export type TuiCommandExecution = {
   result: TuiCommandResult
 }
 
+export type TuiPluginFiberPhase =
+  | 'pending'
+  | 'loading'
+  | 'active'
+  | 'failed'
+  | 'unloading'
+  | null
+
+export type TuiPluginEntry = {
+  entryId: string
+  moduleName: string
+  enabled: boolean
+  fiberPhase: TuiPluginFiberPhase
+}
+
 export type TuiQuestionOption = {
   label: string
   description?: string
@@ -184,6 +199,8 @@ export type TuiRuntimeCapabilityName =
   | 'modelList'
   | 'imageAttachments'
   | 'commands'
+  | 'plugins'
+  | 'pluginsMutate'
 
 export type TuiRuntimeCapabilities = Record<TuiRuntimeCapabilityName, boolean>
 
@@ -197,6 +214,8 @@ export type TuiRuntimeAdvertisement = {
   imageAttachments: boolean
   checkpoint: false
   commands?: boolean
+  plugins?: boolean
+  pluginsMutate?: boolean
 }
 
 /** Result of probing the live SDK runtime after its initialize handshake. */
@@ -264,6 +283,8 @@ export type TuiRuntime = {
   listSkills?(sessionId: string): Promise<SkillEntry[]>
   listCommands?(sessionId: string): Promise<TuiCommandDescriptor[]>
   executeCommand?(sessionId: string, line: string): Promise<TuiCommandExecution | undefined>
+  listPlugins?(): Promise<TuiPluginEntry[]>
+  setPluginEnabled?(entryId: string, enabled: boolean): Promise<TuiPluginEntry>
   listSessions?(cwd?: string): Promise<TuiSessionSummary[]>
   listModels?(): Promise<TuiModelCatalog>
   saveImages?(images: readonly TuiImageInput[]): Promise<TuiImageAttachmentRef[]>

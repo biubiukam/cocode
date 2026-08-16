@@ -27,7 +27,12 @@ import {
   planReviewPanelRows,
 } from './components/PlanReviewPanel.tsx'
 import { SkillsPicker } from './components/SkillsPicker.tsx'
-import { noticeRows, StatusLine } from './components/StatusLine.tsx'
+import { PluginsPicker } from './components/PluginsPicker.tsx'
+import {
+  noticeRows,
+  StatusLine,
+  visibleNoticeRows,
+} from './components/StatusLine.tsx'
 import {
   filterSlashItems,
   isSlashDraft,
@@ -60,6 +65,7 @@ import {
 } from '../runtime/session-tree-picker.ts'
 import { REWIND_WINDOW_SIZE } from '../runtime/rewind-picker.ts'
 import { SKILLS_WINDOW_SIZE, visibleSkills } from '../runtime/skills-picker.ts'
+import { PLUGIN_PICKER_WINDOW_SIZE, visiblePlugins } from '../runtime/plugin-picker.ts'
 import { MODEL_PICKER_WINDOW_SIZE, visibleModelItems } from '../runtime/model-picker.ts'
 import { editDraft } from '../runtime/external-editor.ts'
 import { listWindowStart } from './list-window.ts'
@@ -123,6 +129,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
   const [historyIndex, setHistoryIndex] = useState(0)
   const [messageSelectionActive, setMessageSelectionActive] = useState(false)
   const [messageScrollOffset, setMessageScrollOffset] = useState(0)
+  const [noticeScrollOffset, setNoticeScrollOffset] = useState(0)
   const [followTranscript, setFollowTranscript] = useState(true)
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null)
   const [expandedMessageIds, setExpandedMessageIds] = useState<ReadonlySet<string>>(() => new Set())
@@ -155,6 +162,8 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
   const forkOpen = forkState?.open === true
   const skillsState = snap.skillsPicker
   const skillsOpen = skillsState?.open === true
+  const pluginState = snap.pluginPicker
+  const pluginOpen = pluginState?.open === true
   const modelPickerOpen = snap.modelPicker?.open === true
   const modelInputOpen = snap.modelInputOpen
   const modelOverlayOpen = modelPickerOpen || modelInputOpen
@@ -168,6 +177,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     !forkOpen &&
     !rewindOpen &&
     !skillsOpen &&
+    !pluginOpen &&
     !resumeOpen &&
     !sessionTreeOpen &&
     !queueOpen &&
@@ -190,6 +200,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     !forkOpen &&
     !rewindOpen &&
     !skillsOpen &&
+    !pluginOpen &&
     !resumeOpen &&
     !sessionTreeOpen &&
     !queueOpen &&
@@ -267,9 +278,13 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
   })
   const inspectorLayout = inspectorResize.layout
   const mainColumns = wideInspector ? inspectorLayout.mainColumns : stdout.columns
-  const noticeRowCount = snap.notice === undefined
+  const noticeContentRows = snap.notice === undefined
     ? 0
     : noticeRows(snap.notice.message, mainColumns)
+  const noticeRowCount = snap.notice === undefined
+    ? 0
+    : visibleNoticeRows(snap.notice.message, mainColumns)
+  const noticeScrollMax = Math.max(0, noticeContentRows - noticeRowCount)
   const layout = calculateChatLayout({
     viewportRows: stdout.rows,
     composerLines: snap.composer.text.split('\n').length,
@@ -314,6 +329,9 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
       : undefined,
     skillsItems: skillsOpen ? skillsState.skills.length : undefined,
     skillsSelected: skillsOpen ? skillsState.selected : undefined,
+    pluginItems: pluginOpen && pluginState !== undefined ? visiblePlugins(pluginState).length : undefined,
+    pluginSelected: pluginOpen ? pluginState?.selected : undefined,
+    pluginStatus: pluginOpen && pluginState?.status !== undefined,
       questionRows:
         snap.question === undefined
           ? undefined
@@ -379,6 +397,10 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
   )
 
   useEffect(() => {
+    setNoticeScrollOffset(0)
+  }, [mainColumns, snap.notice?.message])
+
+  useEffect(() => {
     if (followTranscript) setMessageScrollOffset(0)
   }, [followTranscript, messageMaxRows, snap.nodes.length, expandedMessageIds.size])
 
@@ -439,6 +461,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
         rewindOpen ||
         forkOpen ||
         skillsOpen ||
+        pluginOpen ||
         resumeOpen ||
         sessionTreeOpen ||
         queueOpen ||
@@ -679,6 +702,23 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
       }
       return
     }
+    if (pluginOpen && pluginState !== undefined) {
+      const items = visiblePlugins(pluginState)
+      const windowSize = pickerWindowSize(layout.overlayRows, PLUGIN_PICKER_WINDOW_SIZE)
+      const start = listWindowStart(pluginState.selected, items.length, windowSize)
+      const index = listItemIndexAtRow({
+        row: hitRow,
+        itemStartRow: popupStartRow + 4 + Number(start > 0),
+        itemCount: items.length,
+        selectedIndex: pluginState.selected,
+        windowSize,
+      })
+      if (index !== undefined) {
+        app.dispatch({ type: 'plugins.move', delta: index - pluginState.selected })
+        if (isPress) app.dispatch({ type: 'plugins.confirm' })
+      }
+      return
+    }
     if (rewindOpen && rewindState !== undefined) {
       const windowSize = pickerWindowSize(layout.overlayRows, REWIND_WINDOW_SIZE, 6)
       const start = listWindowStart(rewindState.selected, rewindState.items.length, windowSize)
@@ -857,6 +897,28 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
   useInput((input, key) => {
     if (editorBusy) return
     if (isMouseInput(input)) return
+    if (pluginOpen && pluginState !== undefined) {
+      if (key.escape) {
+        app.dispatch({ type: 'plugins.close' })
+        return
+      }
+      if (key.upArrow || key.downArrow) {
+        app.dispatch({ type: 'plugins.move', delta: key.upArrow ? -1 : 1 })
+        return
+      }
+      if (key.return || input === ' ') {
+        app.dispatch({ type: 'plugins.confirm' })
+        return
+      }
+      if (key.backspace || key.delete) {
+        app.dispatch({ type: 'plugins.setQuery', query: pluginState.query.slice(0, -1) })
+        return
+      }
+      if (input !== '' && !key.ctrl && !key.meta) {
+        app.dispatch({ type: 'plugins.setQuery', query: `${pluginState.query}${input}` })
+      }
+      return
+    }
     if (modelPickerOpen) {
       if (key.escape) {
         app.dispatch({ type: 'model.close' })
@@ -931,6 +993,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
       !rewindOpen &&
       !forkOpen &&
       !skillsOpen &&
+      !pluginOpen &&
       !resumeOpen &&
       !sessionTreeOpen &&
       !queueOpen &&
@@ -941,6 +1004,14 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
       !fileOpen &&
       !snap.helpOpen
     ) {
+      if (noticeScrollMax > 0) {
+        const pageRows = Math.max(1, Math.floor(noticeRowCount / 2))
+        const delta = scrollDown ? pageRows : -pageRows
+        setNoticeScrollOffset((offset) =>
+          Math.max(0, Math.min(noticeScrollMax, offset + delta)),
+        )
+        return
+      }
       const pageRows = Math.max(1, Math.floor(messageMaxRows / 2))
       const delta = scrollUp ? pageRows : -pageRows
       setMessageScrollOffset((offset) =>
@@ -1447,6 +1518,9 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
       {skillsOpen && skillsState !== undefined ? (
         <SkillsPicker state={skillsState} locale={snap.locale} maxRows={layout.overlayRows} />
       ) : null}
+      {pluginOpen && pluginState !== undefined ? (
+        <PluginsPicker state={pluginState} locale={snap.locale} maxRows={layout.overlayRows} />
+      ) : null}
       {modelPickerOpen && snap.modelPicker !== undefined ? (
         <ModelPicker
           state={snap.modelPicker}
@@ -1564,6 +1638,8 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
           agent={snap.agent}
           notice={snap.notice}
           locale={snap.locale}
+          noticeRows={noticeRowCount}
+          noticeScrollOffset={noticeScrollOffset}
         />
         {editorBusy ? (
           <Text color={theme.info} wrap="truncate-end">
