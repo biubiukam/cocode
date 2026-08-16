@@ -1,6 +1,6 @@
 /* Settings shell (figma 501:29904 mask context / 501:29947 panel): sidebar
    foot trigger row + centered 1080x700 modal panel. The trigger uses the
-   sidebar's 34px compact row / 36px rail circle rhythm; the
+   sidebar's 34px compact row / 36px rail rounded-rect rhythm; the
    panel is a two-column layout — 188px nav rail + content column with a
    54px header and the 24px-padded options area. */
 
@@ -30,7 +30,7 @@
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
-/* Rail trigger: the same 36x36 circle box as the other rail controls. */
+/* Rail trigger: the same 36x36 rounded rect as the other rail controls. */
 .trigger.rail {
   width: 36px;
   height: 36px;
@@ -38,7 +38,7 @@
   justify-content: center;
   gap: 0;
   padding: 0;
-  border-radius: 50%;
+  border-radius: 12px;
 }
 
 .triggerLabel {
@@ -81,13 +81,6 @@
   overflow: hidden;
   background: var(--dsw-alias-bg-layer-2);
   box-shadow: var(--dsw-shadow-lv3);
-  /* Elevated surface: the scrollbar thumb takes the l2 elevation tokens.
-     Declared on the panel rather than the scrolling `.options` child so the
-     elevation choice sits with the surface; the custom properties inherit
-     down to whichever descendant scrolls (see ui-theme
-     styles/scrollbar.css for the rebinding contract). */
-  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
-  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
 }
 
 /* Nav rail (figma .Setting-nav 501:29958): 188 wide, pad (12,22,12,0),
@@ -211,8 +204,28 @@
 .options {
   flex: 1;
   min-height: 0;
-  padding: 0 24px 24px;
+  /* Right inset is 16px: the 8px themed bar plus 2px thumb inset reads as the
+     figma 24px edge without the thumb hugging the r24 corner. */
+  padding: 0 16px 24px 24px;
   overflow-y: auto;
+  scrollbar-gutter: stable;
+  /* l1 pair on the scrollport: on dark panels the l2 elevation thumb resolves
+     to foreground and reads as a harsh light bar; l1 stays quiet until hover
+     (ui-theme styles/scrollbar.css rebinding contract). */
+  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l1);
+  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l1);
+}
+
+/* Panel-internal scrollbar: inset thumb floats off the rounded edge; track
+   margins keep travel out of the panel corners (ToolRow / TerminalBlock). */
+.options::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: 6px;
+}
+
+.options::-webkit-scrollbar-track {
+  margin: 12px 0;
 }
 
 /* Visually-hidden text seat (close button accessible name from slot content). */

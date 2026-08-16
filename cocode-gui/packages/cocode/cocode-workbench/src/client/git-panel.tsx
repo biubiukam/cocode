@@ -11,7 +11,7 @@ import type { WorkbenchPanelProps } from "./model.ts"
 import { sectionsOf, statusLetter, statusTone, gitRequest, type GitCommit, type GitRepo, type GitRow, type GitSection } from "./git-client.ts"
 import { useGitStore } from "./git-store.ts"
 import { branchMenuEntries, checkoutTarget, commitMenuEntries, moreMenuEntries, rowMenuEntries, sectionLabel, type GitCommand } from "./git-menus.ts"
-import { BranchIcon, DiscardIcon, MoreIcon, OpenFileIcon, RefreshIcon, SectionChevron, SparkleIcon, StageIcon, SyncIcon, UnstageIcon } from "./git-icons.tsx"
+import { BranchIcon, DiscardIcon, MoreIcon, OpenFileIcon, RefreshIcon, SectionChevron, SparkleIcon, StageIcon, StashApplyIcon, StashDropIcon, StashPopIcon, SyncIcon, UnstageIcon } from "./git-icons.tsx"
 import { GitIcon } from "./icons.tsx"
 import { State } from "./panel-state.tsx"
 import { localeRevision, subscribeLocale, t } from "./locales.ts"
@@ -365,6 +365,7 @@ export function GitPanel(props: WorkbenchPanelProps) {
   }
 
   const totalChanges = repo.files.length
+  const hasDiffableChanges = repo.files.some(file => file.group !== "untracked")
   // 有改动可提交，或处于修补/未完成操作中（此时可以提交一次空改动收尾）。
   const canCommit = totalChanges > 0 || repo.operation !== undefined
   const tracking = repo.ahead > 0 || repo.behind > 0
@@ -448,16 +449,16 @@ export function GitPanel(props: WorkbenchPanelProps) {
             void commit("commit")
           }}
         />
-        <span className={css.commitGenerate}>
+        <div className={css.commitGenerate}>
           <IconAction
             label={t("git.generateMessage")}
             busy={generating}
-            disabled={generating || totalChanges === 0}
+            disabled={generating || !hasDiffableChanges}
             onClick={() => void generateMessage()}
           >
             <SparkleIcon size={14} />
           </IconAction>
-        </span>
+        </div>
       </div>
       <div className={css.commitBar}>
         <button type="button" className={css.commitButton} disabled={state.busy || !canCommit} onClick={() => void commit("commit")}>
@@ -531,9 +532,9 @@ export function GitPanel(props: WorkbenchPanelProps) {
           <span className={css.rowIcon} />
           <span className={css.stashLabel} title={stash.label}>{stash.label}</span>
           <span className={css.rowActions}>
-            <IconAction label={t("git.stashApply")} onClick={() => void run("git.stashApply", { index: stash.index }).then(report)}><StageIcon size={14} /></IconAction>
-            <IconAction label={t("git.stashPop")} onClick={() => void run("git.stashPop", { index: stash.index }).then(report)}><OpenFileIcon size={14} /></IconAction>
-            <IconAction label={t("git.stashDrop")} onClick={() => setConfirm({ text: t("git.confirmStashDrop"), run: () => run("git.stashDrop", { index: stash.index }).then(report) })}><DiscardIcon size={14} /></IconAction>
+            <IconAction label={t("git.stashApply")} onClick={() => void run("git.stashApply", { index: stash.index }).then(report)}><StashApplyIcon size={14} /></IconAction>
+            <IconAction label={t("git.stashPop")} onClick={() => void run("git.stashPop", { index: stash.index }).then(report)}><StashPopIcon size={14} /></IconAction>
+            <IconAction label={t("git.stashDrop")} onClick={() => setConfirm({ text: t("git.confirmStashDrop"), run: () => run("git.stashDrop", { index: stash.index }).then(report) })}><StashDropIcon size={14} /></IconAction>
           </span>
         </div>,
       ))}

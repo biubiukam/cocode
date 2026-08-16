@@ -53,3 +53,29 @@ export function SparkleIcon(props: IconProps) {
 export function SectionChevron(props: IconProps) {
   return Icon(props, <path d="m6 4 4 4-4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />)
 }
+
+/** 应用 Stash：自贮藏区向下恢复到工作区，贮藏条目保留。 */
+export function StashApplyIcon(props: IconProps) {
+  return Icon(props, <>
+    <path d="M3.5 2.75h9v2.75H3.5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+    <path d="M8 6.25v3.25M6.25 8.75 8 10.5l1.75-1.75" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M4 12.75h8" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" />
+  </>)
+}
+
+/** 弹出 Stash：自贮藏区向上取出并应用，同时删除该条目。 */
+export function StashPopIcon(props: IconProps) {
+  return Icon(props, <>
+    <path d="M3.5 7.25h9v5.25H3.5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+    <path d="M8 7.25V3.75M6.25 5.5 8 3.75l1.75 1.75" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" />
+  </>)
+}
+
+/** 删除 Stash：丢弃贮藏条目，不恢复到工作区。 */
+export function StashDropIcon(props: IconProps) {
+  return Icon(props, <>
+    <path d="M6 4.25h4M6.75 4.25V3.5h2.5v.75" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M5.25 5.25h5.5l-.5 7h-4.5l-.5-7z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+    <path d="M6.75 7.25v3.25M9.25 7.25v3.25" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+  </>)
+}

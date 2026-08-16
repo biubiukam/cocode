@@ -9,7 +9,9 @@ import type { SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
   ModelRetryNode, TurnErrorNode, UserMessageNode,
 } from '@deepseek-ai/dsh-client-runtime/client'
-import { JsonBlock, MessageText, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
+import {
+  IconRefreshOutline16, JsonBlock, MessageText, StateDot, Tooltip,
+} from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatNodeViewProps, ChatViewSlotProps } from '../contract/slots.ts'
 import type { InjectFace } from '@deepseek-ai/dsh-client-ui-slots'
 import { ImageGallery, type ImageLoader } from '@deepseek-ai/dsh-client-ui-attachment'
@@ -142,14 +144,17 @@ function TurnErrorItem({ node, t, canRetry, retrying, onRetry }: {
         <div className={css.turnErrorHead}>
           <span className={css.turnErrorTitle}>{t('message.turnError')}</span>
           {canRetry && (
-            <button
-              type="button"
-              className={css.turnErrorRetry}
-              disabled={retrying}
-              onClick={onRetry}
-            >
-              {t('message.turnError.retry')}
-            </button>
+            <Tooltip label={t('message.turnError.retry')} side="bottom">
+              <button
+                type="button"
+                className={css.turnErrorRetry}
+                aria-label={t('message.turnError.retry')}
+                disabled={retrying}
+                onClick={onRetry}
+              >
+                <IconRefreshOutline16 />
+              </button>
+            </Tooltip>
           )}
         </div>
         <span className={css.turnErrorMessage}>{node.message}</span>

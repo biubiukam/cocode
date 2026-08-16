@@ -39,6 +39,12 @@
   padding-top: var(--dsh-desktop-titlebar-inset, 32px);
 }
 
+/* Expanded macOS: the wordmark needs a little more breathing room below the
+   traffic lights than the rail's 18px inset already provides when collapsed. */
+:global(html[data-dsh-desktop-platform='darwin']) .root:not(.collapsed) {
+  padding-top: calc(var(--dsh-desktop-titlebar-inset, 32px) + 10px);
+}
+
 :global(html[data-dsh-desktop='true']) .titlebarDragRegion {
   display: block;
   position: absolute;
@@ -198,7 +204,7 @@
   width: 28px;
   height: 28px;
   border: none;
-  border-radius: 50%;
+  border-radius: 8px;
   padding: 0;
   background: transparent;
   cursor: pointer;
@@ -212,6 +218,7 @@
 .collapsed .iconButton {
   width: 36px;
   height: 36px;
+  border-radius: 12px;
 }
 
 /* Rail logo swap: collapsed, the toggle rests as the whale mark (brand ink,

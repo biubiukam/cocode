@@ -135,22 +135,30 @@
   border-bottom: 1px solid var(--dsw-alias-border-l2);
 }
 
-/* 生成按钮浮在输入框右上角，输入区为它让出内边距。 */
+/* 生成按钮叠在输入框右上角，grid 叠层避免 textarea 抢点击。 */
 .commitField {
-  position: relative;
-  display: flex;
+  display: grid;
+}
+
+.commitInput,
+.commitGenerate {
+  grid-area: 1 / 1;
 }
 
 .commitGenerate {
-  position: absolute;
-  top: 4px;
-  right: 4px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-start;
+  padding: 7px 7px 0 0;
+  z-index: 1;
+  pointer-events: none;
 }
 
 .commitGenerate .iconButton {
   width: 22px;
   height: 22px;
   border-radius: 5px;
+  pointer-events: auto;
 }
 
 /* 生成中用呼吸代替旋转：星芒转起来不像在“想”，像在加载。 */
@@ -170,7 +178,7 @@
   width: 100%;
   min-height: 52px;
   max-height: 160px;
-  padding: 6px 30px 6px 8px;
+  padding: 6px 34px 6px 8px;
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 6px;
   color: var(--dsw-alias-label-primary);
