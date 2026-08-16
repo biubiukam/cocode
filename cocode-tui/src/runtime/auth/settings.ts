@@ -1,5 +1,5 @@
 /**
- * Read and patch DSH settings.yaml (LLM routes and default model).
+ * Read/patch harness settings.yaml (llm routes + default model).
  */
 
 import {
@@ -8,6 +8,7 @@ import {
   CLOUD_PROVIDER,
   DEFAULT_MODEL,
   DEFAULT_PROVIDER,
+  LEGACY_CLOUD_PROVIDER,
   type CloudModel,
 } from './types.ts'
 import { settingsPath } from './paths.ts'
@@ -86,7 +87,7 @@ export async function readSettings(home: string): Promise<ProductSettings> {
       ...(writable === undefined ? {} : { writable }),
     }
   }
-  const cloudRoute = providers[CLOUD_PROVIDER]
+  const cloudRoute = providers[CLOUD_PROVIDER] ?? providers[LEGACY_CLOUD_PROVIDER]
   const cloudModels =
     isRecord(cloudRoute) && Array.isArray(cloudRoute.models) ? cloudRoute.models : []
   const firstCloud = isRecord(cloudModels[0]) ? cloudModels[0] : undefined
@@ -98,7 +99,7 @@ export async function readSettings(home: string): Promise<ProductSettings> {
         ? agent.provider
         : DEFAULT_PROVIDER,
     model: typeof agent.model === 'string' && agent.model !== '' ? agent.model : DEFAULT_MODEL,
-    hasCloudRoute: isRecord(providers[CLOUD_PROVIDER]),
+    hasCloudRoute: isRecord(providers[CLOUD_PROVIDER]) || isRecord(providers[LEGACY_CLOUD_PROVIDER]),
     ...(cloudModel === undefined ? {} : { cloudModel }),
     providerCredentials,
   }
@@ -130,7 +131,7 @@ async function writeCloudRoute(
   const llm = isRecord(root['llm-pi-ai']) ? root['llm-pi-ai'] : {}
   const providers = isRecord(llm.providers) ? llm.providers : {}
   providers[CLOUD_PROVIDER] = {
-    displayName: 'Cocode Cloud',
+    displayName: 'Cocode Nut',
     api: CLOUD_API,
     baseURL: `${origin.replace(/\/$/, '')}/v1`,
     apiKeyEnv: CLOUD_KEY_REF,
@@ -182,7 +183,39 @@ async function loadRoot(home: string): Promise<Record<string, unknown>> {
   if (!isRecord(loaded.value)) {
     throw new TuiError('AUTH_SETTINGS_PARSE')
   }
-  return loaded.value
+  const migrated = migrateLegacyCloudRoot(loaded.value)
+  if (migrated !== loaded.value) {
+    await writeYamlFile(settingsPath(home), migrated, 0o600)
+  }
+  return migrated
+}
+
+function migrateLegacyCloudRoot(root: Record<string, unknown>): Record<string, unknown> {
+  const llm = isRecord(root['llm-pi-ai']) ? root['llm-pi-ai'] : undefined
+  if (llm === undefined) return root
+  const providers = isRecord(llm.providers) ? llm.providers : undefined
+  if (providers === undefined || !Object.prototype.hasOwnProperty.call(providers, LEGACY_CLOUD_PROVIDER)) {
+    return root
+  }
+  const next: Record<string, unknown> = { ...root }
+  const nextLlm: Record<string, unknown> = { ...llm }
+  const nextProviders: Record<string, unknown> = { ...providers }
+  const legacyRoute = nextProviders[LEGACY_CLOUD_PROVIDER]
+  if (!Object.prototype.hasOwnProperty.call(nextProviders, CLOUD_PROVIDER) && legacyRoute !== undefined) {
+    nextProviders[CLOUD_PROVIDER] = {
+      ...(isRecord(legacyRoute) ? legacyRoute : {}),
+      displayName: 'Cocode Nut',
+      apiKeyEnv: CLOUD_KEY_REF,
+    }
+  }
+  delete nextProviders[LEGACY_CLOUD_PROVIDER]
+  nextLlm.providers = nextProviders
+  next['llm-pi-ai'] = nextLlm
+  const agent = isRecord(root['agent-default-model']) ? root['agent-default-model'] : undefined
+  if (agent?.provider === LEGACY_CLOUD_PROVIDER) {
+    next['agent-default-model'] = { ...agent, provider: CLOUD_PROVIDER }
+  }
+  return next
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

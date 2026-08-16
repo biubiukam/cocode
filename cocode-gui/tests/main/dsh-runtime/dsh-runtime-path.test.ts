@@ -11,6 +11,7 @@ describe("DSH runtime HTTP surface", () => {
 			"/sidebar/api/fs.tree",
 			"/cocode/shortcuts",
 			"/cocode/shortcuts/api/settings.get",
+			"/cocode/workbench/api/fs.tree",
 		]) {
 			assert.equal(isDshHttpPath(path), true, path)
 		}
@@ -21,6 +22,7 @@ describe("DSH runtime HTTP surface", () => {
 			"/api?request=1",
 			"/sidebar/api/fs.tree?depth=1",
 			"/cocode/shortcuts/api/settings.get?scope=account",
+			"/cocode/workbench/api/fs.tree?depth=1",
 		]) {
 			assert.equal(isDshRuntimeRequestPath(path), true, path)
 		}

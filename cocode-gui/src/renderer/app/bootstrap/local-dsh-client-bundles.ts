@@ -36,7 +36,7 @@ const LOCAL_CLIENT_BUNDLES = new Map<string, string>([
 		"ui-workflow-run",
 		"ui-workspace",
 	].map((directory) => [`${CLIENT_PACKAGE_PREFIX}${directory}`, directory] as const),
-	["cocode-sidebar", "cocode/cocode-sidebar"],
+	["cocode-workbench", "cocode/cocode-workbench"],
 	["cocode-account", "cocode/cocode-account"],
 	["cocode-shortcuts", "cocode/cocode-shortcuts"],
 ])

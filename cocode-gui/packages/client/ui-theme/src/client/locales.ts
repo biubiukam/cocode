@@ -4,6 +4,7 @@
 export const zh = {
   'appearance.title': '外观',
   'appearance.light': '浅色',
+  'appearance.auto': '自动',
   'appearance.dark': '深色',
   'appearance.logo.title': 'Logo 显示',
   'appearance.logo.cocode': 'Cocode',
@@ -17,6 +18,7 @@ export type ThemeKey = keyof typeof zh
 export const en = {
   'appearance.title': 'Appearance',
   'appearance.light': 'Light',
+  'appearance.auto': 'Auto',
   'appearance.dark': 'Dark',
   'appearance.logo.title': 'Logo display',
   'appearance.logo.cocode': 'Cocode',

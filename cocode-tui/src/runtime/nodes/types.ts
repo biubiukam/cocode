@@ -63,6 +63,12 @@ export type AssistantNode = {
   text: string
   reasoning: string
   streaming: boolean
+  /** Whether the assistant is still in its reasoning phase. */
+  thinking?: boolean
+  /** Internal event-clock start used while assembling the node. */
+  thinkingStartedAt?: number
+  /** Event-clock duration spent in reasoning before answer/tool output began. */
+  thinkingDurationMs?: number
   usage?: { input: number; output: number }
 }
 

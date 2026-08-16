@@ -1,5 +1,8 @@
 import { Box, Text } from 'ink'
 import { listWindowStart } from '../list-window.ts'
+import { glyphs } from '../glyphs.ts'
+import { selectionStyle } from '../selection.ts'
+import { PANEL_BORDER } from '../layout.ts'
 import { theme } from '../theme.ts'
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
 
@@ -24,11 +27,11 @@ export function HistorySearch(props: {
     <Box
       flexDirection="column"
       marginTop={1}
-      borderStyle="round"
-      borderColor={theme.brand}
+      borderStyle={PANEL_BORDER}
+      borderColor={theme.border}
       paddingX={1}
     >
-      <Text color={theme.brand} bold wrap="truncate-end">
+      <Text color={theme.accent} bold wrap="truncate-end">
         {text(props.locale, 'history')}{' '}
         <Text color={theme.mute}>· {text(props.locale, 'historyHint')}</Text>
       </Text>
@@ -45,11 +48,10 @@ export function HistorySearch(props: {
           return (
             <Text
               key={`${start + offset}:${entry}`}
-              color={active ? theme.text : theme.mute}
-              inverse={active}
+              {...selectionStyle(active)}
               wrap="truncate-end"
             >
-              {active ? '›' : ' '} {entry.replaceAll('\n', ' ↵ ')}
+              {active ? glyphs.optionActive : glyphs.optionInactive} {entry.replaceAll('\n', ' ↵ ')}
             </Text>
           )
         })

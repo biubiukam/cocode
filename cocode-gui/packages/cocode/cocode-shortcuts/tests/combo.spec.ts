@@ -3,6 +3,8 @@ import {
   comboFromKeyboardEvent,
   comboId,
   formatCombo,
+  formatComboGlyphs,
+  formatComboSearchText,
   isUsableCombo,
   matchesCombo,
   normalizeKey,
@@ -32,6 +34,11 @@ describe("shortcut combos", () => {
     })
     expect(formatCombo({ key: "k", primary: true }, "MacIntel")).toBe("Cmd+K")
     expect(formatCombo({ key: "k", primary: true }, "Win32")).toBe("Ctrl+K")
+    expect(formatCombo({ key: "k", primary: true, control: true, shift: true }, "MacIntel")).toBe("Cmd+Ctrl+Shift+K")
+    expect(formatComboGlyphs({ key: "b", primary: true }, "MacIntel")).toBe("⌘B")
+    expect(formatComboGlyphs({ key: "k", primary: true, shift: true, alt: true }, "MacIntel")).toBe("⌥⇧⌘K")
+    expect(formatComboGlyphs({ key: "k", primary: true }, "Win32")).toBe("Ctrl+K")
+    expect(formatComboSearchText({ key: "b", primary: true }, "MacIntel")).toBe("Cmd+B ⌘B")
     expect(matchesCombo({ key: "k", control: true, shift: true }, event, "Win32")).toBe(true)
   })
 

@@ -8,6 +8,8 @@ import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from 're
 import clsx from 'clsx'
 import { writeClipboard } from '../clipboard.ts'
 import { grammarLoadCount, highlightToHtml, subscribeGrammarLoaded } from './highlight.ts'
+import { IconCheckOutline16, IconCopyOutline16 } from '../icons/index.tsx'
+import { Tooltip } from '../Tooltip.tsx'
 import css from './CodeBlock.module.css'
 
 export interface CodeBlockProps {
@@ -25,6 +27,7 @@ export interface CodeBlockProps {
 
 export function CodeBlock({ code, lang, className, copyLabel = '复制', copiedLabel = '复制成功' }: CodeBlockProps) {
   const trimmed = code.endsWith('\n') ? code.slice(0, -1) : code
+  const hasLanguage = lang !== undefined && lang.length > 0
   // Re-render when a lazy grammar finishes loading, so a fence that showed plain
   // text while its language's grammar imported picks up highlighting. The
   // snapshot value is opaque; only its change across renders drives the memo.
@@ -57,14 +60,25 @@ export function CodeBlock({ code, lang, className, copyLabel = '复制', copiedL
     )
 
   return (
-    <div ref={rootRef} className={clsx(css.block, 'md-code-block', className)}>
+    <div
+      ref={rootRef}
+      className={clsx(css.block, 'md-code-block', className)}
+      data-with-language={hasLanguage || undefined}
+    >
       <div className={css.bannerWrap}>
         <div className={css.banner}>
           <div className={css.infostring}>{lang ?? ''}</div>
           <div className={css.action}>
-            <button type="button" className={css.copyButton} onClick={onCopy}>
-              {copied ? copiedLabel : copyLabel}
-            </button>
+            <Tooltip label={copied ? copiedLabel : copyLabel} side="bottom">
+              <button
+                type="button"
+                className={css.copyButton}
+                aria-label={copied ? copiedLabel : copyLabel}
+                onClick={onCopy}
+              >
+                {copied ? <IconCheckOutline16 /> : <IconCopyOutline16 />}
+              </button>
+            </Tooltip>
           </div>
         </div>
       </div>

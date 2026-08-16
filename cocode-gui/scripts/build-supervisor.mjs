@@ -44,10 +44,10 @@ export function buildSupervisor({ clean = false, manifestPath = defaultManifestP
 		"runtime/plugins.json",
 		"runtime/plugins/cocode-vision/package.json",
 		"runtime/plugins/cocode-vision/lib/index.js",
-		...guiPlugins.flatMap(({ name }) => [
+		...guiPlugins.flatMap(({ name, hasClient }) => [
 			`runtime/plugins/${name}/package.json`,
 			`runtime/plugins/${name}/lib/index.js`,
-			`runtime/plugins/${name}/lib/client.js`,
+			...(hasClient ? [`runtime/plugins/${name}/lib/client.js`] : []),
 		]),
 	]
 	const outputFiles = [
@@ -138,7 +138,10 @@ function discoverGuiPlugins() {
 			const manifest = JSON.parse(readFileSync(manifestPath, "utf8"))
 			if (typeof manifest.name !== "string" || manifest.private !== true || !manifest.cocode)
 				return []
-			return [{ name: manifest.name, directory }]
+			// A Host-only plugin never declares a browser entry, so demanding a
+			// client bundle from it would reject a legitimate shape.
+			const hasClient = Boolean(manifest.dsh?.client || manifest.exports?.["./client"])
+			return [{ name: manifest.name, directory, hasClient }]
 		})
 		.sort((left, right) => left.name.localeCompare(right.name))
 }

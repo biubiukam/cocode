@@ -258,7 +258,7 @@ export class AgencyClient {
 	}
 
 	async models(apiKey: string): Promise<AgencyModel[]> {
-		if (!/^ck_[A-Za-z0-9_-]+$/.test(apiKey)) throw new Error("invalid Cocode Cloud API key")
+		if (!/^ck_[A-Za-z0-9_-]+$/.test(apiKey)) throw new Error("invalid Cocode Nut API key")
 		const response = await this.request<{ data?: { id?: string; name?: string }[] }>(
 			"/v1/me/models",
 			{ method: "GET", token: apiKey },
@@ -280,19 +280,41 @@ export class AgencyClient {
 		const fiveHoursAgo = new Date(now.getTime() - 5 * 60 * 60 * 1000).toISOString()
 		const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
 		const [credit, fiveHourUsage, weekUsage] = await Promise.all([
-			this.request<AgencyModelCredit>("/v1/me/model-credit", { method: "GET", token: accessToken }),
-			this.request<AgencyModelUsage>(`/v1/me/model-usage?from=${encodeURIComponent(fiveHoursAgo)}&to=${encodeURIComponent(to)}`, { method: "GET", token: accessToken }),
-			this.request<AgencyModelUsage>(`/v1/me/model-usage?from=${encodeURIComponent(weekAgo)}&to=${encodeURIComponent(to)}`, { method: "GET", token: accessToken }),
+			this.request<AgencyModelCredit>("/v1/me/model-credit", {
+				method: "GET",
+				token: accessToken,
+			}),
+			this.request<AgencyModelUsage>(
+				`/v1/me/model-usage?from=${encodeURIComponent(
+					fiveHoursAgo,
+				)}&to=${encodeURIComponent(to)}`,
+				{ method: "GET", token: accessToken },
+			),
+			this.request<AgencyModelUsage>(
+				`/v1/me/model-usage?from=${encodeURIComponent(weekAgo)}&to=${encodeURIComponent(
+					to,
+				)}`,
+				{ method: "GET", token: accessToken },
+			),
 		])
 		if (credit.status !== 200 || fiveHourUsage.status !== 200 || weekUsage.status !== 200)
-			throw new AgencyHttpError("could not load account usage", Math.max(credit.status, fiveHourUsage.status, weekUsage.status))
+			throw new AgencyHttpError(
+				"could not load account usage",
+				Math.max(credit.status, fiveHourUsage.status, weekUsage.status),
+			)
 		const granted = finiteNumber(credit.value.granted_microusd)
 		const settled = finiteNumber(credit.value.settled_microusd)
 		const reserved = finiteNumber(credit.value.reserved_microusd)
 		return {
 			plan: credit.value.plan?.trim() || "unknown",
-			fiveHour: usagePercent(finiteNumber(fiveHourUsage.value.totals?.billable_microusd), granted / 5),
-			week: usagePercent(finiteNumber(weekUsage.value.totals?.billable_microusd), granted / 2),
+			fiveHour: usagePercent(
+				finiteNumber(fiveHourUsage.value.totals?.billable_microusd),
+				granted / 5,
+			),
+			week: usagePercent(
+				finiteNumber(weekUsage.value.totals?.billable_microusd),
+				granted / 2,
+			),
 			month: usagePercent(settled + reserved, granted),
 			syncedAt: latestTimestamp(fiveHourUsage.value.fresh_at, weekUsage.value.fresh_at) ?? to,
 		}
@@ -351,6 +373,9 @@ function usagePercent(used: number, limit: number): number {
 
 function latestTimestamp(...values: (string | undefined)[]): string | undefined {
 	return values
-		.filter((value): value is string => typeof value === "string" && !Number.isNaN(Date.parse(value)))
+		.filter(
+			(value): value is string =>
+				typeof value === "string" && !Number.isNaN(Date.parse(value)),
+		)
 		.sort((left, right) => Date.parse(right) - Date.parse(left))[0]
 }

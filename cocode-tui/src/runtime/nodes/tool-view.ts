@@ -32,6 +32,22 @@ export function toolViewDetail(view: ToolView | undefined): string | undefined {
   return view.command === undefined ? 'terminal' : `terminal ${view.command}`
 }
 
+/** Select the most useful single-line object/result detail for a tool summary. */
+export function toolViewPrimaryDetail(view: ToolView | undefined): string | undefined {
+  if (view === undefined) return undefined
+  if (view.kind === 'read') return view.path
+  if (view.kind === 'search') return view.query
+  if (view.kind === 'terminal') return view.command
+  if (view.summary !== undefined && view.summary.files.length > 0) {
+    const fileLabel =
+      view.summary.files.length === 1
+        ? view.summary.files[0]?.path ?? '1 file'
+        : `${view.summary.files.length} files`
+    return `${fileLabel} · +${view.summary.additions}/-${view.summary.deletions}`
+  }
+  return view.paths?.join(', ')
+}
+
 export const PLAN_PROGRESS_MAX_CHARS = 1600
 
 /** Extract a complete or still-growing JSON string argument from a tool call. */

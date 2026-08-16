@@ -17,7 +17,7 @@ export function EmptyState(props: { maxRows?: number; maxColumns?: number; local
     >
       <WhaleLogo size={layout.logoSize} />
       {layout.showTitle ? (
-        <Text color={theme.brand} bold>
+        <Text color={theme.accent} bold>
           {text(props.locale, 'emptyTitle')}
         </Text>
       ) : null}

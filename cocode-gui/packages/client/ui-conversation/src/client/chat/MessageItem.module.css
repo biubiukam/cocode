@@ -212,7 +212,7 @@
 
 .turnErrorRow {
   display: grid;
-  grid-template-columns: 10px minmax(0, 1fr) auto;
+  grid-template-columns: 10px minmax(0, 1fr);
   gap: 8px;
   align-items: start;
   padding: 2px 0;
@@ -224,13 +224,22 @@
   margin-top: 5px;
 }
 
+.turnErrorStack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
 .turnErrorCopy {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   overflow-wrap: anywhere;
 }
 
 .turnErrorTitle {
-  margin-right: 6px;
+  min-width: 0;
   color: var(--dsw-alias-state-error-primary);
   font-weight: 600;
 }
@@ -239,9 +248,9 @@
   color: var(--dsw-alias-label-secondary);
 }
 
-.turnErrorCode {
-  color: var(--dsw-alias-label-tertiary);
-  font: var(--dsw-font-markdown-code-block-small);
+/* Same IconActions row as copy/branch: 28px hit targets, optically aligned. */
+.turnErrorActions {
+  margin-left: -6px;
 }
 
 .maxTokensTitle {

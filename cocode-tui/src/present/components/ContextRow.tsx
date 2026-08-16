@@ -17,7 +17,7 @@ export function ContextRow(props: {
 
   return (
     <Box flexDirection="column" marginTop={1} paddingLeft={1}>
-      <Text color={theme.info}>
+      <Text color={theme.accent}>
         ◇ {role}
         {details.map((detail, index) => (
           <Text key={`${detail}:${index}`} color={theme.mute}> · {detail}</Text>

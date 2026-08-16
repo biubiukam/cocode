@@ -1,5 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { homedir } from 'node:os'
+import { join, resolve } from 'node:path'
 import {
   canReuseOlderSupervisor,
   canonicalizeScope,
@@ -68,14 +70,14 @@ test('resolveHostScope applies the same environment-derived scope for every clie
     DSH_PROFILE: 'web',
     COCODE_HOST_CONFIG_FINGERPRINT: 'cocode-web-jsonrpc-v1',
     COCODE_RUNTIME_CHANNEL: 'stable',
-    COCODE_LLM_PROVIDERS: ' {"cocode-cloud":{"api":"openai-responses"}} ',
+    COCODE_LLM_PROVIDERS: ' {"cocode-nut":{"api":"openai-responses"}} ',
     COCODE_HOME: '/tmp/cocode-account',
-    COCODE_CLOUD_API_KEY: 'secret-is-not-part-of-the-scope',
+    COCODE_NUT_API_KEY: 'secret-is-not-part-of-the-scope',
   }
   const scope = resolveHostScope(env)
   assert.deepEqual(resolveHostRuntimeEnv(env), {
     COCODE_LLM_PROVIDERS: env.COCODE_LLM_PROVIDERS.trim(),
-    COCODE_VISION_CONFIG: '/tmp/cocode-account/vision.yaml',
+    COCODE_VISION_CONFIG: join(resolve('/tmp/cocode-account'), 'vision.yaml'),
   })
   assert.equal(scope.dshHome, '/tmp/cocode-dsh')
   assert.equal(scope.profile, 'web')
@@ -83,15 +85,33 @@ test('resolveHostScope applies the same environment-derived scope for every clie
   assert.match(scope.hostConfigFingerprint, /^cocode-web-jsonrpc-v1:[0-9a-f]{32}$/)
 })
 
+test('resolveHostScope expands a tilde-prefixed DSH_HOME', () => {
+  assert.equal(
+    resolveHostScope({ DSH_HOME: '~/.dsh' }).dshHome,
+    join(homedir(), '.dsh'),
+  )
+})
+
+test('resolveHostRuntimeEnv expands tilde-prefixed vision paths', () => {
+  assert.deepEqual(
+    resolveHostRuntimeEnv({ COCODE_HOME: '~/.cocode' }),
+    { COCODE_VISION_CONFIG: join(homedir(), '.cocode', 'vision.yaml') },
+  )
+  assert.deepEqual(
+    resolveHostRuntimeEnv({ COCODE_VISION_CONFIG: '~/.cocode/vision.yaml' }),
+    { COCODE_VISION_CONFIG: join(homedir(), '.cocode', 'vision.yaml') },
+  )
+})
+
 test('resolveHostScope ignores blank runtime configuration and secrets', () => {
   const scope = resolveHostScope({
     DSH_HOME: '/tmp/cocode-dsh',
     COCODE_LLM_PROVIDERS: '  ',
     COCODE_HOME: '  ',
-    COCODE_CLOUD_API_KEY: 'secret',
+    COCODE_NUT_API_KEY: 'secret',
   })
   assert.equal(scope.hostConfigFingerprint, 'cocode-web-jsonrpc-v1')
-  assert.deepEqual(resolveHostRuntimeEnv({ COCODE_CLOUD_API_KEY: 'secret' }), {})
+  assert.deepEqual(resolveHostRuntimeEnv({ COCODE_NUT_API_KEY: 'secret' }), {})
 })
 
 test('vision config location isolates shared Hosts by account home', () => {
@@ -158,7 +178,7 @@ test('older supervisor can be reused for an active compatible host', () => {
         clientKind: 'standalone-tui',
         requiredServices: ['jsonrpc'],
         minProtocolRevision: '1.0',
-        runtimeEnv: { COCODE_LLM_PROVIDERS: '{"cocode-cloud":{}}' },
+        runtimeEnv: { COCODE_LLM_PROVIDERS: '{"cocode-nut":{}}' },
       },
       { leaseCount: 1, descriptor: descriptor() },
     ),

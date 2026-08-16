@@ -33,15 +33,15 @@ function commandCatalog(ctx: ClientContext): readonly ShortcutCommand[] {
   return [
     {
       id: SIDEBAR_TOGGLE_COMMAND,
-      title: "切换侧栏",
-      description: "显示或隐藏左侧工作区栏",
+      title: "Toggle Sidebar",
+      description: "Show or hide the left workspace bar",
       defaultCombo: { key: "b", primary: true },
       run: () => { ctx.layout.toggleSidebar() },
     },
     {
       id: NEW_SESSION_COMMAND,
-      title: "新建会话",
-      description: "在当前或最近的工作区创建新会话",
+      title: "New Session",
+      description: "Create a new session in the current or most recent workspace",
       defaultCombo: { key: "n", primary: true },
       globalCapable: true,
       run: () => { ctx.workspaces.startSession() },

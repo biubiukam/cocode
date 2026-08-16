@@ -151,6 +151,9 @@ function tryChannel(
       provider === CLOUD_PROVIDER && cloudAccount
         ? createCloudProvider(origin, model, cloudModels)
         : undefined
+    // Harness credentials-local resolves file-backed refs from $DSH_HOME;
+    // only preserve an explicitly inherited env value in the launch env.
+    const launchCredential = nonempty(env[ref]) === undefined ? {} : { [ref]: value }
     return ready(
       mode,
       provider,
@@ -160,7 +163,7 @@ function tryChannel(
       accountHome ?? home,
       home,
       env,
-      { [ref]: value },
+      launchCredential,
       cloudProvider,
     )
   }
@@ -241,7 +244,7 @@ function createCloudProvider(
   cloudModels?: CloudModel[],
 ): CloudProviderProfile {
   return {
-    displayName: 'Cocode Cloud',
+    displayName: 'Cocode Nut',
     api: CLOUD_API,
     baseURL: `${origin.replace(/\/$/, '')}/v1`,
     apiKeyEnv: CLOUD_KEY_REF,

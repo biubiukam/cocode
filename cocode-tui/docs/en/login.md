@@ -44,14 +44,14 @@ The GUI and terminal share the official Harness settings and credentials under
 `~/.dsh`. Cocode identity tokens stay in `~/.cocode/account.yaml`; the TUI
 builds the Cocode provider route only for the current process.
 
-## Temporary overrides
+## Configuration directories
 
-To use another key for this process without changing saved config:
+Your API key is stored in the official Harness credentials file at
+`$DSH_HOME/.credentials.yaml`, defaulting to `~/.dsh/.credentials.yaml`. The TUI does not add a
+Cocode-specific API-key environment variable or copy the file-backed key into the process
+environment.
 
-- `DEEPSEEK_API_KEY` — use this DeepSeek key for this launch only
-- `COCODE_HOME` — use another Cocode account directory (default `~/.cocode`)
-- `DSH_HOME` — use another official Harness home for settings and credentials (default `~/.dsh`)
-
-You do not need these for daily use. Launch flags for development are in `.env.example`.
+Set `COCODE_HOME` (default `~/.cocode`) or `DSH_HOME` (default `~/.dsh`) when you need isolated
+configuration. Development launch flags are documented in `.env.example`.
 
 Sign-in or channel-switch failures show `CODE · explanation` on the status line. See [error codes](./errors.md).

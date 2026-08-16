@@ -47,11 +47,12 @@ describe('resolveAuth', () => {
     expect(result.status).toBe('ready')
     if (result.status !== 'ready') return
     expect(result.auth.provider).toBe('deepseek-official')
+    expect(result.auth.env.DEEPSEEK_API_KEY).toBeUndefined()
   })
 
   it('uses cloud when the account and key are both present', async () => {
     const home = await tempHome()
-    await patchCredential(home, 'COCODE_CLOUD_API_KEY', 'ck_live_x')
+    await patchCredential(home, 'COCODE_NUT_API_KEY', 'ck_live_x')
     await patchCloudRoute(home, 'https://cocode.agency', [{ id: 'cloud-1', name: 'Cloud' }])
     await expect(readFile(join(home, 'settings.yaml'), 'utf8')).resolves.toContain(
       'api: openai-responses',
@@ -67,7 +68,7 @@ describe('resolveAuth', () => {
     expect(result.status).toBe('ready')
     if (result.status !== 'ready') return
     expect(result.auth.mode).toBe('cocode')
-    expect(result.auth.provider).toBe('cocode-cloud')
+    expect(result.auth.provider).toBe('cocode-nut')
   })
 
   it('opens the gate when nothing is configured', async () => {
@@ -78,14 +79,14 @@ describe('resolveAuth', () => {
 
   it('does not treat a cloud key without a route as ready', async () => {
     const home = await tempHome()
-    await patchCredential(home, 'COCODE_CLOUD_API_KEY', 'ck_live_x')
+    await patchCredential(home, 'COCODE_NUT_API_KEY', 'ck_live_x')
     const result = await resolveAuth({ home, env: {}, cwd: '/work' })
     expect(result.status).toBe('gate')
   })
 
   it('does not trust a persisted cloud route without an account', async () => {
     const home = await tempHome()
-    await patchCredential(home, 'COCODE_CLOUD_API_KEY', 'ck_live_x')
+    await patchCredential(home, 'COCODE_NUT_API_KEY', 'ck_live_x')
     await patchCloudRoute(home, 'https://cocode.agency', [{ id: 'cloud-1', name: 'Cloud' }])
     const result = await resolveAuth({ home, env: {}, cwd: '/work' })
     expect(result.status).toBe('gate')
@@ -114,7 +115,7 @@ describe('resolveAuth', () => {
     expect(result.status).toBe('ready')
     if (result.status !== 'ready') return
     expect(result.auth.provider).toBe('ai-gateway')
-    expect(result.auth.env.AI_GATEWAY_API_KEY).toBe('gateway-secret')
+    expect(result.auth.env.AI_GATEWAY_API_KEY).toBeUndefined()
     expect(result.auth.env.DEEPSEEK_API_KEY).toBeUndefined()
   })
 
@@ -153,7 +154,7 @@ describe('resolveAuth', () => {
   it('prefers agent-default-model when both channels are configured', async () => {
     const home = await tempHome()
     await patchCredential(home, 'DEEPSEEK_API_KEY', 'sk-file')
-    await patchCredential(home, 'COCODE_CLOUD_API_KEY', 'ck_live_x')
+    await patchCredential(home, 'COCODE_NUT_API_KEY', 'ck_live_x')
     await writeFile(
       join(home, 'settings.yaml'),
       [
@@ -162,14 +163,14 @@ describe('resolveAuth', () => {
         '  model: deepseek-v4-flash',
         'llm-pi-ai:',
         '  providers:',
-        '    cocode-cloud:',
-        '      apiKeyEnv: COCODE_CLOUD_API_KEY',
+        '    cocode-nut:',
+        '      apiKeyEnv: COCODE_NUT_API_KEY',
         '      baseURL: https://cocode.agency/v1',
       ].join('\n'),
     )
     const result = await resolveAuth({
       home,
-      env: { DEEPSEEK_API_KEY: 'sk-env', COCODE_CLOUD_API_KEY: 'ck_env' },
+      env: { DEEPSEEK_API_KEY: 'sk-env', COCODE_NUT_API_KEY: 'ck_env' },
       cwd: '/work',
     })
     expect(result.status).toBe('ready')
@@ -177,7 +178,7 @@ describe('resolveAuth', () => {
     expect(result.auth.mode).toBe('byok')
     expect(result.auth.provider).toBe('deepseek-official')
     expect(result.auth.env.DEEPSEEK_API_KEY).toBe('sk-env')
-    expect(result.auth.env.COCODE_CLOUD_API_KEY).toBeUndefined()
+    expect(result.auth.env.COCODE_NUT_API_KEY).toBeUndefined()
   })
 
   it('falls back to BYOK when the preferred Cloud channel is gone', async () => {
@@ -185,7 +186,7 @@ describe('resolveAuth', () => {
     await patchCredential(home, 'DEEPSEEK_API_KEY', 'sk-file')
     await writeFile(
       join(home, 'settings.yaml'),
-      'agent-default-model:\n  provider: cocode-cloud\n  model: cloud-1\n',
+      'agent-default-model:\n  provider: cocode-nut\n  model: cloud-1\n',
     )
     const result = await resolveAuth({ home, env: {}, cwd: '/work' })
     expect(result.status).toBe('ready')

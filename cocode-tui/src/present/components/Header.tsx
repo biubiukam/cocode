@@ -1,6 +1,7 @@
 import { Box, Text } from 'ink'
 import type { TuiSnapshot } from '../../runtime/app.ts'
 import { workspaceName } from '../../runtime/workspace.ts'
+import { glyphs } from '../glyphs.ts'
 import { theme } from '../theme.ts'
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
 import { compactColumns } from '../panel-layout.ts'
@@ -10,6 +11,14 @@ type HeaderData = Partial<TuiSnapshot['header']> & {
   cwd: string
   branch?: string
 }
+
+/**
+ * Metrics are padded to a fixed width. They live at the right edge, so any
+ * change in their length shifts the whole meta run and squeezes the workspace
+ * name — the terminal equivalent of the design system's `tabular-nums` rule.
+ */
+const CONTEXT_WIDTH = 4
+const COUNT_WIDTH = 4
 
 export function Header(props: {
   header: HeaderData
@@ -29,10 +38,14 @@ export function Header(props: {
   const meta = wide
     ? [
         model === '' ? undefined : `${header.provider ?? ''}/${model}`,
-        context === undefined ? undefined : `ctx ${formatMetric(context)}%`,
-        tokens === undefined ? undefined : `${tokens.input}/${tokens.output}`,
+        context === undefined
+          ? undefined
+          : `ctx ${formatMetric(context).padStart(CONTEXT_WIDTH)}%`,
+        tokens === undefined
+          ? undefined
+          : `${formatCount(tokens.input)}/${formatCount(tokens.output)}`,
         props.status?.queueCount && props.status.queueCount > 0
-          ? `queue ${props.status.queueCount}`
+          ? `queue ${String(props.status.queueCount)}`
           : undefined,
       ].filter((value): value is string => value !== undefined && value !== '').join(' · ')
     : ''
@@ -46,7 +59,7 @@ export function Header(props: {
           {!compact && header.branch ? (
             <>
               <Text color={theme.mute}>·</Text>
-              <Text color={theme.brand} wrap="truncate-end">
+              <Text color={theme.dim} wrap="truncate-end">
                 #{header.branch}
               </Text>
             </>
@@ -59,7 +72,8 @@ export function Header(props: {
             </Text>
           ) : null}
           <Text color={theme.mute} wrap="truncate-start">
-            {text(props.locale, 'session')} {session}⌄
+            {text(props.locale, 'session')} {session}
+            {glyphs.chevronDown}
           </Text>
         </Box>
       </Box>
@@ -69,4 +83,15 @@ export function Header(props: {
 
 function formatMetric(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1)
+}
+
+/** Compact units keep a growing counter from widening the meta run. */
+function formatCount(value: number): string {
+  const compact =
+    value >= 1_000_000
+      ? `${(value / 1_000_000).toFixed(1)}m`
+      : value >= 1_000
+      ? `${(value / 1_000).toFixed(1)}k`
+      : String(value)
+  return compact.padStart(COUNT_WIDTH)
 }

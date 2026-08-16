@@ -10,7 +10,7 @@ help:
 	@echo "GUI dev:         make gui-dev      → desktop client + Vite on :5273"
 	@echo "                 make dev gui      → alias for make gui-dev"
 	@echo "GUI build:       make gui-build    → Electron Forge distributables"
-	@echo "GUI (browser):   make dev gui-web  → http://localhost:5273"
+	@echo "GUI (browser):   make dev gui-web  → http://localhost:5273 (DSH runtime auto-started)"
 	@echo "GUI cache:       make dev gui reuses the OS cache directory"
 	@echo "                 DSH_FORCE_RESTAGE=1 make dev gui  → refresh runtime cache"
 	@echo "                 DSH_DISABLE_RUNTIME_CACHE=1 make dev gui  → isolated runtime"

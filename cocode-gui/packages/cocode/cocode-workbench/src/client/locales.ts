@@ -1,0 +1,346 @@
+/**
+ * Workbench 词典。
+ *
+ * 面板由 `descriptor.render(props)` 命令式渲染，不经过 slot 的注入通道，因此
+ * 拿不到框架合成的 `t` 座位。这里改用模块级 `t()`：`apply()` 把 locale 服务
+ * 挂进来，任意深度的面板都能直接翻译；根组件订阅 {@link subscribeLocale} 让
+ * 整棵树在语言切换时重渲染。服务缺席时（测试、独立挂载）回退到浏览器语言，
+ * 界面不会退化成一堆键名。
+ */
+
+/** 本包的词典命名空间；DSH 内置的 `sidebar` 等命名空间不能占用。 */
+export const LOCALE_NS = "cocodeWorkbench"
+
+export const zh = {
+  "panel.files": "文件",
+  "panel.preview": "预览",
+  "panel.git": "源代码管理",
+  "panel.jobs": "任务",
+  "panel.terminal": "终端",
+  "panel.browser": "浏览器",
+  "panel.subagents": "子智能体",
+
+  "git.refresh": "刷新",
+  "git.detached": "游离 HEAD",
+  "git.ahead": "领先 {count} 个提交",
+  "git.behind": "落后 {count} 个提交",
+  "git.sync": "同步更改",
+  "git.push": "推送",
+  "git.pushForce": "强制推送",
+  "git.pull": "拉取",
+  "git.pullRebase": "拉取（变基）",
+  "git.fetch": "获取",
+  "git.more": "更多操作",
+  "git.checkout": "切换分支…",
+  "git.branchCreate": "新建分支…",
+  "git.branchDelete": "删除分支…",
+  "git.stash": "Stash（暂存）",
+  "git.stashPush": "Stash 更改",
+  "git.stashPushUntracked": "Stash 更改（含未跟踪）",
+  "git.stashPop": "弹出 Stash…",
+  "git.stashApply": "应用 Stash…",
+  "git.stashDrop": "删除 Stash…",
+  "git.history": "提交历史",
+  "git.abortMerge": "中止合并",
+
+  "git.commitPlaceholder": "消息 ({key} 在“{branch}”提交)",
+  "git.commit": "提交",
+  "git.commitAndPush": "提交并推送",
+  "git.commitAndSync": "提交并同步",
+  "git.commitAmend": "修补上次提交",
+  "git.commitSignoff": "提交并署名",
+  "git.commitEmpty": "请先填写提交信息",
+  "git.generateMessage": "用模型生成 Git 提交信息",
+  "git.generatingMessage": "正在生成提交信息…",
+
+  "settings.nav": "工作台",
+  "settings.commitModel": "Git Commit Message 生成模型",
+  "settings.commitModelHint": "在源代码管理面板中，为 Git 提交生成 Commit Message 时使用的模型。",
+  "settings.commitModelAuto": "自动",
+  "settings.commitModelResolved": "当前使用：{model}",
+  "settings.readOnly": "设置文件为只读，无法修改。",
+  "settings.noModel": "没有可用的模型，请先在「模型」中配置提供方。",
+
+  "git.group.merge": "合并更改",
+  "git.group.index": "暂存的更改",
+  "git.group.worktree": "更改",
+  "git.stageAll": "暂存所有更改",
+  "git.unstageAll": "取消暂存所有更改",
+  "git.discardAll": "撤销所有更改",
+
+  "git.openFile": "打开文件",
+  "git.openChanges": "打开更改",
+  "git.stage": "暂存更改",
+  "git.unstage": "取消暂存更改",
+  "git.discard": "撤销更改",
+  "git.ignore": "添加到 .gitignore",
+  "git.copyPath": "复制路径",
+  "git.reveal": "在文件管理器中显示",
+
+  "git.empty": "没有更改",
+  "git.emptyHint": "工作区与上一次提交一致。",
+  "git.notRepo": "此工作区不是 Git 仓库",
+  "git.notRepoHint": "初始化之后才能跟踪改动、提交并查看历史。",
+  "git.init": "初始化仓库",
+  "git.noSession": "请先打开一个会话",
+  "git.noSessionHint": "源代码管理跟随当前会话的工作区。",
+
+  "git.confirmDiscard": "确定撤销对 {name} 的更改吗？文件将恢复为上次提交的版本，此操作无法恢复。",
+  "git.confirmDiscardAll": "确定撤销全部 {count} 处更改吗？此操作无法恢复。",
+  "git.confirmStashDrop": "确定删除该 Stash 吗？",
+
+  "git.operation.merge": "正在合并",
+  "git.operation.rebase": "正在变基",
+  "git.operation.cherry-pick": "正在拣选提交",
+  "git.operation.revert": "正在还原提交",
+
+  "git.promptBranchName": "分支名",
+  "git.promptStashMessage": "Stash 说明（可选）",
+  "git.pickBranch": "选择要切换的分支",
+
+  "git.diffEmpty": "没有可显示的差异",
+  "git.diffBinary": "二进制文件，无法显示差异",
+  "git.diffStaged": "已暂存",
+  "git.diffWorktree": "工作区",
+
+  "git.historyEmpty": "还没有提交记录",
+
+  "browser.address": "输入网址",
+  "browser.addressInvalid": "请输入完整网址，例如 example.com；此处不做搜索",
+  "browser.back": "后退",
+  "browser.forward": "前进",
+  "browser.reload": "刷新",
+  "browser.stop": "停止",
+  "browser.go": "前往",
+  "browser.openExternal": "在系统浏览器中打开",
+  "browser.agentTab": "智能体",
+  "browser.takeOver": "收回控制权",
+  "browser.detachedTab": "有一个未显示的页面：{title}",
+  "browser.showTab": "查看",
+  "browser.connecting": "正在连接浏览器…",
+  "browser.reconnecting": "正在重连…",
+  "browser.searching": "正在查找可用的浏览器…",
+  "browser.downloading": "正在下载 Chromium…",
+  "browser.downloadOnce": "只需下载一次，之后所有会话共用。",
+  "browser.needEngine": "本机没有找到 Chrome 或 Edge。可以改为下载 Chromium，约 150 MB，只保存一份在 Cocode 主目录下。",
+  "browser.install": "下载 Chromium",
+  "browser.agentWants": "智能体请求：{summary}",
+  "browser.allow": "允许",
+  "browser.deny": "拒绝",
+  "browser.downloadingFile": "正在下载 {name}",
+
+  "preview.source": "源码",
+  "preview.preview": "预览",
+  "preview.viewMode": "查看方式",
+  "preview.save": "保存",
+  "preview.saving": "保存中…",
+  "preview.truncated": "内容过长 · 只读",
+  "preview.pickFile": "请从「文件」中选择一个文件",
+  "preview.download": "下载文件",
+
+  "terminal.noSession": "请先打开一个会话",
+  "terminal.connecting": "正在启动 Shell…",
+  "terminal.reconnecting": "正在重连…",
+  "terminal.exited": "Shell 已退出（代码 {code}）",
+  "terminal.superseded": "该终端已被另一个窗口接管",
+  "terminal.refused": "宿主拒绝了此终端",
+  "terminal.restart": "重启",
+
+  "common.cancel": "取消",
+  "common.confirm": "确定",
+  "common.close": "关闭",
+  "common.loading": "加载中…",
+  "common.failed": "加载失败",
+  "common.retry": "重试",
+  "common.copy": "复制",
+  "common.copied": "已复制",
+} as const
+
+export type WorkbenchKey = keyof typeof zh
+
+export const en: Record<WorkbenchKey, string> = {
+  "panel.files": "Files",
+  "panel.preview": "Preview",
+  "panel.git": "Source Control",
+  "panel.jobs": "Jobs",
+  "panel.terminal": "Terminal",
+  "panel.browser": "Browser",
+  "panel.subagents": "Subagents",
+
+  "git.refresh": "Refresh",
+  "git.detached": "Detached HEAD",
+  "git.ahead": "{count} commits ahead",
+  "git.behind": "{count} commits behind",
+  "git.sync": "Sync Changes",
+  "git.push": "Push",
+  "git.pushForce": "Force Push",
+  "git.pull": "Pull",
+  "git.pullRebase": "Pull (Rebase)",
+  "git.fetch": "Fetch",
+  "git.more": "More Actions",
+  "git.checkout": "Checkout to…",
+  "git.branchCreate": "Create Branch…",
+  "git.branchDelete": "Delete Branch…",
+  "git.stash": "Stash",
+  "git.stashPush": "Stash Changes",
+  "git.stashPushUntracked": "Stash Changes (Include Untracked)",
+  "git.stashPop": "Pop Stash…",
+  "git.stashApply": "Apply Stash…",
+  "git.stashDrop": "Drop Stash…",
+  "git.history": "Commit History",
+  "git.abortMerge": "Abort Merge",
+
+  "git.commitPlaceholder": "Message ({key} to commit on \"{branch}\")",
+  "git.commit": "Commit",
+  "git.commitAndPush": "Commit & Push",
+  "git.commitAndSync": "Commit & Sync",
+  "git.commitAmend": "Amend Last Commit",
+  "git.commitSignoff": "Commit with Sign-off",
+  "git.commitEmpty": "Please provide a commit message",
+  "git.generateMessage": "Generate Git Commit Message",
+  "git.generatingMessage": "Generating commit message…",
+
+  "settings.nav": "Workbench",
+  "settings.commitModel": "Git commit message model",
+  "settings.commitModelHint": "The model used to generate Git commit messages in Source Control.",
+  "settings.commitModelAuto": "Automatic",
+  "settings.commitModelResolved": "Currently using {model}",
+  "settings.readOnly": "The settings file is read-only.",
+  "settings.noModel": "No model is available. Configure a provider under Models first.",
+
+  "git.group.merge": "Merge Changes",
+  "git.group.index": "Staged Changes",
+  "git.group.worktree": "Changes",
+  "git.stageAll": "Stage All Changes",
+  "git.unstageAll": "Unstage All Changes",
+  "git.discardAll": "Discard All Changes",
+
+  "git.openFile": "Open File",
+  "git.openChanges": "Open Changes",
+  "git.stage": "Stage Changes",
+  "git.unstage": "Unstage Changes",
+  "git.discard": "Discard Changes",
+  "git.ignore": "Add to .gitignore",
+  "git.copyPath": "Copy Path",
+  "git.reveal": "Reveal in File Manager",
+
+  "git.empty": "No changes",
+  "git.emptyHint": "The working tree matches the last commit.",
+  "git.notRepo": "This workspace is not a Git repository",
+  "git.notRepoHint": "Initialize it to track changes, commit and browse history.",
+  "git.init": "Initialize Repository",
+  "git.noSession": "Open a session first",
+  "git.noSessionHint": "Source control follows the workspace of the active session.",
+
+  "git.confirmDiscard": "Discard changes in {name}? This is irreversible.",
+  "git.confirmDiscardAll": "Discard all {count} changes? This is irreversible.",
+  "git.confirmStashDrop": "Drop this stash?",
+
+  "git.operation.merge": "Merging",
+  "git.operation.rebase": "Rebasing",
+  "git.operation.cherry-pick": "Cherry-picking",
+  "git.operation.revert": "Reverting",
+
+  "git.promptBranchName": "Branch name",
+  "git.promptStashMessage": "Stash message (optional)",
+  "git.pickBranch": "Select a branch to check out",
+
+  "git.diffEmpty": "No changes to display",
+  "git.diffBinary": "Binary file, no diff available",
+  "git.diffStaged": "Staged",
+  "git.diffWorktree": "Working Tree",
+
+  "git.historyEmpty": "No commits yet",
+
+  "browser.address": "Enter address",
+  "browser.addressInvalid": "Enter a full address such as example.com; this bar does not search",
+  "browser.back": "Back",
+  "browser.forward": "Forward",
+  "browser.reload": "Reload",
+  "browser.stop": "Stop",
+  "browser.go": "Go",
+  "browser.openExternal": "Open in system browser",
+  "browser.agentTab": "agent",
+  "browser.takeOver": "Take over this page",
+  "browser.detachedTab": "A page no panel is showing: {title}",
+  "browser.showTab": "Show",
+  "browser.connecting": "Connecting to the browser…",
+  "browser.reconnecting": "Reconnecting…",
+  "browser.searching": "Looking for a browser…",
+  "browser.downloading": "Downloading Chromium…",
+  "browser.downloadOnce": "This runs once and is shared by every Cocode session.",
+  "browser.needEngine": "Cocode uses Chrome or Edge if either is installed. Neither was found, so it can download Chromium instead — about 150 MB, stored once under your Cocode home directory.",
+  "browser.install": "Download Chromium",
+  "browser.agentWants": "The agent wants to {summary}",
+  "browser.allow": "Allow",
+  "browser.deny": "Deny",
+  "browser.downloadingFile": "Downloading {name}",
+
+  "preview.source": "Source",
+  "preview.preview": "Preview",
+  "preview.viewMode": "View mode",
+  "preview.save": "Save",
+  "preview.saving": "Saving…",
+  "preview.truncated": "Truncated · read only",
+  "preview.pickFile": "Choose a file from Files",
+  "preview.download": "Download file",
+
+  "terminal.noSession": "Open a session first",
+  "terminal.connecting": "Starting the shell…",
+  "terminal.reconnecting": "Reconnecting…",
+  "terminal.exited": "Shell exited with code {code}",
+  "terminal.superseded": "Another window took this terminal over",
+  "terminal.refused": "The host refused this terminal",
+  "terminal.restart": "Restart",
+
+  "common.cancel": "Cancel",
+  "common.confirm": "OK",
+  "common.close": "Close",
+  "common.loading": "Loading…",
+  "common.failed": "Could not load",
+  "common.retry": "Retry",
+  "common.copy": "Copy",
+  "common.copied": "Copied",
+}
+
+/** locale 服务中本模块真正用到的部分，避免值依赖 locale 包（客户端包纯度）。 */
+export interface WorkbenchLocaleService {
+  bind(ns: string): (key: string, params?: Record<string, unknown>) => string
+  getSnapshot(): { active: string; revision: number }
+  subscribe(listener: () => void): () => void
+}
+
+let service: WorkbenchLocaleService | undefined
+let bound: ((key: string, params?: Record<string, unknown>) => string) | undefined
+
+/** 由 `apply()` 调用，把宿主的 locale 服务接进模块级 `t()`。 */
+export function attachLocale(next: WorkbenchLocaleService | undefined): void {
+  service = next
+  bound = next?.bind(LOCALE_NS)
+}
+
+/** 根组件用它订阅语言切换；服务缺席时是一个永不触发的空订阅。 */
+export function subscribeLocale(listener: () => void): () => void {
+  return service?.subscribe(listener) ?? (() => { /* 无服务时语言不会变 */ })
+}
+
+/** uSES 的快照源：修订号变化即触发重渲染。 */
+export function localeRevision(): number {
+  return service?.getSnapshot().revision ?? 0
+}
+
+function fallbackDict(): Record<WorkbenchKey, string> {
+  const tag = typeof navigator === "undefined" ? "zh" : (navigator.language ?? "zh")
+  return tag.toLowerCase().startsWith("zh") ? zh : en
+}
+
+function format(template: string, params?: Record<string, unknown>): string {
+  if (params === undefined) return template
+  return template.replace(/\{(\w+)\}/g, (match, name: string) => name in params ? String(params[name]) : match)
+}
+
+/** 翻译一个键；缺失时原样返回键名，让遗漏在界面上暴露而不是留白。 */
+export function t(key: WorkbenchKey, params?: Record<string, unknown>): string {
+  if (bound !== undefined) return bound(key, params)
+  return format(fallbackDict()[key], params)
+}

@@ -93,17 +93,41 @@ export function matchesCombo(
   return true
 }
 
+function comboKeyLabel(combo: Combo): string {
+  return combo.key.length === 1 ? combo.key.toUpperCase() : combo.key
+}
+
 /** Format a Combo for the current platform and the settings UI. */
 export function formatCombo(combo: Combo | undefined, platform = currentPlatform()): string {
-  if (combo === undefined) return "未设置"
+  if (combo === undefined) return ""
   const mac = isMacPlatform(platform)
   const parts: string[] = []
   if (combo.primary) parts.push(mac ? "Cmd" : "Ctrl")
-  if (combo.control && !combo.primary) parts.push("Ctrl")
+  if (combo.control && (mac || !combo.primary)) parts.push("Ctrl")
   if (combo.alt) parts.push(mac ? "Option" : "Alt")
   if (combo.shift) parts.push("Shift")
-  parts.push(combo.key.length === 1 ? combo.key.toUpperCase() : combo.key)
+  parts.push(comboKeyLabel(combo))
   return parts.join("+")
+}
+
+/** Compact glyph form for keycaps: ⌘B on macOS, Ctrl+B elsewhere. */
+export function formatComboGlyphs(combo: Combo | undefined, platform = currentPlatform()): string {
+  if (combo === undefined) return ""
+  if (!isMacPlatform(platform)) return formatCombo(combo, platform)
+  const parts: string[] = []
+  if (combo.control) parts.push("⌃")
+  if (combo.alt) parts.push("⌥")
+  if (combo.shift) parts.push("⇧")
+  if (combo.primary) parts.push("⌘")
+  parts.push(comboKeyLabel(combo))
+  return parts.join("")
+}
+
+/** Search haystack covering both the readable and glyph renderings. */
+export function formatComboSearchText(combo: Combo | undefined, platform = currentPlatform()): string {
+  const readable = formatCombo(combo, platform)
+  const glyphs = formatComboGlyphs(combo, platform)
+  return readable === glyphs ? readable : `${readable} ${glyphs}`
 }
 
 /** Convert a Combo to Electron's platform-neutral accelerator syntax. */

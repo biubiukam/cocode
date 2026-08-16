@@ -215,7 +215,7 @@ export function createBuiltinCommands(): CommandRegistry {
   local('login', 'Sign in with Cocode', (ctx) => {
     ctx.useAuth?.('login')
   })
-  local('logout', 'Sign out of Cocode Cloud', (ctx) => {
+  local('logout', 'Sign out of Cocode Nut', (ctx) => {
     void ctx.logout()
   })
   registry.register({
@@ -360,7 +360,7 @@ export function helpText(
       ? undefined
       : locale === 'zh'
         ? `${displayShortcut('transcript.toggleVerbose')} 详情`
-        : `${displayShortcut('transcript.toggleVerbose')} verbose`,
+        : `${displayShortcut('transcript.toggleVerbose')} details`,
     displayShortcut('editor.open') === undefined
       ? undefined
       : locale === 'zh'

@@ -6,44 +6,19 @@ import { describe, expect, it } from 'vitest'
 import {
   Inspector,
 } from '../../src/present/components/Inspector.tsx'
-import {
-  inspectorSkillsToggleRow,
-  type InspectorMouseInput,
-} from '../../src/present/inspector-scroll.ts'
 import { createTuiApp, type TuiSnapshot } from '../../src/runtime/app.ts'
 
-describe('Inspector scrolling and expansion', () => {
-  it('expands the collapsed skills row on click and scrolls the expanded content', async () => {
+describe('Inspector', () => {
+  it('does not render diagnostic skills or capability sections', async () => {
     const snapshot = createSnapshot(47)
-    const hasActivity = true
-    const toggleRow = inspectorSkillsToggleRow({
-      snapshot,
-      hasActivity,
-      hasContext: false,
-      hasFiles: false,
-    })
-    expect(toggleRow).toBeDefined()
 
     const stdin = new InputStream()
     const stdout = new CaptureStream(30, 40)
-    const click: InspectorMouseInput = {
-      id: 1,
-      event: {
-        action: 'press',
-        button: 0,
-        x: 10,
-        y: 3 + (toggleRow ?? 0),
-        shift: false,
-        alt: false,
-        ctrl: false,
-      },
-    }
     const screen = render(
       React.createElement(Inspector, {
         snapshot,
         locale: 'en',
         maxRows: 40,
-        mouseInput: click,
       }),
       {
         stdin: stdin as unknown as NodeJS.ReadStream,
@@ -56,34 +31,13 @@ describe('Inspector scrolling and expansion', () => {
 
     await flush()
     await flush()
-    screen.rerender(
-      React.createElement(Inspector, {
-        snapshot,
-        locale: 'en',
-        maxRows: 40,
-        mouseInput: {
-          id: 2,
-          event: {
-            action: 'press',
-            button: 'wheel-down',
-            x: 10,
-            y: 20,
-            shift: false,
-            alt: false,
-            ctrl: false,
-          },
-        },
-      }),
-    )
-    await flush()
-    await flush()
     screen.unmount()
     await flush()
     screen.cleanup()
 
     const output = stdout.output.replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, '')
-    expect(output).toContain('/skill-14')
-    expect(output).toContain('↑ wheel / Alt+↑ · 11')
+    expect(output).not.toContain('Skills')
+    expect(output).not.toContain('Capabilities')
   })
 })
 

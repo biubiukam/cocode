@@ -6,6 +6,9 @@ import {
 } from '../../runtime/session-tree-picker.ts'
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
 import { listWindowStart } from '../list-window.ts'
+import { glyphs } from '../glyphs.ts'
+import { selectionStyle } from '../selection.ts'
+import { PANEL_BORDER } from '../layout.ts'
 import { theme } from '../theme.ts'
 
 export function SessionTreePicker(props: {
@@ -26,8 +29,8 @@ export function SessionTreePicker(props: {
     <Box
       flexDirection="column"
       marginTop={1}
-      borderStyle="round"
-      borderColor={theme.brand}
+      borderStyle={PANEL_BORDER}
+      borderColor={theme.border}
       paddingX={1}
     >
       <Text color={theme.text} bold wrap="truncate-end">
@@ -38,7 +41,11 @@ export function SessionTreePicker(props: {
         {text(props.locale, 'sessionTreeQuery', { query: props.state.query || '…' })}
       </Text>
       <Text color={theme.dim} wrap="truncate-end">
-        {text(props.locale, 'sessionTreeLegend')}
+        {text(props.locale, 'sessionTreeLegend', {
+          done: glyphs.checkDone,
+          running: glyphs.checkActive,
+          idle: glyphs.optionInactive,
+        })}
       </Text>
       {start > 0 ? <Text color={theme.mute}>↑ {start}</Text> : null}
       {visible.length === 0 ? (
@@ -51,25 +58,27 @@ export function SessionTreePicker(props: {
           const marker = item.orphaned
             ? '!'
             : item.current || current
-            ? '✓'
+            ? glyphs.checkDone
             : item.activity === 'running'
-            ? '◉'
+            ? glyphs.checkActive
             : item.activity === 'idle'
-            ? '·'
+            ? glyphs.optionInactive
             : ' '
           const attachedActivity =
-            (item.current || current) && item.activity === 'running' ? ' ◉' : ''
+            (item.current || current) && item.activity === 'running'
+              ? ` ${glyphs.checkActive}`
+              : ''
           const indent = '  '.repeat(Math.min(item.depth, 8))
           const title =
             item.session.title ?? item.session.preview ?? text(props.locale, 'resumeNoSummary')
           return (
             <Text
               key={`${item.session.id}:${item.depth}`}
+              {...selectionStyle(active)}
               color={active ? theme.text : theme.mute}
-              inverse={active}
               wrap="truncate-end"
             >
-              {active ? '›' : ' '} {marker}{attachedActivity} {indent}
+              {active ? glyphs.optionActive : glyphs.optionInactive} {marker}{attachedActivity} {indent}
               {title} · {item.session.id.slice(0, 8)}{' '}
               <Text color={active ? theme.text : theme.dim}>
                 {formatTimestamp(item.updatedAt ?? item.session.createdAt, props.locale)}

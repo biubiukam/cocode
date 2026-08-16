@@ -27,6 +27,25 @@
   border-top-right-radius: var(--dsl-code-block-border-radius);
 }
 
+/* A fence without a language still needs the copy action, but an empty
+   language banner should not reserve a full row above the first code line. */
+.block:not([data-with-language]) .bannerWrap {
+  position: absolute;
+  inset: 0 0 auto;
+  background: transparent;
+  pointer-events: none;
+}
+
+.block:not([data-with-language]) .banner {
+  justify-content: flex-end;
+  background: transparent;
+  pointer-events: none;
+}
+
+.block:not([data-with-language]) .copyButton {
+  pointer-events: auto;
+}
+
 .banner {
   background: var(--dsl-code-block-banner-background-color);
   padding: 9px 14px;
@@ -57,13 +76,29 @@
 }
 
 .copyButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
   background-color: rgb(255 255 255 / 0);
   border: none;
-  padding: 0;
+  padding: 6px;
   margin: 0;
-  color: inherit;
+  border-radius: 28px;
+  color: var(--dsw-alias-label-tertiary);
   cursor: pointer;
   font: inherit;
+}
+
+.copyButton:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-secondary);
+}
+
+.copyButton:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 2px;
 }
 
 .block :where(pre) {

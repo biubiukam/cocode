@@ -25,12 +25,12 @@ describe('credentials', () => {
   it('patches one ref without dropping others', async () => {
     const home = await tempHome()
     await patchCredential(home, 'DEEPSEEK_API_KEY', 'sk-one')
-    await patchCredential(home, 'COCODE_CLOUD_API_KEY', 'ck_live_two')
+    await patchCredential(home, 'COCODE_NUT_API_KEY', 'ck_live_two')
     expect(await readCredentials(home)).toEqual({
       DEEPSEEK_API_KEY: 'sk-one',
-      COCODE_CLOUD_API_KEY: 'ck_live_two',
+      COCODE_NUT_API_KEY: 'ck_live_two',
     })
-    await patchCredential(home, 'COCODE_CLOUD_API_KEY', undefined)
+    await patchCredential(home, 'COCODE_NUT_API_KEY', undefined)
     expect(await readCredentials(home)).toEqual({
       DEEPSEEK_API_KEY: 'sk-one',
     })

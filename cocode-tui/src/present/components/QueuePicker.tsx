@@ -6,6 +6,9 @@ import {
 } from '../../runtime/prompt-queue-picker.ts'
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
 import { listWindowStart } from '../list-window.ts'
+import { glyphs } from '../glyphs.ts'
+import { selectionStyle } from '../selection.ts'
+import { PANEL_BORDER } from '../layout.ts'
 import { theme } from '../theme.ts'
 import { sanitizeSingleLine } from '../text-format.ts'
 
@@ -26,8 +29,8 @@ export function QueuePicker(props: {
     <Box
       flexDirection="column"
       marginTop={1}
-      borderStyle="round"
-      borderColor={theme.brand}
+      borderStyle={PANEL_BORDER}
+      borderColor={theme.border}
       paddingX={1}
     >
       <Text color={theme.text} bold wrap="truncate-end">
@@ -47,11 +50,10 @@ export function QueuePicker(props: {
           return (
             <Text
               key={item.id}
-              color={active ? theme.text : theme.mute}
-              inverse={active}
+              {...selectionStyle(active)}
               wrap="truncate-end"
             >
-              {active ? '›' : ' '} {sanitizeSingleLine(item.text) || '…'}
+              {active ? glyphs.optionActive : glyphs.optionInactive} {sanitizeSingleLine(item.text) || '…'}
               {item.attachments.length + item.images.length > 0 ? (
                 <Text color={active ? theme.text : theme.dim}>
                   {' '}

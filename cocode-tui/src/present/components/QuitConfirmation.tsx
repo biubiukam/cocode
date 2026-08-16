@@ -1,5 +1,6 @@
 import { Box, Text } from 'ink'
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
+import { PANEL_BORDER } from '../layout.ts'
 import { theme } from '../theme.ts'
 
 export function QuitConfirmation(props: {
@@ -15,8 +16,8 @@ export function QuitConfirmation(props: {
         width={width}
         flexDirection="column"
         alignItems="center"
-        borderStyle="round"
-        borderColor={theme.brand}
+        borderStyle={PANEL_BORDER}
+        borderColor={theme.warning}
         paddingX={2}
       >
         <Text color={theme.text} bold wrap="truncate-end">

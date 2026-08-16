@@ -2,10 +2,12 @@ import { Box, Text } from 'ink'
 import type { ReactNode } from 'react'
 import type { TuiSnapshot } from '../../runtime/app.ts'
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
+import { glyphs } from '../glyphs.ts'
 import {
   useInspectorScroll,
   type InspectorMouseInput,
 } from '../inspector-scroll.ts'
+import { PANEL_BORDER, PANEL_PADDING_X } from '../layout.ts'
 import { theme } from '../theme.ts'
 import { ScrollablePanel } from './ScrollablePanel.tsx'
 
@@ -43,34 +45,35 @@ export function Inspector(props: {
     telemetry.tps !== undefined ||
     telemetry.reasoningEffort !== undefined
   const hasFiles = snapshot.composer.attachments.length > 0
-  const { displayedSkills, skillsExpanded, scrollOffset, updateMetrics } = useInspectorScroll({
-    snapshot,
+  const { scrollOffset, updateMetrics } = useInspectorScroll({
+    sessionId: snapshot.header.sessionId,
     maxRows,
     mouseInput,
-    hasActivity,
-    hasContext,
-    hasFiles,
   })
 
   return (
+    // A shell region, not a floating card: one dividing rule instead of a
+    // rounded frame, which also returns two rows and two columns to content.
     <Box
       width={width}
       height={maxRows}
       flexShrink={0}
       flexDirection="column"
-      borderStyle="round"
-      borderColor={theme.border}
-      borderLeftColor={resizing ? theme.brand : theme.border}
-      paddingX={1}
+      borderStyle={PANEL_BORDER}
+      borderColor={resizing ? theme.accent : theme.border}
+      borderTop={false}
+      borderBottom={false}
+      borderRight={false}
+      paddingX={PANEL_PADDING_X}
       marginLeft={1}
       minHeight={0}
     >
-      <Text color={theme.brand} bold>
-        <Text color={resizing ? theme.brand : theme.mute}>↔</Text>{' '}
+      <Text color={theme.text} bold>
+        <Text color={resizing ? theme.accent : theme.mute}>{glyphs.resizeMark}</Text>{' '}
         {text(locale, 'inspector')}
       </Text>
       <ScrollablePanel
-        height={Math.max(1, maxRows - 3)}
+        height={Math.max(1, maxRows - 1)}
         scrollOffset={scrollOffset}
         onMetricsChange={updateMetrics}
         upHint={locale === 'zh' ? '滚轮 / Alt+↑' : 'wheel / Alt+↑'}
@@ -79,27 +82,27 @@ export function Inspector(props: {
         <Section title={text(locale, 'inspectorActivity')}>
           {hasActivity ? (
             <>
-              <Line label="status" value={snapshot.status.line} color={theme.text} />
+              <Line label={text(locale, 'inspectorStatus')} value={snapshot.status.line} color={theme.text} />
               {telemetry.activity !== undefined ? (
                 <Line
-                  label={telemetry.activity.phase || 'activity'}
+                  label={telemetry.activity.phase || text(locale, 'inspectorActivity')}
                   value={telemetry.activity.line}
-                  color={theme.info}
+                  color={theme.accent}
                 />
               ) : null}
               {snapshot.status.subagents?.running !== undefined &&
               snapshot.status.subagents.running > 0 ? (
                 <Line
-                  label="agents"
+                  label={text(locale, 'inspectorAgents')}
                   value={String(snapshot.status.subagents.running)}
-                  color={theme.info}
+                  color={theme.accent}
                 />
               ) : null}
               {snapshot.status.queueCount > 0 ? (
                 <Line
-                  label="queue"
+                  label={text(locale, 'inspectorQueue')}
                   value={String(snapshot.status.queueCount)}
-                  color={theme.running}
+                  color={theme.accent}
                 />
               ) : null}
             </>
@@ -112,32 +115,29 @@ export function Inspector(props: {
             <>
               {snapshot.status.tokens !== undefined ? (
                 <Line
-                  label="tokens"
-                  value={`${snapshot.status.tokens.input} in · ${snapshot.status.tokens.output} out`}
+                  label={text(locale, 'inspectorTokens')}
+                  value={`${snapshot.status.tokens.input} ${text(locale, 'tokensInShort')} · ${snapshot.status.tokens.output} ${text(locale, 'tokensOutShort')}`}
                 />
               ) : null}
               {telemetry.contextPercent !== undefined ? (
-                <Line label="window" value={`${formatMetric(telemetry.contextPercent)}%`} />
+                <Line label={text(locale, 'inspectorWindow')} value={`${formatMetric(telemetry.contextPercent)}%`} />
               ) : null}
               {telemetry.cacheHitRate !== undefined ? (
-                <Line label="cache" value={`${formatMetric(telemetry.cacheHitRate)}%`} />
+                <Line label={text(locale, 'inspectorCache')} value={`${formatMetric(telemetry.cacheHitRate)}%`} />
               ) : null}
               {telemetry.tps !== undefined ? (
-                <Line label="speed" value={`${formatMetric(telemetry.tps)} t/s`} />
+                <Line label={text(locale, 'inspectorSpeed')} value={`${formatMetric(telemetry.tps)} t/s`} />
               ) : null}
               {telemetry.reasoningEffort !== undefined ? (
-                <Line label="reasoning" value={telemetry.reasoningEffort} />
+                <Line label={text(locale, 'inspectorReasoning')} value={telemetry.reasoningEffort} />
               ) : null}
-              <Text color={theme.mute} wrap="truncate-end">
-                segments {formatSegments(telemetry.contextSegments)}
-              </Text>
             </>
           ) : (
             <Text color={theme.mute}>{text(locale, 'inspectorEmpty')}</Text>
           )}
         </Section>
         <Section title={text(locale, 'inspectorFiles')}>
-          <Line label="cwd" value={snapshot.header.cwd} />
+          <Line label={text(locale, 'inspectorCwd')} value={snapshot.header.cwd} />
           {hasFiles ? (
             snapshot.composer.attachments.map((path) => (
               <Text key={path} color={theme.text} wrap="truncate-start">
@@ -145,14 +145,14 @@ export function Inspector(props: {
               </Text>
             ))
           ) : (
-            <Text color={theme.mute}>no attachments</Text>
+            <Text color={theme.mute}>{text(locale, 'inspectorNoAttachments')}</Text>
           )}
         </Section>
         <Section title={text(locale, 'inspectorSession')}>
-          <Line label="model" value={snapshot.header.model} />
-          <Line label="id" value={snapshot.header.sessionId.slice(0, 8)} />
+          <Line label={text(locale, 'inspectorModel')} value={snapshot.header.model} />
+          <Line label={text(locale, 'inspectorId')} value={snapshot.header.sessionId.slice(0, 8)} />
           {snapshot.status.sessionTitle !== undefined ? (
-            <Line label="title" value={snapshot.status.sessionTitle} />
+            <Line label={text(locale, 'inspectorTitle')} value={snapshot.status.sessionTitle} />
           ) : null}
           {snapshot.status.goal !== undefined ? (
             <>
@@ -169,7 +169,7 @@ export function Inspector(props: {
             />
           ) : null}
           {snapshot.status.agentPreset !== undefined ? (
-            <Line label="preset" value={snapshot.status.agentPreset} />
+            <Line label={text(locale, 'inspectorPreset')} value={snapshot.status.agentPreset} />
           ) : null}
         </Section>
         <Section title={text(locale, 'inspectorRuntime')}>
@@ -193,50 +193,6 @@ export function Inspector(props: {
             label={text(locale, 'inspectorCapabilitySource')}
             value={snapshot.runtimeInfo.capabilitySource}
           />
-        </Section>
-        <Section title={text(locale, 'inspectorSkills')}>
-          <Line
-            label={text(locale, 'inspectorLoadedSkill')}
-            value={text(locale, 'inspectorNotReported')}
-            color={theme.mute}
-          />
-          {snapshot.skills.length === 0 ? (
-            <Text color={theme.mute}>{text(locale, 'inspectorNone')}</Text>
-          ) : (
-            <>
-              <Line
-                label={text(locale, 'inspectorAvailable')}
-                value={String(snapshot.skills.length)}
-                color={theme.success}
-              />
-              {displayedSkills.map((skill) => (
-                <Text key={skill.name} color={theme.text} wrap="truncate-end">
-                  <Text color={theme.success}>●</Text> /{skill.name}
-                </Text>
-              ))}
-              {!skillsExpanded && snapshot.skills.length > 3 ? (
-                <Text color={theme.brand} bold underline>
-                  … +{snapshot.skills.length - 3}
-                </Text>
-              ) : null}
-            </>
-          )}
-        </Section>
-        <Section title={text(locale, 'inspectorCapabilities')}>
-          {snapshot.runtimeInfo.capabilities.length === 0 ? (
-            <Text color={theme.mute}>{text(locale, 'inspectorNone')}</Text>
-          ) : (
-            <>
-              <Text color={theme.text} wrap="truncate-end">
-                <Text color={theme.success}>●</Text> {text(locale, 'inspectorEnabled')}:{' '}
-                {capabilityNames(snapshot.runtimeInfo.capabilities, true)}
-              </Text>
-              <Text color={theme.mute} wrap="truncate-end">
-                <Text color={theme.mute}>○</Text> {text(locale, 'inspectorDisabled')}:{' '}
-                {capabilityNames(snapshot.runtimeInfo.capabilities, false)}
-              </Text>
-            </>
-          )}
         </Section>
         <Section title={text(locale, 'inspectorShortcuts')}>
           <Shortcut text={text(locale, 'footerScroll')} />
@@ -278,20 +234,4 @@ function Shortcut(props: { text: string }) {
 
 function formatMetric(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1)
-}
-
-function formatSegments(segments: TuiSnapshot['status']['telemetry']['contextSegments']): string {
-  return `S${segments.system} P${segments.prompt} A${segments.assistant} T${segments.thinking} X${segments.tools}`
-}
-
-function capabilityNames(
-  capabilities: TuiSnapshot['runtimeInfo']['capabilities'],
-  enabled: boolean,
-): string {
-  const names = capabilities
-    .filter((capability) => capability.enabled === enabled)
-    .map((capability) => capability.name)
-  return names.length === 0
-    ? '—'
-    : names.slice(0, 5).join(' ') + (names.length > 5 ? ` +${names.length - 5}` : '')
 }

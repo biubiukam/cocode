@@ -29,15 +29,18 @@
   position: relative;
   flex: none;
   padding: 7px 28px 7px 20px;
-  border-bottom: 1px solid transparent;
-  height: 46px;
+  /* The shell owns this row so the collapsed rail can carry the same seam. */
+  height: var(--dsh-shell-header-height, 46px);
+  overflow: hidden;
 }
 
+/* Bottom pixel row of the header, which the frame continues leftwards across a
+   collapsed rail — the two must land on the same row, so it sits flush. */
 .header::after {
   content: '';
   position: absolute;
   right: 0;
-  bottom: 1px;
+  bottom: 0;
   left: 0;
   z-index: 0;
   height: 1px;
@@ -65,11 +68,13 @@
   display: flex;
   align-items: center;
   gap: 0;
-  height: 46px;
+  height: var(--dsh-shell-header-height, 46px);
   position: absolute;
   left: 0;
+  right: 0;
   top: 0;
   z-index: 10;
+  overflow: hidden;
   padding: 7px 28px 7px 20px;
 }
 

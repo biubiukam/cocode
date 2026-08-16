@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { composerHeaderLayout } from '../../src/present/composer-header.ts'
 
 const base = {
-  composer: { disabled: false, mask: false },
+  composer: { disabled: false, mask: false, placeholder: 'Type a message  / for commands' },
   agent: 'idle' as const,
   planMode: false,
   planModeAvailable: true,
@@ -18,8 +18,8 @@ describe('composer header layout', () => {
       hint: 'tab switch mode',
       compact: false,
       showRoute: true,
-      modelStartColumn: 31,
-      modelEndColumn: 33,
+      modelStartColumn: 29,
+      modelEndColumn: 31,
     })
   })
 
@@ -29,8 +29,8 @@ describe('composer header layout', () => {
       hint: 'tab switch mode',
       compact: true,
       showRoute: true,
-      modelStartColumn: 11,
-      modelEndColumn: 13,
+      modelStartColumn: 9,
+      modelEndColumn: 11,
     })
   })
 
@@ -43,7 +43,7 @@ describe('composer header layout', () => {
     expect(
       composerHeaderLayout({
         ...base,
-        composer: { disabled: true, mask: false },
+        composer: { disabled: true, mask: false, placeholder: 'Type a message  / for commands' },
         columns: 120,
       }),
     ).toMatchObject({ hint: 'locked' })
@@ -53,14 +53,31 @@ describe('composer header layout', () => {
     expect(
       composerHeaderLayout({
         ...base,
-        composer: { disabled: false, mask: true },
+        composer: { disabled: false, mask: true, placeholder: 'Paste API key, press enter to confirm' },
         columns: 120,
       }),
     ).toEqual({
       title: 'secret',
-      hint: 'tab switch mode',
+      hint: 'Paste API key, press enter to confirm',
       compact: false,
       showRoute: false,
     })
+  })
+
+  it('uses textual signals for running and plan modes', () => {
+    expect(composerHeaderLayout({ ...base, agent: 'running', columns: 120 })).toMatchObject({
+      title: 'Build',
+      hint: 'tab queue draft',
+    })
+    expect(composerHeaderLayout({ ...base, planMode: true, columns: 120 })).toMatchObject({
+      title: 'Plan',
+      hint: 'tab switch mode',
+    })
+  })
+
+  it('omits the duplicate submit hint when the footer already owns it', () => {
+    expect(
+      composerHeaderLayout({ ...base, planModeAvailable: false, columns: 120 }),
+    ).toMatchObject({ hint: '' })
   })
 })

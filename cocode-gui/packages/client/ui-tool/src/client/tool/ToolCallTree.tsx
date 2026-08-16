@@ -20,14 +20,15 @@ const ToolCall = memo(function ToolCall({
   selected: boolean
   children?: ReactNode
 }) {
+  // Tool cards stay in the conversation; do not expose the trajectory
+  // handoff action from this surface.
   const owner: ToolCallOwnerProps = useMemo(() => ({
     callId,
     toolName,
     block,
     openFile,
     cwd,
-    inspect: () => { inspectCall(callId) },
-  }), [callId, toolName, block, openFile, cwd, inspectCall])
+  }), [callId, toolName, block, openFile, cwd])
   return (
     <div
       className={css.callRow}

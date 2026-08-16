@@ -2,7 +2,7 @@ import { resolveLocale } from './errors/locale.ts'
 
 export type UiLocale = 'zh' | 'en'
 
-type UiKey =
+export type UiTextKey =
   | 'session'
   | 'tokensIn'
   | 'tokensOut'
@@ -15,6 +15,7 @@ type UiKey =
   | 'runtimeContextDetail'
   | 'secret'
   | 'prompt'
+  | 'runtimeContextDetail'
   | 'locked'
   | 'send'
   | 'attached'
@@ -63,6 +64,27 @@ type UiKey =
   | 'quitCancel'
   | 'quitHint'
   | 'farewell'
+  | 'footerSend'
+  | 'footerNewline'
+  | 'footerMove'
+  | 'footerConfirm'
+  | 'footerCancel'
+  | 'footerClose'
+  | 'footerSearch'
+  | 'footerSelect'
+  | 'footerUse'
+  | 'footerRun'
+  | 'footerToggle'
+  | 'footerMessageActions'
+  | 'footerMessageExpand'
+  | 'footerMessageCollapse'
+  | 'footerHistoryLabel'
+  | 'footerDetailsLabel'
+  | 'footerHelpLabel'
+  | 'footerQuitLabel'
+  | 'footerRunningLabel'
+  | 'footerRedrawLabel'
+  | 'footerModelLabel'
   | 'agentIdle'
   | 'agentRunning'
   | 'agentThinking'
@@ -187,6 +209,20 @@ type UiKey =
   | 'inspectorNone'
   | 'inspectorEnabled'
   | 'inspectorDisabled'
+  | 'inspectorStatus'
+  | 'inspectorAgents'
+  | 'inspectorQueue'
+  | 'inspectorTokens'
+  | 'inspectorWindow'
+  | 'inspectorCache'
+  | 'inspectorSpeed'
+  | 'inspectorReasoning'
+  | 'inspectorCwd'
+  | 'inspectorNoAttachments'
+  | 'inspectorModel'
+  | 'inspectorId'
+  | 'inspectorTitle'
+  | 'inspectorPreset'
   | 'questionSubmit'
   | 'questionNewline'
   | 'questionExit'
@@ -261,7 +297,7 @@ type UiKey =
   | 'sessionTreeLoading'
   | 'sessionTreeOpenFailed'
 
-const TEXT: Record<UiLocale, Record<UiKey, string>> = {
+const TEXT: Record<UiLocale, Record<UiTextKey, string>> = {
   en: {
     session: 'session',
     tokensIn: 'tokens in',
@@ -303,7 +339,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     help: 'help',
     helpHint: 'esc close',
     messageMode: 'message mode',
-    messageModeHint: '↑↓ move · enter expand · m menu · c copy · esc close',
+    messageModeHint: '↑↓ move · m menu · c copy · esc close',
     modeBuild: 'Build',
     modePlan: 'Plan',
     modeSwitchHint: 'tab switch mode',
@@ -323,6 +359,27 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     quitCancel: 'Esc · Nope',
     quitHint: '←→ switch · Enter confirm · Esc cancel · Ctrl+C twice exits',
     farewell: 'Thanks for using Cocode!',
+    footerSend: 'send',
+    footerNewline: 'new line',
+    footerMove: '↑↓ move',
+    footerConfirm: 'enter confirm',
+    footerCancel: 'esc cancel',
+    footerClose: 'esc close',
+    footerSearch: 'type to search',
+    footerSelect: '↑↓ select',
+    footerUse: 'enter use',
+    footerRun: 'enter run',
+    footerToggle: 'space toggle',
+    footerMessageActions: 'M actions',
+    footerMessageExpand: 'or enter expand details',
+    footerMessageCollapse: 'or enter collapse details',
+    footerHistoryLabel: 'history',
+    footerDetailsLabel: 'details',
+    footerHelpLabel: 'help',
+    footerQuitLabel: 'interrupt / quit',
+    footerRunningLabel: 'interrupt',
+    footerRedrawLabel: '/redraw redraw',
+    footerModelLabel: 'model',
     agentIdle: 'ready',
     agentRunning: 'running',
     agentThinking: 'thinking…',
@@ -447,6 +504,20 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     inspectorNone: 'none',
     inspectorEnabled: 'on',
     inspectorDisabled: 'off',
+    inspectorStatus: 'status',
+    inspectorAgents: 'agents',
+    inspectorQueue: 'queue',
+    inspectorTokens: 'tokens',
+    inspectorWindow: 'window',
+    inspectorCache: 'cache',
+    inspectorSpeed: 'speed',
+    inspectorReasoning: 'reasoning',
+    inspectorCwd: 'cwd',
+    inspectorNoAttachments: 'no attachments',
+    inspectorModel: 'model',
+    inspectorId: 'id',
+    inspectorTitle: 'title',
+    inspectorPreset: 'preset',
     questionSubmit: 'enter submit',
     questionNewline: 'shift+enter newline',
     questionExit: 'esc exit',
@@ -516,7 +587,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     sessionTreeEmpty: 'No runtime sessions found.',
     sessionTreeTitle: 'Sessions',
     sessionTreeHint: 'type to filter · ↑↓ select · enter open · esc close',
-    sessionTreeLegend: '✓ current · ◉ running · · idle',
+    sessionTreeLegend: '{done} current · {running} running · {idle} idle',
     sessionTreeQuery: 'filter: {query}',
     sessionTreeLoading: 'Loading sessions…',
     sessionTreeOpenFailed: 'The runtime could not open this session.',
@@ -562,7 +633,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     help: '帮助',
     helpHint: 'Esc 关闭',
     messageMode: '消息模式',
-    messageModeHint: '↑↓ 移动 · 回车展开 · m 菜单 · c 复制 · Esc 关闭',
+    messageModeHint: '↑↓ 移动 · m 菜单 · c 复制 · Esc 关闭',
     modeBuild: 'Build',
     modePlan: 'Plan',
     modeSwitchHint: 'Tab 切换模式',
@@ -582,6 +653,27 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     quitCancel: 'Esc · 取消',
     quitHint: '←→ 切换 · 回车确认 · Esc 取消 · 再按 Ctrl+C 直接退出',
     farewell: '感谢使用 Cocode！',
+    footerSend: '发送',
+    footerNewline: '换行',
+    footerMove: '↑↓ 移动',
+    footerConfirm: '回车确认',
+    footerCancel: 'Esc 取消',
+    footerClose: 'Esc 关闭',
+    footerSearch: '输入搜索',
+    footerSelect: '↑↓ 选择',
+    footerUse: '回车使用',
+    footerRun: '回车执行',
+    footerToggle: '空格切换',
+    footerMessageActions: 'M 操作',
+    footerMessageExpand: '或回车展开详情',
+    footerMessageCollapse: '或回车收起详情',
+    footerHistoryLabel: '历史',
+    footerDetailsLabel: '详情',
+    footerHelpLabel: '帮助',
+    footerQuitLabel: '中断 / 退出',
+    footerRunningLabel: '中断',
+    footerRedrawLabel: '/redraw 重绘',
+    footerModelLabel: '模型',
     agentIdle: '就绪',
     agentRunning: '运行中',
     agentThinking: '思考中…',
@@ -706,6 +798,20 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     inspectorNone: '无',
     inspectorEnabled: '开启',
     inspectorDisabled: '关闭',
+    inspectorStatus: '状态',
+    inspectorAgents: '代理',
+    inspectorQueue: '队列',
+    inspectorTokens: 'token',
+    inspectorWindow: '窗口',
+    inspectorCache: '缓存',
+    inspectorSpeed: '速度',
+    inspectorReasoning: '推理',
+    inspectorCwd: '工作目录',
+    inspectorNoAttachments: '无附件',
+    inspectorModel: '模型',
+    inspectorId: 'ID',
+    inspectorTitle: '标题',
+    inspectorPreset: '预设',
     questionSubmit: '回车提交',
     questionNewline: 'Shift+Enter 换行',
     questionExit: 'Esc 退出',
@@ -775,7 +881,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     sessionTreeEmpty: '没有找到运行时会话。',
     sessionTreeTitle: '会话列表',
     sessionTreeHint: '输入过滤 · ↑↓ 选择 · 回车打开 · Esc 关闭',
-    sessionTreeLegend: '✓ 当前 · ◉ 运行中 · · 空闲',
+    sessionTreeLegend: '{done} 当前 · {running} 运行中 · {idle} 空闲',
     sessionTreeQuery: '筛选：{query}',
     sessionTreeLoading: '正在加载会话列表……',
     sessionTreeOpenFailed: '运行时无法打开该会话。',
@@ -791,7 +897,7 @@ export function resolveUiLocale(env: NodeJS.ProcessEnv = process.env): UiLocale 
   return resolveLocale(env)
 }
 
-export function text(locale: UiLocale, key: UiKey, params?: Record<string, string>): string {
+export function text(locale: UiLocale, key: UiTextKey, params?: Record<string, string>): string {
   let value = TEXT[locale][key]
   for (const [name, replacement] of Object.entries(params ?? {})) {
     value = value.replaceAll(`{${name}}`, replacement)

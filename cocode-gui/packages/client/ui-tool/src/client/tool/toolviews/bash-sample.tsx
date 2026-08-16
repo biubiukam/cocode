@@ -13,7 +13,7 @@
 // full output (maxLines Infinity — no middle collapse). An error row's
 // collapsed summary is the failure's first line in the error color.
 
-import { useState, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
 import clsx from 'clsx'
 import {
@@ -75,9 +75,26 @@ export function BashRow({ toolName, block, sessionId, useSessions, inspect, t }:
   const expandable = terminal !== null || genericError
   const open = expanded && expandable
   const failureLine = model.state === 'error' ? model.errorSummary : null
+  const rootRef = useRef<HTMLDivElement | null>(null)
   const toggleExpand = () => {
     setExpanded(v => !v)
   }
+  useEffect(() => {
+    if (!open) return
+    const onPointerDown = (event: PointerEvent): void => {
+      if (event.target instanceof Node && rootRef.current?.contains(event.target) === true) return
+      setExpanded(false)
+    }
+    const onKeyDown = (event: globalThis.KeyboardEvent): void => {
+      if (event.key === 'Escape') setExpanded(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [open])
   const toggleFromKeyboard = (event: KeyboardEvent<HTMLDivElement>) => {
     if (!expandable || (event.key !== 'Enter' && event.key !== ' ')) return
     event.preventDefault()
@@ -94,7 +111,7 @@ export function BashRow({ toolName, block, sessionId, useSessions, inspect, t }:
       )
       : leadingFor(state)
   return (
-    <div className={css.card}>
+    <div ref={rootRef} className={css.card}>
       <div
         className={css.root}
         data-sample="bash"

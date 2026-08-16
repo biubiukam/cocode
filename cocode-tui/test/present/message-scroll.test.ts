@@ -38,6 +38,10 @@ describe('message scroll window', () => {
     expect(maxMessageScrollOffset(nodes, 3, false, undefined, 5)).toBeGreaterThan(0)
   })
 
+  it('reserves a selectable body row for an empty user message', () => {
+    expect(maxMessageScrollOffset([user('1', '')], 2)).toBe(1)
+  })
+
   it('moves the transcript when selection reaches an older hidden message', () => {
     const nodes = [user('1', 'one'), user('2', 'two'), user('3', 'three')]
 

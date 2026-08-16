@@ -140,7 +140,11 @@ async function acquireDevLock(lockPath) {
 				)
 			}
 			console.log(`[cocode] stopping previous GUI dev instance (pid=${previous.pid})`)
-			await stopProcess(previous.pid)
+			// This is a process from the same workspace and the lock explicitly
+			// identifies it as a Cocode dev runner. Prefer graceful shutdown, but
+			// do not leave `make dev gui` permanently blocked by a stale runner
+			// that ignores SIGTERM while its child tree is already gone.
+			await stopProcess(previous.pid, true)
 			rmSync(lockPath, { force: true })
 		}
 	}
@@ -207,7 +211,7 @@ async function stopOrphanedElectronProcesses() {
 		const pid = Number(match[1])
 		if (resolveProcessCwd(pid) !== path.resolve(process.cwd())) continue
 		console.log(`[cocode] stopping orphaned Electron instance (pid=${pid})`)
-		await stopProcess(pid)
+		await stopProcess(pid, true)
 	}
 }
 

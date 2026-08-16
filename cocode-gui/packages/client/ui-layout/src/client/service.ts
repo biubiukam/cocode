@@ -21,12 +21,18 @@ export type PanelActions = BoundActions<ReturnType<typeof createLayoutStore>>
  * only).
  */
 export interface ILayout {
-  /** Toggle the sidebar panel (closed ⟷ contract default width). */
+  /** Toggle the sidebar panel (closed ⟷ its remembered width). */
   toggleSidebar(): void
   /** Open the details panel (no-op when already open). */
   openDetails(): void
   /** Close the details panel. */
   closeDetails(): void
+  /** Open the Cocode workbench in the requested dock. */
+  openWorkbench(dock: 'right' | 'bottom'): void
+  /** Close one Cocode workbench dock. */
+  closeWorkbench(dock: 'right' | 'bottom'): void
+  /** Toggle one Cocode workbench dock while preserving its panel contents. */
+  toggleWorkbench(dock: 'right' | 'bottom'): void
 }
 
 /** Cross-plugin panel-action face (ctx.layout). */
@@ -44,7 +50,7 @@ export class LayoutController implements ILayout {
     this.#panels = actions
   }
 
-  /** Toggle the sidebar panel (closed ⟷ contract default width). */
+  /** Toggle the sidebar panel (closed ⟷ its remembered width). */
   toggleSidebar(): void {
     this.#require().toggleSidebar()
   }
@@ -57,6 +63,21 @@ export class LayoutController implements ILayout {
   /** Close the details panel. */
   closeDetails(): void {
     this.#require().closeDetails()
+  }
+
+  openWorkbench(dock: 'right' | 'bottom'): void {
+    if (dock === 'right') this.#require().openWorkbenchRight()
+    else this.#require().openWorkbenchBottom()
+  }
+
+  closeWorkbench(dock: 'right' | 'bottom'): void {
+    if (dock === 'right') this.#require().closeWorkbenchRight()
+    else this.#require().closeWorkbenchBottom()
+  }
+
+  toggleWorkbench(dock: 'right' | 'bottom'): void {
+    if (dock === 'right') this.#require().toggleWorkbenchRight()
+    else this.#require().toggleWorkbenchBottom()
   }
 
   #require(): PanelActions {

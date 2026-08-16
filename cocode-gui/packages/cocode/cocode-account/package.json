@@ -1,7 +1,7 @@
 {
   "name": "cocode-account",
   "version": "0.1.0-cocode.0",
-  "description": "Cocode Desktop account login and Cocode Cloud provider UI.",
+  "description": "Cocode Desktop account login and Cocode Nut provider UI.",
   "private": true,
   "type": "module",
   "main": "lib/index.js",

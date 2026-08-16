@@ -1,8 +1,9 @@
 {
   "plugins": [
     "cocode-account",
+    "cocode-dsml",
     "cocode-shortcuts",
-    "cocode-sidebar",
+    "cocode-workbench",
     "cocode-vision"
   ]
 }

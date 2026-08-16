@@ -3,8 +3,8 @@ import test from "node:test"
 import { parseDshClientBundleRequest } from "../../vite.renderer.config"
 
 test("parses nested Cocode client bundle paths", () => {
-	assert.deepEqual(parseDshClientBundleRequest("/dsh-client/cocode/cocode-sidebar/client.js"), {
-		directory: "cocode/cocode-sidebar",
+	assert.deepEqual(parseDshClientBundleRequest("/dsh-client/cocode/cocode-workbench/client.js"), {
+		directory: "cocode/cocode-workbench",
 		sourceMap: false,
 	})
 	assert.deepEqual(parseDshClientBundleRequest("/dsh-client/cocode/cocode-account/client.js"), {
@@ -15,9 +15,9 @@ test("parses nested Cocode client bundle paths", () => {
 
 test("preserves source-map requests for nested client bundles", () => {
 	assert.deepEqual(
-		parseDshClientBundleRequest("/dsh-client/cocode/cocode-sidebar/client.js.map"),
+		parseDshClientBundleRequest("/dsh-client/cocode/cocode-workbench/client.js.map"),
 		{
-			directory: "cocode/cocode-sidebar",
+			directory: "cocode/cocode-workbench",
 			sourceMap: true,
 		},
 	)

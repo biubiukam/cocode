@@ -106,6 +106,12 @@ describe('commands', () => {
     expect(help).toContain('Alt+O 详情 · Alt+G 编辑 · ↑/↓ 历史 · Alt+R 搜索 · Shift+↑ 消息选择')
   })
 
+  it('describes transcript verbosity as details in English help', () => {
+    expect(helpText(P0_CAPABILITIES, createBuiltinCommands(), 'en')).toContain(
+      'ctrl+o details',
+    )
+  })
+
   it('/exit dispatches quit', () => {
     const actions: TuiAction[] = []
     const command = createBuiltinCommands().find('exit', P0_CAPABILITIES)

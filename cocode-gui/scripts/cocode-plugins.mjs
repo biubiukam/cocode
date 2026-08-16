@@ -131,7 +131,13 @@ export function stageCocodePlugins(runtimeRoot) {
 }
 
 function assertBuiltPlugin(plugin) {
-	for (const output of ["lib/index.js", "lib/client.js"]) {
+	// A plugin that never declares a browser entry is Host-only, so demanding a
+	// client bundle from it would reject a legitimate shape.
+	const outputs = ["lib/index.js"]
+	if (plugin.manifest.dsh?.client || plugin.manifest.exports?.["./client"]) {
+		outputs.push("lib/client.js")
+	}
+	for (const output of outputs) {
 		if (!existsSync(path.join(plugin.root, output))) {
 			throw new Error(`${plugin.name} is missing ${output}; run pnpm build:cocode-plugins.`)
 		}

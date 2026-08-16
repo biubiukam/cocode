@@ -12,7 +12,8 @@ import { displayError } from './runtime/errors/index.ts'
 import { startErrorMessage } from './runtime/app-view.ts'
 import { P0_CAPABILITIES } from './runtime/capabilities.ts'
 import { resolveSessionRoot } from './runtime/sessions-root.ts'
-import { setTheme } from './present/theme.ts'
+import { DEFAULT_THEME, setTheme } from './present/theme.ts'
+import { setGlyphs, supportsUnicode } from './present/glyphs.ts'
 import {
   createAuthStore,
   saveByokKey,
@@ -27,6 +28,7 @@ import { Chat } from './present/chat.tsx'
 import { clearViewport, enterScreen, parseScreenMode } from './present/clear-screen.ts'
 import { resolveUiLocale, text } from './runtime/ui-locale.ts'
 import { detectTerminalEnvironment } from './runtime/platform.ts'
+import { createTerminalOutput } from './present/terminal-output.ts'
 
 loadDotenv(resolve(process.cwd(), '.env'))
 
@@ -34,16 +36,21 @@ if (process.stdin.isTTY !== true || process.stdout.isTTY !== true) {
   process.stderr.write('Cocode TUI requires a TTY.\n')
   process.exitCode = 1
 } else {
-  void main().catch((error: unknown) => {
+  void main(createTerminalOutput(process.stdout, { extraRows: 1 })).catch((error: unknown) => {
     process.stderr.write(`Cocode TUI failed to start: ${startErrorMessage(error)}\n`)
     process.exitCode = 1
   })
 }
 
-async function main(): Promise<void> {
+async function main(output: NodeJS.WriteStream): Promise<void> {
+  // Color depth and glyph coverage are fixed for the life of the session, so
+  // they are resolved once here rather than probed at every render.
+  setGlyphs(supportsUnicode())
+  setTheme(DEFAULT_THEME)
+
   const launch = parseLaunchFromEnv()
 
-  const leaveScreen = enterScreen(parseScreenMode(process.env.COCODE_TUI_SCREEN))
+  const leaveScreen = enterScreen(parseScreenMode(process.env.COCODE_TUI_SCREEN), output)
   const terminal = detectTerminalEnvironment({
     stdinIsTTY: process.stdin.isTTY === true,
     stdoutIsTTY: process.stdout.isTTY === true,
@@ -54,7 +61,7 @@ async function main(): Promise<void> {
 
   const auth = await createAuthStore()
   if (auth.snapshot().phase !== 'ready') {
-    const gated = await runAuthGate(auth)
+    const gated = await runAuthGate(auth, output)
     if (!gated) {
       leaveScreen()
       process.exitCode = 0
@@ -115,8 +122,12 @@ async function main(): Promise<void> {
     setTheme,
   })
 
-  clearViewport()
+  clearViewport(output)
   const screen = render(<Chat app={app} mouseSupported={terminal.supportsMouse} />, {
+    stdout: output,
+    // App owns Ctrl+C via session.interruptOrQuit; Ink's default exitOnCtrlC
+    // swallows Kitty Ctrl+C without calling handleExit or useInput handlers.
+    exitOnCtrlC: false,
     kittyKeyboard: { mode: 'enabled' },
   })
   let exitStarted = false
@@ -128,12 +139,13 @@ async function main(): Promise<void> {
     process.stdin.off('end', onInputClosed)
     process.stdin.off('close', onInputClosed)
     process.stdout.off('resize', onResize)
+    process.off('SIGINT', onInterrupt)
     process.off('SIGTERM', onTerminate)
     process.off('SIGHUP', onTerminate)
     await screen.unmount()
     leaveScreen()
     if (appReady) {
-      process.stdout.write(`\n${text(app.snapshot().locale, 'farewell')}\n`)
+      output.write(`\n${text(app.snapshot().locale, 'farewell')}\n`)
     }
     try {
       await releaseLiveInstance(resolved.dshHome)
@@ -157,9 +169,13 @@ async function main(): Promise<void> {
   const onTerminate = (): void => {
     if (!exitStarted) app.dispatch({ type: 'quit' })
   }
+  const onInterrupt = (): void => {
+    if (!exitStarted) app.dispatch({ type: 'interruptOrQuit' })
+  }
   process.stdin.once('end', onInputClosed)
   process.stdin.once('close', onInputClosed)
   process.stdout.on('resize', onResize)
+  process.once('SIGINT', onInterrupt)
   process.once('SIGTERM', onTerminate)
   process.once('SIGHUP', onTerminate)
   try {
@@ -178,7 +194,7 @@ async function main(): Promise<void> {
   }
 }
 
-function runAuthGate(store: AuthStore): Promise<boolean> {
+function runAuthGate(store: AuthStore, output: NodeJS.WriteStream): Promise<boolean> {
   return new Promise((resolveDone) => {
     let settled = false
     let unsubscribe: () => void = () => undefined
@@ -213,8 +229,10 @@ function runAuthGate(store: AuthStore): Promise<boolean> {
     process.once('SIGTERM', onTerminate)
     process.once('SIGHUP', onTerminate)
 
-    clearViewport()
+    clearViewport(output)
     screen = render(view(), {
+      stdout: output,
+      exitOnCtrlC: false,
       kittyKeyboard: { mode: 'enabled' },
     })
     unsubscribe = store.subscribe(() => {

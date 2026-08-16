@@ -27,7 +27,7 @@
   width: 28px;
   height: 28px;
   border: none;
-  border-radius: 50%;
+  border-radius: 8px;
   padding: 0;
   background: transparent;
   cursor: pointer;
@@ -143,7 +143,7 @@
   padding: 0;
   box-sizing: border-box;
   border: none;
-  border-radius: 50%;
+  border-radius: 8px;
   background: transparent;
   cursor: text;
   color: var(--dsw-alias-label-secondary);
@@ -174,7 +174,7 @@
   width: 28px;
   height: 28px;
   border: none;
-  border-radius: 50%;
+  border-radius: 8px;
   padding: 0;
   background: transparent;
   cursor: pointer;
@@ -227,7 +227,7 @@
   width: 24px;
   height: 24px;
   border: none;
-  border-radius: 50%;
+  border-radius: 6px;
   padding: 0;
   background: transparent;
   cursor: pointer;
@@ -240,8 +240,8 @@
 
 /* Rail variant (own .rail class from the wide owner prop — the region never
    reads the shell's class names): the two icon controls stack as 36x36
-   circles matching the shell's rail rhythm. Both use the rail's shared base
-   left anchor so the outer shell can translate the whole region uniformly. */
+   rounded rects matching the shell's rail rhythm. Both use the rail's shared
+   base left anchor so the outer shell can translate the whole region uniformly. */
 .rail .sectionHeader {
   gap: 0;
   padding-left: 0;
@@ -256,6 +256,7 @@
 .rail .iconButton {
   width: 36px;
   height: 36px;
+  border-radius: 12px;
   color: var(--dsw-alias-label-primary);
 }
 
@@ -272,6 +273,7 @@
 .rail .searchButton {
   width: 36px;
   height: 36px;
+  border-radius: 12px;
   color: var(--dsw-alias-label-primary);
 }
 

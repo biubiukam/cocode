@@ -26,7 +26,7 @@ function context(): RuntimeContext {
       if (name === 'credentials') {
         return {
           async resolve(ref: string) {
-            return ref === 'OPENAI_API_KEY' || ref === 'COCODE_CLOUD_API_KEY' || ref === 'CUSTOM_CLOUD_KEY'
+            return ref === 'OPENAI_API_KEY' || ref === 'COCODE_NUT_API_KEY' || ref === 'CUSTOM_CLOUD_KEY'
               ? { value: 'secret-value' }
               : undefined
           },
@@ -91,9 +91,9 @@ describe('cocode vision bridge', () => {
 
   it('derives the cocode target from the account-selected cloud route', async () => {
     vi.stubEnv('COCODE_LLM_PROVIDERS', JSON.stringify({
-      'cocode-cloud': {
+      'cocode-nut': {
         baseURL: 'https://cocode.example/v1',
-        apiKeyEnv: 'COCODE_CLOUD_API_KEY',
+        apiKeyEnv: 'COCODE_NUT_API_KEY',
         models: [{ id: 'cloud-text-model' }],
       },
     }))
@@ -110,7 +110,7 @@ describe('cocode vision bridge', () => {
 
   it('reuses a custom credential reference from the account cloud route', async () => {
     vi.stubEnv('COCODE_LLM_PROVIDERS', JSON.stringify({
-      'cocode-cloud': {
+      'cocode-nut': {
         baseURL: 'https://cocode.example/v1',
         apiKeyEnv: 'CUSTOM_CLOUD_KEY',
       },

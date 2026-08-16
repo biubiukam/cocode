@@ -1381,7 +1381,10 @@ class TuiAppImpl implements TuiApp {
       },
       showUsage: () => {
         const telemetry = this.telemetry.snapshot()
-        const usage = telemetry.usage ?? latestUsage(this.assembler.snapshot())
+        const latest = latestUsage(this.assembler.snapshot())
+        const usage = telemetry.usage ?? (latest === undefined
+          ? undefined
+          : { ...latest, cacheRead: 0, cacheWrite: 0 })
         if (usage === undefined) {
           this.notice = {
             tone: 'info',
@@ -2241,8 +2244,12 @@ class TuiAppImpl implements TuiApp {
       this.model = model
       this.runtimeName = info.name
       this.refreshRuntimeCapabilities()
-      const resumed = await this.resumeSessionAfterRestart(this.sessionId)
-      if (!resumed) this.resetToFreshSession()
+      // A session agent captures its provider/model when it is created. Reopening
+      // the previous durable session here would therefore keep routing requests
+      // through the old provider even though the picker and runtime handshake now
+      // show the newly selected pair. Always create a fresh session after a
+      // successful model-route switch so the next agent is built from that pair.
+      this.resetToFreshSession()
       await this.refreshSessionControls()
       await this.loadSkills()
       await this.loadCommands()
@@ -2250,7 +2257,7 @@ class TuiAppImpl implements TuiApp {
       this.agent = 'idle'
       this.notice = {
         tone: 'info',
-        message: text(this.locale, resumed ? 'modelChanged' : 'modelChangedFresh', { model }),
+        message: text(this.locale, 'modelChangedFresh', { model }),
       }
     } catch (error) {
       this.agent = 'dead'

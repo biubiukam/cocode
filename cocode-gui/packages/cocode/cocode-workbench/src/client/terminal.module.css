@@ -1,0 +1,127 @@
+/*
+ * Terminal palette and layout. xterm paints on a canvas, so the colors it
+ * needs are declared here as custom properties and sampled by
+ * terminal-theme.ts: surface colors alias the design tokens, the sixteen ANSI
+ * slots are a curated pair of palettes (one-light / one-dark) because the
+ * design system has no ANSI scale of its own.
+ */
+.panel {
+  position: relative;
+  display: flex;
+  /* The grid xterm lays out is content-sized; without these the panel would
+     grow with it instead of refitting when the dock gets narrower. */
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  flex-direction: column;
+  background: var(--dsw-alias-bg-base);
+
+  --cocode-terminal-background: var(--dsw-alias-bg-base);
+  --cocode-terminal-foreground: var(--dsw-alias-label-primary);
+  --cocode-terminal-cursor: var(--dsw-alias-label-primary);
+  --cocode-terminal-selection: rgb(0 0 0 / 12%);
+  --cocode-terminal-font-family: var(--ds-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace);
+  --cocode-terminal-font-size: 12;
+
+  --cocode-terminal-black: #383a42;
+  --cocode-terminal-red: #e45649;
+  --cocode-terminal-green: #50a14f;
+  --cocode-terminal-yellow: #c18401;
+  --cocode-terminal-blue: #0184bc;
+  --cocode-terminal-magenta: #a626a4;
+  --cocode-terminal-cyan: #0997b3;
+  --cocode-terminal-white: #a0a1a7;
+  --cocode-terminal-bright-black: #696c77;
+  --cocode-terminal-bright-red: #e45649;
+  --cocode-terminal-bright-green: #50a14f;
+  --cocode-terminal-bright-yellow: #c18401;
+  --cocode-terminal-bright-blue: #0184bc;
+  --cocode-terminal-bright-magenta: #a626a4;
+  --cocode-terminal-bright-cyan: #0997b3;
+  --cocode-terminal-bright-white: #fafafa;
+}
+
+:global(body[data-ds-dark-theme]) .panel {
+  --cocode-terminal-selection: rgb(255 255 255 / 22%);
+
+  --cocode-terminal-black: #282c34;
+  --cocode-terminal-red: #e06c75;
+  --cocode-terminal-green: #98c379;
+  --cocode-terminal-yellow: #e5c07b;
+  --cocode-terminal-blue: #61afef;
+  --cocode-terminal-magenta: #c678dd;
+  --cocode-terminal-cyan: #56b6c2;
+  --cocode-terminal-white: #abb2bf;
+  --cocode-terminal-bright-black: #5c6370;
+  --cocode-terminal-bright-red: #e06c75;
+  --cocode-terminal-bright-green: #98c379;
+  --cocode-terminal-bright-yellow: #e5c07b;
+  --cocode-terminal-bright-blue: #61afef;
+  --cocode-terminal-bright-magenta: #c678dd;
+  --cocode-terminal-bright-cyan: #56b6c2;
+  --cocode-terminal-bright-white: #ffffff;
+}
+
+.surface {
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  padding: 8px 4px 8px 10px;
+}
+
+.surface :global(.xterm) {
+  height: 100%;
+}
+
+/* The terminal owns its own scrollbar; keep it as quiet as the panel chrome. */
+.surface :global(.xterm-viewport)::-webkit-scrollbar {
+  width: 8px;
+}
+
+.surface :global(.xterm-viewport)::-webkit-scrollbar-thumb {
+  border-radius: 4px;
+  background: var(--dsw-alias-border-l3);
+}
+
+.status {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 0 10px;
+  border-top: 1px solid var(--dsw-alias-border-l2);
+  background: var(--dsw-alias-bg-layer-1);
+  font: var(--dsw-font-xxxs-11);
+}
+
+.status[data-tone="settled"] {
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.status[data-tone="pending"] {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.statusText {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.statusAction {
+  height: 22px;
+  padding: 0 10px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-base);
+  font: inherit;
+  cursor: pointer;
+}
+
+.statusAction:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}

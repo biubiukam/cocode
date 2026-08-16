@@ -48,6 +48,18 @@ test("rewrites Cocode shortcut settings routes through the sidecar request bridg
 	)
 })
 
+test("rewrites Cocode Workbench routes through the sidecar request bridge", () => {
+	assert.equal(
+		rewriteDshHttpUrl(
+			"/cocode/workbench/api/fs.tree",
+			"http://localhost:5173",
+			"http://localhost:5173/index.html",
+			"http://127.0.0.1:3080",
+		),
+		"http://127.0.0.1:3080/cocode/workbench/api/fs.tree",
+	)
+})
+
 test("rewrites sidebar WebSockets to the DSH sidecar", () => {
 	assert.equal(
 		rewriteDshWebSocketUrl(

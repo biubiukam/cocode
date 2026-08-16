@@ -9,7 +9,9 @@ import type { SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
   ModelRetryNode, TurnErrorNode, UserMessageNode,
 } from '@deepseek-ai/dsh-client-runtime/client'
-import { JsonBlock, MessageText, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
+import {
+  IconRefreshOutline16, JsonBlock, MessageText, StateDot, Tooltip,
+} from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatNodeViewProps, ChatViewSlotProps } from '../contract/slots.ts'
 import type { InjectFace } from '@deepseek-ai/dsh-client-ui-slots'
 import { ImageGallery, type ImageLoader } from '@deepseek-ai/dsh-client-ui-attachment'
@@ -17,13 +19,20 @@ import { messageImageLabels } from '../image-labels.ts'
 import { CompactionItem } from './CompactionItem.tsx'
 import { ContextInjectionRow } from './ContextInjectionRow.tsx'
 import { MessageIconActions } from './MessageIconActions.tsx'
+import actionCss from './MessageIconActions.module.css'
 import css from './MessageItem.module.css'
 
 export interface ContextMessageNodeInjected {
   hooks: { debugMode: SnapshotStore<boolean> }
 }
 
+/** Session-scoped retry for a terminal turn failure. */
+export interface TurnErrorNodeInjected {
+  retry: () => Promise<void>
+}
+
 type ContextMessageNodeViewProps = ChatNodeViewProps<'context'> & InjectFace<ContextMessageNodeInjected>
+type TurnErrorNodeViewProps = ChatNodeViewProps<'turn-error'> & InjectFace<TurnErrorNodeInjected>
 
 type UserImage = Extract<UserMessageNode['content'][number], { type: 'image' }>
 
@@ -122,18 +131,37 @@ function ModelRetryItem({ node, active, t }: {
 }
 
 /** Persistent, turn-positioned feedback for a terminal failure. */
-function TurnErrorItem({ node, t }: {
+function TurnErrorItem({ node, t, canRetry, retrying, onRetry }: {
   node: TurnErrorNode
   t: ChatViewSlotProps['t']
+  canRetry: boolean
+  retrying: boolean
+  onRetry: () => void
 }) {
   return (
-    <div className={css.turnErrorRow} role="status">
+    <div className={css.turnErrorRow}>
       <StateDot state="error" className={css.turnErrorDot} />
-      <div className={css.turnErrorCopy}>
-        <span className={css.turnErrorTitle}>{t('message.turnError')}</span>
-        <span className={css.turnErrorMessage}>{node.message}</span>
+      <div className={css.turnErrorStack}>
+        <div className={css.turnErrorCopy} role="status">
+          <span className={css.turnErrorTitle}>{t('message.turnError')}</span>
+          <span className={css.turnErrorMessage}>{node.message}</span>
+        </div>
+        {canRetry && (
+          <div className={`${actionCss.actions} ${css.turnErrorActions}`}>
+            <Tooltip label={t('message.turnError.retry')} side="bottom">
+              <button
+                type="button"
+                className={actionCss.action}
+                aria-label={t('message.turnError.retry')}
+                disabled={retrying}
+                onClick={onRetry}
+              >
+                <IconRefreshOutline16 />
+              </button>
+            </Tooltip>
+          </div>
+        )}
       </div>
-      {node.code !== undefined && <code className={css.turnErrorCode}>{node.code}</code>}
     </div>
   )
 }
@@ -293,8 +321,30 @@ export const RetryNodeView = memo(function RetryNodeView({ node, t }: ChatNodeVi
 })
 
 /** Terminal turn-error keyed Chat renderer. */
-export const TurnErrorNodeView = memo(function TurnErrorNodeView({ node, t }: ChatNodeViewProps<'turn-error'>) {
-  return <TurnErrorItem node={node.data} t={t} />
+export const TurnErrorNodeView = memo(function TurnErrorNodeView({
+  node, t, useSession, retry,
+}: TurnErrorNodeViewProps) {
+  const data = node.data
+  const canRetry = useSession(snapshot => (
+    !snapshot.running
+    && !snapshot.removed
+    && snapshot.subagent?.address.mode !== 'one-shot'
+    && snapshot.chat.timeline.turnOrder.at(-1) === data.turn
+  ))
+  const [retrying, setRetrying] = useState(false)
+  return (
+    <TurnErrorItem
+      node={data}
+      t={t}
+      canRetry={canRetry}
+      retrying={retrying}
+      onRetry={() => {
+        if (retrying) return
+        setRetrying(true)
+        void retry().finally(() => { setRetrying(false) })
+      }}
+    />
+  )
 })
 
 /** Max-tokens turn-end notice keyed Chat renderer. */

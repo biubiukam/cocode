@@ -2,6 +2,8 @@ import { Text, useInput } from 'ink'
 import { useEffect, useRef, useState } from 'react'
 import type { TuiAction, TuiApprovalSnapshot } from '../../runtime/app.ts'
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
+import { glyphs } from '../glyphs.ts'
+import { selectionStyle } from '../selection.ts'
 import { theme } from '../theme.ts'
 import { sanitizeSingleLine } from '../text-format.ts'
 import { isMouseInput, type TuiMousePointer } from '../mouse.ts'
@@ -67,7 +69,7 @@ export function ApprovalPanel(props: {
           ? '请稍候…'
           : 'Please wait…'
       }
-      borderColor={theme.accent}
+      borderColor={theme.warning}
     >
       <Text color={theme.text} wrap="truncate-end">
         {sanitizeSingleLine(request.toolName)}
@@ -107,11 +109,10 @@ export function ApprovalPanel(props: {
 function ApprovalAction(props: { active: boolean; label: string; shortcut: string }) {
   return (
     <Text
-      color={props.active ? theme.text : theme.mute}
-      inverse={props.active}
+      {...selectionStyle(props.active)}
       wrap="truncate-end"
     >
-      {props.active ? '›' : ' '} {props.label} <Text color={theme.dim}>{props.shortcut}</Text>
+      {props.active ? glyphs.optionActive : glyphs.optionInactive} {props.label} <Text color={theme.dim}>{props.shortcut}</Text>
     </Text>
   )
 }

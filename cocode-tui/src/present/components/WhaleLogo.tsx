@@ -10,7 +10,7 @@ import { theme } from '../theme.ts'
 export function WhaleLogo(props: { size?: WhaleLogoSize; compact?: boolean; animate?: boolean }) {
   const size = props.size ?? (props.compact === true ? 'inline' : 'large')
   const animation = animationForWhaleSize(size)
-  const animate = props.animate !== false
+  const animate = props.animate !== false && process.env.TERM_PROGRAM !== 'Apple_Terminal'
   const frame = useCharacterFrame(animation, animate)
 
   if (size === 'inline') return <InlineFrame frame={frame} />
@@ -36,7 +36,7 @@ function InlineFrame(props: { frame: string }) {
   return (
     <Text>
       <Text color={theme.accent}>{props.frame.slice(0, whaleIndex)}</Text>
-      <Text color={theme.brand}>🐋</Text>
+      <Text color={theme.accent}>🐋</Text>
       <Text color={theme.accent}>{props.frame.slice(whaleIndex + 2)}</Text>
     </Text>
   )
@@ -58,8 +58,8 @@ function WhaleFrameLine(props: { line: string; accent: boolean }) {
 
 function segmentColor(segment: string): string {
   if (segment === 'cocode' || segment === '●' || segment.startsWith('█')) return theme.accent
-  if (segment.startsWith('0')) return theme.info
-  return theme.brand
+  if (segment.startsWith('0')) return theme.accent
+  return theme.accent
 }
 
 function useCharacterFrame(animation: CharacterAnimation, animate: boolean): string {

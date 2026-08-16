@@ -6,6 +6,8 @@ import {
   type TuiQuestionTab,
 } from '../../runtime/question-coordinator.ts'
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
+import { glyphs } from '../glyphs.ts'
+import { selectionStyle } from '../selection.ts'
 import { theme } from '../theme.ts'
 import { isMouseInput, type TuiMousePointer } from '../mouse.ts'
 import { questionCustomRow, questionOptionIndexAtRow } from '../mouse-hit.ts'
@@ -163,7 +165,7 @@ export function QuestionPanel(props: {
     <PanelFrame
       title={text(props.locale, 'questionTitle')}
       hint={`${props.state.position}/${props.state.total} · ${text(props.locale, 'questionHint')}`}
-      borderColor={theme.brand}
+      borderColor={theme.border}
       footer={
         [
           text(props.locale, 'questionSubmit'),
@@ -181,20 +183,24 @@ export function QuestionPanel(props: {
           return (
             <Text
               key={`${tab.position}-${tab.label}`}
-              color={active ? theme.text : tab.answered ? theme.dim : theme.mute}
-              backgroundColor={active ? theme.brand : undefined}
+              color={active ? theme.accent : tab.answered ? theme.dim : theme.mute}
+              backgroundColor={active ? theme.accentSoft : undefined}
               bold={active}
               wrap="truncate-end"
             >
-              {active ? '▸ ' : tab.answered ? '✓ ' : '· '}
+              {active
+                ? glyphs.optionActive
+                : tab.answered
+                ? glyphs.checkDone
+                : glyphs.optionInactive}{' '}
               {tab.position}. {tab.label}
             </Text>
           )
         })}
       </Box>
       <Box flexDirection="row" marginTop={1}>
-        <Text color={theme.brand} bold>
-          {'▌'}
+        <Text color={theme.accent} bold>
+          {glyphs.railSelected}
         </Text>
         <Box flexDirection="column" marginLeft={1}>
           <Text color={theme.text} bold wrap="truncate-end">
@@ -212,8 +218,9 @@ export function QuestionPanel(props: {
         const checked = multiSelect ? selected.has(index) : active
         return (
           <Box key={option.label} flexDirection="column">
-            <Text color={active ? theme.text : theme.mute} inverse={active} wrap="truncate-end">
-              {active ? '›' : ' '} {checked ? (multiSelect ? '◉' : '●') : '○'} {option.label}
+            <Text {...selectionStyle(active)} wrap="truncate-end">
+              {active ? glyphs.optionActive : glyphs.optionInactive}{' '}
+              {checked ? glyphs.checkActive : glyphs.checkTodo} {option.label}
             </Text>
             {option.description !== undefined ? (
               <Text color={theme.dim} wrap="truncate-end">
@@ -226,7 +233,8 @@ export function QuestionPanel(props: {
       })}
       <Box flexDirection="column" marginTop={1}>
         <Text color={inputFocused ? theme.accent : theme.dim}>
-          {inputFocused ? '│' : ' '} ✎ {text(props.locale, 'questionCustom')}
+          {inputFocused ? glyphs.rail : ' '} {glyphs.editMark}{' '}
+          {text(props.locale, 'questionCustom')}
         </Text>
         {visibleCustomLines.map((line, index) => (
           <Text
@@ -235,7 +243,8 @@ export function QuestionPanel(props: {
             inverse={inputFocused && index === visibleCustomLines.length - 1}
             wrap="truncate-end"
           >
-            {inputFocused ? '│ ' : '  '}{line === '' && custom === '' ? text(props.locale, 'questionCustom') : line}
+            {inputFocused ? `${glyphs.rail} ` : '  '}
+            {line === '' && custom === '' ? text(props.locale, 'questionCustom') : line}
           </Text>
         ))}
       </Box>

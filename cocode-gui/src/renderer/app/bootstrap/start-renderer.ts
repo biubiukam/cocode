@@ -3,25 +3,31 @@ import type { DshThemePreference } from "../../../contracts/ipc/dsh-runtime.cont
 import { createDshBundleLoader } from "./dsh-bundle-loader"
 import { selectDshBootEntries } from "./dsh-boot-entries"
 import { installDshTransport } from "./dsh-transport"
+import {
+	isDesktopDshBridgeAvailable,
+	loadDshBootstrap,
+	resolveRendererRuntimeOrigin,
+} from "./load-dsh-bootstrap"
 import { resolveLocalDshClientBundleUrl } from "./local-dsh-client-bundles"
 import { RendererLogger } from "../../shared/logging/renderer-logger"
 
 const logger = new RendererLogger()
 
+/** macOS traffic-light strip height; sidebar logo row starts below it. */
+const DESKTOP_DARWIN_TITLEBAR_INSET_PX = 32
+
 export async function startRenderer(element: HTMLElement): Promise<void> {
 	logger.info("renderer.start.started", { component: "renderer" })
 	try {
-		if (window.desktopApi?.dsh === undefined) {
-			throw new Error(
-				"Electron preload bridge is unavailable. Start the GUI with `pnpm run dev` instead of opening the Renderer Vite page directly.",
-			)
-		}
-		const bootstrap = await window.desktopApi.dsh.getBootstrap()
+		const bootstrap = await loadDshBootstrap()
 		applyInitialTheme(bootstrap.themePreference)
+		markDesktopHost()
 		markThemeReady()
-		const runtimeOrigin = new URL(bootstrap.origin).origin
+		const runtimeOrigin = resolveRendererRuntimeOrigin(bootstrap)
 		window.__DSH_DESKTOP_RUNTIME_ORIGIN__ = runtimeOrigin
-		installDshTransport(runtimeOrigin, logger)
+		if (isDesktopDshBridgeAvailable()) {
+			installDshTransport(runtimeOrigin, logger)
+		}
 		const bootEntries = selectDshBootEntries(
 			bootstrap.boot.entries,
 			window.location.protocol === "file:",
@@ -49,6 +55,27 @@ export async function startRenderer(element: HTMLElement): Promise<void> {
 
 function markThemeReady(): void {
 	document.documentElement.dataset.dshThemeReady = "true"
+}
+
+/** Reveal desktop titlebar geometry before the client plugin graph paints. */
+function markDesktopHost(): void {
+	if (!isDesktopDshBridgeAvailable()) return
+	const html = document.documentElement
+	const platform = resolveDesktopPlatform()
+	html.dataset.dshDesktop = "true"
+	html.dataset.dshDesktopPlatform = platform
+	if (platform === "darwin") {
+		html.style.setProperty(
+			"--dsh-desktop-titlebar-inset",
+			`${String(DESKTOP_DARWIN_TITLEBAR_INSET_PX)}px`,
+		)
+	}
+}
+
+function resolveDesktopPlatform(): "darwin" | "linux" | "win32" {
+	if (navigator.userAgent.includes("Windows")) return "win32"
+	if (navigator.userAgent.includes("Mac")) return "darwin"
+	return "linux"
 }
 
 /** Apply the host preference before React or the client plugin graph paints. */

@@ -1,0 +1,619 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-xxs-12);
+}
+
+/* ── 工具栏 ─────────────────────────────────────────────── */
+
+.toolbar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  min-height: 36px;
+  padding: 0 6px 0 8px;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+}
+
+.branch {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--dsw-alias-label-primary);
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.branch:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.branch svg {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.branchName {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.branch[data-detached] .branchName {
+  color: var(--dsw-alias-state-warn-primary);
+}
+
+/* 领先/落后计数长在同步按钮内部，两者本就是同一件事。 */
+.syncCount {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: var(--dsw-font-xxxs-11);
+  font-variant-numeric: tabular-nums;
+}
+
+.operation {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 999px;
+  color: var(--dsw-alias-state-warn-primary);
+  background: var(--dsw-alias-state-warn-tertiary);
+  font: var(--dsw-font-xxxs-11);
+  white-space: nowrap;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.iconButton {
+  display: inline-grid;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  place-items: center;
+  color: var(--dsw-alias-label-secondary);
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.iconButton[data-wide] {
+  width: auto;
+  padding: 0 6px;
+  gap: 5px;
+  grid-auto-flow: column;
+}
+
+.iconButton:hover:not(:disabled) {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.iconButton:disabled {
+  color: var(--dsw-alias-label-quaternary);
+  cursor: default;
+}
+
+.iconButton[data-busy]:disabled {
+  color: var(--dsw-alias-label-secondary);
+  cursor: progress;
+}
+
+.iconButton[data-busy] svg {
+  animation: spin 700ms linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .iconButton[data-busy] svg { animation: none; }
+}
+
+/* ── 提交区 ─────────────────────────────────────────────── */
+
+.commit {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+}
+
+/* 生成按钮叠在输入框右上角，grid 叠层避免 textarea 抢点击。 */
+.commitField {
+  display: grid;
+}
+
+.commitInput,
+.commitGenerate {
+  grid-area: 1 / 1;
+}
+
+.commitGenerate {
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-start;
+  padding: 7px 7px 0 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.commitGenerate .iconButton {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  pointer-events: auto;
+}
+
+.commitInput {
+  width: 100%;
+  min-height: 52px;
+  max-height: 160px;
+  padding: 6px 34px 6px 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-base);
+  font: inherit;
+  line-height: 1.5;
+  outline: none;
+  resize: none;
+  overflow-y: auto;
+}
+
+.commitInput::placeholder {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.commitInput:focus-visible {
+  border-color: var(--dsw-alias-interactive-bg-primary);
+}
+
+/* 主操作与下拉共用一个外框，样式对齐 design-system 的 button-secondary button-sm。 */
+.commitBar {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--ds-radius-sm);
+  background: var(--dsw-alias-bg-layer-1);
+  box-shadow: var(--ds-shadow-sm);
+  overflow: hidden;
+  transition:
+    background-color var(--ds-transition-fast),
+    border-color var(--ds-transition-fast);
+}
+
+.commitBar:has(.commitButton:not(:disabled):hover),
+.commitBar:has(.commitMore:not(:disabled):hover) {
+  border-color: var(--dsw-alias-border-l3);
+  background: var(--dsw-alias-interactive-bg-hover-solid);
+}
+
+.commitButton {
+  display: inline-flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  color: var(--dsw-alias-label-primary);
+  background: transparent;
+  font: var(--dsw-font-xxs-strong-12);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.commitButton:disabled {
+  color: var(--dsw-alias-label-tertiary);
+  cursor: default;
+  opacity: 0.45;
+}
+
+.commitButton:focus-visible,
+.commitMore:focus-visible {
+  outline: 2px solid var(--cocode-ring);
+  outline-offset: -2px;
+}
+
+.commitMore {
+  display: inline-grid;
+  width: 26px;
+  flex: none;
+  border: 0;
+  border-left: 1px solid var(--dsw-alias-border-l2);
+  place-items: center;
+  color: var(--dsw-alias-label-secondary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.commitMore:hover:not(:disabled) {
+  color: var(--dsw-alias-label-primary);
+}
+
+/* 主按钮禁用时，下拉箭头同步变淡；仍保留点击以打开 amend 等变体。 */
+.commitBar:has(.commitButton:disabled) .commitMore {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.commitMore:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.commitMore svg {
+  transform: rotate(90deg);
+}
+
+/* ── 提示与确认 ─────────────────────────────────────────── */
+
+.notice {
+  display: flex;
+  flex: none;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xxxs-11);
+}
+
+.notice[data-tone="error"] {
+  color: var(--dsw-alias-state-error-primary);
+  background: var(--dsw-alias-interactive-bg-hover-danger);
+}
+
+.noticeText {
+  min-width: 0;
+  flex: 1;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.noticeActions {
+  display: flex;
+  flex: none;
+  gap: 4px;
+}
+
+.noticeButton {
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 5px;
+  color: inherit;
+  background: var(--dsw-alias-bg-base);
+  font: inherit;
+  cursor: pointer;
+}
+
+.noticeButton:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.noticeButton[data-danger] {
+  color: var(--dsw-alias-label-inverse);
+  border-color: transparent;
+  background: var(--dsw-alias-state-error-primary);
+}
+
+/* 新建分支等需要取名的操作，就地展开一行输入。 */
+.prompt {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+}
+
+.promptInput {
+  min-width: 0;
+  flex: 1;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--dsw-alias-interactive-bg-primary);
+  border-radius: 5px;
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-base);
+  font: inherit;
+  outline: none;
+}
+
+/* ── 分组与文件行 ───────────────────────────────────────── */
+
+.body {
+  min-height: 0;
+  flex: 1;
+  padding-bottom: 8px;
+  overflow: auto auto;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+}
+
+.sectionHeader {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  height: 24px;
+  padding: 0 8px 0 4px;
+  border: 0;
+  color: var(--dsw-alias-label-secondary);
+  background: var(--dsw-alias-bg-layer-1);
+  font: var(--dsw-font-xxxs-strong-11);
+  text-align: left;
+  cursor: pointer;
+}
+
+.sectionHeader:hover {
+  color: var(--dsw-alias-label-primary);
+}
+
+.sectionChevron {
+  display: grid;
+  width: 16px;
+  height: 16px;
+  place-items: center;
+  color: var(--dsw-alias-label-tertiary);
+  transition: transform 120ms ease;
+}
+
+.sectionChevron[data-open] {
+  transform: rotate(90deg);
+}
+
+.sectionTitle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 批量操作在标题 hover 时才出现，静息状态保持干净。 */
+.sectionActions {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+}
+
+.sectionHeader:hover .sectionActions,
+.sectionHeader:focus-within .sectionActions {
+  opacity: 1;
+}
+
+.count {
+  min-width: 17px;
+  padding: 0 5px;
+  border-radius: 999px;
+  color: var(--dsw-alias-label-secondary);
+  background: var(--dsw-alias-fill-l2);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+/*
+ * 四列固定栅格：状态色条、文件名+目录、行内操作、状态字母。列数与子元素数
+ * 一一对应，任何一列内容再长也只会省略，不会溢出到相邻列上。
+ */
+.row {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto 18px;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  height: 22px;
+  padding: 0 8px 0 4px;
+  border: 0;
+  color: var(--dsw-alias-label-secondary);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.row:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.row[data-selected] {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-active);
+}
+
+.rowIcon {
+  display: grid;
+  width: 16px;
+  height: 16px;
+  place-items: center;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+/* 与文件树同一套类型着色，同一个文件在两个面板里长得一样。 */
+.rowIcon[data-ext="ts"],
+.rowIcon[data-ext="tsx"] {
+  color: var(--dsw-alias-state-business-primary);
+}
+
+.rowIcon[data-ext="md"],
+.rowIcon[data-ext="mdx"] {
+  color: var(--dsw-alias-label-secondary);
+}
+
+.rowIcon[data-ext="json"],
+.rowIcon[data-ext="yml"],
+.rowIcon[data-ext="yaml"] {
+  color: var(--dsw-alias-state-warn-primary);
+}
+
+/* 文件名与目录挤在同一列里，目录被优先压缩。 */
+.rowLabel {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.rowName {
+  flex: none;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row[data-tone="deleted"] .rowName {
+  text-decoration: line-through;
+  text-decoration-color: var(--dsw-alias-label-quaternary);
+}
+
+.rowDirectory {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--dsw-alias-label-quaternary);
+  font: var(--dsw-font-xxxs-11);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowActions {
+  display: flex;
+  flex: none;
+  gap: 1px;
+  opacity: 0;
+}
+
+.row:hover .rowActions,
+.row:focus-within .rowActions,
+.row[data-selected] .rowActions {
+  opacity: 1;
+}
+
+/* 操作出现时状态字母让位，避免行尾在 hover / 选中时跳动。 */
+.row:hover .rowStatus,
+.row[data-selected] .rowStatus {
+  display: none;
+}
+
+/* 行与分组标题只有 22/24px 高，工具栏那套 24px 按钮在这里会撑破行。 */
+.row .iconButton,
+.sectionHeader .iconButton,
+.stashRow .iconButton {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+}
+
+.row .iconButton:hover:not(:disabled),
+.sectionHeader .iconButton:hover:not(:disabled),
+.stashRow .iconButton:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover-solid);
+}
+
+.rowStatus {
+  width: 18px;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xxxs-strong-11);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.row[data-tone="modified"] .rowStatus { color: var(--dsw-alias-state-warn-primary); }
+.row[data-tone="added"] .rowStatus { color: var(--dsw-alias-state-success-primary); }
+.row[data-tone="deleted"] .rowStatus { color: var(--dsw-alias-state-error-primary); }
+.row[data-tone="conflict"] .rowStatus { color: var(--dsw-alias-state-error-primary); }
+
+/* ── Stash（暂存） ──────────────────────────────────────── */
+
+.stashRow {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px 0 4px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.stashRow:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.stashRow:hover .rowActions,
+.stashRow:focus-within .rowActions {
+  opacity: 1;
+}
+
+.stashLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── 空状态 ─────────────────────────────────────────────── */
+
+/* ── 提交历史 ───────────────────────────────────────────── */
+
+.commitRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 8px 3px 4px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.commitRow:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.commitSubject {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commitMeta {
+  flex: none;
+  color: var(--dsw-alias-label-quaternary);
+  font: var(--dsw-font-xxxs-11);
+  font-variant-numeric: tabular-nums;
+}
+
+.menuAnchor {
+  display: inline-flex;
+}

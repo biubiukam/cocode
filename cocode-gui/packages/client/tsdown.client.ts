@@ -281,9 +281,8 @@ function clientConfig(id: string, entry: string): UserConfig {
     }, {
       name: 'dsh-css-modules-inline',
       resolveId(source: string, importer: string | undefined) {
-        if (!source.endsWith('.module.css')) return null
-        const abs = importer !== undefined ? sourceAssetPath(source, importer) : source
-        return toCssVirtualId(abs)
+        if (!source.endsWith('.css')) return null
+        return toCssVirtualId(cssAssetPath(source, importer))
       },
       async load(virtualId: string) {
         if (!virtualId.startsWith(CSS_VIRTUAL_PREFIX)) return null
@@ -291,15 +290,18 @@ function clientConfig(id: string, entry: string): UserConfig {
         // The virtual id otherwise hides the physical stylesheet from Rolldown's watch graph.
         this.addWatchFile(fileId)
         const source = await readFile(fileId)
+        // A `.module.css` compiles to a hashed class map; a plain stylesheet
+        // (a dependency's own global css, e.g. xterm) is inlined verbatim.
+        const isModule = fileId.endsWith('.module.css')
         const { code, exports: cssExports } = transform({
           filename: fileId,
           code: source,
-          cssModules: { pattern: '[hash]_[local]' },
+          ...(isModule ? { cssModules: { pattern: '[hash]_[local]' } } : {}),
           minify: true,
         })
         const classMap: Record<string, string> = {}
         for (const [local, exp] of Object.entries(cssExports ?? {})) classMap[local] = exp.name
-        // One <style data-plugin> per module file; idempotent under re-evaluation.
+        // One <style data-plugin> per stylesheet; idempotent under re-evaluation.
         return [
           `const css = ${JSON.stringify(code.toString())};`,
           `const tagId = ${JSON.stringify(`${id}/${basename(fileId)}`)};`,
@@ -310,7 +312,7 @@ function clientConfig(id: string, entry: string): UserConfig {
           '  tag.textContent = css;',
           '  document.head.appendChild(tag);',
           '}',
-          `export default ${JSON.stringify(classMap)};`,
+          `export default ${JSON.stringify(isModule ? classMap : '')};`,
         ].join('\n')
       },
     }],
@@ -326,6 +328,18 @@ function clientConfig(id: string, entry: string): UserConfig {
       intro: 'var module = { exports: {} }; var exports = module.exports;',
     },
   }
+}
+
+/**
+ * Absolute path of an imported stylesheet. Relative and absolute specifiers
+ * resolve against the importer's source-tree counterpart; a bare specifier
+ * (a dependency shipping its own css, e.g. `@xterm/xterm/css/xterm.css`)
+ * resolves through the package graph.
+ */
+function cssAssetPath(source: string, importer: string | undefined): string {
+  if (importer === undefined) return source
+  const relative = source.startsWith('.') || source.startsWith('/') || /^[A-Za-z]:[\\/]/.test(source)
+  return relative ? sourceAssetPath(source, importer) : createRequire(importer).resolve(source)
 }
 
 /** Resolve an emitted JS asset import against its source-tree counterpart. */

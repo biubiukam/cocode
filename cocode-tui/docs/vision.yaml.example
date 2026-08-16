@@ -15,4 +15,4 @@ user:
 # is reused automatically and the vision model defaults to gpt-luna.
 # cocode:
 #   model: gpt-luna
-#   credentialRef: COCODE_CLOUD_API_KEY
+#   credentialRef: COCODE_NUT_API_KEY

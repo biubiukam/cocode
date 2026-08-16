@@ -5,19 +5,38 @@
 const RESULT_PREVIEW_CHARS = 80
 const VERBOSE_RESULT_LINES = 40
 const STREAMING_REASONING_LINES = 24
+const COLLAPSED_REASONING_LINES = 10
+const EXPANDED_REASONING_LINES = 200
 
 export function formatReasoning(
   text: string,
   verbose: boolean,
   streaming: boolean,
+  thinkingDurationMs?: number,
+  viewMode: 0 | 1 | 2 = 0,
 ): string | undefined {
   if (text === '') return undefined
   // Keep the active reasoning visible so the user can tell the model is making
   // progress. Once the assistant message is sealed, the default view folds it
   // back to a compact summary; verbose mode still keeps it expanded.
-  if (verbose) return text
-  if (streaming) return reasoningTail(text, STREAMING_REASONING_LINES)
-  return `thinking · ${text.length} chars`
+  if (verbose || viewMode === 2) return text
+  const limit = streaming
+    ? STREAMING_REASONING_LINES
+    : viewMode === 1
+      ? EXPANDED_REASONING_LINES
+      : COLLAPSED_REASONING_LINES
+  const visible = reasoningTail(text, limit)
+  if (streaming) return visible
+  const duration = formatThinkingDuration(thinkingDurationMs)
+  return duration === undefined ? visible : `${visible}\n\nThought for ${duration}`
+}
+
+export function formatThinkingDuration(durationMs: number | undefined): string | undefined {
+  if (durationMs === undefined || !Number.isFinite(durationMs) || durationMs <= 0) return undefined
+  if (durationMs < 1000) return `${Math.round(durationMs)}ms`
+  const seconds = durationMs / 1000
+  if (seconds < 10) return `${seconds.toFixed(1)}s`
+  return `${Math.round(seconds)}s`
 }
 
 export function reasoningTail(value: string, maxLines = STREAMING_REASONING_LINES): string {

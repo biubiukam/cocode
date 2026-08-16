@@ -13,14 +13,17 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { PropsRenderSlots, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
-import { computeColumns, SIDEBAR_AUTO_COLLAPSE, SIDEBAR_DEFAULT } from './columns.ts'
+import {
+  clampWidth, computeColumns, SIDEBAR_AUTO_COLLAPSE,
+  WORKBENCH_BOTTOM_MAX, WORKBENCH_BOTTOM_MIN,
+} from './columns.ts'
 import type { createLayoutStore } from './stores.ts'
 import css from './AppFrame.module.css'
 
 /** Full composed props: runtime share + child-slot render share + store share. */
 export type AppFrameProps =
   & PropsRuntime<'root'>
-  & PropsRenderSlots<'sidebar' | 'conversation' | 'details' | 'shell.overlay'>
+  & PropsRenderSlots<'sidebar' | 'conversation' | 'details' | 'workbench.right' | 'workbench.bottom' | 'shell.overlay'>
   & PropsStore<ReturnType<typeof createLayoutStore>>
 
 /** Center column grid item (session-body building block). */
@@ -33,34 +36,49 @@ function DetailsColumn(props: { children?: ReactNode }) {
   return <div className={css.detailsCol}>{props.children}</div>
 }
 
+function WorkbenchSlot(props: { dock: 'right' | 'bottom'; children?: ReactNode }) {
+  return <div className={props.dock === 'right' ? css.workbenchRight : css.workbenchBottom}>{props.children}</div>
+}
+
 /**
- * One drag handle: pointer capture, rAF-throttled dx reports against the drag-start origin.
- * `side` keys the hover-reveal CSS to the owning column.
+ * One drag handle for both workbench axes: pointer capture, rAF-throttled
+ * deltas against the drag-start origin. The strip is invisible chrome; hovering
+ * it lights the seam it straddles (AppFrame.module.css).
  */
-function DragHandle(props: { side: 'sidebar' | 'details'; left: number; onStart: () => void; onDrag: (dx: number) => void; onEnd: () => void }) {
+function DragHandle(props: {
+  axis: 'x' | 'y'
+  position: number
+  spanStart?: number
+  spanEnd?: number
+  onStart: () => void
+  onDrag: (delta: number) => void
+  onEnd: () => void
+}) {
   const [dragging, setDragging] = useState(false)
   const origin = useRef(0)
   const latest = useRef(0)
   const frame = useRef<number | null>(null)
   const callbacks = useRef({ onStart: props.onStart, onDrag: props.onDrag, onEnd: props.onEnd })
   callbacks.current = { onStart: props.onStart, onDrag: props.onDrag, onEnd: props.onEnd }
+  const axis = props.axis
 
   const onPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault()
     e.currentTarget.setPointerCapture(e.pointerId)
-    origin.current = e.clientX
-    latest.current = e.clientX
+    const point = axis === 'x' ? e.clientX : e.clientY
+    origin.current = point
+    latest.current = point
     callbacks.current.onStart()
     setDragging(true)
-  }, [])
+  }, [axis])
   const onPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (!e.currentTarget.hasPointerCapture(e.pointerId)) return
-    latest.current = e.clientX
+    latest.current = axis === 'x' ? e.clientX : e.clientY
     frame.current ??= requestAnimationFrame(() => {
       frame.current = null
       callbacks.current.onDrag(latest.current - origin.current)
     })
-  }, [])
+  }, [axis])
   const onPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (!e.currentTarget.hasPointerCapture(e.pointerId)) return
     e.currentTarget.releasePointerCapture(e.pointerId)
@@ -72,9 +90,10 @@ function DragHandle(props: { side: 'sidebar' | 'details'; left: number; onStart:
 
   return (
     <div
-      className={css.handle}
-      style={{ left: props.left }}
-      data-side={props.side}
+      className={axis === 'x' ? css.handle : css.rowHandle}
+      style={axis === 'x'
+        ? { left: props.position }
+        : { bottom: props.position - 4, left: props.spanStart, right: props.spanEnd }}
       data-dragging={dragging || undefined}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -130,16 +149,22 @@ export function AppFrame({
   // Narrow viewports auto-collapse the sidebar; the store mirror keeps
   // toggleSidebar's semantics right (narrow toggles flip the manual
   // re-expand override, stores.ts). Collapsed is decided here, so the
-  // solver stays breakpoint-free: a narrow re-expand passes the preference
-  // (or the default when the wide preference is closed) and the center
-  // absorbs the squeeze.
+  // solver stays breakpoint-free: a narrow re-expand passes the stored width
+  // preference and the center absorbs the squeeze.
   const narrow = viewport < SIDEBAR_AUTO_COLLAPSE
   useEffect(() => { actions.setNarrow(narrow) }, [actions, narrow])
-  const sidebarCollapsed = narrow ? !panels.narrowExpanded : panels.sidebar === 0
-  const sidebarPreference = sidebarCollapsed
-    ? 0
-    : panels.sidebar === 0 ? SIDEBAR_DEFAULT : panels.sidebar
-  const cols = computeColumns(viewport, sidebarPreference, detailsSession === undefined ? 0 : panels.details)
+  const sidebarCollapsed = narrow ? !panels.narrowExpanded : !panels.sidebarOpen
+  // The store keeps width and openness apart, so the solver's 0 = closed
+  // sentinel is produced here per frame and the stored width stays intact.
+  const cols = computeColumns(
+    viewport,
+    sidebarCollapsed ? 0 : panels.sidebar,
+    detailsSession === undefined || !panels.detailsOpen ? 0 : panels.details,
+    panels.workbenchRightOpen ? panels.workbenchRight : 0,
+  )
+  const bottom = panels.workbenchBottomOpen
+    ? clampWidth(panels.workbenchBottom, WORKBENCH_BOTTOM_MIN, WORKBENCH_BOTTOM_MAX)
+    : 0
   const colsRef = useRef(cols)
   colsRef.current = cols
 
@@ -148,26 +173,41 @@ export function AppFrame({
   // it stays frozen for the whole gesture so dx deltas do not compound.
   const sidebarBase = useRef(0)
   const detailsBase = useRef(0)
+  const workbenchBase = useRef(0)
+  const bottomBase = useRef(0)
   // Track-level transitions pause for the whole gesture: eased tracks would
   // detach the column edge from the pointer (AppFrame.module.css).
   const [dragging, setDragging] = useState(false)
   const onDragEnd = useCallback(() => { setDragging(false) }, [])
   const onSidebarStart = useCallback(() => { sidebarBase.current = colsRef.current.sidebar; setDragging(true) }, [])
   const onDetailsStart = useCallback(() => { detailsBase.current = colsRef.current.details; setDragging(true) }, [])
+  const onWorkbenchStart = useCallback(() => { workbenchBase.current = colsRef.current.workbench; setDragging(true) }, [])
+  const onBottomStart = useCallback(() => { bottomBase.current = bottom; setDragging(true) }, [bottom])
   const onSidebarDrag = useCallback((dx: number) => {
     actions.setSidebar(sidebarBase.current + dx)
   }, [actions])
   const onDetailsDrag = useCallback((dx: number) => {
     actions.setDetails(detailsBase.current - dx)
   }, [actions])
+  const onWorkbenchDrag = useCallback((dx: number) => {
+    actions.setWorkbenchRight(workbenchBase.current - dx)
+  }, [actions])
+  const onBottomDrag = useCallback((dy: number) => {
+    actions.setWorkbenchBottom(bottomBase.current - dy)
+  }, [actions])
 
   return (
     <div
       ref={frameRef}
       className={css.frame}
-      style={{ gridTemplateColumns: `${cols.sidebar}px minmax(0, 1fr) ${cols.details}px` }}
+      style={{
+        gridTemplateColumns: `${cols.sidebar}px minmax(0, 1fr) ${cols.details}px ${cols.workbench}px`,
+        gridTemplateRows: `minmax(0, 1fr) ${bottom}px`,
+      }}
       data-sidebar-collapsed={sidebarCollapsed || undefined}
       data-details-collapsed={cols.details === 0 || undefined}
+      data-workbench-right-collapsed={cols.workbench === 0 || undefined}
+      data-workbench-bottom-collapsed={bottom === 0 || undefined}
       data-dragging={dragging || undefined}
     >
       <div className={css.sidebarCol}>
@@ -188,14 +228,18 @@ export function AppFrame({
             is session-maybe; the strict details entry naturally renders
             empty while no session is current. */}
         <CenterColumn>{renderSlot('conversation', {})}</CenterColumn>
+        <WorkbenchSlot dock="right">{renderSlot('workbench.right', { dock: 'right', visible: cols.workbench > 0 })}</WorkbenchSlot>
         <DetailsColumn>{renderSlot('details', {})}</DetailsColumn>
+        <WorkbenchSlot dock="bottom">{renderSlot('workbench.bottom', { dock: 'bottom', visible: bottom > 0 })}</WorkbenchSlot>
       </>
       <div className={css.overlayLayer} data-shell-overlay>
         {renderSlot('shell.overlay', {})}
       </div>
       {/* The collapsed rail is fixed-width: no resize handle while closed. */}
-      {!sidebarCollapsed && <DragHandle side="sidebar" left={cols.sidebar} onStart={onSidebarStart} onDrag={onSidebarDrag} onEnd={onDragEnd} />}
-      {cols.details > 0 && <DragHandle side="details" left={viewport - cols.details} onStart={onDetailsStart} onDrag={onDetailsDrag} onEnd={onDragEnd} />}
+      {!sidebarCollapsed && <DragHandle axis="x" position={cols.sidebar} onStart={onSidebarStart} onDrag={onSidebarDrag} onEnd={onDragEnd} />}
+      {cols.details > 0 && <DragHandle axis="x" position={cols.sidebar + cols.center} onStart={onDetailsStart} onDrag={onDetailsDrag} onEnd={onDragEnd} />}
+      {cols.workbench > 0 && <DragHandle axis="x" position={cols.sidebar + cols.center + cols.details} onStart={onWorkbenchStart} onDrag={onWorkbenchDrag} onEnd={onDragEnd} />}
+      {bottom > 0 && <DragHandle axis="y" position={bottom} spanStart={cols.sidebar} spanEnd={cols.workbench} onStart={onBottomStart} onDrag={onBottomDrag} onEnd={onDragEnd} />}
     </div>
   )
 }
