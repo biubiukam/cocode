@@ -11,10 +11,10 @@
  */
 import { defineStore, type EngineStoreHandle } from '@deepseek-ai/dsh-client-runtime/client'
 import {
-  clampWidth, DETAILS_DEFAULT, DETAILS_MAX, DETAILS_MIN,
+  clampMin, clampWidth, DETAILS_DEFAULT, DETAILS_MAX, DETAILS_MIN,
   SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN,
   WORKBENCH_BOTTOM_DEFAULT, WORKBENCH_BOTTOM_MAX, WORKBENCH_BOTTOM_MIN,
-  WORKBENCH_DEFAULT, WORKBENCH_MAX, WORKBENCH_MIN,
+  WORKBENCH_DEFAULT, WORKBENCH_MIN,
 } from './columns.ts'
 
 /**
@@ -89,7 +89,7 @@ export function createLayoutStore(): EngineStoreHandle<LayoutState, LayoutAction
     actions: {
       setSidebar: (d, px: number) => { d.sidebar = clampWidth(px, SIDEBAR_MIN, SIDEBAR_MAX) },
       setDetails: (d, px: number) => { d.details = clampWidth(px, DETAILS_MIN, DETAILS_MAX) },
-      setWorkbenchRight: (d, px: number) => { d.workbenchRight = clampWidth(px, WORKBENCH_MIN, WORKBENCH_MAX) },
+      setWorkbenchRight: (d, px: number) => { d.workbenchRight = clampMin(px, WORKBENCH_MIN) },
       setWorkbenchBottom: (d, px: number) => {
         d.workbenchBottom = clampWidth(px, WORKBENCH_BOTTOM_MIN, WORKBENCH_BOTTOM_MAX)
       },

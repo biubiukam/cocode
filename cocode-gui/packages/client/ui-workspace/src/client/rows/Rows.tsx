@@ -5,7 +5,7 @@
  * except workspace Rename/Delete and session Rename/Fork/Archive; the session
  * and workspace hover cards are suppressed while a menu is open.
  */
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import clsx from 'clsx'
 import {
   HoverCard, IconArchiveOutline20, IconBranchOutline16, IconEditOutline16,
@@ -128,6 +128,15 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, t }: 
   const label = row.workspaceId === undefined ? t('group.ungrouped') : row.label
   const active = group.expanded && group.containsCurrent
   const [menuOpen, setMenuOpen] = useState(false)
+  const [menuPoint, setMenuPoint] = useState<{ x: number; y: number } | null>(null)
+  const closeMenu = () => {
+    setMenuOpen(false)
+    setMenuPoint(null)
+  }
+  const getMenuAnchorRect = useCallback(
+    () => menuPoint === null ? null : new DOMRect(menuPoint.x, menuPoint.y, 0, 0),
+    [menuPoint],
+  )
   const workspaceMenuItems = [
     { id: 'rename', label: t('rename'), icon: <IconEditOutline16 /> },
     {
@@ -147,6 +156,14 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, t }: 
       role="treeitem"
       aria-expanded={row.expanded}
       onClick={onToggle}
+      onContextMenu={actions === undefined
+        ? undefined
+        : (e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          setMenuPoint({ x: e.clientX, y: e.clientY })
+          setMenuOpen(true)
+        }}
       draggable={drag !== undefined}
       onDragStart={drag === undefined
         ? undefined
@@ -170,10 +187,10 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, t }: 
         {actions !== undefined && (
           <Menu
             open={menuOpen}
-            onClose={() => { setMenuOpen(false) }}
+            onClose={closeMenu}
             items={workspaceMenuItems}
             onSelect={(id) => {
-              setMenuOpen(false)
+              closeMenu()
               // Unknown ids leave before the dispatch: a future menu row must
               // not inherit the destructive branch as an else fallback.
               /* v8 ignore next -- workspaceMenuItems carries exactly these action rows today. */
@@ -183,13 +200,18 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, t }: 
               else actions.delete()
             }}
             portal
-            closeOnPointerLeave
+            closeOnPointerLeave={menuPoint === null}
+            getAnchorRect={menuPoint === null ? undefined : getMenuAnchorRect}
             anchor={(
               <button
                 type="button"
                 className={css.iconButton}
                 aria-label={t('actions.workspace.aria', { name: label })}
-                onClick={(e) => { e.stopPropagation(); setMenuOpen(v => !v) }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setMenuPoint(null)
+                  setMenuOpen(v => !v)
+                }}
               >
                 <IconEllipsisOutline16 />
               </button>

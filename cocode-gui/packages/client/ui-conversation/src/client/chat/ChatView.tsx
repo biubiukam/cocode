@@ -22,6 +22,16 @@ import { formatRunDuration } from './message-chrome.ts'
 import css from './ChatView.module.css'
 
 const FOLLOW_THRESHOLD = 24
+/** Back-to-bottom click: cap duration so long jumps stay snappy. */
+const SMOOTH_SCROLL_MAX_MS = 420
+/** Back-to-bottom click: floor duration so short jumps still feel smooth. */
+const SMOOTH_SCROLL_MIN_MS = 180
+/** px/ms — distance scales duration within the min/max window. */
+const SMOOTH_SCROLL_SPEED = 1.8
+
+function easeOutCubic(t: number): number {
+  return 1 - (1 - t) ** 3
+}
 
 /** Active column host when present; otherwise the view-local scroller. */
 function scrollerOf(from: HTMLElement): HTMLElement {
@@ -183,6 +193,8 @@ export function ChatView({
    *  scroll-driven at-bottom chrome re-render (which would snap inertial
    *  scrolls the rest of the way to the floor). */
   const followSigRef = useRef<string | null>(null)
+  const smoothScrollRafRef = useRef<number | null>(null)
+  const smoothScrollingRef = useRef(false)
 
   const firstKey = order[0]
   const firstSeq = firstKey === undefined ? null : nodeStore.get(firstKey)?.anchorSeq ?? null
@@ -191,13 +203,62 @@ export function ChatView({
   const lastSteeringId = pendingSteering[pendingSteering.length - 1]?.id ?? null
   const followSig = `${openState}:${firstSeq}:${lastKey}:${order.length}:${running ? 1 : 0}:${lastSteeringId ?? ''}`
 
+  const cancelSmoothScroll = (): void => {
+    if (smoothScrollRafRef.current !== null) {
+      cancelAnimationFrame(smoothScrollRafRef.current)
+      smoothScrollRafRef.current = null
+    }
+    smoothScrollingRef.current = false
+  }
+
   const toBottom = (el: HTMLElement): void => {
+    cancelSmoothScroll()
     anchorRef.current = null
     el.scrollTop = el.scrollHeight
     observedTopRef.current = el.scrollTop
     atBottomRef.current = true
     setAtBottom(true)
     chatScroll.save(null)
+  }
+
+  const smoothToBottom = (el: HTMLElement): void => {
+    cancelSmoothScroll()
+    anchorRef.current = null
+    const floor = Math.max(0, el.scrollHeight - el.clientHeight)
+    const startTop = el.scrollTop
+    const distance = floor - startTop
+    if (distance <= 1) {
+      toBottom(el)
+      return
+    }
+    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      toBottom(el)
+      return
+    }
+    const duration = Math.min(
+      SMOOTH_SCROLL_MAX_MS,
+      Math.max(SMOOTH_SCROLL_MIN_MS, distance / SMOOTH_SCROLL_SPEED),
+    )
+    const startTime = performance.now()
+    smoothScrollingRef.current = true
+    const step = (now: number): void => {
+      const t = Math.min(1, (now - startTime) / duration)
+      const scrollTop = startTop + distance * easeOutCubic(t)
+      el.scrollTop = scrollTop
+      observedTopRef.current = scrollTop
+      if (t < 1) {
+        smoothScrollRafRef.current = requestAnimationFrame(step)
+        return
+      }
+      smoothScrollRafRef.current = null
+      smoothScrollingRef.current = false
+      el.scrollTop = floor
+      observedTopRef.current = el.scrollTop
+      atBottomRef.current = true
+      setAtBottom(true)
+      chatScroll.save(null)
+    }
+    smoothScrollRafRef.current = requestAnimationFrame(step)
   }
 
   useLayoutEffect(() => {
@@ -267,6 +328,15 @@ export function ChatView({
     /* v8 ignore next -- ref-null guard: the handler only fires while mounted. */
     if (local === null) return
     const el = scrollerOf(local)
+    if (smoothScrollingRef.current) {
+      const floor = Math.max(0, el.scrollHeight - el.clientHeight)
+      const movedByReader = Math.abs(el.scrollTop - Math.min(observedTopRef.current, floor)) > 0.5
+      if (movedByReader) cancelSmoothScroll()
+      else {
+        observedTopRef.current = el.scrollTop
+        return
+      }
+    }
     // Only reader input may make raw scroll geometry change follow ownership:
     // a delivered position that deviates from the observed-top ledger (every
     // programmatic write records itself there synchronously). This covers
@@ -310,6 +380,7 @@ export function ChatView({
     el.addEventListener('scroll', onScroll, { passive: true })
     return () => {
       el.removeEventListener('scroll', onScroll)
+      cancelSmoothScroll()
     }
   }, [])
 
@@ -414,7 +485,7 @@ export function ChatView({
               onClick={() => {
                 const local = listRef.current
                 /* v8 ignore next -- ref-null guard: the button only renders alongside the mounted list. */
-                if (local !== null) toBottom(scrollerOf(local))
+                if (local !== null) smoothToBottom(scrollerOf(local))
               }}
             >
               <IconChevronDownOutline14 />

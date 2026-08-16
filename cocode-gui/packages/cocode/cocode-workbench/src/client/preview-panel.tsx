@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react"
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { CodeBlock, MarkdownText } from "@deepseek-ai/dsh-client-ui-primitives"
 import type { WorkbenchPanelProps } from "./model.ts"
 import { PreviewIcon } from "./icons.tsx"
@@ -13,6 +13,40 @@ import css from "./preview.module.css"
 
 /** Source is the editable face; preview is always read-only. */
 type ViewMode = "source" | "preview"
+
+/** Matches preview.module.css crossfade duration. */
+const MODE_CROSSFADE_MS = 200
+
+/** Crossfade between source and preview; only one face stays mounted at rest. */
+function ModeCrossfade(props: { readonly mode: ViewMode; readonly path: string; readonly source: ReactNode; readonly preview: ReactNode }) {
+  const reducedMotion = useRef(
+    typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+  ).current
+  const prevMode = useRef(props.mode)
+  const [resident, setResident] = useState<readonly ViewMode[]>(() => [props.mode])
+
+  useEffect(() => {
+    prevMode.current = props.mode
+    setResident([props.mode])
+  }, [props.path])
+
+  useEffect(() => {
+    if (reducedMotion || props.mode === prevMode.current) return
+    prevMode.current = props.mode
+    setResident(prev => prev.includes(props.mode) ? prev : [...prev, props.mode])
+    const timer = window.setTimeout(() => setResident([props.mode]), MODE_CROSSFADE_MS)
+    return () => window.clearTimeout(timer)
+  }, [props.mode, reducedMotion])
+
+  if (reducedMotion) {
+    return <div className={css.body}>{props.mode === "source" ? props.source : props.preview}</div>
+  }
+
+  return <div className={css.body}>
+    {resident.includes("source") && <div className={css.face} data-visible={props.mode === "source" || undefined}>{props.source}</div>}
+    {resident.includes("preview") && <div className={css.face} data-visible={props.mode === "preview" || undefined}>{props.preview}</div>}
+  </div>
+}
 
 /** How the preview face draws a file; `undefined` means it has no preview. */
 type PreviewKind = "markdown" | "html" | "image" | "pdf" | "code"
@@ -129,21 +163,20 @@ function FilePreview(props: WorkbenchPanelProps) {
     ).finally(() => setSaving(false))
   }
 
-  const body = (): ReactNode => {
-    if (mode === "source") {
-      return <textarea
-        className={css.editor}
-        value={text}
-        readOnly={!editable}
-        spellCheck={false}
-        onChange={event => setDraft({ path, text: event.target.value })}
-        onKeyDown={event => {
-          if (event.key !== "s" || !(event.metaKey || event.ctrlKey)) return
-          event.preventDefault()
-          save()
-        }}
-      />
-    }
+  const sourceView = <textarea
+    className={css.editor}
+    value={text}
+    readOnly={!editable}
+    spellCheck={false}
+    onChange={event => setDraft({ path, text: event.target.value })}
+    onKeyDown={event => {
+      if (event.key !== "s" || !(event.metaKey || event.ctrlKey)) return
+      event.preventDefault()
+      save()
+    }}
+  />
+
+  const previewView = ((): ReactNode => {
     switch (kind) {
       case "markdown":
         return <div className={css.scroll}>
@@ -162,20 +195,21 @@ function FilePreview(props: WorkbenchPanelProps) {
           <a className={css.download} href={fileUrl(sessionId, path)} download>{t("preview.download")}</a>
         </div>
     }
-  }
+  })()
 
   return <div className={css.panel}>
     <div className={css.toolbar}>
       <span className={css.name} title={path}>{workspaceRelativePath(cwd, path)}</span>
       {file?.truncated === true && <span className={css.flag}>{t("preview.truncated")}</span>}
       <span className={css.spacer} />
-      {hasSource && kind !== undefined && <div className={css.modes} role="group" aria-label={t("preview.viewMode")}>
+      {hasSource && kind !== undefined && <div className={css.modes} data-mode={mode} role="group" aria-label={t("preview.viewMode")}>
+        <div className={css.modeThumb} aria-hidden="true" />
         <button type="button" className={css.mode} data-active={mode === "source" || undefined} onClick={() => setChoice({ path, mode: "source" })}>{t("preview.source")}</button>
         <button type="button" className={css.mode} data-active={mode === "preview" || undefined} onClick={() => setChoice({ path, mode: "preview" })}>{t("preview.preview")}</button>
       </div>}
       {dirty && <button type="button" className={css.save} disabled={saving} onClick={save}>{t(saving ? "preview.saving" : "preview.save")}</button>}
     </div>
     {notice === undefined ? null : <div className={css.notice}>{notice}</div>}
-    {body()}
+    <ModeCrossfade mode={mode} path={path} source={sourceView} preview={previewView} />
   </div>
 }

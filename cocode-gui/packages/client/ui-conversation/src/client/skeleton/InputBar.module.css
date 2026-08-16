@@ -309,11 +309,10 @@
   min-width: 0;
 }
 
-/* figma 75:8208 drew 16 between + and the mode chips and 4 between Plan /
-   Read-only; the chip gap widened to 12 so the pill chips read as separate
-   controls. */
+/* figma 75:8208 drew 16 between + and the mode chips; tightened to 8 so the
+   attach control sits closer to the access chip without crowding. */
 .tools {
-  gap: 16px;
+  gap: 8px;
 }
 
 .modes {
@@ -322,7 +321,7 @@
 
 .trailing {
   flex: none;
-  gap: 12px;
+  gap: 6px;
 }
 
 /* Attach control (figma + control): 28px, selector fill, primary glyph. */
@@ -380,9 +379,10 @@
   cursor: default;
 }
 
-/* Primary send (figma IconButton 34:10465): 34px rounded rect, #3964FE light /
-   #679EFE dark — the info-fill pair (500→400), NOT button-primary (ink);
-   white glyph; empty text = 0.4 opacity. */
+/* Composer send (design system §5.2): the round primary control. Primary fill,
+   not accent — the canvas stays neutral and blue is spent on links, focus and
+   attention. The glyph rides the inverse label so it flips with the theme
+   (near-white on ink in light, near-black on paper in dark). */
 .primary {
   display: grid;
   place-items: center;
@@ -390,11 +390,9 @@
   width: 34px;
   height: 34px;
   border: none;
-  border-radius: 10px;
-  background: var(--dsw-alias-button-info-fill);
-  /* Static white, not the foreground token: the arrow stays white on the blue
-     fill in both themes (design 34:10465). */
-  color: var(--cocode-accent-foreground);
+  border-radius: var(--ds-radius-pill);
+  background: var(--dsw-alias-button-primary-fill);
+  color: var(--dsw-alias-label-inverse);
   cursor: pointer;
   transition: background-color 100ms ease;
   /* Opts out of the row's 2px downward shift (.row top pad): the send control
@@ -404,7 +402,7 @@
 }
 
 .primary:hover:not(:disabled) {
-  background: var(--dsw-alias-button-info-hover);
+  background: var(--dsw-alias-button-primary-hover);
 }
 
 .primary:disabled {

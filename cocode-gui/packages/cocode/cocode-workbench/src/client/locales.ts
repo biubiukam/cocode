@@ -20,6 +20,9 @@ export const zh = {
   "panel.browser": "浏览器",
   "panel.subagents": "子智能体",
 
+  "dock.emptyTitle": "打开一个面板",
+  "dock.emptyHint": "选一个面板停靠在这里，之后也可以用右上角的 + 添加。",
+
   "git.refresh": "刷新",
   "git.detached": "游离 HEAD",
   "git.ahead": "领先 {count} 个提交",
@@ -166,6 +169,9 @@ export const en: Record<WorkbenchKey, string> = {
   "panel.terminal": "Terminal",
   "panel.browser": "Browser",
   "panel.subagents": "Subagents",
+
+  "dock.emptyTitle": "Open a panel",
+  "dock.emptyHint": "Pick a panel to dock here, or add one later from the + above.",
 
   "git.refresh": "Refresh",
   "git.detached": "Detached HEAD",
