@@ -436,9 +436,16 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
       measureCenter()
     }
     locate()
-    const watcher = new MutationObserver(locate)
+    // The scoped-slot host is inserted below #root's frame wrapper, not as a
+    // direct #root child. Watch descendants until the center column is found;
+    // once found, ordinary conversation mutations are ignored while that
+    // column stays connected (ResizeObserver owns its geometry from there).
+    const watcher = new MutationObserver(() => {
+      if (centerColRef.current?.isConnected === true) return
+      locate()
+    })
     const root = document.getElementById('root')
-    if (root !== null) watcher.observe(root, { childList: true })
+    if (root !== null) watcher.observe(root, { childList: true, subtree: true })
     return () => {
       disposed = true
       observer?.disconnect()

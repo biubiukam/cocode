@@ -23,6 +23,7 @@ import { act } from 'react-dom/test-utils'
 ;(globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 import { Sidebar } from '../src/client/Sidebar.tsx'
+import css from '../src/client/sidebar.module.css'
 import { allLeaves, createSidebarStore, toggleBottomPanel, type SidebarStore } from '../src/client/state.ts'
 import { createBetterSidebarService, type BetterSidebarService } from '../src/client/service.ts'
 import { t } from '../src/client/locales.ts'
@@ -105,6 +106,54 @@ function registerStubTerminal(service: BetterSidebarService, renders: { count: n
 }
 
 describe('bottom-panel first-expand auto terminal (issue #42 trigger chain)', () => {
+  it('measures a conversation slot that mounts later below the root wrapper', async () => {
+    class FakeResizeObserver {
+      constructor(_callback: ResizeObserverCallback) {}
+      observe = (): void => {}
+      disconnect = (): void => {}
+    }
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver)
+
+    const rootHost = document.createElement('div')
+    rootHost.id = 'root'
+    document.body.append(rootHost)
+    const { container, store } = mountSidebar()
+
+    act(() => { store.reduce(toggleBottomPanel) })
+    const close = container.querySelector(`[aria-label="${t('collapseBottomPanel')}"]`)
+    expect(close).not.toBeNull()
+    const bottomPanel = container.querySelector(`.${css.bottomPanel}`) as HTMLDivElement
+    expect(bottomPanel).not.toBeNull()
+    expect(bottomPanel.style.left).toBe('0px')
+    expect(bottomPanel.style.right).toBe(`${window.innerWidth}px`)
+
+    const frame = document.createElement('div')
+    const center = document.createElement('div')
+    const conversation = document.createElement('div')
+    conversation.dataset.slot = 'conversation'
+    center.append(conversation)
+    frame.append(center)
+    center.getBoundingClientRect = () => ({
+      x: 240,
+      y: 0,
+      left: 240,
+      top: 0,
+      right: 900,
+      bottom: 700,
+      width: 660,
+      height: 700,
+      toJSON: () => ({}),
+    })
+
+    await act(async () => {
+      rootHost.append(frame)
+      await Promise.resolve()
+    })
+
+    expect(bottomPanel.style.left).toBe('240px')
+    expect(bottomPanel.style.right).toBe(`${window.innerWidth - 900}px`)
+  })
+
   it('auto-opens exactly one terminal tab in the bottom workbench on the FIRST expansion', () => {
     const { container, store, service } = mountSidebar()
     const renders = { count: 0 }
