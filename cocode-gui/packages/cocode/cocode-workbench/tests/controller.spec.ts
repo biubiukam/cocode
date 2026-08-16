@@ -125,4 +125,12 @@ describe("WorkbenchController", () => {
     expect(closed).toEqual(["right"])
     expect(opened).toEqual([])
   })
+
+  it("closes a visible dock that has no tabs", () => {
+    const { controller, closed } = harness()
+    controller.setSession("s1")
+    controller.setDockOpen("right", true)
+    controller.closeDockIfEmpty("right")
+    expect(closed).toEqual(["right"])
+  })
 })

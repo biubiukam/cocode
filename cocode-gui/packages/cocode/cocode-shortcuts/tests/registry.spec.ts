@@ -169,4 +169,32 @@ describe("ShortcutRegistry", () => {
     expect(run).not.toHaveBeenCalled()
     dispose()
   })
+
+  it("resets every user binding and drops orphaned keys", async () => {
+    const { registry } = await setup({
+      first: { combo: { key: "k", primary: true } },
+      orphan: { combo: { key: "F2" } },
+    })
+    registry.register({
+      id: "first",
+      title: "First",
+      defaultCombo: { key: "a", primary: true },
+      run: () => true,
+    })
+
+    const dispose = registry.mount()
+    try {
+      await registry.clearOrphaned()
+      expect(registry.getSnapshot().orphaned).toEqual([])
+      expect(registry.getUserBinding("first")).toEqual({ combo: { key: "k", primary: true } })
+
+      await registry.resetAllBindings()
+      expect(registry.getUserBinding("first")).toBeUndefined()
+      expect(registry.getSnapshot().bindings).toEqual([
+        expect.objectContaining({ commandId: "first", combo: { key: "a", primary: true } }),
+      ])
+    } finally {
+      dispose()
+    }
+  })
 })

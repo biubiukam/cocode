@@ -65,6 +65,16 @@
   color: var(--dsw-alias-label-secondary);
 }
 
+.action:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.action:disabled:hover {
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+}
+
 /* Unavailable stays focusable and hoverable so Tooltip can explain why. */
 .action[data-unavailable] {
   cursor: default;

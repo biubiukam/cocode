@@ -14,6 +14,10 @@ export interface ViewportProps {
   readonly send: (event: BrowserInputEvent) => void
   readonly registerFrameSink: (sink: (header: BrowserFrameHeader, payload: Uint8Array) => void) => void
   readonly active: boolean
+  /** Host tab id once attach has finished; undefined across reconnects. */
+  readonly attachedTabId?: string
+  /** Changes on every attach so a same-tab re-attach still restarts the stream. */
+  readonly attachSeq: number
 }
 
 function modifiersOf(event: { altKey: boolean; ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }): BrowserModifier[] {
@@ -33,36 +37,40 @@ export function BrowserViewport(props: ViewportProps) {
   const composingRef = useRef(false)
   const [preedit, setPreedit] = useState("")
   const [caret, setCaret] = useState({ x: 16, y: 16 })
-  const { send, registerFrameSink, active } = props
+  const { send, registerFrameSink, active, attachedTabId, attachSeq } = props
+  const attached = attachedTabId !== undefined
 
   // Paint and only then ack: the ack is the flow-control signal, so acking on
-  // arrival would let Chromium outrun the renderer.
+  // arrival would let Chromium outrun the renderer. Dropped frames must still
+  // ack, otherwise Chromium waits forever and the canvas stays black.
   useEffect(() => {
     let disposed = false
+    const ack = (seq: number): void => { send({ kind: "ack", seq }) }
     registerFrameSink((header, payload) => {
       const canvas = canvasRef.current
-      if (canvas === null || disposed) return
+      if (canvas === null || disposed) { ack(header.seq); return }
       const context = canvas.getContext("2d")
-      if (context === null) return
+      if (context === null) { ack(header.seq); return }
       void createImageBitmap(new Blob([payload as BlobPart], { type: "image/jpeg" })).then(bitmap => {
-        if (disposed) { bitmap.close(); return }
+        if (disposed) { bitmap.close(); ack(header.seq); return }
         if (canvas.width !== header.width || canvas.height !== header.height) {
           canvas.width = header.width
           canvas.height = header.height
         }
         context.drawImage(bitmap, 0, 0)
         bitmap.close()
-        send({ kind: "ack", seq: header.seq })
-      }, () => { send({ kind: "ack", seq: header.seq }) })
+        ack(header.seq)
+      }, () => { ack(header.seq) })
     })
     return () => { disposed = true }
   }, [registerFrameSink, send])
 
   // Report the element's own size so the remote page lays out for what the
-  // user actually sees, and stop the stream when the panel is not visible.
+  // user actually sees. Re-send after every attach: a reconnect builds a new
+  // screencast that still has the default viewport until it hears from us.
   useEffect(() => {
     const canvas = canvasRef.current
-    if (canvas === null) return
+    if (canvas === null || !attached) return
     const report = (): void => {
       const rect = canvas.getBoundingClientRect()
       if (rect.width < 1 || rect.height < 1) return
@@ -77,11 +85,13 @@ export function BrowserViewport(props: ViewportProps) {
     const observer = new ResizeObserver(report)
     observer.observe(canvas)
     return () => { observer.disconnect() }
-  }, [send])
+  }, [send, attachedTabId, attachSeq, attached])
 
   useEffect(() => {
+    if (!attached) return
     send({ kind: "subscribe", enabled: active })
-  }, [active, send])
+    return () => { send({ kind: "subscribe", enabled: false }) }
+  }, [active, send, attachedTabId, attachSeq, attached])
 
   const pointer = useCallback((type: "move" | "down" | "up") => (event: React.PointerEvent<HTMLCanvasElement>) => {
     const rect = event.currentTarget.getBoundingClientRect()

@@ -71,17 +71,14 @@ function panelMenuItems(snapshot: ReturnType<WorkbenchController["snapshot"]>) {
 function EmptyDock(props: {
   catalog: readonly WorkbenchPanelDescriptor[]
   onOpen: (id: string) => void
-  onMore: () => void
 }) {
   return <div className={css.emptyDock}>
-    <div className={css.emptyHeading}>No panel is open</div>
     <div className={css.emptyCards}>
-      {props.catalog.slice(0, 4).map(candidate => <button key={candidate.id} type="button" className={css.emptyCard} onClick={() => props.onOpen(candidate.id)}>
+      {props.catalog.map(candidate => <button key={candidate.id} type="button" className={css.emptyCard} onClick={() => props.onOpen(candidate.id)}>
         <span className={css.emptyCardIcon}>{panelIcon(candidate)}</span>
         <span>{panelTitle(candidate)}</span>
       </button>)}
     </div>
-    {props.catalog.length > 4 && <button type="button" className={css.emptyMore} onClick={props.onMore}>Browse all panels</button>}
   </div>
 }
 
@@ -249,7 +246,6 @@ function Pane(props: {
           }} />
         })}
       </div>
-      {paneInstances.length === 0 && <span className={css.paneEmptyLabel}>Empty pane</span>}
       <div className={css.actions}>
         <Menu
           open={chooserOpen}
@@ -269,7 +265,7 @@ function Pane(props: {
     </div>
     <div className={css.paneBody} role="tabpanel">
       {paneInstances.length === 0
-        ? <EmptyDock catalog={addablePanels(props.snapshot.catalog)} onOpen={openHere} onMore={() => setChooserOpen(true)} />
+        ? <EmptyDock catalog={addablePanels(props.snapshot.catalog)} onOpen={openHere} />
         : paneInstances.map(instance => {
           const descriptor = props.snapshot.catalog.find(item => item.id === instance.type)
           const isActive = instance.id === activeId
@@ -305,6 +301,8 @@ export function DockSurface({ controller, dock, visible, sessionId, sessions, us
   // Bound during render so the first child fetch (useEffect) already carries
   // the listed workspace — waiting for an effect would miss that first request.
   bindWorkbenchCwd(cwd)
+  const instances = snapshot.session.instances.filter(instance => instance.dock === dock)
+  const activeId = snapshot.session.active[dock] ?? instances[0]?.id
   useEffect(() => { controller.setSession(sessionId) }, [controller, sessionId])
   useEffect(() => { controller.setDockOpen(dock, visible) }, [controller, dock, visible])
   useEffect(() => {
@@ -313,8 +311,6 @@ export function DockSurface({ controller, dock, visible, sessionId, sessions, us
     else delete document.body.dataset.cocodeWorkbenchRight
     return () => { delete document.body.dataset.cocodeWorkbenchRight }
   }, [dock, visible])
-  const instances = snapshot.session.instances.filter(instance => instance.dock === dock)
-  const activeId = snapshot.session.active[dock] ?? instances[0]?.id
   return <section className={css.dock} data-cocode-workbench={dock} data-visible={visible || undefined}>
     <div className={css.body} role="tabpanel">
       <Pane

@@ -11,7 +11,7 @@ import type { WorkbenchPanelProps } from "./model.ts"
 import { sectionsOf, statusLetter, statusTone, gitRequest, type GitCommit, type GitRepo, type GitRow, type GitSection } from "./git-client.ts"
 import { useGitStore } from "./git-store.ts"
 import { branchMenuEntries, checkoutTarget, commitMenuEntries, moreMenuEntries, rowMenuEntries, sectionLabel, type GitCommand } from "./git-menus.ts"
-import { BranchIcon, DiscardIcon, MoreIcon, OpenFileIcon, RefreshIcon, SectionChevron, SparkleIcon, StageIcon, StashApplyIcon, StashDropIcon, StashPopIcon, SyncIcon, UnstageIcon } from "./git-icons.tsx"
+import { BranchIcon, DiscardIcon, MoreIcon, OpenFileIcon, RefreshIcon, SectionChevron, SparkleIcon, SpinnerIcon, StageIcon, StashApplyIcon, StashDropIcon, StashPopIcon, SyncIcon, UnstageIcon } from "./git-icons.tsx"
 import { GitIcon } from "./icons.tsx"
 import { State } from "./panel-state.tsx"
 import { localeRevision, subscribeLocale, t } from "./locales.ts"
@@ -67,6 +67,7 @@ function IconAction(props: {
       className={css.iconButton}
       aria-label={props.label}
       disabled={props.disabled}
+      aria-busy={props.busy === true || undefined}
       data-busy={props.busy === true || undefined}
       data-wide={props.wide === true || undefined}
       onClick={event => { event.stopPropagation(); props.onClick() }}
@@ -451,12 +452,12 @@ export function GitPanel(props: WorkbenchPanelProps) {
         />
         <div className={css.commitGenerate}>
           <IconAction
-            label={t("git.generateMessage")}
+            label={generating ? t("git.generatingMessage") : t("git.generateMessage")}
             busy={generating}
             disabled={generating || !hasDiffableChanges}
             onClick={() => void generateMessage()}
           >
-            <SparkleIcon size={14} />
+            {generating ? <SpinnerIcon size={14} /> : <SparkleIcon size={14} />}
           </IconAction>
         </div>
       </div>

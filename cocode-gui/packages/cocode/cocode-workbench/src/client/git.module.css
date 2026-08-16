@@ -112,8 +112,13 @@
   cursor: default;
 }
 
+.iconButton[data-busy]:disabled {
+  color: var(--dsw-alias-label-secondary);
+  cursor: progress;
+}
+
 .iconButton[data-busy] svg {
-  animation: spin 900ms linear infinite;
+  animation: spin 700ms linear infinite;
 }
 
 @keyframes spin {
@@ -159,19 +164,6 @@
   height: 22px;
   border-radius: 5px;
   pointer-events: auto;
-}
-
-/* 生成中用呼吸代替旋转：星芒转起来不像在“想”，像在加载。 */
-.commitGenerate .iconButton[data-busy] svg {
-  animation: pulse 1200ms ease-in-out infinite;
-}
-
-@keyframes pulse {
-  50% { opacity: 0.35; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .commitGenerate .iconButton[data-busy] svg { animation: none; }
 }
 
 .commitInput {

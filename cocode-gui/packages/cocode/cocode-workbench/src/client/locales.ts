@@ -51,6 +51,7 @@ export const zh = {
   "git.commitSignoff": "提交并署名",
   "git.commitEmpty": "请先填写提交信息",
   "git.generateMessage": "用模型生成 Git 提交信息",
+  "git.generatingMessage": "正在生成提交信息…",
 
   "settings.nav": "工作台",
   "settings.commitModel": "Git Commit Message 生成模型",
@@ -197,6 +198,7 @@ export const en: Record<WorkbenchKey, string> = {
   "git.commitSignoff": "Commit with Sign-off",
   "git.commitEmpty": "Please provide a commit message",
   "git.generateMessage": "Generate Git Commit Message",
+  "git.generatingMessage": "Generating commit message…",
 
   "settings.nav": "Workbench",
   "settings.commitModel": "Git commit message model",

@@ -399,6 +399,12 @@ export class WorkbenchController implements WorkbenchService {
     this.#dockOpen[dock] = open
   }
 
+  /** Collapse a dock shell that is visible but has no tabs to show. */
+  closeDockIfEmpty(dock: WorkbenchDock): void {
+    const instances = this.snapshot().session.instances.filter(instance => instance.dock === dock)
+    if (instances.length === 0) this.#layout.closeWorkbench(dock)
+  }
+
   /** Toggle a dock; the first open seeds Files (right) or Terminal (bottom). */
   toggleDock(dock: WorkbenchDock): void {
     const instances = this.snapshot().session.instances.filter(instance => instance.dock === dock)

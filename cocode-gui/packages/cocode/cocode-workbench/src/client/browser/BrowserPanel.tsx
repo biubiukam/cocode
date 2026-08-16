@@ -28,10 +28,17 @@ export function BrowserPanel(props: WorkbenchPanelProps) {
   const panelId = props.instance.id
   const adopt = adoptedTabId(props.instance.target)
   const sink = useRef<FrameSink>()
-  const connection = useMemo(
-    () => new BrowserConnection((header, payload) => { sink.current?.(header, payload) }, panelId, adopt),
-    [panelId, adopt],
-  )
+  const connection = useMemo(() => {
+    const conn: BrowserConnection = new BrowserConnection((header, payload) => {
+      const current = sink.current
+      if (current === undefined) {
+        conn.send({ kind: "ack", seq: header.seq })
+        return
+      }
+      current(header, payload)
+    }, panelId, adopt)
+    return conn
+  }, [panelId, adopt])
   // Closing the panel closes the page; a reload never runs this and so keeps it.
   useEffect(() => () => { connection.release() }, [connection])
   useEffect(() => { connection.setSession(props.scope.sessionId) }, [connection, props.scope.sessionId])
@@ -89,7 +96,13 @@ export function BrowserPanel(props: WorkbenchPanelProps) {
       defaultValue={active.dialog.defaultValue}
       send={send}
     />}
-    <BrowserViewport send={send} registerFrameSink={registerFrameSink} active={props.visible} />
+    <BrowserViewport
+      send={send}
+      registerFrameSink={registerFrameSink}
+      active={props.visible}
+      attachedTabId={state.attachedTabId}
+      attachSeq={state.attachSeq}
+    />
     {state.downloads.filter(download => download.state === "active").map(download => <div key={download.id} className={css.download}>
       <span className={css.title}>{t("browser.downloadingFile", { name: download.filename })}</span>
       <button type="button" onClick={() => { send({ kind: "cancelDownload", id: download.id }) }}>{t("common.cancel")}</button>

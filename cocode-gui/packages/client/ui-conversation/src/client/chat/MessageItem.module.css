@@ -224,16 +224,18 @@
   margin-top: 5px;
 }
 
-.turnErrorCopy {
+.turnErrorStack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   min-width: 0;
-  overflow-wrap: anywhere;
 }
 
-.turnErrorHead {
+.turnErrorCopy {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .turnErrorTitle {
@@ -242,38 +244,13 @@
   font-weight: 600;
 }
 
-.turnErrorRetry {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin: -2px 0 -2px auto;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border: none;
-  border-radius: 6px;
-  background: none;
-  color: var(--dsw-alias-state-business-primary);
-  cursor: pointer;
-}
-
-.turnErrorRetry:hover:not(:disabled) {
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-
-.turnErrorRetry:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--dsw-alias-state-business-primary);
-}
-
-.turnErrorRetry:disabled {
-  cursor: default;
-  opacity: 0.45;
-}
-
 .turnErrorMessage {
   color: var(--dsw-alias-label-secondary);
+}
+
+/* Same IconActions row as copy/branch: 28px hit targets, optically aligned. */
+.turnErrorActions {
+  margin-left: -6px;
 }
 
 .maxTokensTitle {

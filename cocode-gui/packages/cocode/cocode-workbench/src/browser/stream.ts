@@ -177,11 +177,21 @@ export function createBrowserStream(options: StreamOptions): {
     const session: StreamSession = {}
     sessions.set(socket, session)
     send(socket, { kind: "engine", status: options.runtime.status() })
+    // Attach launches Chromium and can take seconds. Input, subscribe and
+    // viewport must wait for it: running them concurrently would drop them
+    // because session.cast does not exist yet.
+    let queue = Promise.resolve()
     socket.on("message", (data: Buffer | string) => {
       let event: BrowserInputEvent
       try { event = JSON.parse(typeof data === "string" ? data : data.toString("utf8")) as BrowserInputEvent }
       catch { return }
-      void handle(socket, session, event).catch(error => { fail(socket, error) })
+      // Acks are the screencast back-pressure signal and must not wait behind
+      // a navigation or a still-running attach.
+      if (event.kind === "ack") {
+        session.cast?.ack(event.seq)
+        return
+      }
+      queue = queue.then(() => handle(socket, session, event)).catch(error => { fail(socket, error) })
     })
     socket.on("close", () => {
       sessions.delete(socket)

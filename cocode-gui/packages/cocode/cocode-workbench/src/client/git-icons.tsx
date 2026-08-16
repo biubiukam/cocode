@@ -49,6 +49,11 @@ export function SparkleIcon(props: IconProps) {
   return Icon(props, <><path d="M6.5 2.5 7.6 5.4 10.5 6.5 7.6 7.6 6.5 10.5 5.4 7.6 2.5 6.5 5.4 5.4z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" /><path d="m11.75 9.25.62 1.63 1.63.62-1.63.62-.62 1.63-.62-1.63-1.63-.62 1.63-.62z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round" /></>)
 }
 
+/** 生成中的进行态：开口圆环，由 `data-busy` 旋转。 */
+export function SpinnerIcon(props: IconProps) {
+  return Icon(props, <path d="M13 8A5 5 0 1 1 8 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />)
+}
+
 /** 折叠指示，展开时由 CSS 旋转 90 度。 */
 export function SectionChevron(props: IconProps) {
   return Icon(props, <path d="m6 4 4 4-4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />)

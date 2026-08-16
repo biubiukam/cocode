@@ -5,14 +5,24 @@
  * 不进 agent loop、不写会话日志：它是用户按下按钮换来的一次工具调用，不该出现在
  * 对话历史里。
  */
-import { BlockAssembler, createUserMessage, type LlmRuntime } from "@deepseek-ai/dsh-llm"
+import {
+  BlockAssembler,
+  createUserMessage,
+  ReasoningEffortId,
+  type LlmRuntime,
+} from "@deepseek-ai/dsh-llm"
 import { DEFAULT_COMMIT_MODEL, type CommitMessageSettings } from "./settings.ts"
 
 /** 差异体量上限。超出的部分对写一行标题没有增量信息，却会顶满上下文窗口。 */
 const MAX_DIFF_CHARS = 24_000
+/**
+ * 关掉思考之后的可见输出上限。思考 token 与正文共享预算，开着思考时绝不能
+ * 再用这个数去卡：那会把整段预算耗在 reasoning 上，界面只看到 max-tokens。
+ */
 const MAX_OUTPUT_TOKENS = 512
 /** 生成超时。用户在等一个输入框被填上，拖过这个时长不如让他自己写。 */
 const TIMEOUT_MS = 45_000
+const THINKING_OFF = ReasoningEffortId("off")
 
 const SYSTEM_PROMPT = [
   "You write git commit messages from a diff.",
@@ -86,29 +96,52 @@ export async function generateCommitMessage(
   signal?: AbortSignal,
 ): Promise<string> {
   const deadline = AbortSignal.timeout(TIMEOUT_MS)
+  const combined = signal === undefined ? deadline : AbortSignal.any([signal, deadline])
   const assembler = new BlockAssembler()
   for await (const chunk of llm.stream({
     provider: route.provider,
     model: route.model,
     system: SYSTEM_PROMPT,
-    maxTokens: MAX_OUTPUT_TOKENS,
-    signal: signal === undefined ? deadline : AbortSignal.any([signal, deadline]),
+    signal: combined,
     messages: [createUserMessage({
       content: [{ type: "text", text: promptOf(diff) }],
       source: { kind: "plugin", plugin: "cocode-workbench" },
     })],
+    ...await outputBudget(llm, route, combined),
   })) {
     assembler.push(chunk)
   }
-  if (assembler.finish.kind !== "stop") {
-    throw new Error(`the model stopped early (${assembler.finish.kind})`)
+  const finish = assembler.finish
+  if (finish.kind === "error" || finish.kind === "aborted") {
+    throw new Error(finish.failure.message)
   }
-  const text = assembler.blocks()
+  const message = clean(textOf(assembler))
+  if (message !== "") return message
+  if (finish.kind === "max-tokens") {
+    throw new Error("the model reached its output limit before writing a commit message")
+  }
+  throw new Error("the model returned an empty commit message")
+}
+
+/**
+ * 提交消息只要一行可见正文。模型若支持关掉思考就关掉，并把输出预算留给正文；
+ * 否则不要自作主张设上限——思考与正文共用 maxTokens，卡死只会让调用失败。
+ */
+async function outputBudget(
+  llm: LlmRuntime,
+  route: ModelRoute,
+  signal: AbortSignal,
+): Promise<{ reasoningEffort?: typeof THINKING_OFF; maxTokens?: number }> {
+  const info = await llm.resolveModelInfo(route.provider, route.model, signal).catch(() => undefined)
+  const canDisableThinking = info?.reasoning?.efforts.some(effort => effort.id === THINKING_OFF) === true
+  if (!canDisableThinking) return {}
+  return { reasoningEffort: THINKING_OFF, maxTokens: MAX_OUTPUT_TOKENS }
+}
+
+function textOf(assembler: BlockAssembler): string {
+  return assembler.blocks()
     .flatMap(block => block.type === "text" ? [block.text] : [])
     .join("")
-  const message = clean(text)
-  if (message === "") throw new Error("the model returned an empty commit message")
-  return message
 }
 
 /** 超出上限的差异从中间截断：文件头和末尾的改动同样是判断意图的线索。 */

@@ -24,6 +24,8 @@ export interface BrowserConnectionState {
   /** The single tab this panel drives. */
   readonly tab?: BrowserTabView
   readonly attachedTabId?: string
+  /** Bumped on every attach, even when the tab id is unchanged. */
+  readonly attachSeq: number
   /** Tabs no panel is showing yet, offered for adoption into a new panel. */
   readonly detached: readonly BrowserTabView[]
   readonly downloads: readonly BrowserDownloadState[]
@@ -31,7 +33,7 @@ export interface BrowserConnectionState {
   readonly error?: string
 }
 
-const INITIAL: BrowserConnectionState = { status: "connecting", detached: [], downloads: [], approvals: [] }
+const INITIAL: BrowserConnectionState = { status: "connecting", attachSeq: 0, detached: [], downloads: [], approvals: [] }
 
 /** Backoff schedule; the last entry repeats for as long as the host is down. */
 const RECONNECT_DELAYS = [400, 800, 1600, 3200, 5000] as const
@@ -108,7 +110,9 @@ export class BrowserConnection {
     socket.addEventListener("close", () => {
       this.socket = undefined
       if (this.closed) return
-      this.update({ status: "closed" })
+      // Drop attachedTabId so the viewport re-subscribes when the same tab
+      // comes back; a boolean "still attached" would miss the new screencast.
+      this.update({ status: "closed", attachedTabId: undefined })
       const delay = RECONNECT_DELAYS[Math.min(this.attempt, RECONNECT_DELAYS.length - 1)] ?? 5000
       this.attempt += 1
       this.retry = setTimeout(() => { this.connect() }, delay)
@@ -124,7 +128,9 @@ export class BrowserConnection {
     let message: BrowserStreamMessage
     try { message = JSON.parse(data) as BrowserStreamMessage } catch { return }
     switch (message.kind) {
-      case "attached": this.update({ attachedTabId: message.tabId }); return
+      case "attached":
+        this.update({ attachedTabId: message.tabId, attachSeq: this.state.attachSeq + 1 })
+        return
       case "tab": this.update({ tab: message.tab }); return
       case "agentTabs": this.update({ detached: message.tabs }); return
       case "engine": this.update({ engine: message.status }); return

@@ -37,8 +37,19 @@ export interface ProviderRow {
 const COCODE_NUT_PROVIDER = 'cocode-nut'
 const LEGACY_COCODE_NUT_PROVIDER = 'cocode-cloud'
 
-function isCocodeNutProvider(provider: string): boolean {
+export function isCocodeNutProvider(provider: string): boolean {
   return provider === COCODE_NUT_PROVIDER || provider === LEGACY_COCODE_NUT_PROVIDER
+}
+
+/** Official hosted Nut route stays first; other providers keep adapter order. */
+function sortProvidersForDisplay(
+  providers: readonly ConfigurableProviderView[],
+): ConfigurableProviderView[] {
+  return [...providers].sort((left, right) => {
+    const leftNut = isCocodeNutProvider(left.provider) ? 0 : 1
+    const rightNut = isCocodeNutProvider(right.provider) ? 0 : 1
+    return leftNut - rightNut
+  })
 }
 
 /** Page snapshot. */
@@ -150,13 +161,15 @@ export class ModelsSettingsStore {
     }
     const namespaces = new Map(views.map(view => [view.ns, view]))
     const hasNutProvider = providers.some(entry => entry.provider === COCODE_NUT_PROVIDER)
-    const visibleProviders = hasNutProvider
-      ? providers.filter(entry => entry.provider !== LEGACY_COCODE_NUT_PROVIDER)
-      : providers.map((entry) => (
-        entry.provider === LEGACY_COCODE_NUT_PROVIDER
-          ? { ...entry, displayName: 'Cocode Nut' }
-          : entry
-      ))
+    const visibleProviders = sortProvidersForDisplay(
+      hasNutProvider
+        ? providers.filter(entry => entry.provider !== LEGACY_COCODE_NUT_PROVIDER)
+        : providers.map((entry) => (
+          entry.provider === LEGACY_COCODE_NUT_PROVIDER
+            ? { ...entry, displayName: 'Cocode Nut' }
+            : entry
+        )),
+    )
     const rows: ProviderRow[] = visibleProviders.map((entry) => {
       const namespace = namespaces.get(entry.settingsNs)
       const configured = namespace !== undefined

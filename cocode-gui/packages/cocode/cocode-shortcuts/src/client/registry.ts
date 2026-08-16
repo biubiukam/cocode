@@ -154,8 +154,27 @@ export class ShortcutRegistry {
     })
   }
 
-  resetBinding(commandId: string): void {
-    void this.settings.resetBinding(commandId)
+  resetBinding(commandId: string): Promise<void> {
+    return this.settings.resetBinding(commandId)
+  }
+
+  resetAllBindings(): Promise<void> {
+    return this.settings.setBindings({})
+  }
+
+  clearOrphaned(): Promise<void> {
+    const known = new Set(this.commandsById.keys())
+    const next: Record<string, UserBinding> = {}
+    let changed = false
+    for (const [commandId, binding] of Object.entries(this.userBindings)) {
+      if (known.has(commandId)) {
+        next[commandId] = binding
+        continue
+      }
+      changed = true
+    }
+    if (!changed) return Promise.resolve()
+    return this.settings.setBindings(next)
   }
 
   reloadSettings(): void {

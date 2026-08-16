@@ -19,6 +19,7 @@ import { messageImageLabels } from '../image-labels.ts'
 import { CompactionItem } from './CompactionItem.tsx'
 import { ContextInjectionRow } from './ContextInjectionRow.tsx'
 import { MessageIconActions } from './MessageIconActions.tsx'
+import actionCss from './MessageIconActions.module.css'
 import css from './MessageItem.module.css'
 
 export interface ContextMessageNodeInjected {
@@ -138,16 +139,19 @@ function TurnErrorItem({ node, t, canRetry, retrying, onRetry }: {
   onRetry: () => void
 }) {
   return (
-    <div className={css.turnErrorRow} role="status">
+    <div className={css.turnErrorRow}>
       <StateDot state="error" className={css.turnErrorDot} />
-      <div className={css.turnErrorCopy}>
-        <div className={css.turnErrorHead}>
+      <div className={css.turnErrorStack}>
+        <div className={css.turnErrorCopy} role="status">
           <span className={css.turnErrorTitle}>{t('message.turnError')}</span>
-          {canRetry && (
+          <span className={css.turnErrorMessage}>{node.message}</span>
+        </div>
+        {canRetry && (
+          <div className={`${actionCss.actions} ${css.turnErrorActions}`}>
             <Tooltip label={t('message.turnError.retry')} side="bottom">
               <button
                 type="button"
-                className={css.turnErrorRetry}
+                className={actionCss.action}
                 aria-label={t('message.turnError.retry')}
                 disabled={retrying}
                 onClick={onRetry}
@@ -155,9 +159,8 @@ function TurnErrorItem({ node, t, canRetry, retrying, onRetry }: {
                 <IconRefreshOutline16 />
               </button>
             </Tooltip>
-          )}
-        </div>
-        <span className={css.turnErrorMessage}>{node.message}</span>
+          </div>
+        )}
       </div>
     </div>
   )

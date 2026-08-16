@@ -20,6 +20,7 @@ import type { SnapshotSelectorHook } from '@deepseek-ai/dsh-client-web-react'
 import { CustomProviderCard } from './CustomProviderCard.tsx'
 import { deriveKeyRef, messageOf, protocolChoices, providerUsable } from './store.ts'
 import type { ModelsSettingsState, ModelsSettingsStore, ProviderRow } from './store.ts'
+import { isCocodeNutProvider } from './store.ts'
 import { ProviderEditor, type ProviderEditorProps } from './ProviderEditor.tsx'
 import type { en } from './locales.ts'
 import styles from './ModelsSection.module.css'
@@ -150,7 +151,7 @@ function targetOf(row: ProviderRow): EditorTarget {
     // Absent is not "shipped": an adapter that answers nothing leaves the
     // route-level fields only a declared route owns off the card, exactly as
     // it leaves the custom tag off the row.
-    ...row.entry.declared === true ? { declared: true } : {},
+    ...row.entry.declared === true && !isCocodeNutProvider(row.entry.provider) ? { declared: true } : {},
   }
 }
 
@@ -321,7 +322,7 @@ function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
                   {/* Only the adapter can tell a hand-declared route from a
                       shipped one it also has a stored profile for, so the tag
                       follows its answer and stays off when it gives none. */}
-                  {row.entry.declared === true
+                  {row.entry.declared === true && !isCocodeNutProvider(row.entry.provider)
                     ? <span className={styles['rowTag']}>{t('customTag')}</span>
                     : null}
                   {(row.entry.provider === 'cocode-nut' || row.entry.provider === 'cocode-cloud')
