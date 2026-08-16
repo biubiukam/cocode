@@ -13,11 +13,11 @@
 /* The persistent expand/collapse cluster at the top-right corner: two rail
    controls side by side (bottom panel's glyph LEFT of the right panel's).
    Always pinned to the viewport corner — inside the right panel's top-right
-   while it is open, centered in the compact 52px tab strip (28px buttons at
-   top: 12px) whose right end it really squeezes. */
+   while it is open, centered in the compact 46px tab strip (28px buttons at
+   top: 9px) whose right end it really squeezes. */
 .toggleCluster {
   position: fixed;
-  top: 12px;
+  top: 9px;
   right: 10px;
   z-index: 55;
   display: flex;
@@ -467,7 +467,7 @@
   flex: none;
   display: flex;
   align-items: stretch;
-  height: 52px;
+  height: 46px;
   padding: 8px 0;
   border-bottom: 1px solid var(--dsw-alias-border-l1);
   background: var(--dsw-alias-bg-layer-1);
@@ -497,7 +497,7 @@
   flex: none;
   max-width: 220px;
   min-width: 76px;
-  height: 36px;
+  height: 30px;
   display: flex;
   align-items: center;
   gap: 6px;
