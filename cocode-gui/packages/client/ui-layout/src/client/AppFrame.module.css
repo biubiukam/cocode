@@ -1,13 +1,14 @@
 .frame {
   position: relative; /* anchors the drag handles, which straddle column borders */
   display: grid;
-  grid-template-rows: 100%;
+  grid-template-rows: minmax(0, 1fr) 0;
   height: 100%;
   overflow: hidden;
   background: var(--dsw-alias-bg-base);
-  /* Collapse/expand animates the tracks on the deepsuite sider curve
-     (--ds-ease-in-out / --ds-transition-duration-slow, ui-theme base.css). */
-  transition: grid-template-columns var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+  /* Collapse/expand animates both workbench tracks on the same curve. */
+  transition:
+    grid-template-columns var(--ds-transition-duration-slow) var(--ds-ease-in-out),
+    grid-template-rows var(--ds-transition-duration-slow) var(--ds-ease-in-out);
 }
 
 /* Dragging writes widths at pointer cadence; easing them would detach the
@@ -23,13 +24,24 @@
 }
 
 .sidebarCol {
+  /* Containing block for the sidebar-owned titlebar drag strip. Without
+     this, that abspos strip resolves against .frame and its
+     -webkit-app-region: drag covers the whole top chrome — including the
+     workbench header buttons. */
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  grid-row: 1 / -1;
   min-width: 0;
+  min-height: 0;
   overflow: hidden;
   background: var(--dsw-specific-sidebar-fill);
   border-right: 1px solid var(--dsw-alias-border-l1);
 }
 
 .centerCol {
+  grid-column: 2;
+  grid-row: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -37,9 +49,27 @@
 }
 
 .detailsCol {
+  grid-column: 3;
+  grid-row: 1;
   min-width: 0;
   overflow: hidden;
   border-left: 1px solid var(--dsw-alias-border-l2);
+}
+
+.workbenchRight {
+  min-width: 0;
+  grid-column: 4;
+  grid-row: 1 / -1;
+  overflow: hidden;
+  border-left: 1px solid var(--dsw-alias-border-l2);
+}
+
+.workbenchBottom {
+  min-height: 0;
+  grid-column: 2 / 4;
+  grid-row: 2;
+  overflow: hidden;
+  border-top: 1px solid var(--dsw-alias-border-l2);
 }
 
 /* The details subtree stays mounted at zero width, so its border must not paint
@@ -48,9 +78,18 @@
   border-left: none;
 }
 
+.frame[data-workbench-right-collapsed] .workbenchRight {
+  border-left: none;
+}
+
+.frame[data-workbench-bottom-collapsed] .workbenchBottom {
+  border-top: none;
+}
+
 /* Drag handles are frame children (columns clip overflow): an 8px hit strip
-   centered on the column border via inline left, above column content. Details
-   adds a visible 12x32 pill at vertical center; sidebar keeps only the hit strip. */
+   centered on the column border via inline left, above column content. No grab
+   button — the seam is the affordance: the strip stays invisible until the
+   pointer reaches it, then the border it straddles lights up. */
 .handle {
   position: absolute;
   top: 0;
@@ -60,60 +99,75 @@
   cursor: col-resize;
   z-index: 2;
   touch-action: none;
-  /* Rides the same curve as the tracks so the pill stays on the moving
+  /* Rides the same curve as the tracks so the strip stays on the moving
      border during collapse/expand; paused while dragging (frame rule). */
   transition: left var(--ds-transition-duration-slow) var(--ds-ease-in-out);
 }
 
-.frame[data-dragging] .handle {
+.rowHandle {
+  position: absolute;
+  height: 8px;
+  cursor: row-resize;
+  z-index: 3;
+  touch-action: none;
+  transition:
+    bottom var(--ds-transition-duration-slow) var(--ds-ease-in-out),
+    left var(--ds-transition-duration-slow) var(--ds-ease-in-out),
+    right var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+}
+
+.frame[data-dragging] .handle,
+.frame[data-dragging] .rowHandle {
   transition: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .handle {
+  .handle,
+  .rowHandle {
     transition: none;
   }
 }
 
-.handle[data-side='details']::after {
+/* The lit seam: a hairline through the middle of the hit strip, so it lands
+   exactly on the column border the strip controls. */
+.handle::after,
+.rowHandle::after {
   content: '';
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 12px;
-  height: 32px;
-  border-radius: 10px;
-  box-sizing: border-box;
-  background: var(--dsw-alias-button-floating-fill);
-  border: 1px solid var(--dsw-alias-border-l2-darkmode-thin);
-  /* Hover affordance: the details pill hides until the pointer is over its
-     column, the strip itself, or a drag. */
+  background: var(--cocode-accent);
   opacity: 0;
-  transition:
-    opacity var(--ds-transition-duration-slow) var(--ds-ease-in-out),
-    background var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+  transition: opacity var(--ds-transition-duration-fast) var(--ds-ease-in-out);
 }
 
-.detailsCol:hover ~ .handle[data-side='details']::after,
-.handle[data-side='details']:hover::after,
-.handle[data-side='details'][data-dragging='true']::after {
+.handle::after {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  transform: translateX(-50%);
+}
+
+.rowHandle::after {
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  transform: translateY(-50%);
+}
+
+.handle:hover::after,
+.rowHandle:hover::after,
+.handle[data-dragging='true']::after,
+.rowHandle[data-dragging='true']::after {
   opacity: 1;
-}
-
-.handle[data-side='details']:hover::after,
-.handle[data-side='details'][data-dragging='true']::after {
-  background: var(--dsw-alias-button-floating-hover);
-  border-color: var(--dsw-alias-border-l3);
 }
 
 .overlayLayer {
   position: absolute;
   inset: 0;
   z-index: 20;
+  /* Click-through: occupants opt back in on their own interactive nodes.
+     Forcing pointer-events on every child would let a full-size wrapper
+     swallow the workbench header. */
   pointer-events: none;
-}
-
-.overlayLayer > * {
-  pointer-events: auto;
 }

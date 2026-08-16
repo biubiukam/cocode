@@ -13,11 +13,11 @@
 /* The persistent expand/collapse cluster at the top-right corner: two rail
    controls side by side (bottom panel's glyph LEFT of the right panel's).
    Always pinned to the viewport corner — inside the right panel's top-right
-   while it is open, centered in the compact 46px tab strip (28px buttons at
-   top: 9px) whose right end it really squeezes. */
+   while it is open, sitting flush in the 34px tab strip (28px buttons at
+   top: 3) whose right end it really squeezes. */
 .toggleCluster {
   position: fixed;
-  top: 9px;
+  top: 3px;
   right: 10px;
   z-index: 55;
   display: flex;
@@ -74,10 +74,6 @@
   z-index: 50;
   display: flex;
   flex-direction: column;
-  /* The layout push and the bottom-panel seam use the panel's declared
-     width as the outer occupied width. Keep the left border inside that
-     geometry instead of letting the default content-box model add a pixel. */
-  box-sizing: border-box;
   /* The native sidebar surface: bluish-50 over white / bluish-900 over dark,
      exactly like the app's own sidebar column (SidebarRoot .root). */
   background: var(--dsw-specific-sidebar-fill);
@@ -139,9 +135,6 @@
   z-index: 50;
   display: flex;
   flex-direction: column;
-  /* Match .panel: left/right and height describe the outer panel box, so the
-     top/right hairlines land on the same coordinates as the adjacent panel. */
-  box-sizing: border-box;
   background: var(--dsw-specific-sidebar-fill);
   border-top: 1px solid var(--dsw-alias-border-l2);
   /* Expand/collapse slides the panel; height drags animate the height. */
@@ -189,7 +182,7 @@
    under it. */
 .bottomClose {
   position: absolute;
-  top: 9px;
+  top: 3px;
   right: 6px;
   z-index: 4;
   display: inline-flex;
@@ -474,9 +467,7 @@
   flex: none;
   display: flex;
   align-items: stretch;
-  /* Match the conversation header's outer height: its 46px content box has
-     7px vertical padding, while this strip has 8px padding plus a border. */
-  height: 44px;
+  height: 32px;
   padding: 8px 0;
   border-bottom: 1px solid var(--dsw-alias-border-l1);
   background: var(--dsw-alias-bg-layer-1);
@@ -493,7 +484,6 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 0 12px;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -506,15 +496,15 @@
   flex: none;
   max-width: 220px;
   min-width: 76px;
-  height: 30px;
+  height: 32px;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   padding: 0 8px;
   font: var(--dsw-font-xxs-12);
   color: var(--dsw-alias-label-secondary);
   border: 1px solid transparent;
-  border-radius: 12px;
+  border-radius: 14px;
   background: transparent;
   cursor: pointer;
   user-select: none;
@@ -533,7 +523,7 @@
   /* Selected tabs use the same compact rounded-rectangle language as the
      reference UI, while keeping the panel's existing semantic active token. */
   background: var(--dsw-alias-interactive-bg-active);
-  border-color: transparent;
+  border-color: var(--dsw-alias-border-l1);
 }
 
 .tabTitle {
@@ -762,30 +752,6 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
-.editorSaveCluster {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 28px;
-}
-
-.editorStatus {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  white-space: nowrap;
-}
-
-.editorStatus :global(svg) {
-  display: block;
-  flex: none;
-}
-
-.editorStatusSuccess {
-  color: var(--dsw-alias-state-success-primary);
-}
-
 .editorStatusError {
   color: var(--dsw-alias-state-error-primary);
 }
@@ -986,120 +952,12 @@
   background: var(--dsw-alias-state-warn-tertiary);
 }
 
-/* The live page: a canvas painted from the host's screencast, with an
-   invisible textarea layered on top to own the caret (IME + clipboard). */
-.browserStage {
-  position: relative;
+.browserFrame {
   flex: 1;
   min-height: 0;
-  overflow: hidden;
-  background: var(--dsw-alias-bg-base);
-}
-
-.browserCanvas {
-  display: block;
   width: 100%;
-  height: 100%;
-  /* The screencast is sized to this element, so any residual mismatch during
-     a resize should letterbox rather than distort the page. */
-  object-fit: contain;
-}
-
-.browserKeyboard {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  padding: 0;
   border: none;
-  resize: none;
-  opacity: 0;
-  /* The canvas underneath owns the pointer; focus is handed here on mousedown. */
-  pointer-events: none;
-  caret-color: transparent;
-}
-
-.browserKeyboard:focus {
-  outline: none;
-}
-
-.browserHint {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  text-align: center;
-  font: var(--dsw-font-xs-13);
-  color: var(--dsw-alias-label-tertiary);
-  pointer-events: none;
-}
-
-/* Shown while the model is driving the page, so a click the user did not
-   make is never mysterious. */
-.browserAgentBar {
-  flex: none;
-  padding: 4px 12px;
-  font: var(--dsw-font-xxxs-11);
-  color: var(--dsw-alias-state-business-primary);
-  background: var(--dsw-alias-state-business-tertiary);
-}
-
-.browserPreedit {
-  position: absolute;
-  left: 12px;
-  bottom: 12px;
-  z-index: 2;
-  max-width: calc(100% - 24px);
-  padding: 2px 8px;
-  border-radius: 4px;
-  font: var(--dsw-font-xs-13);
-  color: var(--dsw-alias-label-primary);
-  background: var(--dsw-alias-bg-elevated);
-  pointer-events: none;
-}
-
-.browserPerms {
-  display: flex;
-  flex: none;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 4px 12px;
-}
-
-.browserPermChip {
-  border: 0;
-  border-radius: 999px;
-  padding: 2px 8px;
-  font: var(--dsw-font-xxxs-11);
-  color: var(--dsw-alias-label-secondary);
-  background: var(--dsw-alias-fill-tertiary);
-  cursor: pointer;
-}
-
-/* A native alert/confirm/prompt blocks the remote renderer, so it blocks
-   this surface too rather than failing silently. */
-.browserDialog {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  background: rgb(0 0 0 / 32%);
-}
-
-.browserDialogCard {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: 100%;
-  max-width: 320px;
-  padding: 16px;
-  border: 1px solid var(--dsw-alias-border-l1);
-  border-radius: 10px;
-  background: var(--dsw-alias-bg-layer-1);
+  background: var(--dsw-alias-bg-base);
 }
 
 .browserStart {

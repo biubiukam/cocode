@@ -1,17 +1,23 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs"
 import path from "node:path"
-import { defineConfig, type Plugin } from "vite"
+import { defineConfig, type Plugin, type ProxyOptions } from "vite"
+import {
+	extractDshBootManifest,
+	extractDshThemePreference,
+} from "./src/shared/dsh-runtime/bootstrap-html"
 
 const dshClientRoot = path.resolve(__dirname, "packages/client")
 const cocodeClientRoot = path.resolve(__dirname, "packages/cocode")
 const dshSource = (relativePath: string): string => path.join(__dirname, relativePath)
 const localClient = (relativePath: string): string => path.join(dshClientRoot, relativePath)
 const dshClientBundles = findDshClientBundles()
+const dshRuntimeUrl = normalizeRuntimeUrl(process.env.COCODE_DSH_RUNTIME_URL)
 
 // https://vitejs.dev/config
 export default defineConfig({
 	base: "./",
-	plugins: [dshClientBundlePlugin()],
+	plugins: [dshClientBundlePlugin(), dshWebDevPlugin()],
+	server: dshRuntimeUrl === undefined ? undefined : { proxy: createDshRuntimeProxy(dshRuntimeUrl) },
 	resolve: {
 		alias: [
 			{ find: "@", replacement: path.resolve(__dirname, "src/renderer") },
@@ -78,6 +84,69 @@ export default defineConfig({
 		"process.env.CORDIS_SHARED": "undefined",
 	},
 })
+
+function normalizeRuntimeUrl(value: string | undefined): string | undefined {
+	const trimmed = value?.trim()
+	if (trimmed === undefined || trimmed.length === 0) return undefined
+	return trimmed.replace(/\/$/, "")
+}
+
+function createDshRuntimeProxy(runtimeUrl: string): Record<string, ProxyOptions> {
+	const proxy: ProxyOptions = {
+		target: runtimeUrl,
+		changeOrigin: true,
+		ws: true,
+	}
+	return {
+		"/api": proxy,
+		"/cocode": proxy,
+		"/sidebar": proxy,
+		"/plugins": proxy,
+	}
+}
+
+function dshWebDevPlugin(): Plugin {
+	return {
+		name: "cocode-dsh-web-dev",
+		configureServer(server) {
+			if (dshRuntimeUrl === undefined) return
+			server.middlewares.use(async (request, response, next) => {
+				const pathname = new URL(request.url ?? "/", "http://renderer.local").pathname
+				if (pathname !== "/__cocode/dsh-bootstrap") {
+					next()
+					return
+				}
+				try {
+					const runtimeResponse = await fetch(dshRuntimeUrl)
+					if (!runtimeResponse.ok) {
+						throw new Error(
+							`DSH runtime bootstrap request failed with HTTP ${String(runtimeResponse.status)}.`,
+						)
+					}
+					const html = await runtimeResponse.text()
+					const body = JSON.stringify({
+						origin: new URL(dshRuntimeUrl).origin,
+						boot: extractDshBootManifest(html),
+						themePreference: extractDshThemePreference(html),
+					})
+					response.statusCode = 200
+					response.setHeader("content-type", "application/json; charset=utf-8")
+					response.setHeader("cache-control", "no-store")
+					response.end(body)
+				} catch (error) {
+					response.statusCode = 503
+					response.setHeader("content-type", "application/json; charset=utf-8")
+					response.setHeader("cache-control", "no-store")
+					response.end(
+						JSON.stringify({
+							error: error instanceof Error ? error.message : String(error),
+						}),
+					)
+				}
+			})
+		},
+	}
+}
 
 function findDshClientBundles(): ReadonlyMap<string, string> {
 	const bundles = new Map<string, string>()

@@ -3,7 +3,7 @@
  * content freezes at its expanded width (inline style) and fades out in place
  * while the sliding column (AppFrame grid tracks) clips it — nothing reflows
  * mid-slide. At settle the wide-only content unmounts and the four upper
- * controls enter the 56px rail from the same horizontal offset (one icon each,
+ * controls enter the rail from the same horizontal offset (one icon each,
  * same top-down order) on one fade that ends with the slide. The bottom-pinned
  * settings control only fades. The workspace/session browsing region between
  * the New Session button and the foot is the `sidebar.workspaces` registrant's,
@@ -117,8 +117,6 @@ export function SidebarRoot({
   }, [pointerInside])
 
   return (
-    <>
-    <div className={css.titlebarDragRegion} data-desktop-titlebar-drag aria-hidden="true" />
     <div
       ref={column}
       className={clsx(
@@ -132,6 +130,7 @@ export function SidebarRoot({
       }}
       onPointerLeave={() => { armLinger() }}
     >
+      <div className={css.titlebarDragRegion} data-desktop-titlebar-drag aria-hidden="true" />
       <div className={css.logoRow}>
         {/* Expanded, the wordmark doubles as a New Session shortcut; the
             collapsed rail's logo is the expand toggle below instead. */}
@@ -197,6 +196,5 @@ export function SidebarRoot({
         </div>
       </div>
     </div>
-    </>
   )
 }

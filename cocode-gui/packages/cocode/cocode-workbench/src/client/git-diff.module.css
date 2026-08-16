@@ -1,0 +1,108 @@
+.diff {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--dsw-alias-bg-base);
+}
+
+.summary {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 10px;
+  min-height: 28px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+  color: var(--dsw-alias-label-tertiary);
+  font: var(--dsw-font-xxxs-11);
+  font-variant-numeric: tabular-nums;
+}
+
+.scope {
+  color: var(--dsw-alias-label-secondary);
+}
+
+.added {
+  color: var(--dsw-alias-state-success-primary);
+}
+
+.removed {
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.scroll {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  tab-size: 2;
+}
+
+.line[data-kind="hunk"] {
+  color: var(--dsw-alias-label-tertiary);
+  background: var(--dsw-alias-fill-l2);
+}
+
+/* 增删底色由语义色压淡而来，深浅主题都能盖住而不遮字。 */
+.line[data-kind="add"] {
+  background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 14%, transparent);
+}
+
+.line[data-kind="del"] {
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 14%, transparent);
+}
+
+/* 行号列不参与选择，复制差异时不会混进数字。 */
+.gutter {
+  width: 1%;
+  padding: 0 6px;
+  border-right: 1px solid var(--dsw-alias-border-l1);
+  color: var(--dsw-alias-label-quaternary);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+  user-select: none;
+  vertical-align: top;
+}
+
+.line[data-kind="hunk"] .gutter {
+  color: transparent;
+}
+
+.mark {
+  width: 1%;
+  padding: 0 4px 0 6px;
+  color: var(--dsw-alias-label-tertiary);
+  text-align: center;
+  user-select: none;
+  vertical-align: top;
+}
+
+.line[data-kind="add"] .mark {
+  color: var(--dsw-alias-state-success-primary);
+}
+
+.line[data-kind="del"] .mark {
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.text {
+  width: 100%;
+  padding: 0 10px 0 2px;
+  color: var(--dsw-alias-label-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  vertical-align: top;
+}
+
+.line[data-kind="hunk"] .text {
+  color: var(--dsw-alias-label-tertiary);
+}

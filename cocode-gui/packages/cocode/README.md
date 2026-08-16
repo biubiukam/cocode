@@ -9,5 +9,5 @@ This directory is the home for Cocode Desktop-specific DSH plugins.
 - The integration never runs `dsh plugin add` or writes plugin entries into the
   user's local DSH profile.
 
-`cocode-sidebar` is based on
-`omdsh-dev/DSH-better-sidebar@2bace68af8fa092a9a75070231bbf3488ee55a6b`.
+`cocode-workbench` is Cocode's first-party Workbench implementation. It owns
+the right and bottom docks, panel registry, host API, and persistence format.

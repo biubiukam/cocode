@@ -31,6 +31,7 @@
   padding: 7px 28px 7px 20px;
   border-bottom: 1px solid transparent;
   height: 46px;
+  overflow: hidden;
 }
 
 .header::after {
@@ -68,8 +69,10 @@
   height: 46px;
   position: absolute;
   left: 0;
+  right: 0;
   top: 0;
   z-index: 10;
+  overflow: hidden;
   padding: 7px 28px 7px 20px;
 }
 

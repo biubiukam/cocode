@@ -3,7 +3,7 @@ import assert from "node:assert/strict"
 import {
 	extractDshBootManifest,
 	extractDshThemePreference,
-} from "../../../src/main/contexts/dsh-runtime/infrastructure/dsh-runtime-bootstrap"
+} from "../../../src/shared/dsh-runtime/bootstrap-html"
 import {
 	assertRequiredCocodeWebEndpoints,
 	assertRequiredCocodeWebEntries,
@@ -79,7 +79,7 @@ describe("Cocode Web runtime health", () => {
 	const boot = {
 		rev: "test",
 		entries: [
-			{ id: "cocode-sidebar", url: "/plugins/cocode-sidebar/client.js", rev: "a" },
+			{ id: "cocode-workbench", url: "/plugins/cocode-workbench/client.js", rev: "a" },
 			{ id: "cocode-account", url: "/plugins/cocode-account/client.js", rev: "b" },
 			{ id: "cocode-shortcuts", url: "/plugins/cocode-shortcuts/client.js", rev: "c" },
 		],
@@ -102,7 +102,7 @@ describe("Cocode Web runtime health", () => {
 		assert.deepEqual(requested.sort(), [
 			"http://127.0.0.1:3080/plugins/cocode-account/client.js",
 			"http://127.0.0.1:3080/plugins/cocode-shortcuts/client.js",
-			"http://127.0.0.1:3080/plugins/cocode-sidebar/client.js",
+			"http://127.0.0.1:3080/plugins/cocode-workbench/client.js",
 		])
 	})
 

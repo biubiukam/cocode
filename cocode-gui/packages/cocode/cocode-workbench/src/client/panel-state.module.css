@@ -1,0 +1,12 @@
+.state {
+  display: grid;
+  place-items: center;
+  min-height: 180px;
+  padding: 24px 16px;
+  color: var(--dsw-alias-label-secondary);
+  text-align: center;
+}
+
+.error {
+  color: var(--dsw-alias-state-error-primary);
+}

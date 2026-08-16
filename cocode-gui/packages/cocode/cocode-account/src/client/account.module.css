@@ -1,10 +1,7 @@
-/* The dropdown card itself is portal-rendered by the Menu primitive and keeps
-   the design-system menu styling untouched; only the anchor seat and trigger
-   are styled here. */
-
 /* Keep the inline menu anchor's footer seat explicit. Without this, the
    collapsed sidebar's auto-sized footer can shrink the trigger's 100%-wide
-   layout while the rail is settling. */
+   layout while the rail is settling. Dropdown card styling stays on the
+   Menu primitive (portal list); never put menu chrome on this wrapper. */
 .actionRoot {
   display: flex;
   width: 100%;
@@ -12,9 +9,12 @@
 }
 
 .actionRootRail {
+  align-items: center;
+  justify-content: center;
   width: 36px;
   min-width: 36px;
-  height: 36px;
+  /* Match Settings rail rhythm; the trigger stays a plain 36px circle. */
+  margin: 8px 0 10px;
 }
 
 .menuGlyph {
@@ -27,12 +27,14 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  width: 100%;
+  width: calc(100% + 8px);
   min-width: 0;
-  height: 36px;
-  padding: 0 8px;
+  height: 34px;
+  margin: 4px -4px 4px;
+  padding: 6px 2px 6px 10px;
+  box-sizing: border-box;
   border: none;
-  border-radius: 10px;
+  border-radius: 12px;
   background: transparent;
   color: var(--dsw-alias-label-primary);
   cursor: pointer;
@@ -53,7 +55,7 @@
 }
 
 .trigger:focus-visible {
-  outline: 2px solid var(--dsw-alias-state-focus, currentColor);
+  outline: 2px solid var(--dsw-alias-state-business-primary);
   outline-offset: 1px;
 }
 
@@ -75,26 +77,9 @@
   line-height: 1;
 }
 
-/* Wide (expanded sidebar) trigger is a flat single-line row: a small round
-   initial for the signed-in account, bare monochrome glyphs otherwise. The
-   rail keeps the chip look below. */
-.trigger:not(.rail) .avatar {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  font-size: 11px;
-}
-
-.trigger:not(.rail) .providerAvatar,
-.trigger:not(.rail) .guestAvatar {
-  background: transparent;
-  box-shadow: none;
-  color: var(--dsw-alias-label-secondary);
-}
-
 .accountAvatar {
-  background: var(--dsw-alias-accent-fill, #2f7cf6);
-  color: var(--dsw-alias-label-on-color, white);
+  background: var(--dsw-alias-button-primary-fill);
+  color: var(--dsw-alias-brand-primary-invert);
 }
 
 .providerAvatar {
@@ -109,21 +94,49 @@
   color: var(--dsw-alias-label-secondary);
 }
 
-.primary {
+.copy {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.primary,
+.secondary {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 13px;
+}
+
+.primary {
+  font-size: 14px;
   font-weight: 500;
-  line-height: 18px;
+  line-height: 20px;
   color: var(--dsw-alias-label-primary);
+}
+
+.secondary {
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.chevron {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary);
+  transform: translateY(1px);
+  transition: transform 140ms var(--ds-ease-in-out);
+}
+
+.trigger[aria-expanded='true'] .chevron {
+  transform: translateY(1px) rotate(180deg);
 }
 
 .trigger.rail {
   width: 36px;
   height: 36px;
+  margin: 0;
   padding: 2px;
   border-radius: 50%;
 }
@@ -149,9 +162,9 @@
   padding: 20px;
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 18px;
-  background: var(--dsw-alias-bg-l1, #18181c);
+  background: var(--dsw-alias-bg-overlay);
   color: var(--dsw-alias-label-primary);
-  box-shadow: 0 24px 70px rgba(0, 0, 0, .34);
+  box-shadow: var(--ds-shadow-md);
 }
 
 .panelHeader {
@@ -233,7 +246,7 @@
 }
 
 .planCard {
-  background: linear-gradient(135deg, var(--dsw-alias-bg-layer-2), var(--dsw-alias-bg-l1, #18181c));
+  background: linear-gradient(135deg, var(--dsw-alias-bg-layer-2), var(--dsw-alias-bg-overlay));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .035);
 }
 
@@ -336,7 +349,7 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: var(--dsw-alias-accent-fill, #2f7cf6);
+  background: var(--dsw-alias-state-business-primary);
   transition: width 180ms var(--ds-ease-in-out);
 }
 
@@ -377,7 +390,7 @@
 }
 
 .panelAction:focus-visible {
-  outline: 2px solid var(--dsw-alias-state-focus, currentColor);
+  outline: 2px solid var(--dsw-alias-state-business-primary);
   outline-offset: 1px;
 }
 
@@ -395,8 +408,169 @@
   background: var(--dsw-alias-bg-layer-2);
 }
 
+/* ---------- First-run sign-in prompt ---------- */
+
+.onboardingOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--dsw-alias-bg-mask-3);
+  backdrop-filter: blur(3px);
+  animation: onboardingFade 160ms var(--ds-ease-in-out);
+}
+
+.onboardingCard {
+  width: min(392px, 100%);
+  padding: 24px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 18px;
+  background: var(--dsw-alias-bg-overlay);
+  color: var(--dsw-alias-label-primary);
+  box-shadow: var(--ds-shadow-md);
+  animation: onboardingRise 220ms cubic-bezier(.22, 1, .36, 1);
+}
+
+/* Mirrors the cocode.agency favicon plate: the ASCII mark sits on a recessed
+   surface rather than a solid brand fill, so it stays quiet next to the title. */
+.onboardingMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin-bottom: 16px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 12px;
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-primary);
+}
+
+.onboardingTitle {
+  margin: 0 0 8px;
+  letter-spacing: -.01em;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+.onboardingIntro {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+/* Sized and offset so the ring optically centers on the first text line. */
+.onboardingSpinner {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  margin-top: 3px;
+  border: 1.5px solid var(--dsw-alias-border-l3);
+  border-top-color: var(--dsw-alias-label-secondary);
+  border-radius: 50%;
+  animation: onboardingSpin 700ms linear infinite;
+}
+
+.onboardingError {
+  margin: 12px 0 0;
+  padding: 9px 12px;
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-state-error-primary) 26%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 10%, transparent);
+  color: var(--dsw-alias-label-error);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.onboardingActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 22px;
+}
+
+.onboardingButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  padding: 0 16px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  transition: background-color 140ms var(--ds-ease-in-out), color 140ms var(--ds-ease-in-out), transform 140ms var(--ds-ease-in-out);
+}
+
+.onboardingButton:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.onboardingButton:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 2px;
+}
+
+.onboardingButton:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.onboardingGhost {
+  border-color: var(--dsw-alias-border-l2);
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.onboardingGhost:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.onboardingPrimary {
+  background: var(--dsw-alias-button-primary-fill);
+  color: var(--dsw-alias-brand-primary-invert);
+}
+
+.onboardingPrimary:hover:not(:disabled) {
+  background: var(--dsw-alias-button-primary-hover);
+}
+
+@keyframes onboardingFade {
+  from { opacity: 0; }
+}
+
+@keyframes onboardingRise {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+}
+
+@keyframes onboardingSpin {
+  to { transform: rotate(360deg); }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .trigger {
+  .trigger,
+  .chevron {
     transition: none;
+  }
+
+  .onboardingOverlay,
+  .onboardingCard {
+    animation: none;
+  }
+
+  .onboardingSpinner {
+    animation-duration: 2s;
   }
 }

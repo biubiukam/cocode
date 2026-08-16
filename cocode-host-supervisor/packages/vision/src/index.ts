@@ -285,7 +285,7 @@ function readCocodeRoute(): CocodeRoute | undefined {
   if (raw === undefined || raw.trim() === '') return undefined
   try {
     const root = JSON.parse(raw) as unknown
-    const route = asRecord(asRecord(root)?.['cocode-nut'])
+    const route = asRecord(asRecord(root)?.['cocode-nut']) ?? asRecord(asRecord(root)?.['cocode-cloud'])
     if (route === undefined) return undefined
     const baseURL = typeof route.baseURL === 'string' && route.baseURL.trim() !== ''
       ? route.baseURL.trim()

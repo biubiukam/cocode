@@ -3,7 +3,7 @@
 - 状态：Implemented baseline / P1 partial
 - 日期：2026-08-15
 - 范围：cocode-gui 的 Cocode shortcuts 插件、Renderer 运行时和 Electron Main bounded context
-- 关联：cocode-gui/.dev/rfc/implemented/2026-08-14-gui-plugin-architecture.md、main_backup 分支旧实现、cocode-sidebar / cocode-account 本地插件包
+- 关联：cocode-gui/.dev/rfc/implemented/2026-08-14-gui-plugin-architecture.md、main_backup 分支旧实现、cocode-workbench / cocode-account 本地插件包
 
 ## 1. 结论摘要
 
@@ -446,7 +446,7 @@ cocode-harness/（本次最终状态无修改）
 ## 13. 参考
 
 - cocode-gui/.dev/rfc/implemented/2026-08-14-gui-plugin-architecture.md
-- cocode-gui/packages/cocode/cocode-sidebar
+- cocode-gui/packages/cocode/cocode-workbench
 - cocode-gui/packages/cocode/cocode-account
 - cocode-gui/src/main/contexts/database
 - cocode-gui/src/contracts/ipc/account.contract.ts

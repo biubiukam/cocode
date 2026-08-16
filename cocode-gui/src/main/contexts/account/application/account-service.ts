@@ -22,9 +22,12 @@ import { SecureVault } from "../infrastructure/secure-vault"
 import { SharedAccountStore } from "../infrastructure/shared-account-store"
 
 const CLOUD_PROVIDER = "cocode-nut"
+const LEGACY_CLOUD_PROVIDER = "cocode-cloud"
 const CLOUD_NAMESPACE = "llm-pi-ai"
 const CLOUD_PATH = ["providers", CLOUD_PROVIDER] as const
+const LEGACY_CLOUD_PATH = ["providers", LEGACY_CLOUD_PROVIDER] as const
 const CLOUD_CREDENTIAL = "COCODE_NUT_API_KEY"
+const LEGACY_CLOUD_CREDENTIAL = "COCODE_CLOUD_API_KEY"
 const CLOUD_API = "openai-responses"
 const CLOUD_KEY_PATTERN = /^ck_[A-Za-z0-9_-]+$/
 const CLOUD_READY_ATTEMPTS = 6
@@ -261,6 +264,11 @@ export class AccountService {
 	async hydrate(): Promise<void> {
 		this.stage = "cleanup"
 		await this.ensureLoaded()
+		try {
+			await this.migrateLegacyCloudSettings()
+		} catch {
+			// Best-effort rename; provision can still reconcile the managed route.
+		}
 		const pending = await this.cleanupPending.read()
 		if (pending !== undefined) {
 			try {
@@ -931,7 +939,56 @@ export class AccountService {
 		if (this.loaded) return
 		this.loaded = true
 		await this.identity.read()
+		const legacyVault = new SecureVault<string>("cocode-cloud-key.bin")
+		const legacyKey = await legacyVault.read()
+		if (legacyKey !== undefined && (await this.cloudKey.read()) === undefined) {
+			await this.cloudKey.write(legacyKey)
+			await legacyVault.clear()
+		}
 		await this.cloudKey.read()
+	}
+
+	private async migrateLegacyCloudSettings(): Promise<void> {
+		const settings = await this.dsh.describeSettings()
+		if (!settings.writable) return
+		const cloudNamespace = settings.namespaces.find((item) => item.ns === CLOUD_NAMESPACE)
+		if (cloudNamespace === undefined) return
+		const providers = recordOf(valueAt(cloudNamespace.value, ["providers"]))
+		if (providers === undefined || providers[LEGACY_CLOUD_PROVIDER] === undefined) return
+
+		const legacyRoute = recordOf(providers[LEGACY_CLOUD_PROVIDER])
+		const ops: {
+			readonly op: "set" | "unset"
+			readonly path: readonly string[]
+			readonly value?: unknown
+		}[] = []
+		if (providers[CLOUD_PROVIDER] === undefined && legacyRoute !== undefined) {
+			ops.push({
+				op: "set",
+				path: [...CLOUD_PATH],
+				value: {
+					...legacyRoute,
+					displayName: "Cocode Nut",
+					apiKeyEnv: CLOUD_CREDENTIAL,
+				},
+			})
+		}
+		ops.push({ op: "unset", path: [...LEGACY_CLOUD_PATH] })
+		await this.dsh.mutateSettings({
+			ns: CLOUD_NAMESPACE,
+			expectedRevision: cloudNamespace.revision,
+			ops,
+		})
+
+		const agentNamespace = settings.namespaces.find((item) => item.ns === "agent-default-model")
+		if (agentNamespace === undefined) return
+		const agent = recordOf(agentNamespace.value)
+		if (agent?.provider !== LEGACY_CLOUD_PROVIDER) return
+		await this.dsh.mutateSettings({
+			ns: "agent-default-model",
+			expectedRevision: agentNamespace.revision,
+			ops: [{ op: "set", path: ["provider"], value: CLOUD_PROVIDER }],
+		})
 	}
 
 	private publish(snapshot: AccountSnapshot): void {

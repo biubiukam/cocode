@@ -33,6 +33,14 @@ export interface ProviderRow {
   credential: CredentialView | undefined
 }
 
+/** Hosted Cocode Nut provider id and the pre-rename legacy alias. */
+const COCODE_NUT_PROVIDER = 'cocode-nut'
+const LEGACY_COCODE_NUT_PROVIDER = 'cocode-cloud'
+
+function isCocodeNutProvider(provider: string): boolean {
+  return provider === COCODE_NUT_PROVIDER || provider === LEGACY_COCODE_NUT_PROVIDER
+}
+
 /** Page snapshot. */
 export interface ModelsSettingsState {
   status: 'idle' | 'loading' | 'ready' | 'error'
@@ -141,7 +149,15 @@ export class ModelsSettingsStore {
       return
     }
     const namespaces = new Map(views.map(view => [view.ns, view]))
-    const rows: ProviderRow[] = providers.map((entry) => {
+    const hasNutProvider = providers.some(entry => entry.provider === COCODE_NUT_PROVIDER)
+    const visibleProviders = hasNutProvider
+      ? providers.filter(entry => entry.provider !== LEGACY_COCODE_NUT_PROVIDER)
+      : providers.map((entry) => (
+        entry.provider === LEGACY_COCODE_NUT_PROVIDER
+          ? { ...entry, displayName: 'Cocode Nut' }
+          : entry
+      ))
+    const rows: ProviderRow[] = visibleProviders.map((entry) => {
       const namespace = namespaces.get(entry.settingsNs)
       const configured = namespace !== undefined
         && (entry.settingsPath.length === 0 || getPath(namespace.value, entry.settingsPath) !== undefined)
@@ -149,7 +165,7 @@ export class ModelsSettingsStore {
         && entry.settingsPath.length > 0
         && hasPath(namespace.user, entry.settingsPath)
         && !hasPath(namespace.base, entry.settingsPath)
-        && entry.provider !== 'cocode-nut'
+        && !isCocodeNutProvider(entry.provider)
       return {
         entry,
         configured,

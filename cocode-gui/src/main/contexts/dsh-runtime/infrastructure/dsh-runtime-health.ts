@@ -2,7 +2,7 @@ import type { DshBootEntryDto, DshBootManifestDto } from "../../../../contracts/
 
 /** Cocode Web client entries required by the Desktop composition. */
 export const REQUIRED_COCODE_WEB_CLIENTS = [
-	"cocode-sidebar",
+	"cocode-workbench",
 	"cocode-account",
 	"cocode-shortcuts",
 ] as const

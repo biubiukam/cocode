@@ -18,8 +18,8 @@ test("uses the reference-free browser tsconfig for mirrored client bundles", () 
 		path.resolve("tsconfig.base.client.json"),
 	)
 	assert.equal(
-		resolveClientBuildTsconfig(path.resolve("packages/cocode/cocode-sidebar")),
-		path.resolve("packages/cocode/cocode-sidebar/tsconfig.json"),
+		resolveClientBuildTsconfig(path.resolve("packages/cocode/cocode-workbench")),
+		path.resolve("packages/cocode/cocode-workbench/tsconfig.json"),
 	)
 })
 
@@ -93,8 +93,8 @@ test("resolves the staged runtime path from a scoped package id", () => {
 		),
 	)
 	assert.equal(
-		resolveRuntimeClientBundlePath("/tmp/dsh-runtime", "cocode-sidebar"),
-		path.join("/tmp/dsh-runtime", "node_modules", "cocode-sidebar", "lib", "client.js"),
+		resolveRuntimeClientBundlePath("/tmp/dsh-runtime", "cocode-workbench"),
+		path.join("/tmp/dsh-runtime", "node_modules", "cocode-workbench", "lib", "client.js"),
 	)
 	assert.throws(() => resolveRuntimeClientBundlePath("/tmp/dsh-runtime", "bad/package/name"))
 	assert.throws(() => resolveRuntimeClientBundlePath("/tmp/dsh-runtime", "../escape"))

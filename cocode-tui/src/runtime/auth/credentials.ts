@@ -11,7 +11,15 @@ const REF = /^[A-Za-z_][A-Za-z0-9_]*$/
 export async function readCredentials(home: string): Promise<Record<string, string>> {
   const loaded = await readYamlUnknown(credentialsPath(home), { secret: true })
   if (loaded.missing) return {}
-  return asStringMap(loaded.value)
+  const credentials = asStringMap(loaded.value)
+  const legacyKey = credentials.COCODE_CLOUD_API_KEY
+  if (legacyKey !== undefined && credentials.COCODE_NUT_API_KEY === undefined) {
+    await patchCredential(home, 'COCODE_NUT_API_KEY', legacyKey)
+    await patchCredential(home, 'COCODE_CLOUD_API_KEY', undefined)
+    credentials.COCODE_NUT_API_KEY = legacyKey
+    delete credentials.COCODE_CLOUD_API_KEY
+  }
+  return credentials
 }
 
 export async function patchCredential(
