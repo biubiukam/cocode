@@ -47,6 +47,7 @@ describe('resolveAuth', () => {
     expect(result.status).toBe('ready')
     if (result.status !== 'ready') return
     expect(result.auth.provider).toBe('deepseek-official')
+    expect(result.auth.env.DEEPSEEK_API_KEY).toBeUndefined()
   })
 
   it('uses cloud when the account and key are both present', async () => {
@@ -114,7 +115,7 @@ describe('resolveAuth', () => {
     expect(result.status).toBe('ready')
     if (result.status !== 'ready') return
     expect(result.auth.provider).toBe('ai-gateway')
-    expect(result.auth.env.AI_GATEWAY_API_KEY).toBe('gateway-secret')
+    expect(result.auth.env.AI_GATEWAY_API_KEY).toBeUndefined()
     expect(result.auth.env.DEEPSEEK_API_KEY).toBeUndefined()
   })
 

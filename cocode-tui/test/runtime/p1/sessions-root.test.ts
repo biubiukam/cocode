@@ -36,6 +36,23 @@ describe('resolveSessionRoot', () => {
     ).toEqual({ path: resolve('dsh-home', 'sessions'), source: 'DSH_HOME' })
   })
 
+  it('expands tilde in DSH_HOME and DSH_SESSION_ROOT', () => {
+    expect(
+      resolveSessionRoot({
+        env: { DSH_HOME: '~/.dsh' },
+        cwd,
+        homedir,
+      }),
+    ).toEqual({ path: join(homedir, '.dsh', 'sessions'), source: 'DSH_HOME' })
+    expect(
+      resolveSessionRoot({
+        env: { DSH_SESSION_ROOT: '~/.dsh/sessions' },
+        cwd,
+        homedir,
+      }),
+    ).toEqual({ path: join(homedir, '.dsh', 'sessions'), source: 'DSH_SESSION_ROOT' })
+  })
+
   it('uses ~/.dsh/sessions by default', () => {
     expect(
       resolveSessionRoot({
@@ -55,5 +72,16 @@ describe('resolveSessionRoot', () => {
         platform: 'win32',
       }),
     ).toEqual({ path: 'C:\\workspace\\sessions', source: 'DSH_SESSION_ROOT' })
+  })
+
+  it('expands DSH_HOME with Windows path semantics', () => {
+    expect(
+      resolveSessionRoot({
+        env: { DSH_HOME: '~/.dsh' },
+        cwd: 'C:\\workspace',
+        homedir: 'C:\\Users\\coder',
+        platform: 'win32',
+      }),
+    ).toEqual({ path: 'C:\\Users\\coder\\.dsh\\sessions', source: 'DSH_HOME' })
   })
 })

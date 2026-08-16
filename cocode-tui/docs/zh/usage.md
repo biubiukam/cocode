@@ -61,7 +61,7 @@ TUI 仍然要求真实 TTY；管道、重定向和 CI 环境不会进入交互�
 
 当前已验证的是 macOS 上的本地 Supervisor 与 DSH Host 流程。Windows、Linux 和真实终端组合键仍需按 [平台说明](./platforms.md) 单独验收；自动化测试不会替代真实 TTY 验收。
 
-密钥可以通过首屏登录配置，也可以临时设置 `DEEPSEEK_API_KEY`。开发环境可用 `COCODE_HOME` 和 `DSH_HOME` 指向彼此隔离的目录。DSH 配置和凭据遵循官方 `$DSH_HOME` 目录规范。会话目录默认使用 `$DSH_HOME/sessions`；未设置 `DSH_HOME` 时使用 `~/.dsh/sessions`，也可以用 `DSH_SESSION_ROOT` 覆盖。
+自己的 API Key 通过首屏登录写入官方 Harness 凭据文件 `$DSH_HOME/.credentials.yaml`，TUI 不新增单独的 API Key 环境变量。开发环境可用 `COCODE_HOME` 和 `DSH_HOME` 指向彼此隔离的目录。DSH 配置和凭据遵循官方 `$DSH_HOME` 目录规范。会话目录默认使用 `$DSH_HOME/sessions`；未设置 `DSH_HOME` 时使用 `~/.dsh/sessions`，也可以用 `DSH_SESSION_ROOT` 覆盖。
 
 同一份程序支持 Windows、macOS 和 Linux。Windows 未配置 `$VISUAL` 或 `$EDITOR` 时使用 `notepad.exe`；WSL 使用 Linux 进程语义，并可回退到 `clip.exe` 和 `explorer.exe`。使用 VS Code 等图形编辑器时，请配置带等待参数的命令。
 
