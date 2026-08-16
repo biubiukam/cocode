@@ -275,7 +275,8 @@ describe.sequential('Chat multi-viewport render contract', () => {
       if (process.env.COCODE_UPDATE_GOLDEN === '1') {
         await writeFile(path, actual)
       } else {
-        expect(actual).toBe(await readFile(path, 'utf8'))
+        // Git may check out repository goldens with CRLF on Windows.
+        expect(actual).toBe(normalizeGolden(await readFile(path, 'utf8')))
       }
     } finally {
       await chat.close()
