@@ -157,7 +157,7 @@ export function SidebarRoot({
             onClick={() => { toggleSidebar() }}
           >
             {!wide && (logoPreference === 'cocode'
-              ? <CocodeLogo className={css.railLogo} variant="mark" size={24} />
+              ? <CocodeLogo className={clsx(css.railLogo, css.cocodeRailLogo)} variant="mark" size={18} />
               : <FishLogo className={css.railLogo} size={24} />)}
             {/* Rail icons render at 18 (figma rail spec); expanded keeps the glyph-native sizes. */}
             <IconPanelLeftOutline16 className={css.panelIcon} size={wide ? 16 : 18} />
