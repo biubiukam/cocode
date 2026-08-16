@@ -15,6 +15,8 @@ import { fileURLToPath } from "node:url"
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const pluginsRoot = path.join(repositoryRoot, "packages", "cocode")
+const corepackCommand = process.platform === "win32" ? "corepack.cmd" : "corepack"
+const pinnedPnpmArgs = ["pnpm@10.34.5"]
 
 export function discoverCocodePlugins(root = pluginsRoot) {
 	const plugins = []
@@ -47,17 +49,29 @@ export function buildCocodePlugins() {
 	for (const plugin of discoverCocodePlugins()) {
 		rmSync(path.join(plugin.root, "lib"), { recursive: true, force: true })
 		execFileSync(
-			"pnpm",
-			["--filter", plugin.name, "exec", "tsc", "-p", "tsconfig.build.json"],
+			corepackCommand,
+			[
+				...pinnedPnpmArgs,
+				"--filter",
+				plugin.name,
+				"exec",
+				"tsc",
+				"-p",
+				"tsconfig.build.json",
+			],
 			{
 				cwd: repositoryRoot,
 				stdio: "inherit",
 			},
 		)
-		execFileSync("pnpm", ["--filter", plugin.name, "exec", "tsdown"], {
-			cwd: repositoryRoot,
-			stdio: "inherit",
-		})
+		execFileSync(
+			corepackCommand,
+			[...pinnedPnpmArgs, "--filter", plugin.name, "exec", "tsdown"],
+			{
+				cwd: repositoryRoot,
+				stdio: "inherit",
+			},
+		)
 	}
 }
 
@@ -176,8 +190,17 @@ if (command === "build") buildCocodePlugins()
 else if (command === "typecheck") {
 	for (const plugin of discoverCocodePlugins()) {
 		execFileSync(
-			"pnpm",
-			["--filter", plugin.name, "exec", "tsc", "--noEmit", "-p", "tsconfig.build.json"],
+			corepackCommand,
+			[
+				...pinnedPnpmArgs,
+				"--filter",
+				plugin.name,
+				"exec",
+				"tsc",
+				"--noEmit",
+				"-p",
+				"tsconfig.build.json",
+			],
 			{
 				cwd: repositoryRoot,
 				stdio: "inherit",
@@ -187,10 +210,14 @@ else if (command === "typecheck") {
 } else if (command === "test") {
 	for (const plugin of discoverCocodePlugins()) {
 		if (!containsTestFiles(plugin.root)) continue
-		execFileSync("pnpm", ["--filter", plugin.name, "exec", "vitest", "run"], {
-			cwd: repositoryRoot,
-			stdio: "inherit",
-		})
+		execFileSync(
+			corepackCommand,
+			[...pinnedPnpmArgs, "--filter", plugin.name, "exec", "vitest", "run"],
+			{
+				cwd: repositoryRoot,
+				stdio: "inherit",
+			},
+		)
 	}
 }
 

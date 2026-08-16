@@ -1,6 +1,6 @@
 {
 	"name": "@cocode/gui-root",
-	"productName": "Cocode Desktop",
+	"productName": "Cocode",
 	"version": "1.0.0",
 	"description": "Cocode GUI Root",
 	"repository": {
@@ -25,12 +25,12 @@
 	],
 	"scripts": {
 		"postinstall": "node scripts/harden-electron-default-app.mjs",
-		"predev": "node scripts/harden-electron-default-app.mjs && pnpm run build:cocode-plugins",
+		"predev": "node scripts/harden-electron-default-app.mjs && corepack pnpm@10.34.5 run build:cocode-plugins && corepack pnpm@10.34.5 run build:supervisor",
 		"dev": "node scripts/start-with-dsh-runtime.mjs",
 		"dev:web": "vite --config vite.renderer.config.ts --port 5273",
-		"prestart": "node scripts/harden-electron-default-app.mjs && pnpm run build:cocode-plugins",
+		"prestart": "node scripts/harden-electron-default-app.mjs && corepack pnpm@10.34.5 run build:cocode-plugins && corepack pnpm@10.34.5 run build:supervisor",
 		"start": "node scripts/start-with-dsh-runtime.mjs",
-		"build:cocode-plugins": "node scripts/cocode-plugins.mjs build && corepack pnpm@10.34.5 --dir ../cocode-host-supervisor run build:with-gui-plugins",
+		"build:cocode-plugins": "node scripts/cocode-plugins.mjs build",
 		"test:cocode-plugins": "node scripts/cocode-plugins.mjs test && corepack pnpm@10.34.5 --dir ../cocode-host-supervisor run test",
 		"typecheck:cocode-plugins": "node scripts/cocode-plugins.mjs typecheck && corepack pnpm@10.34.5 --dir ../cocode-host-supervisor run typecheck",
 		"stage:dsh": "node scripts/stage-dsh-runtime.mjs",
