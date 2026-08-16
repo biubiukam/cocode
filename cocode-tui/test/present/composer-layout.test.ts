@@ -3,11 +3,31 @@ import stringWidth from 'string-width'
 import {
   clipComposerRow,
   composerRowText,
+  composerCursorStyle,
   renderComposerRows,
   visibleComposerRows,
 } from '../../src/present/composer-layout.ts'
 
 describe('composer row projection', () => {
+  it('does not split graphemes when rendering or clipping', () => {
+    const rows = renderComposerRows('a🙂b', 1)
+    expect(rows[0]?.spans).toEqual([
+      { text: 'a' },
+      { text: '🙂', cursor: true },
+      { text: 'b' },
+    ])
+    expect(clipComposerRow(rows[0]!, 3).spans).toEqual([
+      { text: 'a' },
+      { text: '🙂', cursor: true },
+    ])
+  })
+
+  it('uses an underline cursor in Apple Terminal', () => {
+    expect(composerCursorStyle(false, false)).toEqual({ inverse: true, underline: false })
+    expect(composerCursorStyle(true, false)).toEqual({ inverse: false, underline: true })
+    expect(composerCursorStyle(true, true)).toEqual({ inverse: false, underline: false })
+  })
+
   it('renders exactly one cursor across multiple lines', () => {
     const rows = renderComposerRows('one\ntwo\nthree', 5)
     expect(rows.filter((row) => row.spans.some((span) => span.cursor))).toHaveLength(1)
@@ -48,6 +68,15 @@ describe('composer row projection', () => {
     ])
     expect(rows[1]?.spans).toEqual([
       { text: 'two', selected: true },
+      { text: ' ', cursor: true },
+    ])
+  })
+
+  it('expands malformed selection offsets to whole graphemes', () => {
+    expect(renderComposerRows('a🙂b', 4, { start: 2, end: 3 })[0]?.spans).toEqual([
+      { text: 'a' },
+      { text: '🙂', selected: true },
+      { text: 'b' },
       { text: ' ', cursor: true },
     ])
   })

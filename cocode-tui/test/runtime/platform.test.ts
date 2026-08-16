@@ -7,10 +7,15 @@ import {
   externalOpenCommandForPlatform,
   externalOpenCommandCandidates,
   isWslEnvironment,
+  isAppleTerminalEnvironment,
   pathForPlatform,
 } from '../../src/runtime/platform.ts'
 
 describe('platform helpers', () => {
+  it('detects Apple Terminal explicitly', () => {
+    expect(isAppleTerminalEnvironment({ TERM_PROGRAM: 'Apple_Terminal' })).toBe(true)
+    expect(isAppleTerminalEnvironment({ TERM_PROGRAM: 'iTerm.app' })).toBe(false)
+  })
   it('selects the requested path semantics for simulated platforms', () => {
     expect(pathForPlatform('win32').resolve('C:\\workspace', '..', 'src')).toBe('C:\\src')
     expect(pathForPlatform('linux').resolve('/workspace', '..', 'src')).toBe('/src')
