@@ -121,6 +121,7 @@ Type `/` to open the command menu. Keep typing to filter by prefix. `Tab` or arr
 | `/clear`                       | Clear the on-screen projection; does not delete the session log                                   |
 | `/new`                         | Start a new session id (not a fork)                                                               |
 | `/compact`                     | Request host conversation compaction through the prompt path                                      |
+| `/rewind`                      | Open the conversation rewind picker                                                               |
 | `/export`                      | Export the current projection as Markdown                                                         |
 | `/copy`                        | Copy the latest assistant reply to the system clipboard                                           |
 | `/focus`                       | Show or hide the latest user turn in the transcript                                               |
@@ -139,11 +140,13 @@ Type `/` to open the command menu. Keep typing to filter by prefix. `Tab` or arr
 | `/models`                     | Open the model picker                                                                             |
 | `/redraw`                     | Redraw the terminal without clearing the session                                                    |
 | `/model <model-id>`            | Switch the current provider's model; preserve the session when durable reopen is supported       |
+| `/thinking`                    | Toggle detailed thinking and full tool output                                                     |
+| `/tokens` / `/cost`            | Show the latest token, cache, and context usage                                                   |
 | `/resume`                      | Open the local session picker and replay a selected session                                       |
 | `/skills`                      | Browse user-invocable skills from the current workspace                                           |
 | `/use byok` / `/use cocode`    | Switch between your key and Cocode; switching starts a new session                                |
 | `/login` / `/logout`           | Sign in or out of Cocode Cloud; logout keeps your key and stays in chat                           |
-| `/exit`                        | Shut down TUI and restore the terminal                                                            |
+| `/exit` / `/quit` / `/q`       | Shut down TUI and restore the terminal                                                            |
 
 `/resume` reads local session headers, supports text filtering plus `↑` `↓` selection, streams the selected JSONL into a temporary projection, and asks the runtime to reopen the same persisted session before swapping it into the current TUI. Follow-up prompts use the selected session id and continue writing to that session. The TUI does not claim cross-process locking; avoid resuming a session that another client is currently writing.
 

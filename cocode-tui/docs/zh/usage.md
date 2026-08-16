@@ -111,6 +111,7 @@ TTY，可以用于安装脚本和故障排查。
 | `/clear`                       | 清除当前屏幕投影，不删除 session log                                 |
 | `/new`                         | 创建新的 session id，不复制旧会话                                    |
 | `/compact`                     | 通过 prompt 路径请求 host 压缩当前会话                               |
+| `/rewind`                      | 打开会话回滚选择器                                                     |
 | `/export`                      | 将当前投影导出为 Markdown 文件                                       |
 | `/copy`                        | 复制最近一条 assistant 回复到系统剪贴板                              |
 | `/focus`                       | 显示或隐藏最近一轮用户消息及其后续节点                               |
@@ -129,11 +130,13 @@ TTY，可以用于安装脚本和故障排查。
 | `/models`                     | 打开模型选择器                                                         |
 | `/redraw`                     | 在不清除会话内容的情况下重绘界面                                     |
 | `/model <model-id>`            | 直接切换当前 provider 下的模型；支持持久会话时保留当前 session        |
+| `/thinking`                    | 切换 thinking 和完整工具详情显示                                     |
+| `/tokens` / `/cost`            | 查看最近一次 token、缓存和 context 用量                              |
 | `/resume`                      | 打开当前工作区的 session 选择器并回放选中会话                        |
 | `/skills`                      | 浏览当前工作区中可由用户调用的技能                                   |
 | `/use byok` / `/use cocode`    | 在自己的 Key 和 Cocode 之间切换；切换即新会话                        |
 | `/login` / `/logout`           | 登录或退出 Cocode Cloud；退出时若还有 Key 则留在对话里               |
-| `/exit`                        | 关闭 TUI 并恢复终端                                                  |
+| `/exit` / `/quit` / `/q`       | 关闭 TUI 并恢复终端                                                  |
 
 `/resume` 会读取本地 session header，支持关键词过滤和 `↑` `↓` 选择，以流式方式将选中 JSONL 的事件回放到临时投影，并要求 runtime 重新打开同一个持久化 session 后再替换当前 TUI。后续输入会继续写入选中的 session id。TUI 不负责跨进程写入锁；如果其它客户端正在写同一 session，请不要同时恢复。
 

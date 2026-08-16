@@ -330,6 +330,8 @@ export type TuiCommandCtx = {
   resumeSessions?: () => Promise<void>
   showSkillsPicker?: () => void
   showModelPicker?: () => void
+  showRewindPicker?: () => void
+  showUsage?: () => void
   copyLatestAssistant?: () => void
   pasteImage?: () => void
   toggleFocus?: () => void
@@ -1203,6 +1205,37 @@ class TuiAppImpl implements TuiApp {
       },
       showModelPicker: () => {
         void this.openModelPicker()
+      },
+      showRewindPicker: () => {
+        this.openRewindPicker()
+      },
+      showUsage: () => {
+        const telemetry = this.telemetry.snapshot()
+        const usage = telemetry.usage ?? latestUsage(this.assembler.snapshot())
+        if (usage === undefined) {
+          this.notice = {
+            tone: 'info',
+            message: text(this.locale, 'usageEmpty'),
+          }
+          this.emit()
+          return
+        }
+        const parts = [
+          `${text(this.locale, 'tokensIn')} ${usage.input} · ${text(this.locale, 'tokensOut')} ${usage.output}`,
+          text(this.locale, 'usageCache', { read: usage.cacheRead, write: usage.cacheWrite }),
+          text(this.locale, 'usageTotals', {
+            input: telemetry.totals.input,
+            output: telemetry.totals.output,
+          }),
+        ]
+        if (telemetry.contextWindow !== undefined && telemetry.contextPercent !== undefined) {
+          parts.push(text(this.locale, 'usageContext', {
+            percent: telemetry.contextPercent,
+            window: telemetry.contextWindow,
+          }))
+        }
+        this.notice = { tone: 'info', message: parts.join(' · ') }
+        this.emit()
       },
       locale: this.locale,
       ...(this.capabilities.sessionList === 'rpc'

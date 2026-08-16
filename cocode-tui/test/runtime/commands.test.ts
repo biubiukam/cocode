@@ -18,6 +18,8 @@ describe('commands', () => {
     expect(names).toEqual([
       'help',
       'exit',
+      'quit',
+      'q',
       'clear',
       'redraw',
       'status',
@@ -25,6 +27,10 @@ describe('commands', () => {
       'theme',
       'lang',
       'model',
+      'rewind',
+      'thinking',
+      'tokens',
+      'cost',
       'models',
       'export',
       'copy',
@@ -164,6 +170,36 @@ describe('commands', () => {
     expect(actions).toEqual([{ type: 'compact' }])
   })
 
+  it('maps rewind, thinking, and usage commands to existing app callbacks', () => {
+    const actions: TuiAction[] = []
+    const calls: string[] = []
+    const registry = createBuiltinCommands()
+    const ctx = commandCtx({
+      dispatch: (action) => actions.push(action),
+      showRewindPicker: () => calls.push('rewind'),
+      showUsage: () => calls.push('usage'),
+    })
+
+    registry.find('rewind', { ...P0_CAPABILITIES, rewind: true })?.run(ctx, '')
+    registry.find('thinking', P0_CAPABILITIES)?.run(ctx, '')
+    registry.find('tokens', P0_CAPABILITIES)?.run(ctx, '')
+    registry.find('cost', P0_CAPABILITIES)?.run(ctx, '')
+
+    expect(calls).toEqual(['rewind', 'usage', 'usage'])
+    expect(actions).toEqual([{ type: 'toggleVerbose' }])
+  })
+
+  it('keeps quit aliases on the normal quit action', () => {
+    const actions: TuiAction[] = []
+    const ctx = commandCtx({ dispatch: (action) => actions.push(action) })
+    const registry = createBuiltinCommands()
+
+    registry.find('quit', P0_CAPABILITIES)?.run(ctx, '')
+    registry.find('q', P0_CAPABILITIES)?.run(ctx, '')
+
+    expect(actions).toEqual([{ type: 'quit' }, { type: 'quit' }])
+  })
+
   it('/copy delegates to the latest assistant callback', () => {
     let called = false
     const command = createBuiltinCommands().find('copy', P0_CAPABILITIES)
@@ -194,6 +230,8 @@ function commandCtx(
     setLocale: (value: string) => void
     setModel: (value: string) => void
     showModelPicker: () => void
+    showRewindPicker: () => void
+    showUsage: () => void
     copyLatestAssistant: () => void
     toggleFocus: () => void
     showChecklist: () => void
@@ -210,6 +248,8 @@ function commandCtx(
     setLocale: overrides.setLocale,
     setModel: overrides.setModel,
     showModelPicker: overrides.showModelPicker,
+    showRewindPicker: overrides.showRewindPicker,
+    showUsage: overrides.showUsage,
     copyLatestAssistant: overrides.copyLatestAssistant,
     toggleFocus: overrides.toggleFocus,
     showChecklist: overrides.showChecklist,

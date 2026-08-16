@@ -6,6 +6,10 @@ type UiKey =
   | 'session'
   | 'tokensIn'
   | 'tokensOut'
+  | 'usageEmpty'
+  | 'usageCache'
+  | 'usageContext'
+  | 'usageTotals'
   | 'secret'
   | 'prompt'
   | 'locked'
@@ -239,6 +243,10 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     session: 'session',
     tokensIn: 'tokens in',
     tokensOut: 'out',
+    usageEmpty: 'No token usage is available for this session.',
+    usageCache: 'cache read {read} · cache write {write}',
+    usageContext: 'context {percent}% / {window}',
+    usageTotals: 'session total {input} in · {output} out',
     secret: 'secret',
     prompt: 'prompt',
     locked: 'locked',
@@ -471,6 +479,10 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     session: '会话',
     tokensIn: '输入 token',
     tokensOut: '输出',
+    usageEmpty: '当前会话暂无 token 用量。',
+    usageCache: '缓存读取 {read} · 缓存写入 {write}',
+    usageContext: 'context {percent}% / {window}',
+    usageTotals: '会话累计输入 {input} · 输出 {output}',
     secret: '密钥',
     prompt: '输入',
     locked: '已锁定',

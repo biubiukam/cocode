@@ -41,10 +41,16 @@ export function filterCommands(commands: readonly Command[], draft: string): rea
 
 export function createBuiltinCommands(): CommandRegistry {
   const registry = new CommandRegistry()
-  const local = (name: string, summary: string, run: Command['run']): void => {
+  const local = (
+    name: string,
+    summary: string,
+    run: Command['run'],
+    summaryZh?: string,
+  ): void => {
     registry.register({
       name,
       summary,
+      ...(summaryZh === undefined ? {} : { summaryZh }),
       kind: 'local',
       available: () => true,
       run,
@@ -57,6 +63,12 @@ export function createBuiltinCommands(): CommandRegistry {
   local('exit', 'Shut down the runtime and leave', (ctx) => {
     ctx.dispatch({ type: 'quit' })
   })
+  local('quit', 'Exit the TUI', (ctx) => {
+    ctx.dispatch({ type: 'quit' })
+  }, '退出 TUI')
+  local('q', 'Exit the TUI', (ctx) => {
+    ctx.dispatch({ type: 'quit' })
+  }, '退出 TUI')
   local('clear', 'Clear the projected transcript', (ctx) => {
     ctx.clearTranscript()
   })
@@ -90,6 +102,22 @@ export function createBuiltinCommands(): CommandRegistry {
     if (value === '') ctx.showModelPicker?.()
     else ctx.setModel?.(value)
   })
+  registry.register({
+    name: 'rewind',
+    summary: 'Rewind the conversation to a previous message',
+    summaryZh: '回滚到之前的消息',
+    available: (caps) => caps.rewind,
+    run: (ctx) => ctx.showRewindPicker?.(),
+  })
+  local('thinking', 'Toggle detailed thinking and tool output', (ctx) => {
+    ctx.dispatch({ type: 'toggleVerbose' })
+  }, '切换 thinking 和完整工具详情显示')
+  local('tokens', 'Show the latest token usage', (ctx) => {
+    ctx.showUsage?.()
+  }, '查看最近 token 用量')
+  local('cost', 'Show the latest token and cache usage', (ctx) => {
+    ctx.showUsage?.()
+  }, '查看最近 token 和缓存用量')
   local('models', 'Browse available models and switch the active model', (ctx, args) => {
     if (args.trim() !== '') {
       ctx.notice('info', 'Use /models without arguments.')

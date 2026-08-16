@@ -28,6 +28,8 @@ export type CommandContextOptions = {
   setLocale?: TuiCommandCtx['setLocale']
   setModel?: TuiCommandCtx['setModel']
   showModelPicker?: TuiCommandCtx['showModelPicker']
+  showRewindPicker?: TuiCommandCtx['showRewindPicker']
+  showUsage?: TuiCommandCtx['showUsage']
   locale?: UiLocale
   showResumePicker?: (sessions: readonly SessionSummary[]) => void
   resumeSessions?: TuiCommandCtx['resumeSessions']
@@ -68,6 +70,8 @@ export type AppCommandContextOptions = {
   setLocale?: TuiCommandCtx['setLocale']
   setModel?: TuiCommandCtx['setModel']
   showModelPicker?: TuiCommandCtx['showModelPicker']
+  showRewindPicker?: TuiCommandCtx['showRewindPicker']
+  showUsage?: TuiCommandCtx['showUsage']
   locale: UiLocale
   showResumePicker: (sessions: readonly SessionSummary[]) => void
   resumeSessions?: TuiCommandCtx['resumeSessions']
@@ -98,6 +102,8 @@ export function createCommandContext(options: CommandContextOptions): TuiCommand
     setLocale: options.setLocale,
     setModel: options.setModel,
     showModelPicker: options.showModelPicker,
+    showRewindPicker: options.showRewindPicker,
+    showUsage: options.showUsage,
     exportTranscript: async () => {
       const path = await writeSessionExport(options.cwd, options.sessionId, options.nodes)
       options.notice('info', `Exported ${path}`)
@@ -181,6 +187,8 @@ export function createAppCommandContext(options: AppCommandContextOptions): TuiC
     setLocale: options.setLocale,
     setModel: options.setModel,
     showModelPicker: options.showModelPicker,
+    showRewindPicker: options.showRewindPicker,
+    showUsage: options.showUsage,
     locale: options.locale,
     showResumePicker: options.showResumePicker,
     resumeSessions: options.resumeSessions,

@@ -8,6 +8,8 @@ describe('builtin command contract', () => {
     expect(createBuiltinCommands().list(P0_CAPABILITIES).map((command) => command.name)).toEqual([
       'help',
       'exit',
+      'quit',
+      'q',
       'clear',
       'redraw',
       'status',
@@ -15,6 +17,10 @@ describe('builtin command contract', () => {
       'theme',
       'lang',
       'model',
+      'rewind',
+      'thinking',
+      'tokens',
+      'cost',
       'models',
       'export',
       'copy',
@@ -64,6 +70,7 @@ describe('builtin command contract', () => {
     const commands = createBuiltinCommands().list(P0_CAPABILITIES)
     expect(filterCommands(commands, '/re').map((command) => command.name)).toEqual([
       'redraw',
+      'rewind',
       'review',
     ])
     expect(filterCommands(commands, '/')).not.toHaveLength(0)
@@ -105,7 +112,10 @@ describe('builtin command contract', () => {
     expect(actions).toEqual([
       { type: 'toggleHelp' },
       { type: 'quit' },
+      { type: 'quit' },
+      { type: 'quit' },
       { type: 'redraw' },
+      { type: 'toggleVerbose' },
       { type: 'compact' },
     ])
     expect(calls).toEqual(
