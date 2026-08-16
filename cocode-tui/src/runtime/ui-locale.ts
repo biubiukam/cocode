@@ -217,7 +217,6 @@ export type UiTextKey =
   | 'inspectorCache'
   | 'inspectorSpeed'
   | 'inspectorReasoning'
-  | 'inspectorSegments'
   | 'inspectorCwd'
   | 'inspectorNoAttachments'
   | 'inspectorModel'
@@ -513,7 +512,6 @@ const TEXT: Record<UiLocale, Record<UiTextKey, string>> = {
     inspectorCache: 'cache',
     inspectorSpeed: 'speed',
     inspectorReasoning: 'reasoning',
-    inspectorSegments: 'segments {value}',
     inspectorCwd: 'cwd',
     inspectorNoAttachments: 'no attachments',
     inspectorModel: 'model',
@@ -808,7 +806,6 @@ const TEXT: Record<UiLocale, Record<UiTextKey, string>> = {
     inspectorCache: '缓存',
     inspectorSpeed: '速度',
     inspectorReasoning: '推理',
-    inspectorSegments: '分段 {value}',
     inspectorCwd: '工作目录',
     inspectorNoAttachments: '无附件',
     inspectorModel: '模型',

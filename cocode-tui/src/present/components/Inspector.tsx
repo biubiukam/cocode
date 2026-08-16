@@ -128,9 +128,6 @@ export function Inspector(props: {
               {telemetry.reasoningEffort !== undefined ? (
                 <Line label={text(locale, 'inspectorReasoning')} value={telemetry.reasoningEffort} />
               ) : null}
-              <Text color={theme.mute} wrap="truncate-end">
-                {text(locale, 'inspectorSegments', { value: formatSegments(telemetry.contextSegments) })}
-              </Text>
             </>
           ) : (
             <Text color={theme.mute}>{text(locale, 'inspectorEmpty')}</Text>
@@ -278,10 +275,6 @@ function Shortcut(props: { text: string }) {
 
 function formatMetric(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1)
-}
-
-function formatSegments(segments: TuiSnapshot['status']['telemetry']['contextSegments']): string {
-  return `S${segments.system} P${segments.prompt} A${segments.assistant} T${segments.thinking} X${segments.tools}`
 }
 
 function capabilityNames(
