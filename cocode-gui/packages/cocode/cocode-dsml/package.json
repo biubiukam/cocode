@@ -1,0 +1,40 @@
+{
+  "name": "cocode-dsml",
+  "version": "0.1.0-cocode.0",
+  "description": "Recover DeepSeek tool calls that leak into thinking text as DSML markup.",
+  "private": true,
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "cocode": {
+    "runtimeDependencies": []
+  },
+  "scripts": {
+    "build": "rm -rf lib && tsc -p tsconfig.build.json && tsdown",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh-llm": "^0.1.0-rc.6",
+    "cordis": "^4.0.0-rc.7"
+  },
+  "devDependencies": {
+    "@deepseek-ai/dsh-llm": "^0.1.0-rc.6",
+    "@types/node": "^24.0.0",
+    "cordis": "^4.0.0-rc.7",
+    "tsdown": "^0.22.2",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.9"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/types/**/*.d.ts"
+  ]
+}
