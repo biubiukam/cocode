@@ -83,6 +83,7 @@ describe('listSessionSummaries', () => {
       expect(result.sessions.map((session) => session.id)).toEqual(['s2', 's1'])
       expect(result.sessions[0]?.path.endsWith('session.jsonl.zstd')).toBe(true)
       expect(result.sessions[0]).toMatchObject({ parentSession: 's1', seedLength: 2 })
+      expect(result.sessions.map((session) => session.updatedAt)).toEqual([21, 11])
       expect(result.sessions.map((session) => session.preview)).toEqual([
         'A compressed session with a first prompt summary',
         'Fix the resume picker summary',
@@ -114,6 +115,35 @@ describe('listSessionSummaries', () => {
       )
       const result = await listSessionSummaries({ root, cwd })
       expect(result.sessions[0]?.title).toBe('Latest title')
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('sorts by the latest event time instead of creation time', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'cocode-session-activity-'))
+    const cwd = '/work/project'
+    try {
+      await writeSession(
+        root,
+        'old-active',
+        'old-active',
+        `${JSON.stringify({ type: 'session', id: 'old-active', createdAt: 1, cwd })}\n${JSON.stringify({
+          type: 'user/message',
+          seq: 1,
+          time: 100,
+          data: { content: [{ type: 'text', text: 'recent activity' }] },
+        })}\n`,
+      )
+      await writeSession(
+        root,
+        'new-idle',
+        'new-idle',
+        `${JSON.stringify({ type: 'session', id: 'new-idle', createdAt: 90, cwd })}\n`,
+      )
+
+      const result = await listSessionSummaries({ root, cwd })
+      expect(result.sessions.map((session) => session.id)).toEqual(['old-active', 'new-idle'])
     } finally {
       await rm(root, { recursive: true, force: true })
     }

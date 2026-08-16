@@ -1,4 +1,4 @@
-import type { WhaleLogoSize } from './whale-animation.ts'
+import { HORIZONTAL_WHALE_MIN_COLUMNS, type WhaleLogoSize } from './whale-animation.ts'
 
 export type EmptyStateLayout = {
   logoSize: WhaleLogoSize
@@ -10,28 +10,23 @@ export function emptyStateLayout(
   maxRows: number | undefined,
   maxColumns?: number,
 ): EmptyStateLayout {
-  if (maxColumns !== undefined && maxColumns < 42) {
-    return { logoSize: 'inline', showTitle: false, showHint: false }
-  }
-  if (maxColumns !== undefined && maxColumns < 56) {
-    if (maxRows === undefined || maxRows >= 11) {
-      return { logoSize: 'small', showTitle: true, showHint: false }
-    }
+  if (maxColumns !== undefined && maxColumns < HORIZONTAL_WHALE_MIN_COLUMNS) {
     return { logoSize: 'inline', showTitle: false, showHint: false }
   }
   if (maxColumns !== undefined && maxColumns < 72) {
-    if (maxRows === undefined || maxRows >= 15) {
+    if (maxRows === undefined || maxRows >= 10) {
       return { logoSize: 'medium', showTitle: true, showHint: true }
     }
-    return { logoSize: 'small', showTitle: true, showHint: false }
+    if (maxRows >= 9) return { logoSize: 'small', showTitle: true, showHint: false }
+    return { logoSize: 'inline', showTitle: false, showHint: false }
   }
   if (maxRows === undefined || maxRows >= 17) {
     return { logoSize: 'large', showTitle: true, showHint: true }
   }
-  if (maxRows >= 15) {
+  if (maxRows >= 10) {
     return { logoSize: 'medium', showTitle: true, showHint: true }
   }
-  if (maxRows >= 11) {
+  if (maxRows >= 9) {
     return { logoSize: 'small', showTitle: true, showHint: false }
   }
   return { logoSize: 'inline', showTitle: false, showHint: false }

@@ -12,8 +12,8 @@ import { parseDiffSummary } from '../diff-summary.ts'
 export function createBuiltinRegistry(): NodeRegistry {
   const registry = new NodeRegistry()
   registry.register(userDefinition)
-  registry.register(assistantDefinition)
   registry.register(toolDefinition)
+  registry.register(assistantDefinition)
   registry.register(fallbackDefinition)
   return registry
 }
@@ -123,6 +123,13 @@ function usageOf(usage: Record<string, unknown>): {
 const toolDefinition: NodeDefinition<ToolNode> = {
   kind: 'tool',
   match(event) {
+    if (event.type === 'assistant/chunk') {
+      const data = isRecord(event.data) ? event.data : {}
+      const chunk = isRecord(data.chunk) ? data.chunk : {}
+      if (chunk.type !== 'tool-call-delta') return null
+      const id = asString(chunk.id)
+      return id === '' ? null : { id, role: 'start' }
+    }
     if (event.type === 'tool/call') {
       const data = isRecord(event.data) ? event.data : {}
       const id = asString(data.callId)
@@ -137,6 +144,21 @@ const toolDefinition: NodeDefinition<ToolNode> = {
     return null
   },
   start(event) {
+    const delta = toolCallDelta(event)
+    if (delta !== undefined) {
+      return {
+        kind: 'tool',
+        id: delta.id,
+        seq: event.seq,
+        time: event.time,
+        callId: delta.id,
+        name: delta.name,
+        args: delta.argumentsDelta,
+        status: 'running',
+        streaming: true,
+        view: inferToolView(delta.name, delta.argumentsDelta),
+      }
+    }
     const data = isRecord(event.data) ? event.data : {}
     return {
       kind: 'tool',
@@ -147,18 +169,49 @@ const toolDefinition: NodeDefinition<ToolNode> = {
       name: asString(data.name, 'tool'),
       args: asString(data.arguments),
       status: 'running',
+      streaming: false,
       view: inferToolView(asString(data.name, 'tool'), asString(data.arguments)),
     }
   },
   update(state, event) {
+    const delta = toolCallDelta(event)
+    if (delta !== undefined) {
+      state.args += delta.argumentsDelta
+      if (delta.name !== '') state.name = delta.name
+      state.streaming = true
+      state.view = inferToolView(state.name, state.args)
+      return state
+    }
+    if (event.type === 'tool/call') {
+      const data = isRecord(event.data) ? event.data : {}
+      state.name = asString(data.name, state.name)
+      state.args = asString(data.arguments, state.args)
+      state.streaming = false
+      state.status = 'running'
+      state.view = inferToolView(state.name, state.args)
+      return state
+    }
     return applyToolResult({ ...state }, event)
   },
   isComplete(state) {
-    return state.status !== 'running'
+    return state.status !== 'running' && state.streaming !== true
   },
   buildViewNode(ctx) {
     return ctx.state
   },
+}
+
+function toolCallDelta(event: SessionEvent):
+  | { id: string; name: string; argumentsDelta: string }
+  | undefined {
+  if (event.type !== 'assistant/chunk') return undefined
+  const data = isRecord(event.data) ? event.data : {}
+  const chunk = isRecord(data.chunk) ? data.chunk : {}
+  if (chunk.type !== 'tool-call-delta') return undefined
+  const id = asString(chunk.id)
+  const argumentsDelta = asString(chunk.argumentsDelta)
+  if (id === '') return undefined
+  return { id, name: asString(chunk.name), argumentsDelta }
 }
 
 function toolResultCallId(event: SessionEvent): string {
@@ -183,6 +236,7 @@ function applyToolResult(node: ToolNode, event: SessionEvent): ToolNode {
     data.error !== undefined ||
     (isRecord(block) && block.type === 'tool-result' && block.isError === true)
   node.status = isError ? 'error' : 'success'
+  node.streaming = false
   node.result = isRecord(block) ? blocksToText(block.content) : ''
   if (node.view?.kind === 'diff' && node.result !== undefined) {
     const summary = parseDiffSummary(node.result)

@@ -12,6 +12,20 @@ import css from './ConversationRoot.module.css'
 /** Full props composed from the slot contract. */
 export type ConversationRootProps = ConversationSlotProps
 
+/** Local optimistic state for a workspace pick. The label is retained across
+ * workspace-list refreshes so a transient list gap cannot erase the choice. */
+interface WorkspaceSelection {
+  workspaceId: WorkspaceId
+  label: string
+  error?: string
+}
+
+function workspaceSelectionError(reason: unknown): string {
+  if (reason instanceof Error) return reason.message
+  if (typeof reason === 'string') return reason
+  return String(reason)
+}
+
 export function ConversationRoot({
   sessionId, useSession, useSessions, useWorkspaces, useInput, useComposerBlock,
   renderSlot, renderSlotChain, selectWorkspace, t,
@@ -29,7 +43,7 @@ export function ConversationRoot({
   const composerBlock = useComposerBlock(block => block)
 
   const [pickerOpen, setPickerOpen] = useState(false)
-  const [pendingWorkspaceId, setPendingWorkspaceId] = useState<WorkspaceId | undefined>()
+  const [workspaceSelection, setWorkspaceSelection] = useState<WorkspaceSelection | undefined>()
   const pickerAnchor = useRef<HTMLButtonElement>(null)
 
   // Publishes the seat's live height as --dsh-composer-height on the scroll
@@ -52,18 +66,18 @@ export function ConversationRoot({
     ? undefined
     : workspaces.items.find(workspace => workspace.sessionIds.includes(sessionId))
   const pendingWorkspace = workspaces.items.find(
-    workspace => workspace.workspaceId === pendingWorkspaceId,
+    workspace => workspace.workspaceId === workspaceSelection?.workspaceId,
   )
 
-  // Clear the pending pick once the session lands in it, or when the picked
-  // workspace disappears from a ready list (deleted from the sidebar).
+  // Clear the optimistic pick only after the current session is actually
+  // accounted to it. Do not use a temporary list gap as a deletion signal:
+  // workspace/session projections refresh independently during connect.
   useEffect(() => {
-    if (pendingWorkspaceId === undefined) return
-    if (sessionWorkspace?.workspaceId === pendingWorkspaceId
-      || (workspaces.phase === 'ready' && pendingWorkspace === undefined)) {
-      setPendingWorkspaceId(undefined)
+    if (workspaceSelection === undefined) return
+    if (sessionWorkspace?.workspaceId === workspaceSelection.workspaceId) {
+      setWorkspaceSelection(undefined)
     }
-  }, [pendingWorkspaceId, sessionWorkspace?.workspaceId, workspaces.phase, pendingWorkspace])
+  }, [workspaceSelection, sessionWorkspace?.workspaceId])
 
   // While a session is still replaying (loading + blank) the hero/docked
   // choice is unknowable — render the composer hidden instead of flashing
@@ -82,14 +96,15 @@ export function ConversationRoot({
     session === undefined || inputState === undefined ? undefined : { session, input: inputState }
 
   // The chip is a selector; label resolution walks the flow top-down:
-  //   1. a just-picked workspace (pending) → its title;
+  //   1. a just-picked workspace (live row, then retained optimistic label);
   //   2. cold start, no session yet → placeholder ("Choose workspace");
   //   3. the blank session's workspace is in the list → its title;
   //   4. list still loading → cwd folder name bridges so the title does not
   //      flash on refresh (empty cwd → placeholder);
-  //   5. list ready but no owning workspace (deleted from the sidebar) →
-  //      placeholder, never the deleted folder's name via cwd.
+  //   5. no optimistic selection and no owning workspace (deleted from the
+  //      sidebar) → placeholder, never the deleted folder's name via cwd.
   const chipTitle = pendingWorkspace?.title
+    ?? workspaceSelection?.label
     ?? (sessionId === undefined
       ? undefined
       : sessionWorkspace?.title
@@ -98,28 +113,41 @@ export function ConversationRoot({
           : workspaceLabel(cwd)))
 
   const heroWorkspaceRow = (
-    <div className={css.heroWorkspaceRow}>
-      <WorkspaceChip
-        buttonRef={pickerAnchor}
-        label={chipTitle}
-        menuOpen={pickerOpen}
-        onClick={() => { setPickerOpen(open => !open) }}
-        t={t}
-      />
-      {renderSlot('conversation.hero.workspace', {
-        open: pickerOpen,
-        anchorRef: pickerAnchor,
-        selectedId: pendingWorkspaceId ?? sessionWorkspace?.workspaceId,
-        onPick: (workspaceId) => {
-          setPickerOpen(false)
-          setPendingWorkspaceId(workspaceId)
-          void selectWorkspace(workspaceId).catch(() => {
-            setPendingWorkspaceId(current => current === workspaceId ? undefined : current)
-          })
-        },
-        onClose: () => { setPickerOpen(false) },
-      })}
-      {renderSlot('conversation.hero.agentPreset', {})}
+    <div className={css.heroWorkspaceArea}>
+      <div className={css.heroWorkspaceRow}>
+        <WorkspaceChip
+          buttonRef={pickerAnchor}
+          label={chipTitle}
+          menuOpen={pickerOpen}
+          onClick={() => { setPickerOpen(open => !open) }}
+          t={t}
+        />
+        {renderSlot('conversation.hero.workspace', {
+          open: pickerOpen,
+          anchorRef: pickerAnchor,
+          selectedId: workspaceSelection?.workspaceId ?? sessionWorkspace?.workspaceId,
+          onPick: (workspaceId) => {
+            setPickerOpen(false)
+            const picked = workspaces.items.find(workspace => workspace.workspaceId === workspaceId)
+            const label = picked === undefined
+              ? workspaceId
+              : (picked.title || workspaceLabel(picked.path))
+            setWorkspaceSelection({ workspaceId, label })
+            void selectWorkspace(workspaceId).catch((reason: unknown) => {
+              setWorkspaceSelection(current => current?.workspaceId === workspaceId
+                ? { ...current, error: workspaceSelectionError(reason) }
+                : current)
+            })
+          },
+          onClose: () => { setPickerOpen(false) },
+        })}
+        {renderSlot('conversation.hero.agentPreset', {})}
+      </div>
+      {workspaceSelection?.error !== undefined && (
+        <div className={css.heroWorkspaceError} role="alert">
+          {t('workspace.selectFailed', { message: workspaceSelection.error })}
+        </div>
+      )}
     </div>
   )
 

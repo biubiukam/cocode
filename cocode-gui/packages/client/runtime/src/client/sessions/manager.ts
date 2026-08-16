@@ -317,6 +317,18 @@ export class SessionManager {
       onEngaged: (engaged) => {
         this.recordMutation({ kind: 'engaged', sessionId: engaged.sessionId })
       },
+      onMissing: (missingId) => {
+        this.recordMutation({ kind: 'remove', sessionId: missingId })
+        this.pendingBuffers.delete(missingId)
+        this.pendingInteractions.delete(missingId)
+        this.completedNotifications.delete(missingId)
+        this.prevRunning.delete(missingId)
+        this.projectionStores.delete(missingId)
+        this.addresses.delete(missingId)
+        if (this.selected === missingId) this.selected = undefined
+        this.sessions.delete(missingId)
+        this.notifier.notifyNow()
+      },
       projections: this.projectionStore(sessionId),
       ...this.conversation === undefined ? {} : { conversation: this.conversation },
     })
@@ -1059,8 +1071,15 @@ export class SessionManager {
     const sameOrder = items.length === this.itemsCache.length && items.every((e, i) => e === this.itemsCache[i])
     if (!sameOrder) this.itemsCache = items
     const selected = this.selected
-    const current = selected !== undefined
+    const selectedIsKnown = selected !== undefined
       && (items.some(item => item.sessionId === selected) || this.addresses.has(selected))
+    // Restore the last session before the first session.list baseline lands.
+    // The persisted selection is already a local fact, and opening its tail
+    // can run in parallel with the cold list scan (which may probe many JSONL
+    // files). If the baseline later proves the id stale, the normal projection
+    // masks it back to undefined and the session's session-not-found path
+    // clears the persisted selection.
+    const current = selectedIsKnown || (this.listPhase === 'pending' && selected !== undefined)
       ? selected
       : undefined
     return {

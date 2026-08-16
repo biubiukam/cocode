@@ -65,9 +65,15 @@ export function parsePrefs(value: unknown): SidebarPrefs {
     htmlViewerDefaultUnsafe: typeof record.htmlViewerDefaultUnsafe === 'boolean'
       ? record.htmlViewerDefaultUnsafe
       : SIDEBAR_PREFS_DEFAULTS.htmlViewerDefaultUnsafe,
-    browserNoSandbox: typeof record.browserNoSandbox === 'boolean'
-      ? record.browserNoSandbox
-      : SIDEBAR_PREFS_DEFAULTS.browserNoSandbox,
+    agentBrowserTools: typeof record.agentBrowserTools === 'boolean'
+      ? record.agentBrowserTools
+      : SIDEBAR_PREFS_DEFAULTS.agentBrowserTools,
+    agentBrowserIsolated: typeof record.agentBrowserIsolated === 'boolean'
+      ? record.agentBrowserIsolated
+      : SIDEBAR_PREFS_DEFAULTS.agentBrowserIsolated,
+    browserHeaded: typeof record.browserHeaded === 'boolean'
+      ? record.browserHeaded
+      : SIDEBAR_PREFS_DEFAULTS.browserHeaded,
     browserInterceptLinks: typeof record.browserInterceptLinks === 'boolean'
       ? record.browserInterceptLinks
       : SIDEBAR_PREFS_DEFAULTS.browserInterceptLinks,

@@ -13,6 +13,7 @@ import type { UiLocale } from '../runtime/ui-locale.ts'
 export type NodeRenderOptions = {
   expanded?: boolean
   locale?: UiLocale
+  maxColumns?: number
 }
 
 export type NodeView = (
@@ -30,6 +31,7 @@ const views: Record<string, NodeView> = {
         node={node}
         verbose={verbose || options.expanded === true}
         locale={options.locale ?? 'en'}
+        maxColumns={options.maxColumns}
       />
     ) : null,
   tool: (node, verbose, options) =>
@@ -38,6 +40,7 @@ const views: Record<string, NodeView> = {
         node={node}
         verbose={verbose || options.expanded === true}
         locale={options.locale ?? 'en'}
+        maxColumns={options.maxColumns}
       />
     ) : null,
   notice: (node, verbose) => {

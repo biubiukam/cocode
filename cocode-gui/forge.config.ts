@@ -13,6 +13,22 @@ import { FuseV1Options, FuseVersion } from "@electron/fuses"
 const config: ForgeConfig = {
 	packagerConfig: {
 		asar: false,
+		afterExtract: [
+			(buildPath, _electronVersion, platform, _arch, callback) => {
+				const resourcesRoot =
+					platform === "darwin"
+						? path.join(buildPath, "Electron.app", "Contents", "Resources")
+						: path.join(buildPath, "resources")
+				runNodeScript("scripts/harden-electron-default-app.mjs", [
+					"--resources-root",
+					resourcesRoot,
+				]).then(
+					() => callback(),
+					(error: unknown) =>
+						callback(error instanceof Error ? error : new Error(String(error))),
+				)
+			},
+		],
 	},
 		hooks: {
 			packageAfterCopy: async (_config, buildPath: string) => {

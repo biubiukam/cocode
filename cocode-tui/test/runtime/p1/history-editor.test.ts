@@ -53,6 +53,8 @@ describe('external editor', () => {
   })
 
   it('reports missing editor configuration', async () => {
-    await expect(editDraft({ text: 'x', env: {} })).rejects.toThrow(/VISUAL|EDITOR/)
+    await expect(
+      editDraft({ text: 'x', env: {}, platform: 'linux' }),
+    ).rejects.toThrow(/VISUAL|EDITOR/)
   })
 })

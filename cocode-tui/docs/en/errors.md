@@ -81,6 +81,7 @@ fingerprint environment variables.
 
 | Code                  | When it happens                              | Message                                         |
 | --------------------- | -------------------------------------------- | ----------------------------------------------- |
+| `CONFIG_SUPERVISOR_UNAVAILABLE` | Shared Host Supervisor cannot be reached | The shared DSH Host Supervisor is unavailable. |
 | `CONFIG_PROVIDER_REF` | Provider `apiKeyEnv` is not a legal env name | Invalid credential ref for provider {provider}. |
 
 ## IO

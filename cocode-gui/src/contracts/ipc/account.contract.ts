@@ -18,10 +18,20 @@ export type AccountProfile = {
 	readonly avatarUrl?: string
 }
 
+export type AccountUsage = {
+	readonly plan?: string
+	readonly fiveHour?: number
+	readonly week?: number
+	readonly month?: number
+	readonly syncedAt?: string
+	readonly error?: string
+}
+
 export type AccountSnapshot = {
 	readonly phase: AccountPhase
 	readonly profile: AccountProfile | null
 	readonly cloud: AccountCloudState
+	readonly usage?: AccountUsage
 	readonly error?: {
 		readonly code: string
 		readonly message: string

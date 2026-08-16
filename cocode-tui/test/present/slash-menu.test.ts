@@ -13,13 +13,14 @@ const items: SlashMenuItem[] = [
 ]
 
 describe('slash menu helpers', () => {
-  it('filters by a slash prefix and closes after whitespace', () => {
+  it('filters by command name or summary and closes after whitespace', () => {
     expect(filterSlashItems(items, '/').map((item) => item.name)).toEqual([
       'help',
       'status',
       'theme',
     ])
     expect(filterSlashItems(items, '/st').map((item) => item.name)).toEqual(['status'])
+    expect(filterSlashItems(items, '/the').map((item) => item.name)).toEqual(['theme'])
     expect(filterSlashItems(items, '/theme dark')).toEqual([])
   })
 

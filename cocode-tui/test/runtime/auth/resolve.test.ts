@@ -1,8 +1,9 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { patchCredential } from '../../../src/runtime/auth/credentials.ts'
+import { deviceKeyName } from '../../../src/runtime/auth/device-name.ts'
 import { resolveAuth } from '../../../src/runtime/auth/resolve.ts'
 import { patchCloudRoute } from '../../../src/runtime/auth/settings.ts'
 
@@ -19,6 +20,11 @@ afterEach(async () => {
 })
 
 describe('resolveAuth', () => {
+  it('uses deterministic device-oriented API key names', () => {
+    expect(deviceKeyName('  my   laptop  ')).toBe('Cocode Device — my laptop')
+    expect(deviceKeyName('   ')).toBe('Cocode Device')
+    expect(deviceKeyName('x'.repeat(100))).toHaveLength('Cocode Device — '.length + 80)
+  })
   it('prefers process env over the credential file', async () => {
     const home = await tempHome()
     await patchCredential(home, 'DEEPSEEK_API_KEY', 'sk-file')
@@ -43,11 +49,21 @@ describe('resolveAuth', () => {
     expect(result.auth.provider).toBe('deepseek-official')
   })
 
-  it('uses cloud when the key and route are both present', async () => {
+  it('uses cloud when the account and key are both present', async () => {
     const home = await tempHome()
     await patchCredential(home, 'COCODE_CLOUD_API_KEY', 'ck_live_x')
     await patchCloudRoute(home, 'https://cocode.agency', [{ id: 'cloud-1', name: 'Cloud' }])
-    const result = await resolveAuth({ home, env: {}, cwd: '/work' })
+    await expect(readFile(join(home, 'settings.yaml'), 'utf8')).resolves.toContain(
+      'api: openai-responses',
+    )
+    const result = await resolveAuth({
+      home,
+      env: {},
+      cwd: '/work',
+      accountHome: home,
+      cloudAccount: true,
+      cloudModels: [{ id: 'cloud-1', name: 'Cloud' }],
+    })
     expect(result.status).toBe('ready')
     if (result.status !== 'ready') return
     expect(result.auth.mode).toBe('cocode')
@@ -63,6 +79,14 @@ describe('resolveAuth', () => {
   it('does not treat a cloud key without a route as ready', async () => {
     const home = await tempHome()
     await patchCredential(home, 'COCODE_CLOUD_API_KEY', 'ck_live_x')
+    const result = await resolveAuth({ home, env: {}, cwd: '/work' })
+    expect(result.status).toBe('gate')
+  })
+
+  it('does not trust a persisted cloud route without an account', async () => {
+    const home = await tempHome()
+    await patchCredential(home, 'COCODE_CLOUD_API_KEY', 'ck_live_x')
+    await patchCloudRoute(home, 'https://cocode.agency', [{ id: 'cloud-1', name: 'Cloud' }])
     const result = await resolveAuth({ home, env: {}, cwd: '/work' })
     expect(result.status).toBe('gate')
   })

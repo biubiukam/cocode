@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { probeRuntimeCapabilities } from '../../packages/connection/src/capability.ts'
-import { createTuiRuntime } from '../../packages/connection/src/client.ts'
+import {
+  createTuiRuntime,
+  parseModelCatalogResult,
+} from '../../packages/connection/src/client.ts'
 
 type ProbeCall = { method: string; params: object; timeoutMs?: number }
 
@@ -20,6 +23,8 @@ describe('runtime capability negotiation', () => {
           permissionMode: false,
           planMode: false,
           sessionList: false,
+          modelList: true,
+          imageAttachments: false,
           checkpoint: false,
         },
       },
@@ -27,6 +32,7 @@ describe('runtime capability negotiation', () => {
 
     expect(snapshot.capabilities.promptMode).toBe(false)
     expect(snapshot.capabilities.queueMode).toBe(true)
+    expect(snapshot.capabilities.modelList).toBe(true)
   })
 
   it('exposes a conservative snapshot before a runtime handshake', () => {
@@ -45,6 +51,8 @@ describe('runtime capability negotiation', () => {
         permissionMode: false,
         planMode: false,
         sessionList: false,
+        modelList: false,
+        imageAttachments: false,
         promptMode: false,
         queueMode: false,
       },
@@ -77,12 +85,14 @@ describe('runtime capability negotiation', () => {
         permissionMode: true,
         planMode: true,
         sessionList: true,
+        modelList: true,
+        imageAttachments: false,
         promptMode: false,
         queueMode: false,
       },
       errors: {},
     })
-    expect(calls).toHaveLength(8)
+    expect(calls).toHaveLength(9)
     expect(calls.every((call) => call.timeoutMs === 1_000)).toBe(true)
     expect(calls[0]?.params).toEqual({ sessionId: 'probe-session', keepInbox: true })
     expect(calls[3]?.params).toEqual({
@@ -112,6 +122,8 @@ describe('runtime capability negotiation', () => {
       permissionMode: false,
       planMode: false,
       sessionList: false,
+      modelList: false,
+      imageAttachments: false,
       promptMode: false,
       queueMode: false,
     })
@@ -124,6 +136,7 @@ describe('runtime capability negotiation', () => {
       sessionList: 'protocol method is not supported by the runtime',
       permissionMode: 'protocol method is not supported by the runtime',
       planMode: 'protocol method is not supported by the runtime',
+      modelList: 'protocol method is not supported by the runtime',
       onRequest: 'SDK client does not expose onRequest',
     })
   })
@@ -168,12 +181,28 @@ describe('runtime capability negotiation', () => {
       open: true,
       fork: false,
       rewind: false,
+      modelList: false,
       skills: true,
       onRequest: true,
     })
     expect(snapshot.errors.cancel).toContain('invalid capability probe result')
     expect(snapshot.errors.fork).toContain('invalid capability probe result')
     expect(snapshot.errors.rewind).toContain('invalid capability probe result')
+  })
+
+  it('rejects a malformed model catalog during capability probing', async () => {
+    const snapshot = await probeRuntimeCapabilities(
+      {
+        async request(method) {
+          if (method === 'model/list') return { groups: [{ id: 'provider' }], failures: [] }
+          throw new Error('session does not exist')
+        },
+      },
+      { onRequest: true },
+    )
+
+    expect(snapshot.capabilities.modelList).toBe(false)
+    expect(snapshot.errors.modelList).toContain('invalid capability probe result')
   })
 
   it('treats a bounded probe timeout as unavailable', async () => {
@@ -207,5 +236,40 @@ describe('runtime capability negotiation', () => {
     expect(snapshot.capabilities.fork).toBe(true)
     expect(snapshot.capabilities.rewind).toBe(false)
     expect(snapshot.errors.rewind).toContain('capability-specific parameters')
+  })
+
+  it('strictly validates model catalog responses', () => {
+    expect(
+      parseModelCatalogResult({
+        groups: [
+          {
+            id: 'provider-a',
+            name: 'Provider A',
+            models: [{ id: 'model-a', name: 'Model A', description: 'Primary model' }],
+          },
+        ],
+        failures: [{ id: 'provider-b', name: 'Provider B', message: 'offline' }],
+      }),
+    ).toEqual({
+      groups: [
+        {
+          id: 'provider-a',
+          name: 'Provider A',
+          models: [{ id: 'model-a', name: 'Model A', description: 'Primary model' }],
+        },
+      ],
+      failures: [{ id: 'provider-b', name: 'Provider B', message: 'offline' }],
+    })
+    expect(() => parseModelCatalogResult({ groups: [{ id: 'p', name: 'P', models: [{}] }], failures: [] }))
+      .toThrow('invalid model entry')
+    expect(() => parseModelCatalogResult({ groups: [], failures: [{ id: 'p' }] }))
+      .toThrow('invalid provider failure')
+    expect(() =>
+      parseModelCatalogResult({
+        groups: [{ id: 'p', name: 'P', models: [{ id: 'm', name: 42, endpoint: 'https://secret' }] }],
+        failures: [],
+      }),
+    )
+      .toThrow('invalid model entry')
   })
 })

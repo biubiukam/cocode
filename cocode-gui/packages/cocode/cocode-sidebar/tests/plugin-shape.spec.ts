@@ -42,7 +42,7 @@ describe('cocode-sidebar plugin export shape', () => {
     const resolved = (PrefsSchema as unknown as {
       (input: Record<string, unknown> | undefined): Record<string, unknown>
     })(undefined)
-    expect(resolved.openByDefault).toBe(true)
+    expect(resolved.openByDefault).toBe(false)
     expect(resolved.defaultWidthPercent).toBe(30)
     expect(resolved.autoOpenSubagent).toBe(true)
     // A new background job auto-opens the Jobs page too.
@@ -62,7 +62,7 @@ describe('cocode-sidebar plugin export shape', () => {
     // default when the stored document predates it.
     const overridden = (PrefsSchema as unknown as {
       (input: Record<string, unknown> | undefined): Record<string, unknown>
-    })({ openByDefault: false, defaultWidthPercent: 45 })
-    expect(overridden).toEqual({ openByDefault: false, defaultWidthPercent: 45, autoOpenSubagent: true, autoOpenJobs: true, agentTerminalTools: false, bottomPanelAutoTerminal: true, terminalFontFamily: '', terminalFontSize: 13, interceptOpenPath: true, htmlViewerNoSandbox: false, htmlViewerDefaultUnsafe: false, browserNoSandbox: false, browserInterceptLinks: true, tabsEnabled: {}, viewersEnabled: {}, pluginSettings: {} })
+    })({ openByDefault: true, defaultWidthPercent: 45 })
+    expect(overridden).toEqual({ openByDefault: true, defaultWidthPercent: 45, autoOpenSubagent: true, autoOpenJobs: true, agentTerminalTools: false, bottomPanelAutoTerminal: true, terminalFontFamily: '', terminalFontSize: 13, interceptOpenPath: true, htmlViewerNoSandbox: false, htmlViewerDefaultUnsafe: false, agentBrowserTools: false, agentBrowserIsolated: false, browserHeaded: false, browserInterceptLinks: true, tabsEnabled: {}, viewersEnabled: {}, pluginSettings: {} })
   })
 })

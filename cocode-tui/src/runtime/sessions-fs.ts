@@ -14,6 +14,7 @@ export const SESSION_PREVIEW_MAX_LENGTH = 72
 export type SessionSummary = {
   id: string
   createdAt: number
+  updatedAt?: number
   cwd?: string
   preview?: string
   title?: string
@@ -120,7 +121,7 @@ export async function listSessionSummaries(options: {
           skipped += 1
           continue
         }
-        let display: { preview?: string; title?: string } = {}
+        let display: { preview?: string; title?: string; updatedAt?: number } = {}
         try {
           display = await readSessionDisplay(existing[0], existing[0] === compressed)
         } catch {
@@ -138,7 +139,9 @@ export async function listSessionSummaries(options: {
   }
 
   sessions.sort(
-    (left, right) => right.createdAt - left.createdAt || left.id.localeCompare(right.id),
+    (left, right) =>
+      (right.updatedAt ?? right.createdAt) - (left.updatedAt ?? left.createdAt) ||
+      left.id.localeCompare(right.id),
   )
   const limit = options.limit === undefined ? sessions.length : Math.max(0, options.limit)
   return { sessions: sessions.slice(0, limit), skipped }
@@ -147,15 +150,17 @@ export async function listSessionSummaries(options: {
 async function readSessionDisplay(
   path: string,
   compressed: boolean,
-): Promise<{ preview?: string; title?: string }> {
+): Promise<{ preview?: string; title?: string; updatedAt?: number }> {
   const source = createReadStream(path)
   const output = compressed ? source.pipe(createZstdDecompress()) : source
   const lines = createInterface({ input: output })
   let preview: string | undefined
   let title: string | undefined
+  let updatedAt: number | undefined
   try {
     for await (const line of lines) {
       const event = parseEvent(line)
+      if (event !== undefined) updatedAt = event.time
       if (event?.type === 'user/message' && preview === undefined) {
         preview = previewText(userMessageText(event.data))
       }
@@ -166,6 +171,7 @@ async function readSessionDisplay(
     return {
       ...(preview === undefined ? {} : { preview }),
       ...(title === undefined ? {} : { title }),
+      ...(updatedAt === undefined ? {} : { updatedAt }),
     }
   } finally {
     lines.close()
@@ -183,9 +189,7 @@ function userMessageText(data: unknown): string {
 
 function previewText(value: string): string | undefined {
   const normalized = value
-    // eslint-disable-next-line no-control-regex
     .replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, '')
-    // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u001f\u007f-\u009f]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()

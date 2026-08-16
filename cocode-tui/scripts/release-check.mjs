@@ -2,6 +2,11 @@ import { existsSync, readFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import {
+  formatPackFailure,
+  npmCommandForPlatform,
+  npmSpawnOptionsForPlatform,
+} from './release-check-utils.mjs'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const packageJson = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'))
@@ -21,12 +26,13 @@ for (const file of releaseFiles) {
   if (!existsSync(resolve(root, file))) failures.push(`missing release file: ${file}`)
 }
 
-const pack = spawnSync('npm', ['pack', '--dry-run', '--json'], {
+const pack = spawnSync(npmCommandForPlatform(), ['pack', '--dry-run', '--json'], {
   cwd: root,
   encoding: 'utf8',
+  ...npmSpawnOptionsForPlatform(),
 })
 if (pack.status !== 0) {
-  failures.push(`npm pack failed: ${pack.stderr.trim() || pack.stdout.trim()}`)
+  failures.push(`npm pack failed: ${formatPackFailure(pack)}`)
 } else {
   try {
     const manifest = JSON.parse(pack.stdout)[0]

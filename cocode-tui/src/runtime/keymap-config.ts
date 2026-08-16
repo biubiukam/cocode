@@ -7,10 +7,20 @@ const COMMAND_ALIASES: Readonly<Record<string, CommandId>> = {
   inputNewline: 'input.newline',
   'session.interruptOrQuit': 'session.interruptOrQuit',
   sessionInterruptOrQuit: 'session.interruptOrQuit',
+  'session.new': 'session.new',
+  sessionNew: 'session.new',
+  'session.open': 'session.open',
+  sessionOpen: 'session.open',
+  'file.open': 'file.open',
+  fileOpen: 'file.open',
   'app.quit': 'app.quit',
   appQuit: 'app.quit',
   'app.redraw': 'app.redraw',
   appRedraw: 'app.redraw',
+  'model.open': 'model.open',
+  modelOpen: 'model.open',
+  'image.paste': 'image.paste',
+  imagePaste: 'image.paste',
   'transcript.toggleVerbose': 'transcript.toggleVerbose',
   transcriptToggleVerbose: 'transcript.toggleVerbose',
   'editor.open': 'editor.open',
@@ -25,7 +35,14 @@ const COMMAND_ALIASES: Readonly<Record<string, CommandId>> = {
   historySearch: 'history.search',
   'messages.select': 'messages.select',
   messagesSelect: 'messages.select',
+  'command.palette': 'command.palette',
+  commandPalette: 'command.palette',
+  'permission.toggle': 'permission.toggle',
+  permissionToggle: 'permission.toggle',
 }
+
+let defaultEnvRaw: string | undefined
+let defaultEnvKeymap: Keymap | undefined
 
 export function resolveKeymap(
   env: NodeJS.ProcessEnv = process.env,
@@ -33,20 +50,31 @@ export function resolveKeymap(
     process.stderr.write(`${message}\n`)
   },
 ): Keymap {
-  const resolved: Record<CommandId, readonly KeyBinding[]> = { ...DEFAULT_BINDINGS }
+  const isDefaultEnv = env === process.env
   const raw = env.COCODE_TUI_KEYMAP?.trim()
-  if (raw === undefined || raw === '') return resolved
+  if (isDefaultEnv && defaultEnvKeymap !== undefined && defaultEnvRaw === raw) {
+    return defaultEnvKeymap
+  }
+  const finish = (keymap: Keymap): Keymap => {
+    if (isDefaultEnv) {
+      defaultEnvRaw = raw
+      defaultEnvKeymap = keymap
+    }
+    return keymap
+  }
+  const resolved: Record<CommandId, readonly KeyBinding[]> = { ...DEFAULT_BINDINGS }
+  if (raw === undefined || raw === '') return finish(resolved)
 
   let parsed: unknown
   try {
     parsed = JSON.parse(raw)
   } catch {
     writeDiagnostic('Cocode TUI: invalid COCODE_TUI_KEYMAP JSON; using default keymap.')
-    return resolved
+    return finish(resolved)
   }
   if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
     writeDiagnostic('Cocode TUI: COCODE_TUI_KEYMAP must be a JSON object; using default keymap.')
-    return resolved
+    return finish(resolved)
   }
 
   for (const [name, value] of Object.entries(parsed)) {
@@ -65,9 +93,25 @@ export function resolveKeymap(
       continue
     }
     const emptyOnly = DEFAULT_BINDINGS[id][0]?.emptyOnly
-    resolved[id] = [{ ...parsedBinding, emptyOnly }]
+    const resolvedBinding = { ...parsedBinding, emptyOnly }
+    for (const otherId of Object.keys(resolved) as CommandId[]) {
+      if (otherId === id) continue
+      resolved[otherId] = resolved[otherId].filter(
+        (binding) => !sameBinding(binding, resolvedBinding),
+      )
+    }
+    resolved[id] = [resolvedBinding]
   }
-  return resolved
+  return finish(resolved)
+}
+
+function sameBinding(left: KeyBinding, right: KeyBinding): boolean {
+  return (
+    left.key === right.key &&
+    left.ctrl === right.ctrl &&
+    left.alt === right.alt &&
+    left.shift === right.shift
+  )
 }
 
 function parseBinding(value: string): Omit<KeyBinding, 'emptyOnly'> | undefined {

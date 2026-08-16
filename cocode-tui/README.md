@@ -27,8 +27,9 @@ The CLI keeps the current working directory as the agent workspace. Set
 move session files when needed.
 
 The first launch shows the authentication choice. You can paste a DeepSeek API
-key or sign in to Cocode. The key is stored in the local Cocode configuration,
-not in the session log.
+key or sign in to Cocode. DeepSeek keys use the DSH credentials file under
+`$DSH_HOME`; Cocode identity tokens use `account.yaml` under
+`~/.cocode`. Neither is stored in the session log.
 
 After the package is published, the installation command becomes:
 

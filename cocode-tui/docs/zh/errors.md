@@ -50,7 +50,7 @@ TUI 自己产生的失败会显示为 `CODE · 解释`。语言由 `COCODE_LANG`
 | Code                  | 何时出现                     | 解释                                                                                        |
 | --------------------- | ---------------------------- | ------------------------------------------------------------------------------------------- |
 | `RUNTIME_INIT_FAILED` | `initialize` 失败            | 初始化失败。请检查共享 DSH Host 与 Supervisor，然后 /exit。{detail}                 |
-| `RUNTIME_STOPPED`     | Host 连接或传输断开          | 运行时已停止：{detail}                                                              |
+| `RUNTIME_STOPPED`     | Host 连接或传输断开          | 运行时已停止：{detail}。                                                             |
 | `RUNTIME_UNKNOWN`     | 非 `TuiError` 的失败落到界面 | 未预期的错误：{detail}。                                                                    |
 
 ## COMMAND
@@ -80,6 +80,7 @@ TUI 不需要运行时命令或 sibling checkout。它通过 `DSH_HOME`、`DSH_P
 
 | Code                  | 何时出现                              | 解释                              |
 | --------------------- | ------------------------------------- | --------------------------------- |
+| `CONFIG_SUPERVISOR_UNAVAILABLE` | 共享 Host Supervisor 无法连接 | 共享 DSH Host Supervisor 不可用。 |
 | `CONFIG_PROVIDER_REF` | 提供方 `apiKeyEnv` 不是合法环境变量名 | 提供方 {provider} 的凭证引用无效。 |
 
 ## IO

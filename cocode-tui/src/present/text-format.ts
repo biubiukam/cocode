@@ -4,6 +4,7 @@
 
 const RESULT_PREVIEW_CHARS = 80
 const VERBOSE_RESULT_LINES = 40
+const STREAMING_REASONING_LINES = 24
 
 export function formatReasoning(
   text: string,
@@ -11,8 +12,19 @@ export function formatReasoning(
   streaming: boolean,
 ): string | undefined {
   if (text === '') return undefined
+  // Keep the active reasoning visible so the user can tell the model is making
+  // progress. Once the assistant message is sealed, the default view folds it
+  // back to a compact summary; verbose mode still keeps it expanded.
   if (verbose) return text
-  return `thinking · ${text.length} chars${streaming ? ' …' : ''}`
+  if (streaming) return reasoningTail(text, STREAMING_REASONING_LINES)
+  return `thinking · ${text.length} chars`
+}
+
+export function reasoningTail(value: string, maxLines = STREAMING_REASONING_LINES): string {
+  const lines = value.replace(/\r\n?/g, '\n').split('\n')
+  const limit = Math.max(1, Math.trunc(maxLines))
+  if (lines.length <= limit) return value
+  return `… ${lines.length - limit} earlier lines hidden\n${lines.slice(-limit).join('\n')}`
 }
 
 export function formatToolResult(text: string | undefined, verbose: boolean): string | undefined {
@@ -39,9 +51,7 @@ export function sanitizeSingleLine(text: string): string {
   return (
     text
       // ANSI and control characters must not reach the terminal renderer.
-      // eslint-disable-next-line no-control-regex
       .replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, '')
-      // eslint-disable-next-line no-control-regex
       .replace(/[\u0000-\u001f\u007f-\u009f]/g, ' ')
       .replace(/\s+/g, ' ')
       .trim()

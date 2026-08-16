@@ -67,10 +67,10 @@ describe('built-in tab registrations', () => {
     expect(toggles[1]?.type ?? 'switch').toBe('switch')
   })
 
-  it('the browser tab declares its sandbox and link-takeover related settings', () => {
+  it('the browser tab declares its agent-tools and link-takeover settings', () => {
     const { service } = setup()
     const toggles = service.getTab('browser')?.settings?.toggles ?? []
-    expect(toggles.map(t => t.key)).toEqual(['browserNoSandbox', 'browserInterceptLinks'])
+    expect(toggles.map(t => t.key)).toEqual(['agentBrowserTools', 'agentBrowserIsolated', 'browserHeaded', 'browserInterceptLinks'])
     expect(toggles[0]?.title).toBeDefined()
     expect(toggles[0]?.desc).toBeDefined()
     expect(toggles[1]?.title).toBeDefined()

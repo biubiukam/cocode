@@ -9,13 +9,16 @@ describe('builtin command contract', () => {
       'help',
       'exit',
       'clear',
+      'redraw',
       'status',
       'doctor',
       'theme',
       'lang',
       'model',
+      'models',
       'export',
       'copy',
+      'todos',
       'review',
       'focus',
       'init',
@@ -59,7 +62,10 @@ describe('builtin command contract', () => {
 
   it('filters slash menu input without matching ordinary text', () => {
     const commands = createBuiltinCommands().list(P0_CAPABILITIES)
-    expect(filterCommands(commands, '/re').map((command) => command.name)).toEqual(['review'])
+    expect(filterCommands(commands, '/re').map((command) => command.name)).toEqual([
+      'redraw',
+      'review',
+    ])
     expect(filterCommands(commands, '/')).not.toHaveLength(0)
     expect(filterCommands(commands, 'review')).toEqual([])
     expect(parseSlash('/model deepseek-v4')).toEqual({ name: 'model', args: 'deepseek-v4' })
@@ -77,6 +83,7 @@ describe('builtin command contract', () => {
       setTheme: () => calls.add('setTheme'),
       setLocale: () => calls.add('setLocale'),
       setModel: () => calls.add('setModel'),
+      showModelPicker: () => calls.add('showModelPicker'),
       exportTranscript: async () => calls.add('exportTranscript'),
       copyLatestAssistant: () => calls.add('copyLatestAssistant'),
       review: () => calls.add('review'),
@@ -87,6 +94,7 @@ describe('builtin command contract', () => {
       showForkPicker: () => calls.add('showForkPicker'),
       cloneSession: async () => calls.add('cloneSession'),
       showQueuePicker: () => calls.add('showQueuePicker'),
+      showChecklist: () => calls.add('showChecklist'),
       notice: vi.fn(),
     }
 
@@ -94,7 +102,12 @@ describe('builtin command contract', () => {
       command.run(ctx, command.name === 'theme' ? 'dark' : command.name === 'lang' ? 'en' : '')
     }
 
-    expect(actions).toEqual([{ type: 'toggleHelp' }, { type: 'quit' }, { type: 'compact' }])
+    expect(actions).toEqual([
+      { type: 'toggleHelp' },
+      { type: 'quit' },
+      { type: 'redraw' },
+      { type: 'compact' },
+    ])
     expect(calls).toEqual(
       new Set([
         'newSession',
@@ -103,7 +116,7 @@ describe('builtin command contract', () => {
         'showDoctor',
         'setTheme',
         'setLocale',
-        'setModel',
+        'showModelPicker',
         'exportTranscript',
         'copyLatestAssistant',
         'review',
@@ -114,6 +127,7 @@ describe('builtin command contract', () => {
         'showForkPicker',
         'cloneSession',
         'showQueuePicker',
+        'showChecklist',
       ]),
     )
   })

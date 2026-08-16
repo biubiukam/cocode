@@ -27,11 +27,13 @@ export type CommandContextOptions = {
   setTheme?: TuiCommandCtx['setTheme']
   setLocale?: TuiCommandCtx['setLocale']
   setModel?: TuiCommandCtx['setModel']
+  showModelPicker?: TuiCommandCtx['showModelPicker']
   locale?: UiLocale
   showResumePicker?: (sessions: readonly SessionSummary[]) => void
   resumeSessions?: TuiCommandCtx['resumeSessions']
   showSkillsPicker?: TuiCommandCtx['showSkillsPicker']
   copyLatestAssistant?: TuiCommandCtx['copyLatestAssistant']
+  pasteImage?: TuiCommandCtx['pasteImage']
   toggleFocus?: TuiCommandCtx['toggleFocus']
   review?: TuiCommandCtx['review']
   forkSession?: TuiCommandCtx['forkSession']
@@ -39,6 +41,7 @@ export type CommandContextOptions = {
   showSessionTree?: TuiCommandCtx['showSessionTree']
   showForkPicker?: TuiCommandCtx['showForkPicker']
   showQueuePicker?: TuiCommandCtx['showQueuePicker']
+  showChecklist?: TuiCommandCtx['showChecklist']
 }
 
 export type AppCommandContextOptions = {
@@ -64,11 +67,13 @@ export type AppCommandContextOptions = {
   setTheme?: TuiCommandCtx['setTheme']
   setLocale?: TuiCommandCtx['setLocale']
   setModel?: TuiCommandCtx['setModel']
+  showModelPicker?: TuiCommandCtx['showModelPicker']
   locale: UiLocale
   showResumePicker: (sessions: readonly SessionSummary[]) => void
   resumeSessions?: TuiCommandCtx['resumeSessions']
   showSkillsPicker: TuiCommandCtx['showSkillsPicker']
   copyLatestAssistant?: TuiCommandCtx['copyLatestAssistant']
+  pasteImage?: TuiCommandCtx['pasteImage']
   toggleFocus?: TuiCommandCtx['toggleFocus']
   review?: TuiCommandCtx['review']
   forkSession?: TuiCommandCtx['forkSession']
@@ -76,6 +81,7 @@ export type AppCommandContextOptions = {
   showSessionTree?: TuiCommandCtx['showSessionTree']
   showForkPicker?: TuiCommandCtx['showForkPicker']
   showQueuePicker?: TuiCommandCtx['showQueuePicker']
+  showChecklist?: TuiCommandCtx['showChecklist']
 }
 
 export function createCommandContext(options: CommandContextOptions): TuiCommandCtx {
@@ -91,6 +97,7 @@ export function createCommandContext(options: CommandContextOptions): TuiCommand
     setTheme: options.setTheme,
     setLocale: options.setLocale,
     setModel: options.setModel,
+    showModelPicker: options.showModelPicker,
     exportTranscript: async () => {
       const path = await writeSessionExport(options.cwd, options.sessionId, options.nodes)
       options.notice('info', `Exported ${path}`)
@@ -128,6 +135,7 @@ export function createCommandContext(options: CommandContextOptions): TuiCommand
       }),
     showSkillsPicker: options.showSkillsPicker,
     copyLatestAssistant: options.copyLatestAssistant,
+    pasteImage: options.pasteImage,
     toggleFocus: options.toggleFocus,
     review: options.review,
     forkSession: options.forkSession,
@@ -135,6 +143,7 @@ export function createCommandContext(options: CommandContextOptions): TuiCommand
     showSessionTree: options.showSessionTree,
     showForkPicker: options.showForkPicker,
     showQueuePicker: options.showQueuePicker,
+    showChecklist: options.showChecklist,
   }
 }
 
@@ -171,11 +180,13 @@ export function createAppCommandContext(options: AppCommandContextOptions): TuiC
     setTheme: options.setTheme,
     setLocale: options.setLocale,
     setModel: options.setModel,
+    showModelPicker: options.showModelPicker,
     locale: options.locale,
     showResumePicker: options.showResumePicker,
     resumeSessions: options.resumeSessions,
     showSkillsPicker: options.showSkillsPicker,
     copyLatestAssistant: options.copyLatestAssistant,
+    pasteImage: options.pasteImage,
     toggleFocus: options.toggleFocus,
     review: options.review,
     forkSession: options.forkSession,
@@ -183,5 +194,6 @@ export function createAppCommandContext(options: AppCommandContextOptions): TuiC
     showSessionTree: options.showSessionTree,
     showForkPicker: options.showForkPicker,
     showQueuePicker: options.showQueuePicker,
+    showChecklist: options.showChecklist,
   })
 }

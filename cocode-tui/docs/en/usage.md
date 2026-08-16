@@ -27,8 +27,8 @@ cocode
 ```
 
 The CLI uses the current directory as the Agent workspace. Set `COCODE_HOME` to
-isolate credentials, `DSH_HOME`/`DSH_PROFILE` to select the shared Host scope, or
-`DSH_SESSION_ROOT` to move session files.
+isolate the Cocode account, `DSH_HOME`/`DSH_PROFILE` to select the shared Host
+scope, or `DSH_SESSION_ROOT` to move session files.
 
 The first launch opens the authentication gate. Choose a DeepSeek API key or
 sign in to Cocode. Later launches reuse the local configuration. The `cocode`
@@ -37,15 +37,22 @@ are suitable for installation scripts and troubleshooting.
 
 ## Before launch
 
-No Desktop installation or sibling runtime checkout is required. The first TUI
+No Desktop installation or separate runtime checkout is required. The first TUI
 or Desktop client for a scope starts the Supervisor and DSH Host; later clients
 acquire another lease and connect to the existing Host. Configure `DSH_HOME`,
 `DSH_PROFILE`, or `COCODE_HOST_CONFIG_FINGERPRINT` only when the default shared
 scope is not appropriate.
 
-The local sibling-Harness composition is currently verified on macOS. Windows, Linux, and real terminal key combinations still require separate acceptance as described in [platform notes](./platforms.md); automated tests are not a substitute for a real TTY check.
+The local Supervisor and DSH Host flow is currently verified on macOS. Windows,
+Linux, and real terminal key combinations still require separate acceptance as
+described in [platform notes](./platforms.md); automated tests are not a
+substitute for a real TTY check.
 
-Configure a key on the first-run gate, or set `DEEPSEEK_API_KEY` for this process. For development, point `COCODE_HOME` at a separate config directory. Sessions default to `$DSH_HOME/sessions`, or `~/.dsh/sessions` when `DSH_HOME` is unset; `DSH_SESSION_ROOT` can override it.
+Configure a key on the first-run gate, or set `DEEPSEEK_API_KEY` for this process.
+For development, point `COCODE_HOME` and `DSH_HOME` at separate directories.
+DSH settings and credentials follow the official `$DSH_HOME` layout; sessions
+default to `$DSH_HOME/sessions`, or `~/.dsh/sessions` when `DSH_HOME` is unset.
+`DSH_SESSION_ROOT` can override the session directory.
 
 The same build runs on Windows, macOS, and Linux. On Windows, `notepad.exe` is used when neither `$VISUAL` nor `$EDITOR` is configured. WSL uses Linux process semantics and can fall back to `clip.exe` and `explorer.exe`; configure a GUI editor with a wait flag when using an editor such as VS Code.
 
@@ -58,8 +65,8 @@ Inside `tmux` or `screen`, the TUI automatically uses inline rendering and suppr
 - The header shows the workspace, git branch, session, provider, model, and live Agent state.
 - The transcript projects `you`, `cocode`, reasoning, and tool results as separate node groups.
 - The status bar shows runtime state, notices, and input/output token usage when supplied by the runtime.
-- The composer is a bordered `prompt` panel; a dead runtime is shown as `locked` instead of looking editable.
-- The `/` command menu and `?` help panel appear between status and composer. The transcript shrinks first, then overlay height is bounded by the remaining rows.
+- The composer is a bordered `prompt` panel that shows the current `Build` / `Plan` mode; a dead runtime is shown as `locked` instead of looking editable.
+- The `/` command menu, pickers, and confirmation panels open as centered floating popups. The transcript shrinks first, then popup height is bounded by the remaining rows.
 - A multiline draft shows at most six logical lines around the cursor without deleting the full draft. If the fixed chrome cannot fit, the TUI asks for a taller terminal and pauses ordinary input.
 
 ## Editing
@@ -70,14 +77,17 @@ Inside `tmux` or `screen`, the TUI automatically uses inline rendering and suppr
 - `Ctrl+R` opens history search; type to filter recent messages, use `↑` `↓` to select, Enter to restore the draft, and `Esc` to close.
 - `Ctrl+G` opens the draft in `$VISUAL` or `$EDITOR`; the edited Markdown is restored to the composer when the editor exits. Non-zero exits, invalid UTF-8, and drafts over 256 KiB are reported as errors.
 - `Shift+↑` enters message selection; use `↑` `↓` to move, Enter to expand or collapse the current message, and `Esc` to exit.
+- Mouse tracking is off by default so native terminal drag-selection keeps working. Press `Alt+M` to toggle mouse menu mode; clicking the underlined model name opens the model picker, while clicking elsewhere in the header opens the command menu. The picker groups models by provider and supports filtering, arrow keys, Enter, and mouse selection; runtimes without a model catalog fall back to manual model-id input. Switching still restarts the runtime and starts a new session. Popups temporarily enable mouse tracking and restore native text selection when they close. Message actions remain available through `Shift+↑`, then `m`.
 - Press `c` in message selection to copy the current node, or use `/copy` to copy the latest assistant reply. The TUI tries macOS `pbcopy`, Windows `clip.exe`, then Linux `wl-copy`, `xclip`, and `xsel`; an unavailable command produces a notice without interrupting the session.
 - `/focus` toggles a local latest-turn view. When enabled, the transcript shows the most recent user message and every node after it, and the status line shows `focus: latest turn`. It only changes the projection, so `/clear`, `/resume`, `/rewind`, export, and the persisted session log keep their existing semantics. Toggle it again to return to the normal full-transcript view.
 - `/lang zh` or `/lang en` switches the interface immediately; startup language follows `COCODE_LANG`, `LANG`, and related locale variables.
-- `/model <model-id>` restarts the runtime with a new model and starts a new session; a failed switch attempts to restore the previous model.
-- `Ctrl+O` toggles verbose mode for full reasoning and tool I/O.
+- `/model` and `/models` without arguments open the model picker; `/model <model-id>` switches the current provider directly. The picker can switch provider and model together. Every switch restarts the runtime and starts a new session; a failed switch attempts to restore the previous provider/model. Older runtimes without a model catalog still accept a manually entered model id.
+- Reasoning is expanded by default while it streams, then folds back to a summary when the reply is complete; `Ctrl+O` keeps full reasoning and tool I/O expanded.
 - While a turn is running, the status line shows `thinking…` so a quiet interval before the next stream chunk is distinguishable from an idle runtime. It also shows the latest assistant input/output usage and current subagent activity when the wire reports it. When optional events are present, it also shows decode TPS, cache hit rate, context-window percentage, reasoning effort, current working activity, compact context segments (`S/P/A/T/X` for system, prompt, assistant, thinking, and tools), todo progress, goal phase, and the active agent preset. Segment values are estimates based on text length, not provider billing data.
-- While a turn is running, press `Tab` to queue the current draft. Up to eight queued prompts are sent in order after `session.status=idle`; this is local queuing, not steer or cancellation.
+- When the runtime supports plan mode, press `Tab` while idle to switch the composer between `Build` and `Plan`. Open Slash-command and `@` file pickers keep using `Tab` for selection.
+- While a turn is running, the footer changes to `esc interrupt`; type a draft and press `Tab` to queue it. Up to eight queued prompts are sent in order after `session.status=idle`; this is local queuing, not steer or cancellation.
 - Use `/queue` while prompts are queued to inspect them. Type to filter, use `↑`/`↓` to select, `Enter` to move the selected prompt to the front, and `Ctrl+D` to remove it. When the runtime is idle after a send failure, `Enter` retries the selected prompt immediately. The picker closes with `Esc`; an empty queue produces a notice instead of an empty overlay. Queued text is not written to the session log until it is actually sent. If sending fails, the prompt is restored to the front. The local queue is cleared when the runtime restarts or the session changes.
+- The main area keeps a compact Checklist summary below the conversation. Use `/todos` to open the full current-turn Checklist. It shows each task as completed, in progress, or pending; use `↑`/`↓` to select, click a row in mouse mode, and press `Esc` to close. The list is driven by Host `todo/write` events rather than local edits, and is cleared when the next turn starts.
 - `/review` opens a read-only Git review. Choose `working-tree`, `staged`, `last-commit`, or `branch`; inspect the bounded summary, then press Enter to send the structured review context to the current session.
 - `Esc` closes overlays (help, command menu) first; while a turn is running, the first press requests cancellation and the second exits. When idle, press twice to quit.
 - `Ctrl+L` redraws the screen without clearing the session.
@@ -114,6 +124,7 @@ Type `/` to open the command menu. Keep typing to filter by prefix. `Tab` or arr
 | `/focus`                       | Show or hide the latest user turn in the transcript                                               |
 | `/review`                      | Review Git changes with a bounded, read-only diff preview                                         |
 | `/queue`                       | Inspect, reorder, or remove local queued prompts                                                  |
+| `/todos`                       | Show the current-turn Checklist                                                                  |
 | `/permissions` / `/plan`       | Cycle permission mode or toggle plan mode when the runtime advertises them                        |
 | `/fork`                        | Choose a user message, then create a child session from that boundary                             |
 | `/clone`                       | Create a child session from the current conversation                                              |
@@ -122,7 +133,9 @@ Type `/` to open the command menu. Keep typing to filter by prefix. `Tab` or arr
 | `/init`                        | Create a minimal `AGENTS.md` only when the workspace has none                                     |
 | `/theme dark` / `/theme light` | Switch the display theme                                                                          |
 | `/lang zh` / `/lang en`        | Switch between Chinese and English UI                                                             |
-| `/model <model-id>`            | Switch models and start a new session                                                             |
+| `/model`                      | Open the model picker                                                                             |
+| `/models`                     | Open the model picker                                                                             |
+| `/model <model-id>`            | Switch the current provider's model and start a new session                                       |
 | `/resume`                      | Open the local session picker and replay a selected session                                       |
 | `/skills`                      | Browse user-invocable skills from the current workspace                                           |
 | `/use byok` / `/use cocode`    | Switch between your key and Cocode; switching starts a new session                                |
@@ -130,6 +143,8 @@ Type `/` to open the command menu. Keep typing to filter by prefix. `Tab` or arr
 | `/exit`                        | Shut down TUI and restore the terminal                                                            |
 
 `/resume` reads local session headers, supports text filtering plus `↑` `↓` selection, streams the selected JSONL into a temporary projection, and asks the runtime to reopen the same persisted session before swapping it into the current TUI. Follow-up prompts use the selected session id and continue writing to that session. The TUI does not claim cross-process locking; avoid resuming a session that another client is currently writing.
+
+The runtime session tree marks the attached session with `✓`, live sessions reported as running with `◉`, and known idle sessions with `·`. These activity markers are best-effort notifications from the current runtime and do not claim cross-process locking.
 
 `/fork` opens a picker of user messages, newest first. Press `↑`/`↓` to choose a boundary, then press Enter twice to confirm. The runtime creates the child session and replaces the current live session through the fork wire. Use `/clone` when you want to copy the complete current conversation without choosing a boundary.
 
@@ -151,8 +166,10 @@ If another TUI window is still open, `/use`, `/login`, and `/logout` refuse so t
 
 ## Runtime capability boundaries
 
-The `/skills` command is enabled only after `skills/list` returns a real catalog from the harness. A composition without `@deepseek-ai/dsh-skill` (and a provider such as `@deepseek-ai/dsh-skill-filesystem`) keeps the command hidden; an empty or failed probe is not presented as a usable feature.
+The `/skills` command is enabled only after `skills/list` returns a real catalog from the Host. A composition without a skills provider keeps the command hidden; an empty or failed probe is not presented as a usable feature.
+
+The Host mounts Cocode's own `cocode-vision` plugin with `autoRead` enabled. `image` blocks are converted into visual evidence before the active text model runs, while the durable attachment reference is retained for native vision models. Choose `cocode` for the Cocode service, whose default vision model is `gpt-luna`, or `user` for a user-managed OpenAI-compatible endpoint. After switching the account to Cocode, the plugin automatically reuses the account-generated `COCODE_LLM_PROVIDERS.cocode-cloud` endpoint and credential reference; it does not select the first model from the cloud catalog. User settings can be persisted in `$COCODE_HOME/vision.yaml` (default `~/.cocode/vision.yaml`); use [vision.yaml.example](./vision.yaml.example) as a template. Environment variables such as `COCODE_VISION_PROVIDER` and `COCODE_VISION_USER_MODEL` override the file. Only credential references are configured here; Host credentials own the actual values, which never enter session logs or TUI settings.
 
 In `/doctor`, `caps-configured` is what the TUI expects from local configuration and implementation, while `caps-runtime` is the result of probing the live JSON-RPC runtime after initialization. When they differ, the runtime result wins; `caps-errors` explains disabled capabilities. Probes use a random, non-existent session id and do not create or mutate a user session.
 
-Interactive questions require the harness composition to mount the user-questions service and an ask-user consumer. The SDK server then forwards `question/ask` to the TUI and waits for the complete answer batch. A composition without that service does not register the terminal as a question provider.
+Interactive questions require the Host composition to mount the user-questions service and an ask-user consumer. The JSON-RPC service then forwards `question/ask` to the TUI and waits for the complete answer batch. A composition without that service does not register the terminal as a question provider.

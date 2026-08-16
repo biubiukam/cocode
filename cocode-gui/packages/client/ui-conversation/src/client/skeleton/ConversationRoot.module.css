@@ -28,7 +28,7 @@
 .header {
   position: relative;
   flex: none;
-  padding: 12px 28px 12px 20px;
+  padding: 7px 28px 7px 20px;
   border-bottom: 1px solid transparent;
   -webkit-app-region: drag;
 }
@@ -354,6 +354,23 @@
   /* figma drew px 8; nudged +12 so the chip's folder glyph lines up closer to
      the card's inner controls below. */
   padding-left: 20px;
+}
+
+.heroWorkspaceArea {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.heroWorkspaceError {
+  max-width: min(var(--dsh-composer-card-max-width), calc(100vw - 64px));
+  padding-left: 20px;
+  color: var(--dsw-alias-state-error-primary);
+  font-size: 12px;
+  line-height: 18px;
+  overflow-wrap: anywhere;
 }
 
 .heroWorkspaceRow * {

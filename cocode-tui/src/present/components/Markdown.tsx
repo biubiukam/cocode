@@ -2,6 +2,7 @@ import { marked, type Token, type Tokens } from 'marked'
 import { Box, Text } from 'ink'
 import type { ReactNode } from 'react'
 import { memo, useMemo, useRef } from 'react'
+import stringWidth from 'string-width'
 import { theme } from '../theme.ts'
 
 export type MarkdownBlock =
@@ -19,18 +20,22 @@ const BLOCK_CACHE_CHARS = 160_000
 const blockCache = new Map<string, readonly MarkdownBlock[]>()
 let blockCacheChars = 0
 
-export const Markdown = memo(function Markdown(props: { text: string }) {
+export const Markdown = memo(function Markdown(props: { text: string; maxColumns?: number }) {
   const blocks = useMemo(() => parseMarkdownBlocks(props.text), [props.text])
   return (
     <Box flexDirection="column">
       {blocks.map((block, index) => (
-        <MarkdownBlockView block={block} key={`${block.kind}:${index}`} />
+        <MarkdownBlockView
+          block={block}
+          key={`${block.kind}:${index}`}
+          maxColumns={props.maxColumns}
+        />
       ))}
     </Box>
   )
 })
 
-export function StreamingMarkdown(props: { text: string }) {
+export function StreamingMarkdown(props: { text: string; maxColumns?: number }) {
   const stablePrefix = useRef('')
   const split = useMemo(
     () => splitStreamingMarkdown(props.text, stablePrefix.current),
@@ -39,8 +44,12 @@ export function StreamingMarkdown(props: { text: string }) {
   stablePrefix.current = split.stablePrefix
   return (
     <Box flexDirection="column">
-      {split.stablePrefix !== '' ? <Markdown text={split.stablePrefix} /> : null}
-      {split.unstableSuffix !== '' ? <Markdown text={split.unstableSuffix} /> : null}
+      {split.stablePrefix !== '' ? (
+        <Markdown text={split.stablePrefix} maxColumns={props.maxColumns} />
+      ) : null}
+      {split.unstableSuffix !== '' ? (
+        <Markdown text={split.unstableSuffix} maxColumns={props.maxColumns} />
+      ) : null}
     </Box>
   )
 }
@@ -126,7 +135,7 @@ function toBlocks(token: Token): MarkdownBlock[] {
   }
 }
 
-function MarkdownBlockView(props: { block: MarkdownBlock }) {
+function MarkdownBlockView(props: { block: MarkdownBlock; maxColumns?: number }) {
   const { block } = props
   if (block.kind === 'heading') {
     return (
@@ -161,7 +170,11 @@ function MarkdownBlockView(props: { block: MarkdownBlock }) {
     return <Text color={theme.dim}>│ {renderInline(block.text)}</Text>
   }
   if (block.kind === 'table') {
-    return <Text color={theme.assistant}>{renderTable(block.header, block.rows)}</Text>
+    return (
+      <Text color={theme.assistant} wrap="truncate-end">
+        {renderTable(block.header, block.rows, props.maxColumns)}
+      </Text>
+    )
   }
   if (block.kind === 'rule') return <Text color={theme.border}>{'─'.repeat(24)}</Text>
   return <Text color={theme.assistant}>{renderInline(block.text)}</Text>
@@ -207,19 +220,135 @@ function renderInline(text: string): ReactNode {
   return nodes
 }
 
-function renderTable(header: readonly string[], rows: readonly (readonly string[])[]): string {
+export function renderTable(
+  header: readonly string[],
+  rows: readonly (readonly string[])[],
+  maxColumns = 80,
+): string {
+  const columnCount = Math.max(header.length, ...rows.map((row) => row.length), 1)
   const allRows = [header, ...rows]
-  const widths = header.map((_, column) =>
-    Math.max(...allRows.map((row) => (row[column] ?? '').length), 3),
-  )
-  const line = (row: readonly string[]) =>
-    `│ ${row.map((cell, index) => (cell ?? '').padEnd(widths[index] ?? 3)).join(' │ ')} │`
+  const widths = tableColumnWidths(allRows, columnCount, maxColumns)
+  const line = (row: readonly string[]) => {
+    const cells = rowLines(row, widths)
+    return cells.map((lineCells) =>
+      `│ ${lineCells.map((cell, index) => padCell(cell, widths[index] ?? 1)).join(' │ ')} │`,
+    )
+  }
   const divider = `├${widths.map((width) => `─${'─'.repeat(width)}─`).join('┼')}┤`
   return [
     `┌${widths.map((width) => `─${'─'.repeat(width)}─`).join('┬')}┐`,
-    line(header),
+    ...line(header),
     divider,
-    ...rows.map(line),
+    ...rows.flatMap(line),
     `└${widths.map((width) => `─${'─'.repeat(width)}─`).join('┴')}┘`,
   ].join('\n')
+}
+
+const TABLE_CELL_CAP = 48
+const TABLE_MIN_CELL_WIDTH = 8
+
+function tableColumnWidths(
+  rows: readonly (readonly string[])[],
+  columnCount: number,
+  maxColumns: number,
+): number[] {
+  const separators = 4 + Math.max(0, columnCount - 1) * 3
+  const available = Math.max(columnCount, Math.max(1, maxColumns) - separators)
+  const preferred = Array.from({ length: columnCount }, (_, column) => {
+    const contentWidth = Math.max(
+      0,
+      ...rows.flatMap((row) =>
+        splitCellLines(row[column] ?? '').map((line) => stringWidth(line)),
+      ),
+    )
+    return Math.max(3, Math.min(TABLE_CELL_CAP, contentWidth))
+  })
+  const minimum = Math.min(TABLE_MIN_CELL_WIDTH, Math.max(1, Math.floor(available / columnCount)))
+  const widths = preferred.map((width) => Math.max(minimum, width))
+  while (sum(widths) > available) {
+    const index = widestShrinkingColumn(widths, minimum)
+    if (index === -1) break
+    widths[index] -= 1
+  }
+  return widths
+}
+
+function widestShrinkingColumn(widths: readonly number[], minimum: number): number {
+  let index = -1
+  for (let candidate = 0; candidate < widths.length; candidate += 1) {
+    if ((widths[candidate] ?? 0) <= minimum) continue
+    if (index === -1 || (widths[candidate] ?? 0) > (widths[index] ?? 0)) index = candidate
+  }
+  return index
+}
+
+function rowLines(row: readonly string[], widths: readonly number[]): string[][] {
+  const lines = widths.map((width, column) => wrapCell(row[column] ?? '', width))
+  const rowHeight = Math.max(1, ...lines.map((cellLines) => cellLines.length))
+  return Array.from({ length: rowHeight }, (_, line) =>
+    lines.map((cellLines) => cellLines[line] ?? ''),
+  )
+}
+
+function wrapCell(value: string, width: number): string[] {
+  const normalized = splitCellLines(value).join(' ')
+  if (normalized === '') return ['']
+  const lines: string[] = []
+  let current = ''
+  for (const word of normalized.split(/\s+/)) {
+    const wordWidth = stringWidth(word)
+    if (wordWidth <= width) {
+      const next = current === '' ? word : `${current} ${word}`
+      if (stringWidth(next) <= width) {
+        current = next
+        continue
+      }
+      if (current !== '') lines.push(current)
+      current = word
+      continue
+    }
+    if (current !== '') {
+      lines.push(current)
+      current = ''
+    }
+    const chunks = hardWrap(word, width)
+    lines.push(...chunks.slice(0, -1))
+    current = chunks.at(-1) ?? ''
+  }
+  if (current !== '' || lines.length === 0) lines.push(current)
+  return lines
+}
+
+function hardWrap(value: string, width: number): string[] {
+  const lines: string[] = []
+  let current = ''
+  let currentWidth = 0
+  for (const character of value) {
+    const characterWidth = stringWidth(character)
+    if (current !== '' && currentWidth + characterWidth > width) {
+      lines.push(current)
+      current = ''
+      currentWidth = 0
+    }
+    if (characterWidth > width) {
+      lines.push('…')
+      continue
+    }
+    current += character
+    currentWidth += characterWidth
+  }
+  if (current !== '' || lines.length === 0) lines.push(current)
+  return lines
+}
+
+function splitCellLines(value: string): string[] {
+  return value.split(/\r?\n/).map((line) => line.trim()).filter((line) => line !== '')
+}
+
+function padCell(value: string, width: number): string {
+  return `${value}${' '.repeat(Math.max(0, width - stringWidth(value)))}`
+}
+
+function sum(values: readonly number[]): number {
+  return values.reduce((total, value) => total + value, 0)
 }

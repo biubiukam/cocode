@@ -30,14 +30,17 @@ import {
 } from './config.ts'
 import { isWithin, parentOf, requireAbsolute, listDirectory, rootLabel } from './fs-tree.ts'
 import { decodeHtmlUrl } from './html-route.ts'
-import { extractFrameAncestors } from './browser-probe.ts'
-import { isTrustedApiRequest, isLoopbackHostname } from './trust-fence.ts'
+import { isTrustedApiRequest } from './trust-fence.ts'
 import { registerBundleRoute } from './bundle-route.ts'
 import * as git from './git.ts'
 import { SettingsConflictError, settingsNamespace, type SettingsNamespace } from '@deepseek-ai/dsh-settings'
 import { defaultShell, ensureSpawnHelper, PtyManager } from './pty-manager.ts'
 import { AgentPtyRegistry, clampDims, type AgentTerminalHandle } from './agent-pty.ts'
 import { registerTools } from './tools.ts'
+import { BrowserEngine } from './browser/engine.ts'
+import { BrowserRegistry } from './browser/registry.ts'
+import { registerBrowserTools } from './browser/tools.ts'
+import { attachBrowserTabList, attachBrowserViewport } from './browser/stream.ts'
 import { buildJobsApi, type SidebarJobsRoutes } from './jobs-routes.ts'
 import { readJsonBody, requireString, SidebarError, writeError, writeJson, writeOk } from './wire.ts'
 
@@ -181,6 +184,8 @@ function buildApi(
   ctx: Context,
   ptyManager: PtyManager,
   agentPtyRegistry: AgentPtyRegistry,
+  browserEngine: BrowserEngine,
+  browserRegistry: BrowserRegistry,
   resolved: ResolvedSidebarConfig,
   getSettings: () => SidebarSettingsFace | undefined,
 ): Record<string, ApiMethod> {
@@ -362,54 +367,20 @@ function buildApi(
         throw new SidebarError('settings-rejected', error instanceof Error ? error.message : String(error), 400)
       }
     },
-    // Probe a URL's RESPONSE HEADERS so the sidebar browser can explain an
-    // iframe refusal: X-Frame-Options / CSP frame-ancestors are exactly the
-    // signals the browser enforces when it refuses to embed a site. The
-    // probe is display-only (headers back to the caller), restricted to
-    // http(s) non-loopback URLs with a hard timeout, and gated by the same
-    // trust fence as every other route — a cross-site page cannot reach it.
-    'browser.probe': async (payload) => {
-      const raw = requireString(payload, 'url')
-      let parsed: URL
-      try {
-        parsed = new URL(raw)
-      } catch {
-        throw new SidebarError('bad-request', 'invalid url', 400)
-      }
-      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-        throw new SidebarError('bad-request', 'only http/https urls can be probed', 400)
-      }
-      // Mirror the browser tab's address-bar policy: loopback stays unreachable
-      // from the sidebar, so probing it would leak nothing the tab could use.
-      if (isLoopbackHostname(parsed.hostname)) {
-        throw new SidebarError('bad-request', 'local addresses are not probed', 400)
-      }
-      const controller = new AbortController()
-      const timer = setTimeout(() => controller.abort(), 8000)
-      try {
-        let response = await fetch(parsed, { method: 'HEAD', redirect: 'follow', signal: controller.signal })
-        // Some servers answer HEAD with 405/501; retry once as GET (the
-        // body is discarded — only the headers matter).
-        if (response.status === 405 || response.status === 501) {
-          response = await fetch(parsed, { method: 'GET', redirect: 'follow', signal: controller.signal })
-        }
-        const csp = response.headers.get('content-security-policy')
-        const frameAncestors = extractFrameAncestors(csp)
-        const xFrameOptions = response.headers.get('x-frame-options')
-        return {
-          reachable: true,
-          url: response.url,
-          status: response.status,
-          ...(xFrameOptions !== null ? { xFrameOptions } : {}),
-          ...(frameAncestors !== undefined ? { frameAncestors } : {}),
-        }
-      } catch {
-        // DNS / TLS / connection / timeout: nothing to judge — the client
-        // keeps the plain iframe.
-        return { reachable: false }
-      } finally {
-        clearTimeout(timer)
-      }
+    // The sidebar browser's out-of-band control surface. Everything about a
+    // LIVE page (navigation, input, frames) rides the browser WebSocket; only
+    // the two things that happen when no page exists live here — asking
+    // whether Chromium is installed, and installing it — plus the tab release
+    // that covers a tab closed while its socket was down.
+    'browser.engine': async () => await browserEngine.probe(),
+    'browser.install': async () => {
+      await browserEngine.install()
+      return browserEngine.status
+    },
+    'browser.close': async (payload) => {
+      const sessionId = requireString(payload, 'sessionId')
+      const tabId = requireString(payload, 'tabId')
+      return { closed: await browserRegistry.close(sessionId, tabId) }
     },
   }
 }
@@ -438,6 +409,17 @@ export function apply(ctx: Context, config?: SidebarConfig): void {
   // through the terminal_create tool; the sidebar view attaches through the
   // same /sidebar/ws/terminal upgrade with ?uuid=... instead of ?tab=...
   const agentPtyRegistry = new AgentPtyRegistry(defaultShell())
+  // The sidebar browser: one headless Chromium shared by every conversation
+  // (a single persistent profile, so logins survive restarts) and a per-session
+  // tab book. Nothing is launched here — the engine downloads and the context
+  // launches on the first page anyone actually opens.
+  const browserEngine = new BrowserEngine({ profile: resolved.browserProfile, headed: resolved.browserHeaded })
+  const browserRegistry = new BrowserRegistry(browserEngine, {
+    tabsPerSession: resolved.browserTabsPerSession,
+    reconnectGraceMs: resolved.reconnectGraceMs,
+    humanProfile: resolved.browserProfile,
+    agentProfile: 'agent',
+  })
 
   // ── User-facing "Side card" preferences ──────────────────────────────────
   // Register the namespace with the settings provider so the Settings page
@@ -453,8 +435,15 @@ export function apply(ctx: Context, config?: SidebarConfig): void {
   // turns the feature on, and turning it off mid-session unregisters the
   // tools and releases the agent terminals they created.
   let toolsDisposers: (() => void) | null = null
+  // The model-facing BROWSER tools are gated the same way, on
+  // `agentBrowserTools`. They deserve their own switch rather than riding the
+  // terminal one: granting them lets the agent act inside every site the
+  // user's browser profile is logged into, which is a materially different
+  // decision from granting it a shell.
+  let browserToolsDisposers: (() => void) | null = null
   const syncToolsGate = (scope: { get(): SidebarPrefs }): void => {
-    if (scope.get().agentTerminalTools) {
+    const prefs = scope.get()
+    if (prefs.agentTerminalTools) {
       if (toolsDisposers === null) {
         toolsDisposers = registerTools(ctx, agentPtyRegistry, (sessionId) => sessionCwdOf(ctx, sessionId))
       }
@@ -465,6 +454,18 @@ export function apply(ctx: Context, config?: SidebarConfig): void {
       // while it was on (they are only reachable through the tools). The
       // registry change fires the push, so the sidebar reconciles them away.
       agentPtyRegistry.disposeAll()
+    }
+    browserEngine.setHeaded(prefs.browserHeaded)
+    browserRegistry.setIsolateAgent(prefs.agentBrowserIsolated)
+    if (prefs.agentBrowserTools) {
+      browserToolsDisposers ??= registerBrowserTools(ctx, browserRegistry, (sessionId) => sessionCwdOf(ctx, sessionId))
+    } else if (browserToolsDisposers !== null) {
+      browserToolsDisposers()
+      browserToolsDisposers = null
+      // Only the model's own pages go: the user's tabs stay open, because
+      // revoking the model's tools is not a reason to close what they are
+      // reading.
+      void browserRegistry.disposeAgentTabs()
     }
   }
   ctx.inject(['settings'], (sctx) => {
@@ -496,7 +497,7 @@ export function apply(ctx: Context, config?: SidebarConfig): void {
   })
 
   // ── JSON API ────────────────────────────────────────────────────────────
-  const api = buildApi(ctx, ptyManager, agentPtyRegistry, resolved, () => settingsFace)
+  const api = buildApi(ctx, ptyManager, agentPtyRegistry, browserEngine, browserRegistry, resolved, () => settingsFace)
   ctx.effect(() => ctx.webServer.register({
     kind: 'prefix',
     path: '/sidebar/api',
@@ -693,12 +694,59 @@ export function apply(ctx: Context, config?: SidebarConfig): void {
     },
   }), 'dsh-better-sidebar: agent-terminals push WebSocket')
 
+  // ── Browser WebSockets ──────────────────────────────────────────────────
+  // The viewport channel is bidirectional and MIXED: JPEG screencast frames
+  // ride binary, everything else (navigation, input, state, dialogs) rides
+  // JSON text on the same socket, which is what keeps a frame and the input
+  // that produced it strictly ordered.
+  const browserWss = new WebSocketServer({ noServer: true })
+  ctx.effect(() => ctx.webServer.registerUpgrade({
+    path: '/sidebar/ws/browser',
+    handler: (req, socket, head) => {
+      if (!fence(req)) {
+        socket.destroy()
+        return
+      }
+      browserWss.handleUpgrade(req as unknown as IncomingMessage, socket as unknown as Duplex, head as Buffer, (ws) => {
+        void attachBrowserViewport(browserRegistry, browserEngine, ws, req)
+      })
+    },
+  }), 'dsh-better-sidebar: browser viewport WebSocket')
+
+  // Pages the MODEL opened become sidebar tabs on their own, through the same
+  // list-push + reconcile contract the agent terminals use — the user always
+  // sees what the agent is browsing.
+  const browserListWss = new WebSocketServer({ noServer: true })
+  ctx.effect(() => ctx.webServer.registerUpgrade({
+    path: '/sidebar/ws/browser-tabs',
+    handler: (req, socket, head) => {
+      if (!fence(req)) {
+        socket.destroy()
+        return
+      }
+      browserListWss.handleUpgrade(req as unknown as IncomingMessage, socket as unknown as Duplex, head as Buffer, (ws) => {
+        attachBrowserTabList(browserRegistry, ws, req)
+      })
+    },
+  }), 'dsh-better-sidebar: browser tab list WebSocket')
+
+  const sessionSweep = setInterval(() => {
+    for (const sessionId of browserRegistry.sessionIds()) {
+      if (ctx.sessions.get(sessionId) === undefined) void browserRegistry.closeSession(sessionId)
+    }
+  }, 60_000)
+
   ctx.effect(() => () => {
+    clearInterval(sessionSweep)
     toolsDisposers?.()
+    browserToolsDisposers?.()
     ptyManager.disposeAll()
     agentPtyRegistry.disposeAll()
+    void browserRegistry.disposeAll().then(async () => { await browserEngine.dispose() })
     wss.close()
     agentListWss.close()
+    browserWss.close()
+    browserListWss.close()
   }, 'dsh-better-sidebar: teardown')
 }
 

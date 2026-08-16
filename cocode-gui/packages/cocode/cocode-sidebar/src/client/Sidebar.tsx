@@ -33,6 +33,7 @@ import type { Context, SidebarSessionList } from '../context-types.ts'
 import { appendToDraft } from './conversation-draft.ts'
 import {
   BOTTOM_MIN, PANEL_MIN, agentUuidOf, firstLeaf, isAgentTabId, leafWithTab, migrateBottomTabs, moveTab, moveTabToEdge, openDiffTab,
+  reconcileAgentBrowserTabs,
   reconcileAgentTerminals,
   resizeSplitIn, setBottomHeight, setWidth, toggleBottomPanel, toggleExpanded, togglePanel,
   type DropZone, type SidebarState, type SidebarStore, type SidebarTab, type SplitNode,
@@ -251,6 +252,55 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
       socket?.close()
     }
   }, [sessionId, store])
+
+  /**
+   * The same contract for browser pages the MODEL opened: the host pushes the
+   * live list, the sidebar mirrors it into tabs. The user should never have
+   * to ask what the agent is browsing — the page just appears, live, next to
+   * the conversation, and they can take it over by clicking in it.
+   */
+  useEffect(() => {
+    if (sessionId === undefined) return
+    let socket: WebSocket | null = null
+    let retry: number | undefined
+    let closed = false
+    let failures = 0
+    const connect = (): void => {
+      if (closed) return
+      const url = new URL(desktopRuntimeUrl('/sidebar/ws/browser-tabs'), location.origin)
+      url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+      url.search = new URLSearchParams({ sessionId }).toString()
+      socket = new WebSocket(url.toString())
+      socket.onmessage = (event) => {
+        if (typeof event.data !== 'string') return
+        try {
+          const list = JSON.parse(event.data) as Array<{ tabId: string; title: string; url: string }>
+          if (!Array.isArray(list)) return
+          store.reduce(s => ctx.betterSidebar?.isTabEnabled('browser') === false
+            ? s
+            : reconcileAgentBrowserTabs(s, list))
+        } catch {
+          // Malformed push: ignore (the next push will reconcile).
+        }
+      }
+      socket.onclose = () => {
+        if (closed) return
+        failures += 1
+        if (failures >= FAILURE_LIMIT) {
+          console.error('[dsh-better-sidebar] browser-tabs connection failed; stopping reconnect loop', sessionId)
+          return
+        }
+        retry = window.setTimeout(connect, 2000)
+      }
+      socket.onerror = () => { socket?.close() }
+    }
+    connect()
+    return () => {
+      closed = true
+      window.clearTimeout(retry)
+      socket?.close()
+    }
+  }, [sessionId, store, ctx])
 
   /**
    * Subagent auto-activation: the moment the current conversation spawns its
@@ -572,6 +622,12 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
         } else if (sessionId !== undefined) {
           void api.ptyClose({ sessionId, cwd }, tabId).catch(() => { /* the host may already have released it */ })
         }
+      }
+      // A browser page costs a live renderer process, so a closed tab releases
+      // it now rather than waiting out the reconnect grace. The WS close frame
+      // is the primary path; this covers a tab closed while the socket is down.
+      if (tab?.type === 'browser' && sessionId !== undefined) {
+        void api.browserClose({ sessionId, cwd }, tabId).catch(() => { /* the host may already have released it */ })
       }
     },
     activateTab: (paneId, tabId) => {

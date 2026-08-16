@@ -51,16 +51,27 @@ const LARGE_GLYPHS = {
 
 const LARGE_WORDMARK = createWordmark(LARGE_GLYPHS, ' ')
 
-const MEDIUM_WORDMARK = LARGE_WORDMARK
-
-const SMALL_GLYPHS = {
-  C: ['███', '█  ', '█  ', '███'],
-  O: ['███', '█ █', '█ █', '███'],
-  D: ['██ ', '█ █', '█ █', '██ '],
-  E: ['███', '█  ', '██ ', '███'],
-} as const
-
-const SMALL_WORDMARK = createWordmark(SMALL_GLYPHS, ' ')
+const HORIZONTAL_WHALE_WIDTH = 34
+const HORIZONTAL_WORDMARK_COLUMN = HORIZONTAL_WHALE_WIDTH + 2
+const HORIZONTAL_SPOUT_STAGES = [
+  ['', '', ''],
+  ['', '  ###  ', ' ### ### '],
+  [' ### ### ', '#########', '  #####  '],
+  ['### ### ###', '###########', ' ####### '],
+  [' ### ### ', '#########', '  #####  '],
+  ['', ' ### ### ', ''],
+] as const
+const HORIZONTAL_SPOUT_SEQUENCE = [0, 0, 1, 2, 3, 4, 5, 4, 3, 2, 1]
+const HORIZONTAL_BODY_MASK = [
+  '       ###################        ',
+  '   #########################  ### ',
+  '##################################',
+  '  ##########################  ### ',
+  '       ###################        ',
+] as const
+export const HORIZONTAL_WHALE_COLUMNS =
+  HORIZONTAL_WORDMARK_COLUMN + (LARGE_WORDMARK[0]?.length ?? 0)
+export const HORIZONTAL_WHALE_MIN_COLUMNS = HORIZONTAL_WHALE_COLUMNS + 2
 
 const LARGE_SPEC: WhaleSpec = {
   width: 68,
@@ -80,40 +91,9 @@ const LARGE_SPEC: WhaleSpec = {
   brand: { row: 1, column: 17, lines: LARGE_WORDMARK },
 }
 
-const MEDIUM_SPEC: WhaleSpec = {
-  width: 50,
-  spoutMasks: createSpoutMasks(50),
-  bodyMask: [
-    '          ############################          ',
-    '     ###################################   #### ',
-    '  ######################################## #### ',
-    '##############################################  ',
-    '  ######################################## #### ',
-    '     ###################################   #### ',
-    '          ############################          ',
-    '                       ####                     ',
-  ],
-  eye: { row: 3, column: 5 },
-  brand: { row: 0, column: 8, lines: MEDIUM_WORDMARK },
-}
-
-const SMALL_SPEC: WhaleSpec = {
-  width: 34,
-  spoutMasks: createSpoutMasks(34),
-  bodyMask: [
-    '       ###################        ',
-    '   #########################  ### ',
-    '##################################',
-    '  ##########################  ### ',
-    '       ###################        ',
-  ],
-  eye: { row: 2, column: 4 },
-  brand: { row: 0, column: 6, lines: SMALL_WORDMARK },
-}
-
 export const LARGE_WHALE_ANIMATION = createWhaleAnimation(LARGE_SPEC)
-export const MEDIUM_WHALE_ANIMATION = createWhaleAnimation(MEDIUM_SPEC)
-export const SMALL_WHALE_ANIMATION = createWhaleAnimation(SMALL_SPEC)
+export const MEDIUM_WHALE_ANIMATION = createHorizontalWhaleAnimation()
+export const SMALL_WHALE_ANIMATION = MEDIUM_WHALE_ANIMATION
 
 export const INLINE_WHALE_ANIMATION: CharacterAnimation = {
   interval: 160,
@@ -142,6 +122,31 @@ function createWhaleAnimation(spec: WhaleSpec): CharacterAnimation {
       const spoutMask = spec.spoutMasks[SPOUT_SEQUENCE[phase] ?? 0] ?? []
       return [...renderBinaryMask(spoutMask, phase + 5), ...renderWhaleBody(spec, phase)]
         .map((line) => normalizeLine(line, spec.width))
+        .join('\n')
+    }),
+  }
+}
+
+function createHorizontalWhaleAnimation(): CharacterAnimation {
+  const spoutMasks = HORIZONTAL_SPOUT_STAGES.map((stage) =>
+    stage.map((line) =>
+      normalizeLine(centerLine(line, HORIZONTAL_WHALE_WIDTH), HORIZONTAL_WHALE_WIDTH),
+    ),
+  )
+  const accentRows = spoutMasks[0]?.length ?? 0
+  const blankWordmark = ' '.repeat(LARGE_WORDMARK[0]?.length ?? 0)
+  return {
+    interval: 180,
+    accentRows,
+    frames: HORIZONTAL_SPOUT_SEQUENCE.map((stage, phase) => {
+      const spout = renderBinaryMask(spoutMasks[stage] ?? [], phase + 5)
+      const body = renderBinaryMask(HORIZONTAL_BODY_MASK, phase)
+      body[2] = replaceAt(body[2] ?? '', 4, '●')
+      return [...spout, ...body]
+        .map((line, row) => {
+          const wordmark = row < accentRows ? blankWordmark : (LARGE_WORDMARK[row - accentRows] ?? '')
+          return `${normalizeLine(line, HORIZONTAL_WHALE_WIDTH)}  ${wordmark}`
+        })
         .join('\n')
     }),
   }

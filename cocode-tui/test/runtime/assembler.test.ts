@@ -129,6 +129,112 @@ describe('Assembler', () => {
     })
   })
 
+  it('projects exit_plan_mode arguments while the tool call is streaming', () => {
+    const a = assembler()
+    a.ingest(
+      ev('assistant/chunk', 1, {
+        turn: 1,
+        step: 0,
+        chunk: {
+          type: 'tool-call-delta',
+          index: 0,
+          id: 'plan-1',
+          name: 'exit_plan_mode',
+          argumentsDelta: '{"plan":"# Plan\\n',
+        },
+      }),
+    )
+    expect(a.snapshot()[0]).toMatchObject({
+      kind: 'tool',
+      id: 'plan-1',
+      name: 'exit_plan_mode',
+      args: '{"plan":"# Plan\\n',
+      status: 'running',
+      streaming: true,
+    })
+    a.ingest(
+      ev('assistant/chunk', 2, {
+        turn: 1,
+        step: 0,
+        chunk: {
+          type: 'tool-call-delta',
+          index: 0,
+          id: 'plan-1',
+          argumentsDelta: '\\n- inspect files"}',
+        },
+      }),
+    )
+    a.ingest(
+      ev('tool/call', 3, {
+        turn: 1,
+        step: 0,
+        callId: 'plan-1',
+        name: 'exit_plan_mode',
+        arguments: '{"plan":"# Plan\\n\\n- inspect files"}',
+      }),
+    )
+    expect(a.snapshot()[0]).toMatchObject({
+      kind: 'tool',
+      args: '{"plan":"# Plan\\n\\n- inspect files"}',
+      streaming: false,
+    })
+  })
+
+  it('keeps an empty tool-call delta as a live tool context', () => {
+    const a = assembler()
+    a.ingest(
+      ev('assistant/chunk', 1, {
+        turn: 1,
+        step: 0,
+        chunk: {
+          type: 'tool-call-delta',
+          index: 0,
+          id: 'plan-2',
+          name: 'exit_plan_mode',
+          argumentsDelta: '',
+        },
+      }),
+    )
+    expect(a.snapshot()[0]).toMatchObject({
+      kind: 'tool',
+      id: 'plan-2',
+      name: 'exit_plan_mode',
+      args: '',
+      streaming: true,
+    })
+  })
+
+  it('preserves a tool name when it arrives after the first delta', () => {
+    const a = assembler()
+    a.ingest(
+      ev('assistant/chunk', 1, {
+        turn: 1,
+        step: 0,
+        chunk: {
+          type: 'tool-call-delta',
+          index: 0,
+          id: 'plan-3',
+          argumentsDelta: '{"plan":"# Plan',
+        },
+      }),
+    )
+    expect(a.snapshot()[0]).toMatchObject({ kind: 'tool', name: '', streaming: true })
+    a.ingest(
+      ev('assistant/chunk', 2, {
+        turn: 1,
+        step: 0,
+        chunk: {
+          type: 'tool-call-delta',
+          index: 0,
+          id: 'plan-3',
+          name: 'exit_plan_mode',
+          argumentsDelta: '"}',
+        },
+      }),
+    )
+    expect(a.snapshot()[0]).toMatchObject({ kind: 'tool', name: 'exit_plan_mode', streaming: true })
+  })
+
   it('marks tool error from error field', () => {
     const a = assembler()
     a.ingest(

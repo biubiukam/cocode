@@ -14,6 +14,7 @@ import {
 	type HostLease,
 	type HostScope,
 } from "@cocode/host-supervisor"
+import { quarantineCorruptDshSessions } from "./dsh-session-recovery"
 
 const FORWARDED_REQUEST_HEADERS = new Set(["accept", "content-type", "if-none-match", "range"])
 
@@ -27,6 +28,7 @@ export class DshRuntimeProcess {
 
 	public async start(): Promise<string> {
 		if (this.lease !== null) throw new Error("DSH Host lease is already active.")
+		quarantineCorruptDshSessions(resolveDshHome())
 		const scope: HostScope = {
 			dshHome: resolveDshHome(),
 			profile: process.env.DSH_PROFILE?.trim() || "web",

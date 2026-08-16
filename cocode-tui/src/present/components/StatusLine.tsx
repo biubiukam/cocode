@@ -1,8 +1,9 @@
 import { Box, Text } from 'ink'
 import type { TuiSnapshot } from '../../runtime/app.ts'
-import { agentMark } from './agent-status.ts'
+import { AgentStatusIndicator } from './AgentStatusIndicator.tsx'
 import { theme } from '../theme.ts'
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
+import { formatNoticeLine } from '../status-format.ts'
 
 const NOTICE_MAX_LINES = 12
 
@@ -23,6 +24,7 @@ export function StatusLine(props: {
   agent: TuiSnapshot['agent']
   notice?: TuiSnapshot['notice']
   locale: UiLocale
+  maxColumns?: number
 }) {
   const notice = props.notice
   const telemetry = props.status.telemetry
@@ -35,11 +37,6 @@ export function StatusLine(props: {
       : text(props.locale, 'telemetryCache', {
           value: formatMetric(telemetry.cacheHitRate),
         }),
-    telemetry.contextPercent === undefined
-      ? undefined
-      : text(props.locale, 'telemetryContext', {
-          value: formatMetric(telemetry.contextPercent),
-        }),
     telemetry.reasoningEffort === undefined
       ? undefined
       : text(props.locale, 'telemetryReasoning', { value: telemetry.reasoningEffort }),
@@ -49,15 +46,6 @@ export function StatusLine(props: {
           phase: telemetry.activity.phase,
           line: telemetry.activity.line,
         }),
-    hasContextSegments(telemetry)
-      ? text(props.locale, 'telemetrySegments', {
-          system: String(telemetry.contextSegments.system),
-          prompt: String(telemetry.contextSegments.prompt),
-          assistant: String(telemetry.contextSegments.assistant),
-          thinking: String(telemetry.contextSegments.thinking),
-          tools: String(telemetry.contextSegments.tools),
-        })
-      : undefined,
     props.status.todos.length > 0
       ? text(props.locale, 'todoProgress', {
           done: String(props.status.todos.filter((todo) => todo.status === 'completed').length),
@@ -80,7 +68,7 @@ export function StatusLine(props: {
     <Box flexDirection="column" marginBottom={1}>
       <Box width="100%" justifyContent="space-between">
         <Text color={theme.dim} wrap="truncate-end">
-          {agentMark(props.agent)} {props.status.line}
+          <AgentStatusIndicator agent={props.agent} /> {props.status.line}
         </Text>
         <Box flexShrink={0}>
           {props.status.focusMode ? (
@@ -123,7 +111,7 @@ export function StatusLine(props: {
           {telemetryBits.join(' · ')}
         </Text>
       ) : null}
-      {notice ? <Notice notice={notice} /> : null}
+      {notice ? <Notice notice={notice} maxColumns={props.maxColumns} /> : null}
     </Box>
   )
 }
@@ -132,20 +120,15 @@ function formatMetric(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1)
 }
 
-function hasContextSegments(telemetry: TuiSnapshot['status']['telemetry']): boolean {
-  return Object.values(telemetry.contextSegments).some((value) => value > 0)
-}
-
-function Notice(props: { notice: NonNullable<TuiSnapshot['notice']> }) {
+function Notice(props: {
+  notice: NonNullable<TuiSnapshot['notice']>
+  maxColumns?: number
+}) {
   const color = props.notice.tone === 'error' ? theme.error : theme.info
+  const compact = formatNoticeLine(props.notice, props.maxColumns ?? 80)
   return (
-    <Box flexDirection="column">
-      {noticeLines(props.notice.message).map((line, index) => (
-        <Text key={`${index}:${line}`} color={color} wrap="truncate-end">
-          {index === 0 ? '! ' : '  '}
-          {line}
-        </Text>
-      ))}
-    </Box>
+    <Text color={color} wrap="truncate-end">
+      {compact}
+    </Text>
   )
 }

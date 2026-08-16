@@ -16,7 +16,7 @@ function notice(id: string): ConversationNode {
 describe('visibleTail', () => {
   it('keeps the newest nodes within the row budget', () => {
     const nodes = [notice('1'), notice('2'), notice('3')]
-    expect(visibleTail(nodes, 2).map((node) => node.id)).toEqual(['2', '3'])
+    expect(visibleTail(nodes, 4).map((node) => node.id)).toEqual(['2', '3'])
   })
 
   it('does not render hidden notices in compact mode', () => {
@@ -24,7 +24,7 @@ describe('visibleTail', () => {
       ...notice('1'),
       verboseOnly: true,
     }
-    expect(visibleTail([hidden, notice('2')], 1)).toEqual([notice('2')])
+    expect(visibleTail([hidden, notice('2')], 2)).toEqual([notice('2')])
   })
 
   it('budgets expanded tool rows as detailed content', () => {
@@ -39,7 +39,7 @@ describe('visibleTail', () => {
       status: 'success',
       result: 'line one\nline two',
     }
-    expect(visibleTail([tool, notice('2')], 6, false, new Set(['tool:tool-1']))).toHaveLength(2)
+    expect(visibleTail([tool, notice('2')], 7, false, new Set(['tool:tool-1']))).toHaveLength(2)
     expect(visibleTail([tool, notice('2')], 2)).toEqual([notice('2')])
   })
 })

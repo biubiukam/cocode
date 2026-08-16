@@ -3,6 +3,7 @@
  */
 
 import {
+  CLOUD_API,
   CLOUD_KEY_REF,
   CLOUD_PROVIDER,
   DEFAULT_MODEL,
@@ -113,7 +114,7 @@ export async function patchCloudRoute(
   const providers = isRecord(llm.providers) ? llm.providers : {}
   providers[CLOUD_PROVIDER] = {
     displayName: 'Cocode Cloud',
-    api: 'openai-responses',
+    api: CLOUD_API,
     baseURL: `${origin.replace(/\/$/, '')}/v1`,
     apiKeyEnv: CLOUD_KEY_REF,
     models: models.map((model) => ({ id: model.id, name: model.name })),
@@ -153,6 +154,17 @@ export async function unsetCloudRoute(home: string): Promise<void> {
     agent.model = DEFAULT_MODEL
     root['agent-default-model'] = agent
   }
+  await writeYamlFile(settingsPath(home), root, 0o600)
+}
+
+/** Remove a legacy persisted Cocode route without changing the selected model. */
+export async function removeCloudRoute(home: string): Promise<void> {
+  const root = await loadRoot(home)
+  const llm = isRecord(root['llm-pi-ai']) ? root['llm-pi-ai'] : {}
+  const providers = isRecord(llm.providers) ? llm.providers : {}
+  delete providers[CLOUD_PROVIDER]
+  llm.providers = providers
+  root['llm-pi-ai'] = llm
   await writeYamlFile(settingsPath(home), root, 0o600)
 }
 

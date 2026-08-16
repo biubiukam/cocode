@@ -9,12 +9,12 @@ describe('chat layout rows', () => {
         composerLines: 3,
       }),
     ).toEqual({
-      baseRows: 14,
+      baseRows: 13,
       composerRows: 3,
       overlayRows: 0,
-      reservedRows: 14,
-      messageRows: 16,
-      minimumRows: 14,
+      reservedRows: 13,
+      messageRows: 17,
+      minimumRows: 13,
       tooSmall: false,
     })
   })
@@ -30,6 +30,24 @@ describe('chat layout rows', () => {
         editorFeedbackRows: 2,
       }),
     ).toEqual({
+      baseRows: 16,
+      composerRows: 1,
+      overlayRows: 0,
+      reservedRows: 16,
+      messageRows: 14,
+      minimumRows: 16,
+      tooSmall: false,
+    })
+  })
+
+  it('reserves the main-area checklist without pushing the composer away', () => {
+    expect(
+      calculateChatLayout({
+        viewportRows: 30,
+        composerLines: 1,
+        checklistStripRows: 6,
+      }),
+    ).toEqual({
       baseRows: 17,
       composerRows: 1,
       overlayRows: 0,
@@ -41,17 +59,20 @@ describe('chat layout rows', () => {
   })
 
   it.each([
-    ['help', { helpLines: 5 }, 21],
-    ['slash', { slashItems: 3 }, 19],
-    ['file', { fileItems: 4 }, 20],
-    ['loading file', { fileItems: 4, fileLoading: true }, 21],
-    ['empty history', { historyMatches: 0 }, 18],
-    ['history results', { historyMatches: 3 }, 20],
-    ['empty resume', { resumeItems: 0 }, 18],
-    ['resume results', { resumeItems: 4 }, 21],
-    ['windowed resume', { resumeItems: 12 }, 26],
-    ['rewind results', { rewindItems: 4 }, 22],
-    ['windowed rewind', { rewindItems: 12, rewindSelected: 6 }, 26],
+    ['help', { helpLines: 5 }, 20],
+    ['slash', { slashItems: 3 }, 18],
+    ['file', { fileItems: 4 }, 19],
+    ['loading file', { fileItems: 4, fileLoading: true }, 20],
+    ['empty history', { historyMatches: 0 }, 17],
+    ['history results', { historyMatches: 3 }, 19],
+    ['empty resume', { resumeItems: 0 }, 17],
+    ['resume results', { resumeItems: 4 }, 20],
+    ['windowed resume', { resumeItems: 12 }, 25],
+    ['checklist', { checklistItems: 3 }, 18],
+    ['windowed checklist', { checklistItems: 12, checklistSelected: 6 }, 25],
+    ['rewind results', { rewindItems: 4 }, 21],
+    ['windowed rewind', { rewindItems: 12, rewindSelected: 6 }, 25],
+    ['model switch', { modelSwitchRows: 6 }, 17],
   ] as const)('covers the %s overlay height', (_name, overlay, reservedRows) => {
     const layout = calculateChatLayout({
       viewportRows: 80,
@@ -71,12 +92,12 @@ describe('chat layout rows', () => {
         composerLines: 20,
       }),
     ).toEqual({
-      baseRows: 17,
+      baseRows: 16,
       composerRows: 6,
       overlayRows: 0,
-      reservedRows: 17,
+      reservedRows: 16,
       messageRows: 0,
-      minimumRows: 17,
+      minimumRows: 16,
       tooSmall: true,
     })
   })
@@ -89,12 +110,12 @@ describe('chat layout rows', () => {
         helpLines: 20,
       }),
     ).toEqual({
-      baseRows: 12,
+      baseRows: 11,
       composerRows: 1,
-      overlayRows: 11,
+      overlayRows: 12,
       reservedRows: 23,
       messageRows: 1,
-      minimumRows: 18,
+      minimumRows: 17,
       tooSmall: false,
     })
   })
@@ -106,19 +127,19 @@ describe('chat layout rows', () => {
       slashItems: 8,
     })
     expect(layout).toEqual({
-      baseRows: 12,
+      baseRows: 11,
       composerRows: 1,
       overlayRows: 0,
-      reservedRows: 12,
-      messageRows: 3,
-      minimumRows: 18,
+      reservedRows: 11,
+      messageRows: 4,
+      minimumRows: 17,
       tooSmall: true,
     })
   })
 
   it('enters the size fallback when the overlay cannot show its title and selection', () => {
     const layout = calculateChatLayout({
-      viewportRows: 17,
+      viewportRows: 16,
       composerLines: 1,
       slashItems: 8,
     })

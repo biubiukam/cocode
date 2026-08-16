@@ -18,6 +18,15 @@ export type ThemeTokens = {
   error: string
   info: string
   running: string
+  pending: string
+  waiting: string
+  warning: string
+  canceled: string
+  successIcon: string
+  pendingIcon: string
+  waitingIcon: string
+  errorIcon: string
+  canceledIcon: string
 }
 
 export const themes: Record<ThemeName, ThemeTokens> = {
@@ -35,6 +44,15 @@ export const themes: Record<ThemeName, ThemeTokens> = {
     error: '#FCA5A5',
     info: '#93C5FD',
     running: '#FDE68A',
+    pending: '#C4B5FD',
+    waiting: '#FCD34D',
+    warning: '#FBBF24',
+    canceled: '#A8A29E',
+    successIcon: '✓',
+    pendingIcon: '◌',
+    waitingIcon: '…',
+    errorIcon: '×',
+    canceledIcon: '−',
   },
   light: {
     brand: '#25627A',
@@ -50,6 +68,15 @@ export const themes: Record<ThemeName, ThemeTokens> = {
     error: '#B91C1C',
     info: '#1D4ED8',
     running: '#A16207',
+    pending: '#6D28D9',
+    waiting: '#A16207',
+    warning: '#92400E',
+    canceled: '#78716C',
+    successIcon: '✓',
+    pendingIcon: '◌',
+    waitingIcon: '…',
+    errorIcon: '×',
+    canceledIcon: '−',
   },
 }
 

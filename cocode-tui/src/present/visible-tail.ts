@@ -4,7 +4,12 @@
 
 import type { ConversationNode } from '../runtime/nodes/types.ts'
 import { nodeKey } from '../runtime/nodes/types.ts'
+import stringWidth from 'string-width'
 import { formatReasoning, formatToolResult } from './text-format.ts'
+import {
+  extractPartialJsonStringArgument,
+  truncatePlanProgress,
+} from '../runtime/nodes/tool-view.ts'
 
 export function visibleTail(
   nodes: readonly ConversationNode[],
@@ -37,29 +42,56 @@ export function estimateNodeRows(
   node: ConversationNode,
   verbose = false,
   expanded = false,
+  maxColumns?: number,
 ): number {
   const detailed = verbose || expanded
   switch (node.kind) {
     case 'user':
-      return 2 + lineCount(node.text)
+      return 2 + lineCount(node.text, contentColumns(maxColumns, 2))
     case 'assistant': {
       const reasoning = formatReasoning(node.reasoning, detailed, node.streaming)
-      return 2 + lineCount(reasoning) + lineCount(node.text)
+      const columns = contentColumns(maxColumns, 3)
+      return 2 + lineCount(reasoning, columns) + lineCount(node.text, columns)
     }
     case 'tool': {
       const result = formatToolResult(node.result, detailed)
-      if (!detailed) return 2
-      return 2 + lineCount(node.args) + lineCount(result) + (node.error === undefined ? 0 : 1)
+      const plan =
+        (node.name === '' ? 'tool' : node.name) === 'exit_plan_mode'
+          ? extractPartialJsonStringArgument(node.args, 'plan')
+          : undefined
+      const planRows =
+        plan === undefined
+          ? 0
+          : lineCount(truncatePlanProgress(plan), contentColumns(maxColumns, 6)) + 1
+      if (!detailed) return 2 + planRows
+      const columns = contentColumns(maxColumns, 4)
+      return (
+        2 +
+        planRows +
+        lineCount(node.args, columns) +
+        lineCount(result, columns) +
+        (node.error === undefined ? 0 : 1)
+      )
     }
     case 'notice':
       if (node.verboseOnly === true && !verbose) return 0
-      return lineCount(node.message)
+      return 1 + lineCount(node.message, maxColumns)
   }
 }
 
 const EMPTY_EXPANDED_NODES: ReadonlySet<string> = new Set()
 
-function lineCount(text: string | undefined): number {
+function lineCount(text: string | undefined, maxColumns?: number): number {
   if (text === undefined || text === '') return 0
-  return text.replace(/\r\n?/g, '\n').split('\n').length
+  const lines = text.replace(/\r\n?/g, '\n').split('\n')
+  if (maxColumns === undefined) return lines.length
+  const columns = Math.max(1, Math.trunc(maxColumns))
+  return lines.reduce(
+    (rows, line) => rows + Math.max(1, Math.ceil(stringWidth(line) / columns)),
+    0,
+  )
+}
+
+function contentColumns(maxColumns: number | undefined, chromeColumns: number): number | undefined {
+  return maxColumns === undefined ? undefined : Math.max(1, maxColumns - chromeColumns)
 }

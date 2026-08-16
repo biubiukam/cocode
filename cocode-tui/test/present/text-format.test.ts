@@ -7,8 +7,9 @@ import {
 } from '../../src/present/text-format.ts'
 
 describe('presentation text formatting', () => {
-  it('summarizes reasoning until verbose mode is enabled', () => {
-    expect(formatReasoning('thinking', false, true)).toBe('thinking · 8 chars …')
+  it('shows active reasoning and collapses it after completion by default', () => {
+    expect(formatReasoning('thinking', false, true)).toBe('thinking')
+    expect(formatReasoning('thinking', false, false)).toBe('thinking · 8 chars')
     expect(formatReasoning('thinking', true, false)).toBe('thinking')
     expect(formatReasoning('', false, false)).toBeUndefined()
   })

@@ -24,6 +24,18 @@ export class InputHistory {
     return this.entries.slice()
   }
 
+  at(index: number): string | undefined {
+    const resolved = index < 0 ? this.entries.length + index : index
+    return this.entries[resolved]
+  }
+
+  pop(): string | undefined {
+    const value = this.entries.pop()
+    this.cursor = -1
+    this.draft = ''
+    return value
+  }
+
   begin(current: string): void {
     if (this.cursor < 0) this.draft = current
   }

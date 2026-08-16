@@ -1,6 +1,12 @@
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { homeDisplay, productHome } from '../../../src/runtime/auth/paths.ts'
+import {
+  accountHome,
+  dshHome,
+  homeDisplay,
+  productHome,
+  productHomes,
+} from '../../../src/runtime/auth/paths.ts'
 
 const testHome = resolve('test-home')
 
@@ -13,10 +19,10 @@ function ctx(partial: { env?: NodeJS.ProcessEnv; homedir?: string; files?: strin
   }
 }
 
-describe('productHome', () => {
+describe('home resolution', () => {
   it('resolves a relative COCODE_HOME against cwd', () => {
     expect(
-      productHome(
+      accountHome(
         ctx({
           env: { COCODE_HOME: '.dev/home' },
         }),
@@ -24,51 +30,38 @@ describe('productHome', () => {
     ).toBe(resolve('.dev/home'))
   })
 
-  it('prefers COCODE_HOME over DSH_HOME', () => {
+  it('keeps COCODE_HOME and DSH_HOME independent', () => {
     const cocodeHome = resolve('tmp', 'cocode')
-    const dshHome = resolve('tmp', 'dsh')
-    expect(
-      productHome(
-        ctx({
-          env: { COCODE_HOME: cocodeHome, DSH_HOME: dshHome },
-        }),
-      ),
-    ).toBe(cocodeHome)
+    const dshRoot = resolve('tmp', 'dsh')
+    const context = ctx({ env: { COCODE_HOME: cocodeHome, DSH_HOME: dshRoot } })
+    expect(accountHome(context)).toBe(cocodeHome)
+    expect(dshHome(context)).toBe(dshRoot)
+    expect(productHomes(context)).toEqual({ accountHome: cocodeHome, dshHome: dshRoot })
   })
 
-  it('uses DSH_HOME when COCODE_HOME is empty', () => {
-    const dshHome = resolve('tmp', 'dsh')
+  it('uses DSH_HOME only for the harness home when COCODE_HOME is empty', () => {
+    const dshRoot = resolve('tmp', 'dsh')
     expect(
-      productHome(
+      dshHome(
         ctx({
-          env: { COCODE_HOME: '  ', DSH_HOME: dshHome },
+          env: { COCODE_HOME: '  ', DSH_HOME: dshRoot },
         }),
       ),
-    ).toBe(dshHome)
+    ).toBe(dshRoot)
   })
 
-  it('uses ~/.cocode when it already has product files', () => {
-    expect(
-      productHome(
-        ctx({
-          files: [join(testHome, '.cocode', '.credentials.yaml')],
-        }),
-      ),
-    ).toBe(join(testHome, '.cocode'))
+  it('uses ~/.cocode for the account home without inspecting marker files', () => {
+    expect(accountHome(ctx({ files: [join(testHome, '.cocode', '.credentials.yaml')] }))).toBe(
+      join(testHome, '.cocode'),
+    )
   })
 
-  it('falls back to existing ~/.dsh so GUI keys are shared', () => {
-    expect(
-      productHome(
-        ctx({
-          files: [join(testHome, '.dsh')],
-        }),
-      ),
-    ).toBe(join(testHome, '.dsh'))
+  it('uses ~/.dsh for DSH data even when it does not exist yet', () => {
+    expect(dshHome(ctx({ files: [join(testHome, '.dsh')] }))).toBe(join(testHome, '.dsh'))
   })
 
-  it('creates the new-user root at ~/.cocode', () => {
-    expect(productHome(ctx({}))).toBe(join(testHome, '.cocode'))
+  it('keeps the deprecated productHome alias on ~/.dsh', () => {
+    expect(productHome(ctx({}))).toBe(join(testHome, '.dsh'))
   })
 })
 
@@ -79,12 +72,9 @@ describe('homeDisplay', () => {
       homeDisplay(privateHome, {
         env: { COCODE_HOME: privateHome },
         homedir: testHome,
-        exists: () => false,
       }),
     ).toBe('$COCODE_HOME')
     expect(homeDisplay(join(testHome, '.cocode'), ctx({}))).toBe('~/.cocode')
-    expect(homeDisplay(join(testHome, '.dsh'), ctx({ files: [join(testHome, '.dsh')] }))).toBe(
-      '~/.dsh',
-    )
+    expect(homeDisplay(join(testHome, '.dsh'), ctx({}))).toBe('~/.dsh')
   })
 })

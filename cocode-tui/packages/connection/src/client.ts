@@ -26,6 +26,11 @@ import type {
   TuiNotification,
   TuiRuntime,
   TuiSessionOpenResult,
+  TuiModelCatalog,
+  TuiModelCatalogFailure,
+  TuiModelProviderGroup,
+  TuiImageAttachmentRef,
+  TuiImageInput,
 } from './types.ts'
 import { fallbackCapabilitySnapshot, probeRuntimeCapabilities } from './capability.ts'
 
@@ -249,6 +254,29 @@ class SdkTuiRuntime implements TuiRuntime {
     return rows.map(parseSessionSummary)
   }
 
+  async listModels(): Promise<TuiModelCatalog> {
+    const client = this.requireClient()
+    this.requireCapability('modelList')
+    const result = await client.request(this.wireMethod('cocode/model/list', 'model/list'))
+    return parseModelCatalogResult(result)
+  }
+
+  async saveImages(images: readonly TuiImageInput[]): Promise<TuiImageAttachmentRef[]> {
+    const client = this.requireClient()
+    this.requireCapability('imageAttachments')
+    const result = await client.request('cocode/attachment/saveImages', {
+      images: images.map((image) => ({
+        data: Buffer.from(image.data).toString('base64'),
+        mediaType: image.mediaType,
+        ...(image.name === undefined ? {} : { name: image.name }),
+      })),
+    })
+    if (!isRecord(result) || !Array.isArray(result.attachments)) {
+      throw new Error(`attachment/saveImages returned an invalid result: ${JSON.stringify(result)}`)
+    }
+    return result.attachments.map(parseImageAttachmentRef)
+  }
+
   async permissionMode(
     sessionId: string,
     mode?: string,
@@ -371,6 +399,8 @@ class SdkTuiRuntime implements TuiRuntime {
           permissionMode: companion.permissionMode,
           planMode: companion.planMode,
           sessionList: companion.sessionList,
+          modelList: companion.modelList,
+          imageAttachments: companion.imageAttachments,
           promptMode: companion.promptModes.includes('steer'),
           queueMode: companion.promptModes.includes('queue'),
         },
@@ -419,17 +449,19 @@ class SdkTuiRuntime implements TuiRuntime {
   private async respondToQuestion(params: Record<string, unknown>): Promise<void> {
     const requestId = params.requestId
     if (typeof requestId !== 'string') return
-    let answer: TuiQuestionAnswer = { answers: [] }
+    let response: { answer: TuiQuestionAnswer } | { cancelled: true }
     try {
       const handler = this.questionHandler
       if (handler === undefined) throw new Error('TUI has no question handler')
-      answer = await handler(parseQuestionRequest(params))
+      response = { answer: await handler(parseQuestionRequest(params)) }
     } catch {
-      // The companion validates the answer and rejects the waiting operation;
-      // an empty answer is intentionally sent to settle the request.
+      // A rejected UI handler means that the user cancelled the interaction.
+      // Send that outcome explicitly instead of fabricating an empty answer,
+      // which would fail normal question-batch validation.
+      response = { cancelled: true }
     }
     await this.requireClient()
-      .request('cocode/question/respond', { requestId, answer })
+      .request('cocode/question/respond', { requestId, ...response })
       .catch(() => undefined)
   }
 
@@ -473,6 +505,8 @@ type CompanionCapabilities = {
   permissionMode: boolean
   planMode: boolean
   sessionList: boolean
+  modelList: boolean
+  imageAttachments: boolean
   interactions: 'notification-response'
   checkpoint: false
   skills: boolean
@@ -495,7 +529,9 @@ function parseCompanionCapabilities(value: unknown): CompanionCapabilities | und
     typeof value.approval !== 'boolean' ||
     typeof value.permissionMode !== 'boolean' ||
     typeof value.planMode !== 'boolean' ||
-    typeof value.sessionList !== 'boolean'
+    typeof value.sessionList !== 'boolean' ||
+    (value.modelList !== undefined && typeof value.modelList !== 'boolean')
+    || (value.imageAttachments !== undefined && typeof value.imageAttachments !== 'boolean')
   ) {
     return undefined
   }
@@ -506,6 +542,8 @@ function parseCompanionCapabilities(value: unknown): CompanionCapabilities | und
     permissionMode: value.permissionMode,
     planMode: value.planMode,
     sessionList: value.sessionList,
+    modelList: value.modelList === true,
+    imageAttachments: value.imageAttachments === true,
     interactions: 'notification-response',
     checkpoint: false,
     skills: value.skills === true,
@@ -562,6 +600,7 @@ function parseSkillEntries(value: unknown[]): SkillEntry[] {
       name: entry.name,
       description: entry.description,
       ...(typeof entry.whenToUse === 'string' ? { whenToUse: entry.whenToUse } : {}),
+      ...(typeof entry.source === 'string' ? { source: entry.source } : {}),
     })
   }
   return skills
@@ -579,8 +618,87 @@ function parseRuntimeAdvertisement(value: Record<string, unknown>): TuiRuntimeAd
     permissionMode: value.permissionMode === true,
     planMode: value.planMode === true,
     sessionList: value.sessionList === true,
+    modelList: value.modelList === true,
+    imageAttachments: value.imageAttachments === true,
     checkpoint: false,
   }
+}
+
+function parseImageAttachmentRef(value: unknown): TuiImageAttachmentRef {
+  if (
+    !isRecord(value) ||
+    typeof value.attachmentId !== 'string' ||
+    !isImageMediaType(value.mediaType) ||
+    !isNonnegativeInteger(value.bytes) ||
+    !isNonnegativeInteger(value.width) ||
+    !isNonnegativeInteger(value.height) ||
+    (value.name !== undefined && typeof value.name !== 'string')
+  ) {
+    throw new Error(`attachment/saveImages returned an invalid attachment: ${JSON.stringify(value)}`)
+  }
+  return {
+    attachmentId: value.attachmentId,
+    mediaType: value.mediaType,
+    bytes: value.bytes,
+    width: value.width,
+    height: value.height,
+    ...(value.name === undefined ? {} : { name: value.name }),
+  }
+}
+
+function isImageMediaType(value: unknown): value is TuiImageAttachmentRef['mediaType'] {
+  return value === 'image/png' || value === 'image/jpeg' || value === 'image/webp' || value === 'image/gif'
+}
+
+function isNonnegativeInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
+}
+
+export function parseModelCatalogResult(value: unknown): TuiModelCatalog {
+  if (!isRecord(value) || !Array.isArray(value.groups) || !Array.isArray(value.failures)) {
+    throw new Error('model/list returned an invalid catalog')
+  }
+  const groups: TuiModelProviderGroup[] = value.groups.map((group) => {
+    if (
+      !isRecord(group) ||
+      typeof group.id !== 'string' ||
+      typeof group.name !== 'string' ||
+      !Array.isArray(group.models)
+    ) {
+      throw new Error('model/list returned an invalid provider group')
+    }
+    return {
+      id: group.id,
+      name: group.name,
+      models: group.models.map((model) => {
+        if (
+          !isRecord(model) ||
+          typeof model.id !== 'string' ||
+          typeof model.name !== 'string' ||
+          (model.description !== undefined && typeof model.description !== 'string')
+        ) {
+          throw new Error('model/list returned an invalid model entry')
+        }
+        return {
+          id: model.id,
+          name: model.name,
+          ...(model.description === undefined ? {} : { description: model.description }),
+        }
+      }),
+    }
+  })
+  const failures: TuiModelCatalogFailure[] = value.failures.map((failure) => {
+    if (
+      !isRecord(failure) ||
+      typeof failure.id !== 'string' ||
+      typeof failure.name !== 'string' ||
+      typeof failure.message !== 'string'
+    ) {
+      throw new Error('model/list returned an invalid provider failure')
+    }
+    return { id: failure.id, name: failure.name, message: failure.message }
+  })
+  return { groups, failures }
 }
 
 function parseApprovalRequest(params: Record<string, unknown>): TuiApprovalRequest {

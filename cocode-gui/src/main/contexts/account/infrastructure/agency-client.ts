@@ -1,3 +1,5 @@
+import { deviceKeyName } from "./device-name"
+
 type AgencyResponse<T> = { readonly status: number; readonly value: T }
 
 export class AgencyHttpError extends Error {
@@ -40,6 +42,26 @@ type AgencyProfile = {
 }
 
 export type AgencyModel = { readonly id: string; readonly name: string }
+export type CreatedApiKey = { readonly secret: string; readonly id: string; readonly name: string }
+export type AgencyAccountUsage = {
+	readonly plan: string
+	readonly fiveHour: number
+	readonly week: number
+	readonly month: number
+	readonly syncedAt: string
+}
+
+type AgencyModelCredit = {
+	readonly plan?: string
+	readonly granted_microusd?: number
+	readonly settled_microusd?: number
+	readonly reserved_microusd?: number
+}
+
+type AgencyModelUsage = {
+	readonly fresh_at?: string
+	readonly totals?: { readonly billable_microusd?: number }
+}
 
 const DEFAULT_ORIGIN = "https://cocode.agency"
 
@@ -112,7 +134,7 @@ export class AgencyClient {
 				method: "POST",
 				body: {
 					client_id: "cocode-desktop",
-					device_label: "Cocode Desktop",
+					device_label: deviceKeyName(),
 					redirect_uri: input.redirectUri,
 					state: input.state,
 					code_challenge: input.codeChallenge,
@@ -208,25 +230,31 @@ export class AgencyClient {
 		}
 	}
 
-	async createDesktopKey(accessToken: string): Promise<string> {
-		const response = await this.request<{ secret?: string }>("/v1/me/api-keys", {
+	async createDesktopKey(accessToken: string): Promise<CreatedApiKey> {
+		const name = deviceKeyName()
+		const response = await this.request<{ secret?: string; id?: string }>("/v1/me/api-keys", {
 			method: "POST",
 			token: accessToken,
-			body: { name: "Cocode Desktop", scopes: ["models:read", "inference:write"] },
+			body: { name, scopes: ["models:read", "inference:write"] },
 		})
 		const secret = response.value.secret?.trim()
+		const id = response.value.id?.trim()
 		if (
 			(response.status !== 201 && response.status !== 200) ||
 			typeof secret !== "string" ||
+			typeof id !== "string" ||
+			id === "" ||
 			!/^ck_[A-Za-z0-9_-]+$/.test(secret)
 		) {
 			const detail = problemDetail(response.value)
 			throw new AgencyHttpError(
-				`could not create a desktop API key (HTTP ${String(response.status)})${detail === undefined ? "" : `: ${detail}`}`,
+				`could not create a device API key (HTTP ${String(response.status)})${
+					detail === undefined ? "" : `: ${detail}`
+				}`,
 				response.status,
 			)
 		}
-		return secret
+		return { secret, id, name }
 	}
 
 	async models(apiKey: string): Promise<AgencyModel[]> {
@@ -244,6 +272,30 @@ export class AgencyClient {
 			)
 			.map((row) => ({ id: row.id, name: row.name?.trim() || row.id }))
 		return [...new Map(models.map((model) => [model.id, model])).values()]
+	}
+
+	async accountUsage(accessToken: string): Promise<AgencyAccountUsage> {
+		const now = new Date()
+		const to = now.toISOString()
+		const fiveHoursAgo = new Date(now.getTime() - 5 * 60 * 60 * 1000).toISOString()
+		const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
+		const [credit, fiveHourUsage, weekUsage] = await Promise.all([
+			this.request<AgencyModelCredit>("/v1/me/model-credit", { method: "GET", token: accessToken }),
+			this.request<AgencyModelUsage>(`/v1/me/model-usage?from=${encodeURIComponent(fiveHoursAgo)}&to=${encodeURIComponent(to)}`, { method: "GET", token: accessToken }),
+			this.request<AgencyModelUsage>(`/v1/me/model-usage?from=${encodeURIComponent(weekAgo)}&to=${encodeURIComponent(to)}`, { method: "GET", token: accessToken }),
+		])
+		if (credit.status !== 200 || fiveHourUsage.status !== 200 || weekUsage.status !== 200)
+			throw new AgencyHttpError("could not load account usage", Math.max(credit.status, fiveHourUsage.status, weekUsage.status))
+		const granted = finiteNumber(credit.value.granted_microusd)
+		const settled = finiteNumber(credit.value.settled_microusd)
+		const reserved = finiteNumber(credit.value.reserved_microusd)
+		return {
+			plan: credit.value.plan?.trim() || "unknown",
+			fiveHour: usagePercent(finiteNumber(fiveHourUsage.value.totals?.billable_microusd), granted / 5),
+			week: usagePercent(finiteNumber(weekUsage.value.totals?.billable_microusd), granted / 2),
+			month: usagePercent(settled + reserved, granted),
+			syncedAt: latestTimestamp(fiveHourUsage.value.fresh_at, weekUsage.value.fresh_at) ?? to,
+		}
 	}
 
 	async revoke(refreshToken: string): Promise<void> {
@@ -286,4 +338,19 @@ export class AgencyClient {
 		}
 		return { status: response.status, value }
 	}
+}
+
+function finiteNumber(value: number | undefined): number {
+	return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 0
+}
+
+function usagePercent(used: number, limit: number): number {
+	if (limit <= 0) return 0
+	return Math.max(0, Math.min(100, Math.round((used / limit) * 100)))
+}
+
+function latestTimestamp(...values: (string | undefined)[]): string | undefined {
+	return values
+		.filter((value): value is string => typeof value === "string" && !Number.isNaN(Date.parse(value)))
+		.sort((left, right) => Date.parse(right) - Date.parse(left))[0]
 }

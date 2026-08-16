@@ -1,11 +1,11 @@
 /**
- * Browser address-bar policy tests: only http(s) URLs may be navigated,
- * loopback addresses and the GUI's own origin are refused outright. The
- * iframe sandbox (opaque origin) is the primary security boundary; this
- * policy is the address-bar gate on top of it.
+ * Address-bar policy tests. Both halves import the same module — the toolbar
+ * to normalize what was typed, the host to re-check every navigation the page
+ * initiates — so these cases pin the shared contract: http(s) only, loopback
+ * allowed (previewing a dev server is the point), the GUI's own origin never.
  */
 import { describe, expect, it } from 'vitest'
-import { isLoopbackHostname, normalizeBrowserUrl } from '../src/client/browser.ts'
+import { normalizeBrowserUrl } from '../src/browser/url.ts'
 
 const SELF = 'http://127.0.0.1:3080'
 
@@ -14,7 +14,7 @@ describe('normalizeBrowserUrl', () => {
     expect(normalizeBrowserUrl('example.com', SELF)).toEqual({ kind: 'ok', url: 'https://example.com/' })
   })
 
-  it('normalizes a host with a port to https', () => {
+  it('normalizes a host with a port to https rather than reading it as a scheme', () => {
     expect(normalizeBrowserUrl('example.com:8080/path', SELF)).toEqual({ kind: 'ok', url: 'https://example.com:8080/path' })
   })
 
@@ -22,58 +22,43 @@ describe('normalizeBrowserUrl', () => {
     expect(normalizeBrowserUrl('http://example.com/a?b=1', SELF)).toEqual({ kind: 'ok', url: 'http://example.com/a?b=1' })
   })
 
-  it('accepts a non-loopback IP literal', () => {
-    expect(normalizeBrowserUrl('https://8.8.8.8/dns', SELF)?.kind).toBe('ok')
+  it('accepts an IP literal', () => {
+    expect(normalizeBrowserUrl('https://8.8.8.8/dns', SELF).kind).toBe('ok')
   })
 
-  it('refuses non-http(s) schemes', () => {
+  it('allows loopback dev servers in every spelling', () => {
+    for (const input of [
+      'http://localhost:5173/', 'http://LOCALHOST:5173/',
+      'http://127.0.0.1:8000/', 'http://[::1]:4000/',
+    ]) {
+      expect(normalizeBrowserUrl(input, SELF), input).toEqual({ kind: 'ok', url: new URL(input).href })
+    }
+  })
+
+  it('refuses non-http(s) schemes, with and without a //', () => {
     expect(normalizeBrowserUrl('javascript:alert(1)', SELF)).toEqual({ kind: 'blocked', reason: 'scheme' })
     expect(normalizeBrowserUrl('data:text/html,<b>x</b>', SELF)).toEqual({ kind: 'blocked', reason: 'scheme' })
     expect(normalizeBrowserUrl('file:///etc/passwd', SELF)).toEqual({ kind: 'blocked', reason: 'scheme' })
     expect(normalizeBrowserUrl('about:blank', SELF)).toEqual({ kind: 'blocked', reason: 'scheme' })
+    expect(normalizeBrowserUrl('view-source:https://example.com', SELF)).toEqual({ kind: 'blocked', reason: 'scheme' })
+    expect(normalizeBrowserUrl('ws://example.com/socket', SELF)).toEqual({ kind: 'blocked', reason: 'scheme' })
   })
 
-  it('refuses loopback hostnames in every spelling', () => {
-    for (const input of [
-      'http://localhost/', 'https://localhost:3080/', 'http://LOCALHOST/',
-      'http://127.0.0.1/', 'http://127.255.255.255/',
-      'http://[::1]/', 'http://0.0.0.0/',
-    ]) {
-      expect(normalizeBrowserUrl(input, SELF), input).toEqual({ kind: 'blocked', reason: 'loopback' })
-    }
+  it('refuses the GUI origin so the automation profile cannot drive Cocode itself', () => {
+    expect(normalizeBrowserUrl('http://127.0.0.1:3080/sidebar', SELF)).toEqual({ kind: 'blocked', reason: 'self' })
+    expect(normalizeBrowserUrl('127.0.0.1:3080', 'https://127.0.0.1:3080')).toEqual({ kind: 'blocked', reason: 'self' })
+    // A different port on the same host is a different origin: allowed.
+    expect(normalizeBrowserUrl('http://127.0.0.1:9999/', SELF)).toEqual({ kind: 'ok', url: 'http://127.0.0.1:9999/' })
   })
 
-  it('allows the GUI\'s own origin (the sandbox keeps it opaque like any site)', () => {
-    // The user may browse the GUI itself in the sidebar; its host is
-    // loopback, so the self check must win BEFORE the loopback gate.
-    expect(normalizeBrowserUrl('http://127.0.0.1:3080/sidebar', SELF)).toEqual({
-      kind: 'ok', url: 'http://127.0.0.1:3080/sidebar',
-    })
-    expect(normalizeBrowserUrl('http://127.0.0.1:3080/', SELF)).toEqual({
-      kind: 'ok', url: 'http://127.0.0.1:3080/',
-    })
-    // A different port of the same loopback host is NOT the GUI origin and
-    // stays blocked.
-    expect(normalizeBrowserUrl('http://127.0.0.1:9999/', SELF)).toEqual({ kind: 'blocked', reason: 'loopback' })
+  it('allows everything when the caller does not know its own origin', () => {
+    expect(normalizeBrowserUrl('http://127.0.0.1:3080/sidebar').kind).toBe('ok')
+    expect(normalizeBrowserUrl('http://127.0.0.1:3080/sidebar', 'not a url').kind).toBe('ok')
   })
 
   it('reports invalid input', () => {
     expect(normalizeBrowserUrl('', SELF)).toEqual({ kind: 'invalid' })
     expect(normalizeBrowserUrl('   ', SELF)).toEqual({ kind: 'invalid' })
     expect(normalizeBrowserUrl('ht tp://x', SELF)).toEqual({ kind: 'invalid' })
-  })
-})
-
-describe('isLoopbackHostname', () => {
-  it('flags localhost, IPv6 loopback, and the 127/8 block', () => {
-    expect(isLoopbackHostname('localhost')).toBe(true)
-    expect(isLoopbackHostname('::1')).toBe(true)
-    expect(isLoopbackHostname('[::1]')).toBe(true)
-    expect(isLoopbackHostname('127.0.0.1')).toBe(true)
-    expect(isLoopbackHostname('127.8.9.10')).toBe(true)
-    expect(isLoopbackHostname('0.0.0.0')).toBe(true)
-    expect(isLoopbackHostname('example.com')).toBe(false)
-    expect(isLoopbackHostname('128.0.0.1')).toBe(false)
-    expect(isLoopbackHostname('192.168.1.1')).toBe(false)
   })
 })

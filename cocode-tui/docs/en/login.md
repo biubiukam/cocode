@@ -40,16 +40,17 @@ When `COCODE_PROVIDER` is set in the environment, `/use` does not change the def
 
 ## Relation to the desktop app
 
-The GUI and the terminal share one machine-local model config. A provider key saved on one side is usable on the other. The current channel is stored in that shared config too.
-
-Files live under `.cocode` in your home directory by default. If this machine already has `.dsh` (the desktop app still uses it), the terminal prefers that copy so existing setup does not disappear.
+The GUI and terminal share the official Harness settings and credentials under
+`~/.dsh`. Cocode identity tokens stay in `~/.cocode/account.yaml`; the TUI
+builds the Cocode provider route only for the current process.
 
 ## Temporary overrides
 
 To use another key for this process without changing saved config:
 
 - `DEEPSEEK_API_KEY` — use this DeepSeek key for this launch only
-- `COCODE_HOME` — use another config directory (default `~/.cocode`)
+- `COCODE_HOME` — use another Cocode account directory (default `~/.cocode`)
+- `DSH_HOME` — use another official Harness home for settings and credentials (default `~/.dsh`)
 
 You do not need these for daily use. Launch flags for development are in `.env.example`.
 

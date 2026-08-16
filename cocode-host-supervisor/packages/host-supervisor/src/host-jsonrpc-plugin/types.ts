@@ -1,5 +1,16 @@
 export type ContentBlock = { type: string; [key: string]: unknown }
 
+export type ImageMediaType = 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif'
+
+export type ImageAttachmentRef = {
+  attachmentId: string
+  mediaType: ImageMediaType
+  bytes: number
+  width: number
+  height: number
+  name?: string
+}
+
 export type SessionEvent = {
   type: string
   seq: number
@@ -69,6 +80,8 @@ export type CompanionCapabilities = {
   protocolVersion: 1
   promptModes: ('normal' | 'queue' | 'steer')[]
   skills: boolean
+  modelList: boolean
+  imageAttachments: boolean
   approval: boolean
   permissionMode: boolean
   planMode: boolean

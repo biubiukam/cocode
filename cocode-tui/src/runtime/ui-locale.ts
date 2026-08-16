@@ -4,7 +4,6 @@ export type UiLocale = 'zh' | 'en'
 
 type UiKey =
   | 'session'
-  | 'interactive'
   | 'tokensIn'
   | 'tokensOut'
   | 'secret'
@@ -12,6 +11,14 @@ type UiKey =
   | 'locked'
   | 'send'
   | 'attached'
+  | 'imageReading'
+  | 'imageAttached'
+  | 'imageClipboardUnavailable'
+  | 'imageClipboardEmpty'
+  | 'imageTooLarge'
+  | 'imageUnsupported'
+  | 'imageRuntimeUnavailable'
+  | 'imageCountLimit'
   | 'history'
   | 'historyHint'
   | 'historyPlaceholder'
@@ -21,16 +28,26 @@ type UiKey =
   | 'filesSearching'
   | 'commands'
   | 'commandsHint'
+  | 'commandsFilter'
+  | 'commandsEmpty'
   | 'help'
   | 'helpHint'
   | 'messageMode'
   | 'messageModeHint'
+  | 'modeBuild'
+  | 'modePlan'
+  | 'modeSwitchHint'
   | 'footerHistory'
+  | 'footerScroll'
   | 'footerMessages'
+  | 'footerMenu'
   | 'footerDetails'
   | 'footerHelp'
   | 'footerQuit'
+  | 'footerRunning'
+  | 'footerQueueDraft'
   | 'footerRedraw'
+  | 'footerModel'
   | 'agentIdle'
   | 'agentRunning'
   | 'agentThinking'
@@ -44,7 +61,21 @@ type UiKey =
   | 'modelBusy'
   | 'modelSwitching'
   | 'modelChanged'
+  | 'modelChangedFresh'
   | 'modelRestored'
+  | 'modelRestoredFresh'
+  | 'modelSwitchTitle'
+  | 'modelSwitchCurrent'
+  | 'modelSwitchHint'
+  | 'modelSwitchPlaceholder'
+  | 'modelCatalogTitle'
+  | 'modelCatalogHint'
+  | 'modelCatalogQuery'
+  | 'modelCatalogEmpty'
+  | 'modelCatalogLoading'
+  | 'modelCatalogUnavailable'
+  | 'modelCatalogFailed'
+  | 'modelCatalogPartial'
   | 'resumeTitle'
   | 'resumeHint'
   | 'resumeQuery'
@@ -64,6 +95,9 @@ type UiKey =
   | 'questionCustom'
   | 'questionMultiHint'
   | 'questionSelectHint'
+  | 'questionStreaming'
+  | 'questionReady'
+  | 'questionUnavailable'
   | 'rewindTitle'
   | 'rewindHint'
   | 'rewindArm'
@@ -87,6 +121,10 @@ type UiKey =
   | 'queueAttachments'
   | 'queueDeleted'
   | 'queueRestored'
+  | 'checklistTitle'
+  | 'checklistHint'
+  | 'checklistEmpty'
+  | 'checklistMore'
   | 'turnComplete'
   | 'turnBusy'
   | 'sessionChanging'
@@ -95,10 +133,8 @@ type UiKey =
   | 'cancelFailed'
   | 'telemetryTps'
   | 'telemetryCache'
-  | 'telemetryContext'
   | 'telemetryReasoning'
   | 'telemetryActivity'
-  | 'telemetrySegments'
   | 'todoProgress'
   | 'goalPhase'
   | 'agentPreset'
@@ -112,9 +148,26 @@ type UiKey =
   | 'inspectorContext'
   | 'inspectorFiles'
   | 'inspectorSession'
+  | 'inspectorShortcuts'
   | 'inspectorEmpty'
   | 'inspectorGoal'
   | 'inspectorTodos'
+  | 'inspectorRuntime'
+  | 'inspectorSkills'
+  | 'inspectorCapabilities'
+  | 'inspectorRuntimeName'
+  | 'inspectorMcp'
+  | 'inspectorCapabilitySource'
+  | 'inspectorAvailable'
+  | 'inspectorUnavailable'
+  | 'inspectorNotReported'
+  | 'inspectorLoadedSkill'
+  | 'inspectorNone'
+  | 'inspectorEnabled'
+  | 'inspectorDisabled'
+  | 'questionSubmit'
+  | 'questionNewline'
+  | 'questionExit'
   | 'copySuccess'
   | 'copyEmpty'
   | 'copyUnavailable'
@@ -158,6 +211,13 @@ type UiKey =
   | 'planUnavailable'
   | 'planEnabled'
   | 'planDisabled'
+  | 'planReviewTitle'
+  | 'planReviewHint'
+  | 'planReviewPreview'
+  | 'planReviewEmpty'
+  | 'planReviewFooter'
+  | 'planStreaming'
+  | 'planReady'
   | 'steerSending'
   | 'forkUnavailable'
   | 'forkCreated'
@@ -169,6 +229,7 @@ type UiKey =
   | 'sessionTreeEmpty'
   | 'sessionTreeTitle'
   | 'sessionTreeHint'
+  | 'sessionTreeLegend'
   | 'sessionTreeQuery'
   | 'sessionTreeLoading'
   | 'sessionTreeOpenFailed'
@@ -176,7 +237,6 @@ type UiKey =
 const TEXT: Record<UiLocale, Record<UiKey, string>> = {
   en: {
     session: 'session',
-    interactive: 'interactive',
     tokensIn: 'tokens in',
     tokensOut: 'out',
     secret: 'secret',
@@ -184,6 +244,14 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     locked: 'locked',
     send: 'enter to send',
     attached: 'attached',
+    imageReading: 'Reading image from the clipboard…',
+    imageAttached: 'Attached {name}.',
+    imageClipboardUnavailable: 'Image clipboard access is unavailable on this system.',
+    imageClipboardEmpty: 'The clipboard does not contain an image.',
+    imageTooLarge: 'Clipboard image exceeds the 5 MiB limit.',
+    imageUnsupported: 'Clipboard image format is not supported.',
+    imageRuntimeUnavailable: 'This runtime cannot store image attachments.',
+    imageCountLimit: 'A prompt can contain at most 20 images.',
     history: 'history',
     historyHint: 'ctrl+r · ↑↓ select · enter use · esc close',
     historyPlaceholder: 'type to search…',
@@ -192,22 +260,32 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     filesHint: 'tab / ↑↓ select',
     filesSearching: ' searching workspace…',
     commands: 'commands',
-    commandsHint: 'tab / ↑↓ select',
+    commandsHint: '↑↓ select · enter use · esc close',
+    commandsFilter: 'type to filter',
+    commandsEmpty: 'No matching commands',
     help: 'help',
     helpHint: 'esc close',
     messageMode: 'message mode',
-    messageModeHint: '↑↓ move · enter expand · c copy · esc close',
+    messageModeHint: '↑↓ move · enter expand · m menu · c copy · esc close',
+    modeBuild: 'Build',
+    modePlan: 'Plan',
+    modeSwitchHint: 'tab switch mode',
     footerHistory: '↑↓ history',
+    footerScroll: 'pgup / pgdn scroll',
     footerMessages: 'shift+↑ messages',
+    footerMenu: 'ctrl+p menu',
     footerDetails: 'ctrl+o details',
     footerHelp: '? help',
     footerQuit: 'esc interrupt / quit',
-    footerRedraw: 'ctrl+l redraw',
-    agentIdle: 'idle',
+    footerRunning: 'esc interrupt',
+    footerQueueDraft: 'tab queue draft',
+    footerRedraw: 'redraw: /redraw',
+    footerModel: 'ctrl+l model',
+    agentIdle: 'ready',
     agentRunning: 'running',
     agentThinking: 'thinking…',
-    agentStarting: 'starting',
-    agentDead: 'dead',
+    agentStarting: 'connecting…',
+    agentDead: 'runtime stopped',
     emptyTitle: 'cocode is ready',
     emptyHint: 'Ask a question or describe a task to start.',
     langChanged: 'Language: {lang}',
@@ -215,8 +293,22 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     modelUsage: 'Use /model <model-id>.',
     modelBusy: 'Turn in progress. Wait before changing model.',
     modelSwitching: 'Switching model to {model}…',
-    modelChanged: 'Model changed to {model}; new session started.',
+    modelChanged: 'Model changed to {model}; current session continued.',
+    modelChangedFresh: 'Model changed to {model}; new session started because persistence is unavailable.',
     modelRestored: 'Model switch failed; restored {model}.',
+    modelRestoredFresh: 'Model switch failed; restored {model} in a new session because persistence is unavailable.',
+    modelSwitchTitle: 'Switch model',
+    modelSwitchCurrent: 'current: {model}',
+    modelSwitchHint: 'type a model id · enter apply · esc close',
+    modelSwitchPlaceholder: 'model id',
+    modelCatalogTitle: 'Available models',
+    modelCatalogHint: 'type to filter · ↑↓ select · enter apply · esc close',
+    modelCatalogQuery: 'filter: {query}',
+    modelCatalogEmpty: 'No model catalog is available; enter a model id manually.',
+    modelCatalogLoading: 'Loading model catalog…',
+    modelCatalogUnavailable: 'This runtime has no model catalog; enter a model id manually.',
+    modelCatalogFailed: 'Could not load model catalog',
+    modelCatalogPartial: 'Some providers could not be listed.',
     resumeTitle: 'Recent sessions',
     resumeHint: 'type to filter · ↑↓ select · enter choose · esc close',
     resumeQuery: 'filter: {query}',
@@ -232,10 +324,13 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     skillsUnavailable: 'Skills are unavailable in this runtime.',
     skillReady: 'Skill /{name} is ready in the composer.',
     questionTitle: 'Question',
-    questionHint: '↑↓ move · enter answer · esc cancel',
+    questionHint: '↑↓ move · ←→ switch',
     questionCustom: 'Type another answer',
-    questionMultiHint: 'space toggles options · tab opens custom answer',
-    questionSelectHint: 'enter selects · tab opens custom answer',
+    questionMultiHint: 'space toggles · tab custom',
+    questionSelectHint: 'tab custom',
+    questionStreaming: 'question is streaming…',
+    questionReady: 'question ready for interaction',
+    questionUnavailable: 'Question text unavailable',
     rewindTitle: 'Rewind conversation',
     rewindHint: '↑↓ select · enter review · esc close',
     rewindArm: 'Press Esc again to choose a rewind point.',
@@ -259,6 +354,10 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     queueAttachments: '{count} attachments',
     queueDeleted: 'Queued prompt deleted.',
     queueRestored: 'Queued prompt restored to the front of the queue.',
+    checklistTitle: 'Checklist',
+    checklistHint: '↑↓ select · esc close',
+    checklistEmpty: 'No tasks in the current turn.',
+    checklistMore: '… {count} more',
     turnComplete: 'Turn complete',
     turnBusy: 'Turn in progress. Press Tab to queue this prompt.',
     sessionChanging: 'Session is changing. Wait for it to finish.',
@@ -267,10 +366,8 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     cancelFailed: 'Cancel request failed',
     telemetryTps: 'TPS {value}',
     telemetryCache: 'cache {value}%',
-    telemetryContext: 'context {value}%',
     telemetryReasoning: 'reasoning {value}',
     telemetryActivity: '{phase}: {line}',
-    telemetrySegments: 'segments S{system} P{prompt} A{assistant} T{thinking} X{tools}',
     todoProgress: 'todos {done}/{total}',
     goalPhase: 'goal {phase}',
     agentPreset: 'preset {name}',
@@ -284,9 +381,26 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     inspectorContext: 'context',
     inspectorFiles: 'files',
     inspectorSession: 'session',
+    inspectorShortcuts: 'shortcuts',
     inspectorEmpty: 'no active details',
     inspectorGoal: 'goal',
     inspectorTodos: 'todos',
+    inspectorRuntime: 'runtime / MCP',
+    inspectorSkills: 'skills',
+    inspectorCapabilities: 'capabilities',
+    inspectorRuntimeName: 'runtime',
+    inspectorMcp: 'MCP / companion',
+    inspectorCapabilitySource: 'capability source',
+    inspectorAvailable: 'available',
+    inspectorUnavailable: 'unavailable',
+    inspectorNotReported: 'not reported',
+    inspectorLoadedSkill: 'loaded skill',
+    inspectorNone: 'none',
+    inspectorEnabled: 'on',
+    inspectorDisabled: 'off',
+    questionSubmit: 'enter submit',
+    questionNewline: 'shift+enter newline',
+    questionExit: 'esc exit',
     copySuccess: 'Copied to clipboard.',
     copyEmpty: 'There is no message text to copy.',
     copyUnavailable: 'Clipboard unavailable on this terminal.',
@@ -330,6 +444,13 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     planUnavailable: 'Plan mode is unavailable in this runtime.',
     planEnabled: 'Plan mode enabled.',
     planDisabled: 'Plan mode disabled.',
+    planReviewTitle: 'Plan review',
+    planReviewHint: '↑↓ choose · pgup/pgdn scroll · enter confirm · esc cancel',
+    planReviewPreview: 'Plan preview',
+    planReviewEmpty: 'The plan preview is empty.',
+    planReviewFooter: '↑↓ choose an action · PgUp/PgDn scroll · Enter confirm · Esc cancel',
+    planStreaming: 'plan is streaming…',
+    planReady: 'plan ready for review',
     steerSending: 'Sending follow-up at the next tool boundary…',
     forkUnavailable: 'Session fork is unavailable or the turn is still running.',
     forkCreated: 'Created a child session from the current conversation.',
@@ -341,13 +462,13 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     sessionTreeEmpty: 'No runtime sessions found.',
     sessionTreeTitle: 'Sessions',
     sessionTreeHint: 'type to filter · ↑↓ select · enter open · esc close',
+    sessionTreeLegend: '✓ current · ◉ running · · idle',
     sessionTreeQuery: 'filter: {query}',
     sessionTreeLoading: 'Loading sessions…',
     sessionTreeOpenFailed: 'The runtime could not open this session.',
   },
   zh: {
     session: '会话',
-    interactive: '交互模式',
     tokensIn: '输入 token',
     tokensOut: '输出',
     secret: '密钥',
@@ -355,6 +476,14 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     locked: '已锁定',
     send: '回车发送',
     attached: '已附加',
+    imageReading: '正在读取剪贴板图片…',
+    imageAttached: '已附加图片 {name}。',
+    imageClipboardUnavailable: '当前系统无法读取图片剪贴板。',
+    imageClipboardEmpty: '剪贴板中没有图片。',
+    imageTooLarge: '剪贴板图片超过 5 MiB 限制。',
+    imageUnsupported: '不支持剪贴板中的图片格式。',
+    imageRuntimeUnavailable: '当前运行时无法存储图片附件。',
+    imageCountLimit: '一条输入最多包含 20 张图片。',
     history: '历史搜索',
     historyHint: 'Ctrl+R · ↑↓ 选择 · 回车使用 · Esc 关闭',
     historyPlaceholder: '输入关键词搜索…',
@@ -363,22 +492,32 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     filesHint: 'Tab / ↑↓ 选择',
     filesSearching: ' 正在搜索工作区…',
     commands: '命令',
-    commandsHint: 'Tab / ↑↓ 选择',
+    commandsHint: '↑↓ 选择 · 回车使用 · Esc 关闭',
+    commandsFilter: '输入关键词筛选',
+    commandsEmpty: '没有匹配的命令',
     help: '帮助',
     helpHint: 'Esc 关闭',
     messageMode: '消息模式',
-    messageModeHint: '↑↓ 移动 · 回车展开 · c 复制 · Esc 关闭',
+    messageModeHint: '↑↓ 移动 · 回车展开 · m 菜单 · c 复制 · Esc 关闭',
+    modeBuild: 'Build',
+    modePlan: 'Plan',
+    modeSwitchHint: 'Tab 切换模式',
     footerHistory: '↑↓ 历史',
+    footerScroll: 'PageUp / PageDown 滚动',
     footerMessages: 'Shift+↑ 消息',
+    footerMenu: 'Ctrl+P 菜单',
     footerDetails: 'Ctrl+O 详情',
     footerHelp: '? 帮助',
     footerQuit: 'Esc 中断 / 退出',
-    footerRedraw: 'Ctrl+L 重绘',
-    agentIdle: '空闲',
+    footerRunning: '按 Esc 终止',
+    footerQueueDraft: '按 Tab 加入队列',
+    footerRedraw: '重绘：/redraw',
+    footerModel: 'Ctrl+L 模型',
+    agentIdle: '就绪',
     agentRunning: '运行中',
     agentThinking: '思考中…',
-    agentStarting: '连接中',
-    agentDead: '已停止',
+    agentStarting: '连接中…',
+    agentDead: '运行时已停止',
     emptyTitle: 'cocode 已准备好',
     emptyHint: '输入问题或描述任务，开始工作。',
     langChanged: '界面语言：{lang}',
@@ -386,8 +525,22 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     modelUsage: '使用 /model <model-id>。',
     modelBusy: '当前任务仍在运行，请等待任务结束后再切换模型。',
     modelSwitching: '正在切换模型到 {model}…',
-    modelChanged: '已切换到 {model}，并创建新会话。',
+    modelChanged: '已切换到 {model}，继续使用当前会话。',
+    modelChangedFresh: '已切换到 {model}，由于持久化不可用，已创建新会话。',
     modelRestored: '模型切换失败，已恢复为 {model}。',
+    modelRestoredFresh: '模型切换失败，已恢复为 {model}，但由于持久化不可用，已创建新会话。',
+    modelSwitchTitle: '切换模型',
+    modelSwitchCurrent: '当前：{model}',
+    modelSwitchHint: '输入模型名称 · 回车应用 · Esc 关闭',
+    modelSwitchPlaceholder: '模型名称',
+    modelCatalogTitle: '可用模型',
+    modelCatalogHint: '输入过滤 · ↑↓ 选择 · 回车应用 · Esc 关闭',
+    modelCatalogQuery: '筛选：{query}',
+    modelCatalogEmpty: '没有可用的模型目录，请手动输入模型名称。',
+    modelCatalogLoading: '正在加载模型目录…',
+    modelCatalogUnavailable: '当前 runtime 不提供模型目录，请手动输入模型名称。',
+    modelCatalogFailed: '模型目录加载失败',
+    modelCatalogPartial: '部分 provider 无法列出模型。',
     resumeTitle: '最近会话',
     resumeHint: '输入关键词过滤 · ↑↓ 选择 · 回车确认 · Esc 关闭',
     resumeQuery: '筛选：{query}',
@@ -403,10 +556,13 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     skillsUnavailable: '当前运行时未配置 Skills。',
     skillReady: '技能 /{name} 已写入输入区。',
     questionTitle: '需要确认',
-    questionHint: '↑↓ 移动 · 回车回答 · Esc 取消',
+    questionHint: '↑↓ 移动 · ←→ 切换问题',
     questionCustom: '输入其他答案',
-    questionMultiHint: '空格勾选 · Tab 切换到其他答案',
-    questionSelectHint: '回车选择 · Tab 切换到其他答案',
+    questionMultiHint: '空格勾选 · Tab 输入其他答案',
+    questionSelectHint: 'Tab 输入其他答案',
+    questionStreaming: '问题生成中…',
+    questionReady: '问题已生成，等待交互',
+    questionUnavailable: '问题内容暂不可用',
     rewindTitle: '回滚会话',
     rewindHint: '↑↓ 选择 · 回车预览 · Esc 关闭',
     rewindArm: '再次按 Esc 选择回滚位置。',
@@ -430,6 +586,10 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     queueAttachments: '{count} 个附件',
     queueDeleted: '已删除队列中的输入。',
     queueRestored: '已将队列输入恢复到队首。',
+    checklistTitle: '任务清单',
+    checklistHint: '↑↓ 选择 · Esc 关闭',
+    checklistEmpty: '当前回合没有任务。',
+    checklistMore: '… 还有 {count} 项',
     turnComplete: '本轮任务已完成',
     turnBusy: '当前任务仍在运行，按 Tab 可将输入加入队列。',
     sessionChanging: '正在切换会话，请等待当前操作完成。',
@@ -438,10 +598,8 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     cancelFailed: '取消请求失败',
     telemetryTps: 'TPS {value}',
     telemetryCache: '缓存命中 {value}%',
-    telemetryContext: '上下文 {value}%',
     telemetryReasoning: '推理 {value}',
     telemetryActivity: '{phase}：{line}',
-    telemetrySegments: '分段 系统{system} 输入{prompt} 回复{assistant} 思考{thinking} 工具{tools}',
     todoProgress: '待办 {done}/{total}',
     goalPhase: '目标 {phase}',
     agentPreset: '预设 {name}',
@@ -455,9 +613,26 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     inspectorContext: '上下文',
     inspectorFiles: '文件',
     inspectorSession: '会话',
+    inspectorShortcuts: '快捷键',
     inspectorEmpty: '暂无活动详情',
     inspectorGoal: '目标',
     inspectorTodos: '待办',
+    inspectorRuntime: '运行时 / MCP',
+    inspectorSkills: 'Skills',
+    inspectorCapabilities: '能力',
+    inspectorRuntimeName: '运行时',
+    inspectorMcp: 'MCP / companion',
+    inspectorCapabilitySource: '能力来源',
+    inspectorAvailable: '可用',
+    inspectorUnavailable: '不可用',
+    inspectorNotReported: '未提供',
+    inspectorLoadedSkill: '当前 Skill',
+    inspectorNone: '无',
+    inspectorEnabled: '开启',
+    inspectorDisabled: '关闭',
+    questionSubmit: '回车提交',
+    questionNewline: 'Shift+Enter 换行',
+    questionExit: 'Esc 退出',
     copySuccess: '已复制到剪贴板。',
     copyEmpty: '没有可复制的消息文本。',
     copyUnavailable: '当前终端无法使用剪贴板。',
@@ -501,6 +676,13 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     planUnavailable: '当前运行时不支持计划模式。',
     planEnabled: '已启用计划模式。',
     planDisabled: '已关闭计划模式。',
+    planReviewTitle: '计划审阅',
+    planReviewHint: '↑↓ 选择 · PgUp/PgDn 滚动 · 回车确认 · Esc 取消',
+    planReviewPreview: '计划预览',
+    planReviewEmpty: '计划内容为空。',
+    planReviewFooter: '↑↓ 选择操作 · PgUp/PgDn 滚动 · 回车确认 · Esc 取消',
+    planStreaming: '计划生成中…',
+    planReady: '计划已生成，等待审阅',
     steerSending: '将在下一个工具步骤完成后发送后续输入……',
     forkUnavailable: '当前无法创建会话分支，或任务仍在运行。',
     forkCreated: '已从当前对话创建子会话。',
@@ -512,6 +694,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     sessionTreeEmpty: '没有找到运行时会话。',
     sessionTreeTitle: '会话列表',
     sessionTreeHint: '输入过滤 · ↑↓ 选择 · 回车打开 · Esc 关闭',
+    sessionTreeLegend: '✓ 当前 · ◉ 运行中 · · 空闲',
     sessionTreeQuery: '筛选：{query}',
     sessionTreeLoading: '正在加载会话列表……',
     sessionTreeOpenFailed: '运行时无法打开该会话。',

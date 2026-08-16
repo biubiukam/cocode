@@ -80,13 +80,13 @@ describe('SideCardSection declarative inventory', () => {
     expect(html).toContain('>explorer<')
     expect(html).toContain('data-icon="subagent"')
     expect(html).toContain('>Subagents<')
-    // Default prefs: openByDefault + interceptOpenPath switches checked, and
+    // Default prefs: openByDefault unchecked, interceptOpenPath checked, and
     // both tabs + the image viewer cards pressed (3 aria-pressed cards).
     // The nested auto-open toggle is NOT an inline card (it lives in the popup).
     expect(pressedCount(html, 'true')).toBe(3)
     expect(pressedCount(html, 'false')).toBe(0)
-    // The general toggles are custom switches (real checkboxes, checked).
-    expect(html.match(/checked=""/g)?.length).toBe(2)
+    // Only interceptOpenPath is checked by default.
+    expect(html.match(/checked=""/g)?.length).toBe(1)
     expect(html).not.toContain('Auto-open Subagents')
   })
 
@@ -140,9 +140,9 @@ describe('SideCardSection declarative inventory', () => {
     expect(html).toContain('>Subagents<')
     expect(html).toContain('>Image<')
     expect(pressedCount(html, 'false')).toBe(2)
-    // The explorer card stays pressed; the general switches stay checked.
+    // The explorer card stays pressed; only interceptOpenPath stays checked.
     expect(pressedCount(html, 'true')).toBe(1)
-    expect(html.match(/checked=""/g)?.length).toBe(2)
+    expect(html.match(/checked=""/g)?.length).toBe(1)
   })
 
   it('hides the gear of a disabled feature (its related settings are dormant)', () => {

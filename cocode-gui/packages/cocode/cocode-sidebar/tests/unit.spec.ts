@@ -214,7 +214,7 @@ describe('git parsing', () => {
 })
 
 describe('sidebar state', () => {
-  const state = (): SidebarState => makeDefaultState()
+  const state = (): SidebarState => makeDefaultState(400, true)
 
   it('opens tabs into the active pane and dedupes by id (safety net)', () => {
     let s = state()
@@ -427,6 +427,17 @@ describe('sidebar state', () => {
     s = closeTab(s, paneA.id, 't')
     expect(s.splits.kind).toBe('leaf')
     expect((s.splits as { id: string }).id).toBe(paneB.id)
+    expect(s.panelOpen).toBe(true)
+  })
+
+  it('closing the final tab collapses the right sidebar', () => {
+    let s = state()
+    const leaf = s.splits as { id: string; tabs: { id: string }[] }
+
+    s = closeTab(s, leaf.id, leaf.tabs[0]!.id)
+
+    expect(allLeaves(s.splits).flatMap(candidate => candidate.tabs)).toHaveLength(0)
+    expect(s.panelOpen).toBe(false)
   })
 
   it('resizes splits within the clamp range', () => {
@@ -643,6 +654,20 @@ describe('sidebar state', () => {
     expect(tabOpenIn(s, 'terminal:1')).toBe(false)
     // The right tree is untouched.
     expect(tabOpenIn(s, (s.splits as { tabs: { id: string }[] }).tabs[0]!.id)).toBe(true)
+  })
+
+  it('closing the final bottom tab collapses the bottom panel', () => {
+    let s = state()
+    s = toggleBottomPanel(s)
+    const bottomPane = (s.bottomSplits as { id: string }).id
+    s = openTabInActivePane({ ...s, activePane: bottomPane }, { id: 'terminal:1', type: 'terminal', title: 'T1' })
+
+    s = closeTab(s, bottomPane, 'terminal:1')
+
+    expect(allLeaves(s.bottomSplits).flatMap(leaf => leaf.tabs)).toHaveLength(0)
+    expect(s.bottomOpen).toBe(false)
+    // Closing a bottom tab does not affect the right panel.
+    expect(s.panelOpen).toBe(true)
   })
 
   it('moveTabToEdge splits within the bottom tree', () => {
@@ -1142,7 +1167,9 @@ describe('side card preferences', () => {
         interceptOpenPath: true,
         htmlViewerNoSandbox: false,
         htmlViewerDefaultUnsafe: false,
-        browserNoSandbox: false,
+        agentBrowserTools: false,
+        agentBrowserIsolated: false,
+        browserHeaded: false,
         browserInterceptLinks: true,
         tabsEnabled: {},
         viewersEnabled: {},
@@ -1153,7 +1180,7 @@ describe('side card preferences', () => {
   it('falls back per-field when a stored field is malformed', async () => {
     expect(await loadPrefs(wire({ openByDefault: 'yes', defaultWidthPercent: 33, autoOpenSubagent: 'no', agentTerminalTools: 'yes' })))
       .toEqual({
-        openByDefault: true,
+        openByDefault: false,
         defaultWidthPercent: 33,
         autoOpenSubagent: true,
         autoOpenJobs: true,
@@ -1164,7 +1191,9 @@ describe('side card preferences', () => {
         interceptOpenPath: true,
         htmlViewerNoSandbox: false,
         htmlViewerDefaultUnsafe: false,
-        browserNoSandbox: false,
+        agentBrowserTools: false,
+        agentBrowserIsolated: false,
+        browserHeaded: false,
         browserInterceptLinks: true,
         tabsEnabled: {},
         viewersEnabled: {},
@@ -1186,7 +1215,9 @@ describe('side card preferences', () => {
         interceptOpenPath: true,
         htmlViewerNoSandbox: false,
         htmlViewerDefaultUnsafe: false,
-        browserNoSandbox: false,
+        agentBrowserTools: false,
+        agentBrowserIsolated: false,
+        browserHeaded: false,
         browserInterceptLinks: true,
         tabsEnabled: {},
         viewersEnabled: {},
@@ -1251,17 +1282,17 @@ describe('side card preferences', () => {
     const store = createSidebarStore()
     // Node environment: no window → the width falls back to PANEL_DEFAULT,
     // while the open flag still follows the preference.
-    store.setPrefs({ openByDefault: false, defaultWidthPercent: 45, autoOpenSubagent: true, autoOpenJobs: true, agentTerminalTools: false, bottomPanelAutoTerminal: true, terminalFontFamily: '', terminalFontSize: 13, interceptOpenPath: true, htmlViewerNoSandbox: false, htmlViewerDefaultUnsafe: false, browserNoSandbox: false, browserInterceptLinks: true, tabsEnabled: {}, viewersEnabled: {}, pluginSettings: {} })
+    store.setPrefs({ openByDefault: false, defaultWidthPercent: 45, autoOpenSubagent: true, autoOpenJobs: true, agentTerminalTools: false, bottomPanelAutoTerminal: true, terminalFontFamily: '', terminalFontSize: 13, interceptOpenPath: true, htmlViewerNoSandbox: false, htmlViewerDefaultUnsafe: false, agentBrowserTools: false, agentBrowserIsolated: false, browserHeaded: false, browserInterceptLinks: true, tabsEnabled: {}, viewersEnabled: {}, pluginSettings: {} })
     store.setSession('fresh-session')
-    expect(store.getPrefs()).toEqual({ openByDefault: false, defaultWidthPercent: 45, autoOpenSubagent: true, autoOpenJobs: true, agentTerminalTools: false, bottomPanelAutoTerminal: true, terminalFontFamily: '', terminalFontSize: 13, interceptOpenPath: true, htmlViewerNoSandbox: false, htmlViewerDefaultUnsafe: false, browserNoSandbox: false, browserInterceptLinks: true, tabsEnabled: {}, viewersEnabled: {}, pluginSettings: {} })
+    expect(store.getPrefs()).toEqual({ openByDefault: false, defaultWidthPercent: 45, autoOpenSubagent: true, autoOpenJobs: true, agentTerminalTools: false, bottomPanelAutoTerminal: true, terminalFontFamily: '', terminalFontSize: 13, interceptOpenPath: true, htmlViewerNoSandbox: false, htmlViewerDefaultUnsafe: false, agentBrowserTools: false, agentBrowserIsolated: false, browserHeaded: false, browserInterceptLinks: true, tabsEnabled: {}, viewersEnabled: {}, pluginSettings: {} })
     const snapshot = store.getSnapshot()
     expect(snapshot.sessionId).toBe('fresh-session')
     expect(snapshot.state?.panelOpen).toBe(false)
     expect(snapshot.state?.width).toBe(400)
-    // The default prefs keep the panel open.
-    const openStore = createSidebarStore()
-    openStore.setSession('another-fresh')
-    expect(openStore.getSnapshot().state?.panelOpen).toBe(true)
+    // Product defaults keep a fresh session collapsed.
+    const defaultStore = createSidebarStore()
+    defaultStore.setSession('another-fresh')
+    expect(defaultStore.getSnapshot().state?.panelOpen).toBe(false)
   })
 
   it('seeds a brand-new session COLLAPSED on narrow viewports (the panel is a full-screen drawer there)', () => {
@@ -1275,8 +1306,7 @@ describe('side card preferences', () => {
     }
     try {
       const store = createSidebarStore()
-      // Default prefs say openByDefault: true — the narrow viewport overrides
-      // it for the FIRST seeding only (a later user expansion persists).
+      // The product default is collapsed; narrow viewports must remain so.
       store.setSession('narrow-fresh')
       expect(store.getSnapshot().state?.panelOpen).toBe(false)
       // The width seeding still follows the window (clamped to the floor).
@@ -1289,7 +1319,7 @@ describe('side card preferences', () => {
 
   it('skips the default explorer tab when the explorer type is disabled', () => {
     const store = createSidebarStore()
-    store.setPrefs({ openByDefault: true, defaultWidthPercent: 30, autoOpenSubagent: true, autoOpenJobs: true, agentTerminalTools: false, bottomPanelAutoTerminal: true, terminalFontFamily: '', terminalFontSize: 13, interceptOpenPath: true, htmlViewerNoSandbox: false, htmlViewerDefaultUnsafe: false, browserNoSandbox: false, browserInterceptLinks: true, tabsEnabled: { explorer: false }, viewersEnabled: {}, pluginSettings: {} })
+    store.setPrefs({ openByDefault: true, defaultWidthPercent: 30, autoOpenSubagent: true, autoOpenJobs: true, agentTerminalTools: false, bottomPanelAutoTerminal: true, terminalFontFamily: '', terminalFontSize: 13, interceptOpenPath: true, htmlViewerNoSandbox: false, htmlViewerDefaultUnsafe: false, agentBrowserTools: false, agentBrowserIsolated: false, browserHeaded: false, browserInterceptLinks: true, tabsEnabled: { explorer: false }, viewersEnabled: {}, pluginSettings: {} })
     store.setSession('no-explorer')
     const state = store.getSnapshot().state!
     const tabs = allLeaves(state.splits).flatMap(leaf => leaf.tabs)
@@ -1297,7 +1327,7 @@ describe('side card preferences', () => {
     expect(state.splits.kind).toBe('leaf')
     // Re-enabling seeds the explorer tab again.
     const openStore = createSidebarStore()
-    openStore.setPrefs({ openByDefault: true, defaultWidthPercent: 30, autoOpenSubagent: true, autoOpenJobs: true, agentTerminalTools: false, bottomPanelAutoTerminal: true, terminalFontFamily: '', terminalFontSize: 13, interceptOpenPath: true, htmlViewerNoSandbox: false, htmlViewerDefaultUnsafe: false, browserNoSandbox: false, browserInterceptLinks: true, tabsEnabled: {}, viewersEnabled: {}, pluginSettings: {} })
+    openStore.setPrefs({ openByDefault: true, defaultWidthPercent: 30, autoOpenSubagent: true, autoOpenJobs: true, agentTerminalTools: false, bottomPanelAutoTerminal: true, terminalFontFamily: '', terminalFontSize: 13, interceptOpenPath: true, htmlViewerNoSandbox: false, htmlViewerDefaultUnsafe: false, agentBrowserTools: false, agentBrowserIsolated: false, browserHeaded: false, browserInterceptLinks: true, tabsEnabled: {}, viewersEnabled: {}, pluginSettings: {} })
     openStore.setSession('with-explorer')
     const openTabs = allLeaves(openStore.getSnapshot().state!.splits).flatMap(leaf => leaf.tabs)
     expect(openTabs.map(tab => tab.type)).toEqual(['explorer'])
@@ -1310,7 +1340,8 @@ describe('side card preferences', () => {
   })
 
   it('makeDefaultState honors the open flag', () => {
-    expect(makeDefaultState().panelOpen).toBe(true)
+    expect(makeDefaultState().panelOpen).toBe(false)
+    expect(makeDefaultState(400, true).panelOpen).toBe(true)
     expect(makeDefaultState(400, false).panelOpen).toBe(false)
     expect(makeDefaultState(400, false).width).toBe(400)
     // The seedExplorer flag controls the default explorer tab.
@@ -1642,6 +1673,32 @@ describe('v0.12.0 store additions', () => {
     const g = globalThis as Record<string, unknown>
     delete g.window
     delete g.localStorage
+  })
+
+  it('starts the initial restored session collapsed without changing later sessions', () => {
+    const g = globalThis as Record<string, unknown>
+    const persisted = JSON.stringify(makeDefaultState(400, true))
+    g.localStorage = {
+      getItem: (key: string) => key.endsWith(':restored') || key.endsWith(':later') ? persisted : null,
+      setItem: () => {},
+    }
+
+    const store = createSidebarStore()
+    store.setSession('restored')
+    expect(store.getSnapshot().state?.panelOpen).toBe(false)
+
+    store.setSession('later')
+    expect(store.getSnapshot().state?.panelOpen).toBe(true)
+
+    store.setSession('restored')
+    expect(store.getSnapshot().state?.panelOpen).toBe(false)
+  })
+
+  it('still honors openByDefault for a genuinely new initial session', () => {
+    const store = createSidebarStore()
+    store.setPrefs({ ...store.getPrefs(), openByDefault: true })
+    store.setSession('fresh')
+    expect(store.getSnapshot().state?.panelOpen).toBe(true)
   })
 
 describe('store.reduceFor (targeted opens, v0.12.0)', () => {

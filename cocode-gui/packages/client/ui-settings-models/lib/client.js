@@ -56,78 +56,78 @@ window.__ModuleLoader__.load({
 			if (!LEGAL_API_KEY.test(value)) return "keyIllegalCharacters";
 		}
 		//#endregion
-		//#region \0dsh-css:/Users/kambiu/worker/open/cocode/cocode-gui/packages/client/ui-settings-models/src/client/ModelsSection.module.css.mjs
-		const css$3 = ".GizMjG_section{max-width:720px;color:var(--dsw-alias-label-primary);flex-direction:column;gap:12px;display:flex}.GizMjG_title{color:var(--dsw-alias-label-primary);margin:0;font-size:16px;font-weight:500;line-height:24px}.GizMjG_intro{color:var(--dsw-alias-label-tertiary);margin:0;font-size:14px;line-height:22px}.GizMjG_notice{color:var(--dsw-alias-state-warn-label);margin:0;font-size:12px;line-height:18px}.GizMjG_savedNotice{color:var(--dsw-alias-state-success-primary);margin:0;font-size:12px;line-height:18px}.GizMjG_rows{flex-direction:column;gap:8px;margin:12px 0 0;padding:0;list-style:none;display:flex}.GizMjG_rowCard{border:1px solid var(--dsw-alias-border-l2);border-radius:12px;flex-direction:column;gap:12px;padding:12px 14px;display:flex}.GizMjG_rowHead{align-items:center;gap:10px;display:flex}.GizMjG_rowIdentity{align-items:center;gap:6px;min-width:0;display:inline-flex}.GizMjG_rowName{color:var(--dsw-alias-label-primary);font-size:14px;font-weight:500;line-height:22px}.GizMjG_rowTag{border:1px solid var(--dsw-alias-border-l3);color:var(--dsw-alias-label-secondary);border-radius:4px;flex:none;padding:1px 6px;font-size:11px;line-height:16px}.GizMjG_credentialDot{box-sizing:border-box;border-radius:50%;flex:none;width:8px;height:8px;display:inline-block}.GizMjG_credentialDotConfigured{background:var(--dsw-alias-state-success-primary)}.GizMjG_credentialDotMissing{background:var(--dsw-alias-state-error-primary)}.GizMjG_rowActions{align-items:center;gap:4px;margin-left:auto;display:inline-flex}.GizMjG_primaryButton,.GizMjG_secondaryButton,.GizMjG_addButton{box-sizing:border-box;height:36px;font:inherit;cursor:pointer;border:none;border-radius:18px;justify-content:center;align-items:center;gap:4px;padding:0 14px;font-size:14px;line-height:22px;display:inline-flex}.GizMjG_primaryButton{background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary-foreground)}.GizMjG_primaryButton:hover:not(:disabled){background:var(--dsw-alias-button-primary-hover)}.GizMjG_secondaryButton,.GizMjG_addButton{border:1px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-primary);background:0 0}.GizMjG_secondaryButton:hover:not(:disabled),.GizMjG_addButton:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover)}.GizMjG_secondaryButton:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover-solid)}.GizMjG_dangerButton{box-sizing:border-box;height:36px;color:var(--dsw-alias-state-error-primary);font:inherit;cursor:pointer;background:0 0;border:none;border-radius:18px;justify-content:center;align-items:center;padding:0 14px;font-size:14px;line-height:22px;display:inline-flex}.GizMjG_dangerButton:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover-danger)}.GizMjG_rowActions .GizMjG_secondaryButton,.GizMjG_rowActions .GizMjG_dangerButton{border-radius:14px;height:28px;padding:0 10px;font-size:12px;line-height:18px}.GizMjG_primaryButton:disabled,.GizMjG_secondaryButton:disabled,.GizMjG_dangerButton:disabled,.GizMjG_addButton:disabled,.GizMjG_linkButton:disabled,.GizMjG_addModelButton:disabled{opacity:.4;cursor:default}.GizMjG_primaryButton:focus-visible,.GizMjG_secondaryButton:focus-visible,.GizMjG_dangerButton:focus-visible,.GizMjG_addButton:focus-visible,.GizMjG_linkButton:focus-visible,.GizMjG_addModelButton:focus-visible,.GizMjG_iconButton:focus-visible,.GizMjG_customizedSummary:focus-visible{box-shadow:0 0 0 2px var(--dsw-alias-state-business-primary);outline:none}.GizMjG_editor{background:var(--dsw-alias-bg-module-platform);border-radius:12px;flex-direction:column;gap:14px;padding:14px 16px;display:flex}.GizMjG_editorHeader{align-items:baseline;gap:8px;display:flex}.GizMjG_editorTitle{color:var(--dsw-alias-label-primary);font-size:14px;font-weight:500;line-height:22px}.GizMjG_editorRoute{color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px}.GizMjG_field{flex-direction:column;gap:6px;display:flex}.GizMjG_fieldLabel{color:var(--dsw-alias-label-secondary);align-items:center;gap:10px;font-size:12px;font-weight:500;line-height:18px;display:inline-flex}.GizMjG_linkButton{box-sizing:border-box;height:28px;color:var(--dsw-alias-label-tertiary);font:inherit;cursor:pointer;background:0 0;border:none;border-radius:14px;align-items:center;padding:0 10px;font-size:12px;line-height:18px;display:inline-flex}.GizMjG_linkButton:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-secondary)}.GizMjG_advancedHint{color:var(--dsw-alias-label-tertiary);margin:0;font-size:12px;line-height:18px}.GizMjG_editorActions{justify-content:flex-end;gap:8px;display:flex}.GizMjG_addBlock{flex-direction:column;gap:12px;display:flex}.GizMjG_addActions{flex-wrap:wrap;gap:10px;display:flex}.GizMjG_addButton{border:1px dashed var(--dsw-alias-border-l3);border-radius:12px;flex:1 1 0;gap:6px;min-width:180px;height:44px}.GizMjG_addCard,.GizMjG_setupCard{background:var(--dsw-alias-bg-module-platform);border-radius:12px;flex-direction:column;gap:14px;padding:14px 16px;list-style:none;display:flex}.GizMjG_addCard .GizMjG_editor,.GizMjG_setupCard .GizMjG_editor{background:0 0;padding:0}.GizMjG_customized{border-top:1px solid var(--dsw-alias-border-l2);padding-top:10px}.GizMjG_customizedSummary{cursor:pointer;width:fit-content;color:var(--dsw-alias-label-secondary);border-radius:6px;align-items:center;gap:6px;margin-left:-4px;padding:2px 4px;font-size:12px;font-weight:500;line-height:18px;list-style:none;display:flex}.GizMjG_customizedSummary::-webkit-details-marker{display:none}.GizMjG_customizedSummary:before{content:\"\";border-bottom:1.5px solid;border-right:1.5px solid;width:5px;height:5px;transition:transform .12s;transform:rotate(-45deg)translate(-1px,-1px)}.GizMjG_customized[open]>.GizMjG_customizedSummary:before{transform:rotate(45deg)translate(-1px,-1px)}.GizMjG_customizedSummary:hover{color:var(--dsw-alias-label-primary)}.GizMjG_customizedBody{flex-direction:column;gap:12px;padding-top:12px;display:flex}.GizMjG_modelCatalog{border-top:1px solid var(--dsw-alias-border-l2);flex-direction:column;gap:10px;padding-top:12px;display:flex}.GizMjG_modelCatalogHeading{flex-direction:column;gap:2px;display:flex}.GizMjG_modelCatalogTitle{color:var(--dsw-alias-label-secondary);font-size:12px;font-weight:500;line-height:18px}.GizMjG_modelCatalogMeta,.GizMjG_modelEmpty{color:var(--dsw-alias-label-tertiary);margin:0;font-size:12px;line-height:18px}.GizMjG_modelList{flex-direction:column;gap:8px;display:flex}.GizMjG_modelListHead{justify-content:space-between;align-items:flex-start;gap:12px;display:flex}.GizMjG_modelEntry{border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:6px}.GizMjG_modelRow{grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) auto auto;align-items:center;gap:6px;display:grid}.GizMjG_iconButton{box-sizing:border-box;width:28px;height:28px;color:var(--dsw-alias-label-tertiary);cursor:pointer;background:0 0;border:none;border-radius:6px;justify-content:center;align-items:center;display:inline-flex}.GizMjG_iconButton:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.GizMjG_iconButton:disabled{cursor:default;opacity:.4}.GizMjG_iconButtonDanger:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover-danger);color:var(--dsw-alias-state-error-primary)}.GizMjG_modelAdvanced{grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;padding:8px 4px 2px;display:grid}.GizMjG_modelField{flex-direction:column;gap:4px;display:flex}.GizMjG_modelFieldLabel{color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px}.GizMjG_modelEmpty{border:1px dashed var(--dsw-alias-border-l3);text-align:center;border-radius:8px;padding:12px}.GizMjG_addModelButton{box-sizing:border-box;border:1px solid var(--dsw-alias-border-l2);height:28px;color:var(--dsw-alias-label-primary);font:inherit;cursor:pointer;background:0 0;border-radius:14px;align-self:flex-start;align-items:center;gap:4px;padding:0 10px;font-size:12px;line-height:18px;display:inline-flex}.GizMjG_addModelButton:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover)}.GizMjG_input{box-sizing:border-box;border:1px solid var(--dsw-alias-border-l2);width:100%;height:32px;font:inherit;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);border-radius:8px;padding:0 10px;font-size:14px;line-height:22px}select.GizMjG_input{cursor:pointer;max-width:240px}.GizMjG_input:focus{border-color:var(--dsw-alias-state-business-primary);outline:none}.GizMjG_input::placeholder{color:var(--dsw-alias-label-dimmed)}.GizMjG_input:disabled{opacity:.6;cursor:default}.GizMjG_selectInput{appearance:none;background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%2381858C' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\");background-position:right 12px center;background-repeat:no-repeat;background-size:12px 12px;padding-right:32px}.GizMjG_error{color:var(--dsw-alias-state-error-primary);margin:0;font-size:12px;line-height:18px}.GizMjG_deleteDialog{width:min(480px,100%)}.GizMjG_deleteConfirm:not(:disabled){border-color:var(--dsw-alias-state-error-primary);color:var(--dsw-alias-state-error-primary)}.GizMjG_deleteConfirm:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover-danger)}.GizMjG_hiddenLabel{clip:rect(0 0 0 0);white-space:nowrap;width:1px;height:1px;position:absolute;overflow:hidden}@media (prefers-reduced-motion:reduce){.GizMjG_customizedSummary:before{transition:none}}.GizMjG_fetchDialog{--dsh-scrollbar-thumb:var(--dsw-alias-scrollbar-bg-l2);--dsh-scrollbar-thumb-hover:var(--dsw-alias-scrollbar-hover-l2);max-width:520px}.GizMjG_candidateList{flex-direction:column;gap:2px;max-height:320px;margin:0;padding:0;list-style:none;display:flex;overflow-y:auto}.GizMjG_candidate{border-radius:6px}.GizMjG_candidateLabel{cursor:pointer;align-items:center;gap:8px;padding:6px 8px;display:flex}.GizMjG_candidateId{font-family:var(--ds-font-family-code);overflow-wrap:anywhere;flex:auto;font-size:13px}";
-		const tagId$3 = "@deepseek-ai/dsh-client-ui-settings-models/ModelsSection.module.css";
-		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId$3) + "]") === null) {
+		//#region \0dsh-css:packages/client/ui-settings-models/src/client/ModelsSection.module.css.mjs
+		const css$2 = ".GizMjG_section{max-width:720px;color:var(--dsw-alias-label-primary);flex-direction:column;gap:12px;display:flex}.GizMjG_title{color:var(--dsw-alias-label-primary);margin:0;font-size:16px;font-weight:500;line-height:24px}.GizMjG_intro{color:var(--dsw-alias-label-tertiary);margin:0;font-size:14px;line-height:22px}.GizMjG_notice{color:var(--dsw-alias-state-warn-label);margin:0;font-size:12px;line-height:18px}.GizMjG_savedNotice{color:var(--dsw-alias-state-success-primary);margin:0;font-size:12px;line-height:18px}.GizMjG_rows{flex-direction:column;gap:8px;margin:12px 0 0;padding:0;list-style:none;display:flex}.GizMjG_rowCard{border:1px solid var(--dsw-alias-border-l2);border-radius:12px;flex-direction:column;gap:12px;padding:12px 14px;display:flex}.GizMjG_rowHead{align-items:center;gap:10px;display:flex}.GizMjG_rowIdentity{align-items:center;gap:6px;min-width:0;display:inline-flex}.GizMjG_rowName{color:var(--dsw-alias-label-primary);font-size:14px;font-weight:500;line-height:22px}.GizMjG_rowTag{border:1px solid var(--dsw-alias-border-l3);color:var(--dsw-alias-label-secondary);border-radius:4px;flex:none;padding:1px 6px;font-size:11px;line-height:16px}.GizMjG_credentialDot{box-sizing:border-box;border-radius:50%;flex:none;width:8px;height:8px;display:inline-block}.GizMjG_credentialDotConfigured{background:var(--dsw-alias-state-success-primary)}.GizMjG_credentialDotMissing{background:var(--dsw-alias-state-error-primary)}.GizMjG_rowActions{align-items:center;gap:4px;margin-left:auto;display:inline-flex}.GizMjG_primaryButton,.GizMjG_secondaryButton,.GizMjG_addButton{box-sizing:border-box;height:36px;font:inherit;cursor:pointer;border:none;border-radius:18px;justify-content:center;align-items:center;gap:4px;padding:0 14px;font-size:14px;line-height:22px;display:inline-flex}.GizMjG_primaryButton{background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary-foreground)}.GizMjG_primaryButton:hover:not(:disabled){background:var(--dsw-alias-button-primary-hover)}.GizMjG_secondaryButton,.GizMjG_addButton{border:1px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-primary);background:0 0}.GizMjG_secondaryButton:hover:not(:disabled),.GizMjG_addButton:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover)}.GizMjG_secondaryButton:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover-solid)}.GizMjG_dangerButton{box-sizing:border-box;height:36px;color:var(--dsw-alias-state-error-primary);font:inherit;cursor:pointer;background:0 0;border:none;border-radius:18px;justify-content:center;align-items:center;padding:0 14px;font-size:14px;line-height:22px;display:inline-flex}.GizMjG_dangerButton:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover-danger)}.GizMjG_rowActions .GizMjG_secondaryButton,.GizMjG_rowActions .GizMjG_dangerButton{border-radius:14px;height:28px;padding:0 10px;font-size:12px;line-height:18px}.GizMjG_primaryButton:disabled,.GizMjG_secondaryButton:disabled,.GizMjG_dangerButton:disabled,.GizMjG_addButton:disabled,.GizMjG_linkButton:disabled,.GizMjG_addModelButton:disabled{opacity:.4;cursor:default}.GizMjG_primaryButton:focus-visible,.GizMjG_secondaryButton:focus-visible,.GizMjG_dangerButton:focus-visible,.GizMjG_addButton:focus-visible,.GizMjG_linkButton:focus-visible,.GizMjG_addModelButton:focus-visible,.GizMjG_iconButton:focus-visible,.GizMjG_customizedSummary:focus-visible{box-shadow:0 0 0 2px var(--dsw-alias-state-business-primary);outline:none}.GizMjG_editor{background:var(--dsw-alias-bg-module-platform);border-radius:12px;flex-direction:column;gap:14px;padding:14px 16px;display:flex}.GizMjG_editorHeader{align-items:baseline;gap:8px;display:flex}.GizMjG_editorTitle{color:var(--dsw-alias-label-primary);font-size:14px;font-weight:500;line-height:22px}.GizMjG_editorRoute{color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px}.GizMjG_field{flex-direction:column;gap:6px;display:flex}.GizMjG_fieldLabel{color:var(--dsw-alias-label-secondary);align-items:center;gap:10px;font-size:12px;font-weight:500;line-height:18px;display:inline-flex}.GizMjG_linkButton{box-sizing:border-box;height:28px;color:var(--dsw-alias-label-tertiary);font:inherit;cursor:pointer;background:0 0;border:none;border-radius:14px;align-items:center;padding:0 10px;font-size:12px;line-height:18px;display:inline-flex}.GizMjG_linkButton:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-secondary)}.GizMjG_advancedHint{color:var(--dsw-alias-label-tertiary);margin:0;font-size:12px;line-height:18px}.GizMjG_editorActions{justify-content:flex-end;gap:8px;display:flex}.GizMjG_addBlock{flex-direction:column;gap:12px;display:flex}.GizMjG_addActions{flex-wrap:wrap;gap:10px;display:flex}.GizMjG_addButton{border:1px dashed var(--dsw-alias-border-l3);border-radius:12px;flex:1 1 0;gap:6px;min-width:180px;height:44px}.GizMjG_addCard,.GizMjG_setupCard{background:var(--dsw-alias-bg-module-platform);border-radius:12px;flex-direction:column;gap:14px;padding:14px 16px;list-style:none;display:flex}.GizMjG_addCard .GizMjG_editor,.GizMjG_setupCard .GizMjG_editor{background:0 0;padding:0}.GizMjG_customized{border-top:1px solid var(--dsw-alias-border-l2);padding-top:10px}.GizMjG_customizedSummary{cursor:pointer;width:fit-content;color:var(--dsw-alias-label-secondary);border-radius:6px;align-items:center;gap:6px;margin-left:-4px;padding:2px 4px;font-size:12px;font-weight:500;line-height:18px;list-style:none;display:flex}.GizMjG_customizedSummary::-webkit-details-marker{display:none}.GizMjG_customizedSummary:before{content:\"\";border-bottom:1.5px solid;border-right:1.5px solid;width:5px;height:5px;transition:transform .12s;transform:rotate(-45deg)translate(-1px,-1px)}.GizMjG_customized[open]>.GizMjG_customizedSummary:before{transform:rotate(45deg)translate(-1px,-1px)}.GizMjG_customizedSummary:hover{color:var(--dsw-alias-label-primary)}.GizMjG_customizedBody{flex-direction:column;gap:12px;padding-top:12px;display:flex}.GizMjG_modelCatalog{border-top:1px solid var(--dsw-alias-border-l2);flex-direction:column;gap:10px;padding-top:12px;display:flex}.GizMjG_modelCatalogHeading{flex-direction:column;gap:2px;display:flex}.GizMjG_modelCatalogTitle{color:var(--dsw-alias-label-secondary);font-size:12px;font-weight:500;line-height:18px}.GizMjG_modelCatalogMeta,.GizMjG_modelEmpty{color:var(--dsw-alias-label-tertiary);margin:0;font-size:12px;line-height:18px}.GizMjG_modelList{flex-direction:column;gap:8px;display:flex}.GizMjG_modelListHead{justify-content:space-between;align-items:flex-start;gap:12px;display:flex}.GizMjG_modelEntry{border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:6px}.GizMjG_modelRow{grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) auto auto;align-items:center;gap:6px;display:grid}.GizMjG_iconButton{box-sizing:border-box;width:28px;height:28px;color:var(--dsw-alias-label-tertiary);cursor:pointer;background:0 0;border:none;border-radius:6px;justify-content:center;align-items:center;display:inline-flex}.GizMjG_iconButton:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.GizMjG_iconButton:disabled{cursor:default;opacity:.4}.GizMjG_iconButtonDanger:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover-danger);color:var(--dsw-alias-state-error-primary)}.GizMjG_modelAdvanced{grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;padding:8px 4px 2px;display:grid}.GizMjG_modelField{flex-direction:column;gap:4px;display:flex}.GizMjG_modelFieldLabel{color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px}.GizMjG_modelEmpty{border:1px dashed var(--dsw-alias-border-l3);text-align:center;border-radius:8px;padding:12px}.GizMjG_addModelButton{box-sizing:border-box;border:1px solid var(--dsw-alias-border-l2);height:28px;color:var(--dsw-alias-label-primary);font:inherit;cursor:pointer;background:0 0;border-radius:14px;align-self:flex-start;align-items:center;gap:4px;padding:0 10px;font-size:12px;line-height:18px;display:inline-flex}.GizMjG_addModelButton:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover)}.GizMjG_input{box-sizing:border-box;border:1px solid var(--dsw-alias-border-l2);width:100%;height:32px;font:inherit;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);border-radius:8px;padding:0 10px;font-size:14px;line-height:22px}select.GizMjG_input{cursor:pointer;max-width:240px}.GizMjG_input:focus{border-color:var(--dsw-alias-state-business-primary);outline:none}.GizMjG_input::placeholder{color:var(--dsw-alias-label-dimmed)}.GizMjG_input:disabled{opacity:.6;cursor:default}.GizMjG_selectInput{appearance:none;background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%2381858C' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\");background-position:right 12px center;background-repeat:no-repeat;background-size:12px 12px;padding-right:32px}.GizMjG_error{color:var(--dsw-alias-state-error-primary);margin:0;font-size:12px;line-height:18px}.GizMjG_deleteDialog{width:min(480px,100%)}.GizMjG_deleteConfirm:not(:disabled){border-color:var(--dsw-alias-state-error-primary);color:var(--dsw-alias-state-error-primary)}.GizMjG_deleteConfirm:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover-danger)}.GizMjG_hiddenLabel{clip:rect(0 0 0 0);white-space:nowrap;width:1px;height:1px;position:absolute;overflow:hidden}@media (prefers-reduced-motion:reduce){.GizMjG_customizedSummary:before{transition:none}}.GizMjG_fetchDialog{--dsh-scrollbar-thumb:var(--dsw-alias-scrollbar-bg-l2);--dsh-scrollbar-thumb-hover:var(--dsw-alias-scrollbar-hover-l2);max-width:520px}.GizMjG_candidateList{flex-direction:column;gap:2px;max-height:320px;margin:0;padding:0;list-style:none;display:flex;overflow-y:auto}.GizMjG_candidate{border-radius:6px}.GizMjG_candidateLabel{cursor:pointer;align-items:center;gap:8px;padding:6px 8px;display:flex}.GizMjG_candidateId{font-family:var(--ds-font-family-code);overflow-wrap:anywhere;flex:auto;font-size:13px}";
+		const tagId$2 = "@deepseek-ai/dsh-client-ui-settings-models/ModelsSection.module.css";
+		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId$2) + "]") === null) {
 			const tag = document.createElement("style");
 			tag.dataset.plugin = "@deepseek-ai/dsh-client-ui-settings-models";
-			tag.dataset.pluginCss = tagId$3;
-			tag.textContent = css$3;
+			tag.dataset.pluginCss = tagId$2;
+			tag.textContent = css$2;
 			document.head.appendChild(tag);
 		}
 		var ModelsSection_module_css_default = {
-			"editorActions": "GizMjG_editorActions",
-			"intro": "GizMjG_intro",
-			"savedNotice": "GizMjG_savedNotice",
-			"error": "GizMjG_error",
-			"modelRow": "GizMjG_modelRow",
-			"candidateLabel": "GizMjG_candidateLabel",
-			"rowHead": "GizMjG_rowHead",
-			"rowActions": "GizMjG_rowActions",
-			"secondaryButton": "GizMjG_secondaryButton",
-			"modelCatalogTitle": "GizMjG_modelCatalogTitle",
-			"advancedHint": "GizMjG_advancedHint",
-			"modelEmpty": "GizMjG_modelEmpty",
-			"linkButton": "GizMjG_linkButton",
-			"candidateId": "GizMjG_candidateId",
-			"modelList": "GizMjG_modelList",
-			"hiddenLabel": "GizMjG_hiddenLabel",
 			"iconButtonDanger": "GizMjG_iconButtonDanger",
-			"section": "GizMjG_section",
+			"rowHead": "GizMjG_rowHead",
 			"modelCatalogHeading": "GizMjG_modelCatalogHeading",
-			"modelAdvanced": "GizMjG_modelAdvanced",
+			"addModelButton": "GizMjG_addModelButton",
+			"credentialDotConfigured": "GizMjG_credentialDotConfigured",
+			"modelCatalogMeta": "GizMjG_modelCatalogMeta",
+			"savedNotice": "GizMjG_savedNotice",
+			"rowIdentity": "GizMjG_rowIdentity",
+			"secondaryButton": "GizMjG_secondaryButton",
+			"title": "GizMjG_title",
+			"editorActions": "GizMjG_editorActions",
+			"notice": "GizMjG_notice",
+			"setupCard": "GizMjG_setupCard",
+			"addActions": "GizMjG_addActions",
 			"selectInput": "GizMjG_selectInput",
+			"primaryButton": "GizMjG_primaryButton",
+			"error": "GizMjG_error",
 			"rowCard": "GizMjG_rowCard",
 			"editorRoute": "GizMjG_editorRoute",
-			"editor": "GizMjG_editor",
-			"addCard": "GizMjG_addCard",
-			"modelFieldLabel": "GizMjG_modelFieldLabel",
 			"modelCatalog": "GizMjG_modelCatalog",
-			"modelCatalogMeta": "GizMjG_modelCatalogMeta",
-			"addButton": "GizMjG_addButton",
-			"rowName": "GizMjG_rowName",
-			"dangerButton": "GizMjG_dangerButton",
-			"modelField": "GizMjG_modelField",
-			"addModelButton": "GizMjG_addModelButton",
-			"setupCard": "GizMjG_setupCard",
-			"rows": "GizMjG_rows",
-			"addActions": "GizMjG_addActions",
-			"field": "GizMjG_field",
-			"editorHeader": "GizMjG_editorHeader",
-			"title": "GizMjG_title",
-			"candidateList": "GizMjG_candidateList",
-			"primaryButton": "GizMjG_primaryButton",
-			"modelListHead": "GizMjG_modelListHead",
-			"customizedSummary": "GizMjG_customizedSummary",
-			"customizedBody": "GizMjG_customizedBody",
-			"credentialDotConfigured": "GizMjG_credentialDotConfigured",
-			"rowIdentity": "GizMjG_rowIdentity",
-			"iconButton": "GizMjG_iconButton",
-			"notice": "GizMjG_notice",
-			"rowTag": "GizMjG_rowTag",
 			"addBlock": "GizMjG_addBlock",
+			"rowActions": "GizMjG_rowActions",
+			"modelFieldLabel": "GizMjG_modelFieldLabel",
+			"modelField": "GizMjG_modelField",
 			"credentialDot": "GizMjG_credentialDot",
-			"deleteConfirm": "GizMjG_deleteConfirm",
+			"advancedHint": "GizMjG_advancedHint",
+			"fetchDialog": "GizMjG_fetchDialog",
+			"linkButton": "GizMjG_linkButton",
+			"addButton": "GizMjG_addButton",
+			"field": "GizMjG_field",
+			"input": "GizMjG_input",
+			"editorTitle": "GizMjG_editorTitle",
+			"modelList": "GizMjG_modelList",
+			"customizedSummary": "GizMjG_customizedSummary",
+			"intro": "GizMjG_intro",
+			"iconButton": "GizMjG_iconButton",
 			"customized": "GizMjG_customized",
+			"deleteConfirm": "GizMjG_deleteConfirm",
+			"modelEntry": "GizMjG_modelEntry",
+			"candidateId": "GizMjG_candidateId",
+			"candidateList": "GizMjG_candidateList",
 			"candidate": "GizMjG_candidate",
 			"fieldLabel": "GizMjG_fieldLabel",
-			"input": "GizMjG_input",
-			"credentialDotMissing": "GizMjG_credentialDotMissing",
-			"editorTitle": "GizMjG_editorTitle",
-			"fetchDialog": "GizMjG_fetchDialog",
+			"rows": "GizMjG_rows",
+			"modelCatalogTitle": "GizMjG_modelCatalogTitle",
+			"modelAdvanced": "GizMjG_modelAdvanced",
+			"editorHeader": "GizMjG_editorHeader",
 			"deleteDialog": "GizMjG_deleteDialog",
-			"modelEntry": "GizMjG_modelEntry"
+			"candidateLabel": "GizMjG_candidateLabel",
+			"modelRow": "GizMjG_modelRow",
+			"section": "GizMjG_section",
+			"dangerButton": "GizMjG_dangerButton",
+			"rowTag": "GizMjG_rowTag",
+			"modelListHead": "GizMjG_modelListHead",
+			"hiddenLabel": "GizMjG_hiddenLabel",
+			"addCard": "GizMjG_addCard",
+			"rowName": "GizMjG_rowName",
+			"editor": "GizMjG_editor",
+			"customizedBody": "GizMjG_customizedBody",
+			"modelEmpty": "GizMjG_modelEmpty",
+			"credentialDotMissing": "GizMjG_credentialDotMissing"
 		};
 		//#endregion
 		//#region packages/client/ui-settings-models/src/client/EditorFooter.tsx
@@ -456,7 +456,7 @@ window.__ModuleLoader__.load({
 		* @param error - the rejection value.
 		* @returns the message to show.
 		*/
-		function messageOf$1(error) {
+		function messageOf(error) {
 			return error instanceof Error ? error.message : String(error);
 		}
 		/**
@@ -563,7 +563,7 @@ window.__ModuleLoader__.load({
 					if (response.result.ok) credentials = response.result.value.credentials;
 					else credentialError = response.result.error.message;
 				} catch (error) {
-					credentialError = messageOf$1(error);
+					credentialError = messageOf(error);
 				}
 				if (generation !== this.generation) return;
 				this.store.update((s) => {
@@ -802,7 +802,7 @@ window.__ModuleLoader__.load({
 					setCandidates(found);
 					setPicked(new Set(found.filter((model) => !known.has(model.id)).map((model) => model.id)));
 				} catch (error) {
-					setFailure(messageOf$1(error));
+					setFailure(messageOf(error));
 				} finally {
 					setBusy(false);
 				}
@@ -1128,7 +1128,7 @@ window.__ModuleLoader__.load({
 					}
 					props.onClose(true);
 				} catch (error) {
-					setFailure(messageOf$1(error));
+					setFailure(messageOf(error));
 				} finally {
 					setBusy(false);
 				}
@@ -1463,7 +1463,7 @@ window.__ModuleLoader__.load({
 					}
 					props.onClose(true);
 				} catch (error) {
-					setFailure(messageOf$1(error));
+					setFailure(messageOf(error));
 				} finally {
 					setBusy(false);
 				}
@@ -1708,7 +1708,7 @@ window.__ModuleLoader__.load({
 				});
 				if (!response.result.ok) return response.result.error.message;
 			} catch (error) {
-				return messageOf$1(error);
+				return messageOf(error);
 			}
 			await controller.load();
 		}
@@ -2069,21 +2069,21 @@ window.__ModuleLoader__.load({
 			});
 		}
 		//#endregion
-		//#region \0dsh-css:/Users/kambiu/worker/open/cocode/cocode-gui/packages/client/ui-settings-models/src/client/OnboardingModal.module.css.mjs
-		const css$2 = ".abevUq_dialog{-webkit-app-region:no-drag;width:min(600px,100%);padding:0}.abevUq_content{box-sizing:border-box;flex-direction:column;max-height:calc(100vh - 48px);padding:28px;display:flex;overflow-y:auto}.abevUq_title{color:var(--dsw-alias-label-primary);outline:none;margin:0;font-size:20px;font-weight:500;line-height:28px}.abevUq_body{margin-top:20px}@media (width<=560px){.abevUq_content{padding:24px}}";
-		const tagId$2 = "@deepseek-ai/dsh-client-ui-settings-models/OnboardingModal.module.css";
-		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId$2) + "]") === null) {
+		//#region \0dsh-css:packages/client/ui-settings-models/src/client/OnboardingModal.module.css.mjs
+		const css$1 = ".abevUq_dialog{-webkit-app-region:no-drag;width:min(600px,100%);padding:0}.abevUq_content{box-sizing:border-box;flex-direction:column;max-height:calc(100vh - 48px);padding:28px;display:flex;overflow-y:auto}.abevUq_title{color:var(--dsw-alias-label-primary);outline:none;margin:0;font-size:20px;font-weight:500;line-height:28px}.abevUq_body{margin-top:20px}@media (width<=560px){.abevUq_content{padding:24px}}";
+		const tagId$1 = "@deepseek-ai/dsh-client-ui-settings-models/OnboardingModal.module.css";
+		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId$1) + "]") === null) {
 			const tag = document.createElement("style");
 			tag.dataset.plugin = "@deepseek-ai/dsh-client-ui-settings-models";
-			tag.dataset.pluginCss = tagId$2;
-			tag.textContent = css$2;
+			tag.dataset.pluginCss = tagId$1;
+			tag.textContent = css$1;
 			document.head.appendChild(tag);
 		}
 		var OnboardingModal_module_css_default = {
-			"content": "abevUq_content",
-			"body": "abevUq_body",
 			"title": "abevUq_title",
-			"dialog": "abevUq_dialog"
+			"dialog": "abevUq_dialog",
+			"content": "abevUq_content",
+			"body": "abevUq_body"
 		};
 		//#endregion
 		//#region packages/client/ui-settings-models/src/client/OnboardingModal.tsx
@@ -2131,14 +2131,14 @@ window.__ModuleLoader__.load({
 			});
 		}
 		//#endregion
-		//#region \0dsh-css:/Users/kambiu/worker/open/cocode/cocode-gui/packages/client/ui-settings-models/src/client/DeepSeekOnboardingDialog.module.css.mjs
-		const css$1 = ".n3rOEq_description{color:var(--dsw-alias-label-secondary);margin:0;font-size:14px;line-height:24px}.n3rOEq_editor{margin-top:24px}@media (width<=560px){.n3rOEq_editor{margin-top:20px}}";
-		const tagId$1 = "@deepseek-ai/dsh-client-ui-settings-models/DeepSeekOnboardingDialog.module.css";
-		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId$1) + "]") === null) {
+		//#region \0dsh-css:packages/client/ui-settings-models/src/client/DeepSeekOnboardingDialog.module.css.mjs
+		const css = ".n3rOEq_description{color:var(--dsw-alias-label-secondary);margin:0;font-size:14px;line-height:24px}.n3rOEq_editor{margin-top:24px}@media (width<=560px){.n3rOEq_editor{margin-top:20px}}";
+		const tagId = "@deepseek-ai/dsh-client-ui-settings-models/DeepSeekOnboardingDialog.module.css";
+		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId) + "]") === null) {
 			const tag = document.createElement("style");
 			tag.dataset.plugin = "@deepseek-ai/dsh-client-ui-settings-models";
-			tag.dataset.pluginCss = tagId$1;
-			tag.textContent = css$1;
+			tag.dataset.pluginCss = tagId;
+			tag.textContent = css;
 			document.head.appendChild(tag);
 		}
 		var DeepSeekOnboardingDialog_module_css_default = {
@@ -2222,89 +2222,7 @@ window.__ModuleLoader__.load({
 			});
 		}
 		//#endregion
-		//#region \0dsh-css:/Users/kambiu/worker/open/cocode/cocode-gui/packages/client/ui-settings-models/src/client/WelcomeNotice.module.css.mjs
-		const css = ".YRBQ5q_copy{color:var(--dsw-alias-label-secondary);font-size:14px;line-height:24px}.YRBQ5q_copy p{margin:0}.YRBQ5q_copy p+p{margin-top:12px}.YRBQ5q_error{color:var(--dsw-alias-state-error-primary);margin:16px 0 0;font-size:14px;line-height:22px}.YRBQ5q_actions{justify-content:flex-end;margin-top:24px;display:flex}.YRBQ5q_primary{min-width:120px}@media (width<=560px){.YRBQ5q_primary{width:100%}}";
-		const tagId = "@deepseek-ai/dsh-client-ui-settings-models/WelcomeNotice.module.css";
-		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId) + "]") === null) {
-			const tag = document.createElement("style");
-			tag.dataset.plugin = "@deepseek-ai/dsh-client-ui-settings-models";
-			tag.dataset.pluginCss = tagId;
-			tag.textContent = css;
-			document.head.appendChild(tag);
-		}
-		var WelcomeNotice_module_css_default = {
-			"actions": "YRBQ5q_actions",
-			"primary": "YRBQ5q_primary",
-			"copy": "YRBQ5q_copy",
-			"error": "YRBQ5q_error"
-		};
-		//#endregion
-		//#region packages/client/ui-settings-models/src/client/WelcomeNotice.tsx
-		/** Product-wide, versioned internal-testing notice. */
-		/**
-		* Render the current notice until its exact copy version is acknowledged.
-		* @param props - settings-shell owner state and welcome dependencies.
-		* @returns the welcome modal or null while the step decides not to show.
-		*/
-		function WelcomeNotice(props) {
-			const { complete, controller, useWelcome, t } = props;
-			const state = useWelcome((snapshot) => snapshot);
-			const finished = (0, react.useRef)(false);
-			const finish = (0, react.useCallback)(() => {
-				if (finished.current) return;
-				finished.current = true;
-				complete();
-			}, [complete]);
-			(0, react.useEffect)(() => {
-				if (state.status === "idle") controller.load();
-			}, [controller, state.status]);
-			(0, react.useEffect)(() => {
-				if (state.acknowledged) finish();
-			}, [finish, state.acknowledged]);
-			if (state.status === "idle" || state.status === "loading" || state.acknowledged) return null;
-			const acknowledge = async () => {
-				if (await controller.acknowledge()) finish();
-			};
-			const paragraphs = t("welcomeBody").split("\n\n");
-			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(OnboardingModal, {
-				title: t("welcomeTitle"),
-				focusTitle: true,
-				children: [
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-						className: WelcomeNotice_module_css_default.copy,
-						children: paragraphs.map((paragraph) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", { children: paragraph }, paragraph))
-					}),
-					state.error === null ? null : /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
-						className: WelcomeNotice_module_css_default.error,
-						role: "alert",
-						children: t("welcomeError")
-					}),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-						className: WelcomeNotice_module_css_default.actions,
-						children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
-							variant: "primary",
-							className: WelcomeNotice_module_css_default.primary,
-							disabled: state.status === "saving",
-							onClick: () => {
-								acknowledge();
-							},
-							children: t("welcomeContinue")
-						})
-					})
-				]
-			});
-		}
-		//#endregion
 		//#region packages/client/ui-settings-models/src/onboarding-copy.ts
-		/** Durable settings namespace for product-wide GUI onboarding facts. */
-		const WELCOME_NOTICE_SETTINGS_NAMESPACE = "ui-onboarding";
-		/** Field storing the last welcome notice version the user acknowledged. */
-		const WELCOME_NOTICE_ACK_FIELD = "welcomeNoticeVersion";
-		/**
-		* Bump only when the notice changes materially and every user should see it
-		* again. The acknowledgement is compared for exact equality.
-		*/
-		const WELCOME_NOTICE_VERSION = "2026-08-13.1";
 		/** The complete editable internal-testing notice in both supported GUI locales. */
 		const WELCOME_NOTICE_COPY = {
 			zh: {
@@ -2318,120 +2236,6 @@ window.__ModuleLoader__.load({
 				continueLabel: "Continue"
 			}
 		};
-		//#endregion
-		//#region packages/client/ui-settings-models/src/client/welcome-store.ts
-		function messageOf(error) {
-			return error instanceof Error ? error.message : String(error);
-		}
-		function acknowledgementOf(view) {
-			if (typeof view.value !== "object" || view.value === null) return void 0;
-			const value = view.value[WELCOME_NOTICE_ACK_FIELD];
-			return typeof value === "string" ? value : void 0;
-		}
-		/** Coordinates durable Host acknowledgement or a process-local remote fallback. */
-		var WelcomeNoticeStore = class {
-			/** uSES-safe state source shared by the registered welcome step. */
-			store = (0, _deepseek_ai_dsh_client_runtime_client.createSnapshotStore)({
-				status: "idle",
-				acknowledged: false,
-				error: null
-			});
-			generation = 0;
-			/**
-			* @param api - settings wire face used for durable reads and writes.
-			* @param persistence - remote browsers use memory because settings is loopback-only.
-			*/
-			constructor(api, persistence = "host") {
-				this.api = api;
-				this.persistence = persistence;
-			}
-			/** Load the acknowledgement from Host settings or initialize process-local state. */
-			async load() {
-				const generation = ++this.generation;
-				if (this.persistence === "memory") {
-					this.store.update((state) => {
-						state.status = "ready";
-						state.error = null;
-					});
-					return;
-				}
-				this.store.update((state) => {
-					state.status = "loading";
-					state.error = null;
-				});
-				try {
-					const response = await this.api.settings.describe({});
-					if (!response.result.ok) throw new Error(response.result.error.message);
-					const view = response.result.value.namespaces.find((candidate) => candidate.ns === WELCOME_NOTICE_SETTINGS_NAMESPACE);
-					if (view === void 0) throw new Error("welcome acknowledgement settings are unavailable");
-					if (generation !== this.generation) return;
-					this.store.update((state) => {
-						state.status = "ready";
-						state.acknowledged = acknowledgementOf(view) === WELCOME_NOTICE_VERSION;
-						state.error = null;
-					});
-				} catch (error) {
-					if (generation !== this.generation) return;
-					this.store.update((state) => {
-						state.status = "error";
-						state.acknowledged = false;
-						state.error = messageOf(error);
-					});
-				}
-			}
-			/**
-			* Persist this copy version, or advance only this process for a remote browser.
-			* @returns true when the selected persistence mode accepted the acknowledgement.
-			*/
-			async acknowledge() {
-				const generation = ++this.generation;
-				if (this.persistence === "memory") {
-					this.store.update((state) => {
-						state.status = "ready";
-						state.acknowledged = true;
-						state.error = null;
-					});
-					return true;
-				}
-				this.store.update((state) => {
-					state.status = "saving";
-					state.error = null;
-				});
-				try {
-					const response = await this.api.settings.mutate({
-						ns: WELCOME_NOTICE_SETTINGS_NAMESPACE,
-						ops: [{
-							op: "set",
-							path: [WELCOME_NOTICE_ACK_FIELD],
-							value: WELCOME_NOTICE_VERSION
-						}]
-					});
-					if (!response.result.ok) throw new Error(response.result.error.message);
-					if (generation === this.generation) this.store.update((state) => {
-						state.status = "ready";
-						state.acknowledged = true;
-						state.error = null;
-					});
-					return true;
-				} catch (error) {
-					if (generation === this.generation) this.store.update((state) => {
-						state.status = "error";
-						state.acknowledged = false;
-						state.error = messageOf(error);
-					});
-					return false;
-				}
-			}
-		};
-		/**
-		* Refresh only after welcome state has left idle. A memory-mode load retains
-		* acknowledgement so reconnect does not reopen a process-local notice.
-		* @param controller - welcome state owner whose current status decides whether to load.
-		*/
-		function refreshWelcomeIfLoaded(controller) {
-			if (controller.store.getSnapshot().status === "idle") return;
-			controller.load();
-		}
 		//#endregion
 		//#region packages/client/ui-settings-models/src/client/locales.ts
 		/** Copy dictionaries for the Models settings section. */
@@ -2680,28 +2484,17 @@ window.__ModuleLoader__.load({
 				api: connection.api,
 				t
 			});
-			const welcomeController = new WelcomeNoticeStore(connection.api, connection.isLoopback ? "host" : "memory");
-			const welcomeInjected = () => ({
-				controller: welcomeController,
-				hooks: { welcome: welcomeController.store },
-				t
-			});
 			ctx.effect(() => {
 				const refreshModels = () => {
 					refreshIfLoaded(controller);
 				};
-				const refreshAll = () => {
-					refreshModels();
-					refreshWelcomeIfLoaded(welcomeController);
-				};
 				const disposers = [
 					ctx.remote.$on("settings/document-updated", (ns) => {
 						refreshModels();
-						if (ns === "ui-onboarding") refreshWelcomeIfLoaded(welcomeController);
 					}),
 					ctx.remote.$on("credentials/updated", refreshModels),
 					ctx.remote.$on("llm/adapters-updated", refreshModels),
-					ctx.on("connection/reset", refreshAll)
+					ctx.on("connection/reset", refreshModels)
 				];
 				return () => {
 					for (const dispose of disposers) dispose();
@@ -2714,12 +2507,6 @@ window.__ModuleLoader__.load({
 				label: () => t("nav"),
 				inject: injected
 			}, ModelsSection));
-			ctx.slots.inject("settings.onboarding", () => ctx.slots.register({
-				name: "settings.onboarding",
-				id: "welcome-notice",
-				order: -100,
-				inject: welcomeInjected
-			}, WelcomeNotice));
 			ctx.slots.inject("settings.onboarding", () => ctx.slots.register({
 				name: "settings.onboarding",
 				id: "deepseek-official",

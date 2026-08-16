@@ -13,16 +13,19 @@ import {
 	AgencyClient,
 	AgencyHttpError,
 	type AgencyModel,
+	type CreatedApiKey,
 	type TokenPair,
 } from "../infrastructure/agency-client"
 import { listenForCallback as createCallbackListener } from "../infrastructure/callback-server"
 import { CleanupPendingStore, type CleanupPendingState } from "../infrastructure/cleanup-pending"
 import { SecureVault } from "../infrastructure/secure-vault"
+import { SharedAccountStore } from "../infrastructure/shared-account-store"
 
 const CLOUD_PROVIDER = "cocode-cloud"
 const CLOUD_NAMESPACE = "llm-pi-ai"
 const CLOUD_PATH = ["providers", CLOUD_PROVIDER] as const
 const CLOUD_CREDENTIAL = "COCODE_CLOUD_API_KEY"
+const CLOUD_API = "openai-responses"
 const CLOUD_KEY_PATTERN = /^ck_[A-Za-z0-9_-]+$/
 const CLOUD_READY_ATTEMPTS = 6
 const CLOUD_READY_RETRY_MS = 100
@@ -53,12 +56,15 @@ export type IdentityState = {
 	readonly profile?: AccountProfile
 	readonly preLoginDefault?: DefaultSelection
 	readonly managedRoute?: { readonly baseURL: string; readonly apiKeyEnv: string }
+	readonly personalKeyId?: string
+	readonly personalKeyName?: string
 }
 
 type Vault<T> = {
 	read(): Promise<T | undefined>
 	write(value: T): Promise<void>
 	clear(): Promise<void>
+	withLock?<R>(operation: () => Promise<R>): Promise<R>
 }
 
 type AccountAgency = {
@@ -71,8 +77,15 @@ type AccountAgency = {
 	exchangeCode(input: { code: string; redirectUri: string; verifier: string }): Promise<TokenPair>
 	refresh(refreshToken: string): Promise<TokenPair>
 	profile(accessToken: string): Promise<AccountProfile>
-	createDesktopKey(accessToken: string): Promise<string>
+	createDesktopKey(accessToken: string): Promise<CreatedApiKey>
 	models(apiKey: string): Promise<AgencyModel[]>
+	accountUsage(accessToken: string): Promise<{
+		readonly plan: string
+		readonly fiveHour: number
+		readonly week: number
+		readonly month: number
+		readonly syncedAt: string
+	}>
 	revoke(refreshToken: string): Promise<void>
 }
 
@@ -155,16 +168,36 @@ function routeOf(namespaces: readonly SettingsNamespace[]): Record<string, unkno
 	return recordOf(valueAt(namespace?.value, CLOUD_PATH))
 }
 
-function routeMatches(
+function isManagedCloudRoute(
 	route: Record<string, unknown> | undefined,
 	managedRoute: { readonly baseURL: string; readonly apiKeyEnv: string } | undefined,
 ): boolean {
 	return (
 		managedRoute !== undefined &&
-		route?.api === "openai-responses" &&
+		(route?.api === CLOUD_API || route?.api === "openai-completions") &&
 		route.baseURL === managedRoute.baseURL &&
 		route.apiKeyEnv === managedRoute.apiKeyEnv
 	)
+}
+
+function routeIsCurrent(
+	route: Record<string, unknown> | undefined,
+	managedRoute: { readonly baseURL: string; readonly apiKeyEnv: string } | undefined,
+): boolean {
+	return isManagedCloudRoute(route, managedRoute) && route?.api === CLOUD_API
+}
+
+function cloudRouteValue(
+	baseURL: string,
+	models: readonly { readonly id: string; readonly name: string }[],
+): Record<string, unknown> {
+	return {
+		displayName: "Cocode Cloud",
+		api: CLOUD_API,
+		baseURL,
+		apiKeyEnv: CLOUD_CREDENTIAL,
+		models: models.map((model) => ({ id: model.id, name: model.name })),
+	}
 }
 
 function isExpectedCloudProvider(provider: ProviderView): boolean {
@@ -211,8 +244,7 @@ export class AccountService {
 		dependencies: Partial<AccountServiceDependencies> = {},
 	) {
 		this.agency = agency
-		this.identity =
-			dependencies.identity ?? new SecureVault<IdentityState>("cocode-account-identity.bin")
+		this.identity = dependencies.identity ?? new SharedAccountStore()
 		this.cloudKey = dependencies.cloudKey ?? new SecureVault<string>("cocode-cloud-key.bin")
 		this.cleanupPending = dependencies.cleanupPending ?? new CleanupPendingStore()
 		this.listenForCallback = dependencies.listenForCallback ?? createCallbackListener
@@ -294,7 +326,27 @@ export class AccountService {
 
 	async snapshot(): Promise<AccountSnapshot> {
 		await this.ensureLoaded()
-		return this.snapshotValue
+		if (this.snapshotValue.phase !== "signed-in") return this.snapshotValue
+		const state = await this.identity.read()
+		if (state === undefined) return this.snapshotValue
+		try {
+			this.assertIdentityOrigin(state)
+			const current = await this.ensureIdentityAccess(state)
+			const usage = await this.agency.accountUsage(current.accessToken)
+			const snapshot = { ...this.snapshotValue, usage }
+			this.publish(snapshot)
+			return snapshot
+		} catch (error) {
+			const snapshot: AccountSnapshot = {
+				...this.snapshotValue,
+				usage: {
+					...this.snapshotValue.usage,
+					error: safeError(error, "usage-unavailable").message,
+				},
+			}
+			this.publish(snapshot)
+			return snapshot
+		}
 	}
 
 	async signIn(): Promise<AccountSnapshot> {
@@ -308,6 +360,14 @@ export class AccountService {
 	async signOut(): Promise<void> {
 		this.stage = "logout"
 		await this.ensureLoaded()
+		if (this.identity.withLock !== undefined) {
+			await this.identity.withLock(() => this.performSignOut())
+			return
+		}
+		await this.performSignOut()
+	}
+
+	private async performSignOut(): Promise<void> {
 		const state = await this.identity.read()
 		const existingPending = await this.cleanupPending.read()
 		const pending =
@@ -472,6 +532,15 @@ export class AccountService {
 	}
 
 	private async provision(state: IdentityState): Promise<AccountSnapshot> {
+		if (this.identity.withLock !== undefined) {
+			return this.identity.withLock(async () =>
+				this.provisionLocked((await this.identity.read()) ?? state),
+			)
+		}
+		return this.provisionLocked(state)
+	}
+
+	private async provisionLocked(state: IdentityState): Promise<AccountSnapshot> {
 		const baseURL = `${this.agency.getOrigin()}/v1`
 		this.stage = "settings.describe"
 		const settings = await this.dsh.describeSettings()
@@ -479,6 +548,7 @@ export class AccountService {
 		if (!settings.writable || cloudNamespace === undefined)
 			throw new Error("Cocode Cloud settings are not writable")
 		const route = routeOf(settings.namespaces)
+		const intendedRoute = { baseURL, apiKeyEnv: CLOUD_CREDENTIAL }
 		this.stage = "credentials.describe"
 		const credentials = await this.dsh.describeCredentials([CLOUD_CREDENTIAL])
 		this.stage = "providers"
@@ -490,7 +560,7 @@ export class AccountService {
 			state.managedRoute?.baseURL === baseURL &&
 			state.managedRoute.apiKeyEnv === CLOUD_CREDENTIAL
 		const managed =
-			hasManagedMetadata && (route === undefined || routeMatches(route, state.managedRoute))
+			route === undefined ? hasManagedMetadata : isManagedCloudRoute(route, intendedRoute)
 		if (route !== undefined && !managed) throw new CloudProviderConflictError()
 		const existingProvider = providersBefore.find(
 			(provider) => provider.provider === CLOUD_PROVIDER,
@@ -501,24 +571,45 @@ export class AccountService {
 				(existingProvider.active && route === undefined && !managed))
 		)
 			throw new CloudProviderConflictError()
-		if (existingCredential?.configured === true && !hasManagedMetadata)
-			throw new CloudProviderConflictError(
-				"COCODE_CLOUD_API_KEY is already configured by another source",
+		if (
+			routeIsCurrent(route, intendedRoute) &&
+			existingCredential?.configured === true &&
+			existingProvider?.active === true
+		) {
+			const group = (await this.dsh.models()).find(
+				(candidate) => candidate.id === CLOUD_PROVIDER,
 			)
+			if (group !== undefined && group.models.length > 0) {
+				const next: IdentityState = { ...state, managedRoute: intendedRoute }
+				await this.identity.write(next)
+				const snapshot: AccountSnapshot = {
+					phase: "signed-in",
+					profile: next.profile ?? null,
+					cloud: { status: "ready", providerId: CLOUD_PROVIDER },
+				}
+				this.publish(snapshot)
+				return snapshot
+			}
+		}
+		// COCODE_CLOUD_API_KEY is a reserved product slot. If another client (for
+		// example TUI) left a value there, reconcile it to the current Agency
+		// account instead of stopping with a conflict. Other provider routes still
+		// fail closed above.
 		const oldKey = await this.cloudKey.read()
+		const hadExistingCredential = existingCredential?.configured === true && !hasManagedMetadata
 		this.stage = "cloud-key"
 		const key = await this.ensureCloudKey(state)
 		this.stage = "models"
-		const models = await this.agency.models(key)
+		const models = await this.agency.models(key.secret)
 		if (models.length === 0) throw new Error("Cocode Cloud returned no available models")
 		// Persist a newly minted key before the DSH saga starts. If settings
 		// activation fails after the Agency has created the key, the next retry
-		// must reuse it instead of minting another Desktop key.
-		await this.cloudKey.write(key)
+		// must reuse it instead of minting another device key.
+		await this.cloudKey.write(key.secret)
 		const oldRoute = route === undefined ? undefined : { ...route }
 		try {
 			this.stage = "credentials.set"
-			await this.dsh.setCredential(CLOUD_CREDENTIAL, key)
+			await this.dsh.setCredential(CLOUD_CREDENTIAL, key.secret)
 			this.stage = "settings.mutate"
 			await this.dsh.mutateSettings({
 				ns: CLOUD_NAMESPACE,
@@ -527,13 +618,7 @@ export class AccountService {
 					{
 						op: "set",
 						path: CLOUD_PATH,
-						value: {
-							displayName: "Cocode Cloud",
-							api: "openai-responses",
-							baseURL,
-							apiKeyEnv: CLOUD_CREDENTIAL,
-							models: models.map((model) => ({ id: model.id, name: model.name })),
-						},
+						value: cloudRouteValue(baseURL, models),
 					},
 				],
 			})
@@ -542,6 +627,8 @@ export class AccountService {
 			if (!ready) throw new Error("Cocode Cloud provider did not become active")
 			const next: IdentityState = {
 				...state,
+				...(key.id === undefined ? {} : { personalKeyId: key.id }),
+				...(key.name === undefined ? {} : { personalKeyName: key.name }),
 				managedRoute: { baseURL, apiKeyEnv: CLOUD_CREDENTIAL },
 			}
 			await this.identity.write(next)
@@ -554,7 +641,7 @@ export class AccountService {
 			this.publish(snapshot)
 			return snapshot
 		} catch (error) {
-			await this.rollbackProvision(oldRoute, oldKey, baseURL)
+			await this.rollbackProvision(oldRoute, oldKey, baseURL, hadExistingCredential)
 			throw error
 		}
 	}
@@ -563,13 +650,14 @@ export class AccountService {
 		oldRoute: Record<string, unknown> | undefined,
 		oldKey: string | undefined,
 		baseURL: string,
+		preserveExistingCredential = false,
 	): Promise<void> {
 		try {
 			const settings = await this.dsh.describeSettings()
 			const namespace = settings.namespaces.find((item) => item.ns === CLOUD_NAMESPACE)
 			const currentRoute = routeOf(settings.namespaces)
 			const intendedRoute = { baseURL, apiKeyEnv: CLOUD_CREDENTIAL }
-			const routeWasWritten = routeMatches(currentRoute, intendedRoute)
+			const routeWasWritten = routeIsCurrent(currentRoute, intendedRoute)
 			const credentialWasWrittenWithoutRoute =
 				currentRoute === undefined && oldRoute === undefined
 			if (!routeWasWritten && !credentialWasWrittenWithoutRoute) return
@@ -589,8 +677,10 @@ export class AccountService {
 				}
 			}
 			try {
-				if (oldKey === undefined) await this.dsh.unsetCredential(CLOUD_CREDENTIAL)
-				else await this.dsh.setCredential(CLOUD_CREDENTIAL, oldKey)
+				if (oldKey === undefined) {
+					if (!preserveExistingCredential)
+						await this.dsh.unsetCredential(CLOUD_CREDENTIAL)
+				} else await this.dsh.setCredential(CLOUD_CREDENTIAL, oldKey)
 			} catch {
 				// A later hydrate or cleanup-pending pass can retry without touching a
 				// route that no longer matches the Cocode-managed shape.
@@ -624,11 +714,21 @@ export class AccountService {
 		return false
 	}
 
-	private async ensureCloudKey(state: IdentityState): Promise<string> {
+	private async ensureCloudKey(
+		state: IdentityState,
+	): Promise<{ readonly secret: string; readonly id?: string; readonly name?: string }> {
 		const existing = await this.cloudKey.read()
 		if (existing !== undefined && CLOUD_KEY_PATTERN.test(existing)) {
 			try {
-				if ((await this.agency.models(existing)).length > 0) return existing
+				if ((await this.agency.models(existing)).length > 0) {
+					return {
+						secret: existing,
+						...(state.personalKeyId === undefined ? {} : { id: state.personalKeyId }),
+						...(state.personalKeyName === undefined
+							? {}
+							: { name: state.personalKeyName }),
+					}
+				}
 			} catch (error) {
 				if (
 					!(error instanceof AgencyHttpError) ||
@@ -647,7 +747,7 @@ export class AccountService {
 		const settings = await this.dsh.describeSettings()
 		const namespace = settings.namespaces.find((item) => item.ns === CLOUD_NAMESPACE)
 		const route = routeOf(settings.namespaces)
-		if (routeMatches(route, managedRoute)) {
+		if (isManagedCloudRoute(route, managedRoute)) {
 			await this.dsh.mutateSettings({
 				ns: CLOUD_NAMESPACE,
 				expectedRevision: namespace?.revision,
@@ -778,14 +878,20 @@ export class AccountService {
 			return (await this.identity.read()) ?? state
 		}
 		this.refreshTask = (async () => {
-			this.stage = "identity-refresh"
-			const refreshed = await this.agency.refresh(state.refreshToken)
-			await this.identity.write({
-				...state,
-				accessToken: refreshed.access_token,
-				refreshToken: refreshed.refresh_token || state.refreshToken,
-				accessExpiresAt: Date.now() + refreshed.expires_in * 1000,
-			})
+			const refresh = async (): Promise<void> => {
+				const current = (await this.identity.read()) ?? state
+				if (Date.now() < current.accessExpiresAt - 30_000) return
+				this.stage = "identity-refresh"
+				const refreshed = await this.agency.refresh(current.refreshToken)
+				await this.identity.write({
+					...current,
+					accessToken: refreshed.access_token,
+					refreshToken: refreshed.refresh_token || current.refreshToken,
+					accessExpiresAt: Date.now() + refreshed.expires_in * 1000,
+				})
+			}
+			if (this.identity.withLock !== undefined) await this.identity.withLock(refresh)
+			else await refresh()
 		})().finally(() => {
 			this.refreshTask = undefined
 		})

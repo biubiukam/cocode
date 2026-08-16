@@ -25,7 +25,7 @@ describe('account', () => {
       refreshToken: 'refresh',
       accessExpiresAt: 1710000000000,
       personalKeyId: 'key-1',
-      personalKeyName: 'Cocode TUI',
+      personalKeyName: 'Cocode Device — test-host',
     })
     expect(await readAccount(home)).toEqual({
       origin: 'https://cocode.agency',
@@ -33,7 +33,7 @@ describe('account', () => {
       refreshToken: 'refresh',
       accessExpiresAt: 1710000000000,
       personalKeyId: 'key-1',
-      personalKeyName: 'Cocode TUI',
+      personalKeyName: 'Cocode Device — test-host',
     })
     expect(JSON.stringify(await readAccount(home))).not.toMatch(/ck_|sk-/)
   })

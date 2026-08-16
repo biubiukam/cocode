@@ -3,9 +3,10 @@
 import { RESUME_WINDOW_SIZE } from '../runtime/resume-picker.ts'
 import { REWIND_WINDOW_SIZE } from '../runtime/rewind-picker.ts'
 import { SKILLS_WINDOW_SIZE } from '../runtime/skills-picker.ts'
+import { CHECKLIST_WINDOW_SIZE } from '../runtime/checklist.ts'
 import { listWindowStart } from './list-window.ts'
 
-const HEADER_ROWS = 3
+export const CHAT_HEADER_ROWS = 2
 const STATUS_ROWS = 2
 const COMPOSER_CHROME_ROWS = 4
 const FOOTER_ROWS = 2
@@ -22,6 +23,7 @@ export type ChatLayoutInput = {
   hasAttachments?: boolean
   hasNotice?: boolean
   hasStatusDetails?: boolean
+  checklistStripRows?: number
   editorFeedbackRows?: number
   helpLines?: number
   slashItems?: number
@@ -30,6 +32,8 @@ export type ChatLayoutInput = {
   historyMatches?: number
   resumeItems?: number
   resumeSelected?: number
+  checklistItems?: number
+  checklistSelected?: number
   rewindItems?: number
   rewindSelected?: number
   rewindConfirming?: boolean
@@ -38,6 +42,9 @@ export type ChatLayoutInput = {
   questionRows?: number
   approvalRows?: number
   reviewRows?: number
+  actionMenuItems?: number
+  actionMenuQuery?: boolean
+  modelSwitchRows?: number
 }
 
 export type ChatLayout = {
@@ -54,7 +61,7 @@ export function calculateChatLayout(input: ChatLayoutInput): ChatLayout {
   const viewportRows = nonNegativeInteger(input.viewportRows)
   const composerRows = Math.min(MAX_COMPOSER_ROWS, atLeastOne(input.composerLines))
   const baseRows =
-    HEADER_ROWS +
+    CHAT_HEADER_ROWS +
     STATUS_ROWS +
     COMPOSER_CHROME_ROWS +
     FOOTER_ROWS +
@@ -62,6 +69,7 @@ export function calculateChatLayout(input: ChatLayoutInput): ChatLayout {
     optionalRow(input.hasAttachments) +
     optionalRow(input.hasNotice) +
     optionalRow(input.hasStatusDetails) +
+    nonNegativeInteger(input.checklistStripRows) +
     nonNegativeInteger(input.editorFeedbackRows)
   const requestedOverlayRows =
     helpRows(input.helpLines) +
@@ -69,11 +77,14 @@ export function calculateChatLayout(input: ChatLayoutInput): ChatLayout {
     fileRows(input.fileItems, input.fileLoading) +
     historyRows(input.historyMatches) +
     resumeRows(input.resumeItems, input.resumeSelected) +
+    checklistRows(input.checklistItems, input.checklistSelected) +
     rewindRows(input.rewindItems, input.rewindSelected, input.rewindConfirming) +
     skillsRows(input.skillsItems, input.skillsSelected) +
     questionRows(input.questionRows) +
     questionRows(input.approvalRows) +
-    reviewRows(input.reviewRows)
+    reviewRows(input.reviewRows) +
+    actionMenuRows(input.actionMenuItems, input.actionMenuQuery) +
+    modelSwitchRows(input.modelSwitchRows)
   const availableRows = Math.max(0, viewportRows - baseRows)
   const minimumOverlayRows = minimumOverlayHeight(input)
   const minimumRows =
@@ -107,7 +118,7 @@ function helpRows(lines: number | undefined): number {
 function slashRows(items: number | undefined): number {
   if (items === undefined) return 0
   const count = nonNegativeInteger(items)
-  return count + 4
+  return Math.max(1, count) + 4
 }
 
 function fileRows(items: number | undefined, loading = false): number {
@@ -133,11 +144,14 @@ function resumeRows(items: number | undefined, selected = 0): number {
 
 function minimumOverlayHeight(input: ChatLayoutInput): number {
   if (input.resumeItems !== undefined) return MIN_RESUME_OVERLAY_ROWS
+  if (input.checklistItems !== undefined) return MIN_OVERLAY_ROWS
   if (input.rewindItems !== undefined) return MIN_REWIND_OVERLAY_ROWS
   if (input.skillsItems !== undefined) return MIN_OVERLAY_ROWS
   if (input.questionRows !== undefined) return MIN_OVERLAY_ROWS
   if (input.approvalRows !== undefined) return MIN_OVERLAY_ROWS
   if (input.reviewRows !== undefined) return MIN_OVERLAY_ROWS
+  if (input.actionMenuItems !== undefined) return MIN_OVERLAY_ROWS
+  if (input.modelSwitchRows !== undefined) return MIN_OVERLAY_ROWS
   if (input.historyMatches !== undefined) return MIN_OVERLAY_ROWS
   if (input.fileItems !== undefined || input.fileLoading === true) {
     return MIN_OVERLAY_ROWS + optionalRow(input.fileLoading)
@@ -146,6 +160,20 @@ function minimumOverlayHeight(input: ChatLayoutInput): number {
     return MIN_OVERLAY_ROWS
   }
   return MIN_OVERLAY_ROWS
+}
+
+function checklistRows(items: number | undefined, selected = 0): number {
+  if (items === undefined) return 0
+  const count = nonNegativeInteger(items)
+  const visible = Math.max(1, Math.min(count, CHECKLIST_WINDOW_SIZE))
+  const start = listWindowStart(selected, count, CHECKLIST_WINDOW_SIZE)
+  const indicators = optionalRow(start > 0) + optionalRow(count - start - visible > 0)
+  return visible + indicators + 4
+}
+
+function actionMenuRows(items: number | undefined, query = false): number {
+  if (items === undefined) return 0
+  return Math.max(1, nonNegativeInteger(items)) + 4 + optionalRow(query)
 }
 
 function rewindRows(items: number | undefined, selected = 0, confirming = false): number {
@@ -171,6 +199,10 @@ function questionRows(rows: number | undefined): number {
 }
 
 function reviewRows(rows: number | undefined): number {
+  return rows === undefined ? 0 : Math.max(MIN_OVERLAY_ROWS, nonNegativeInteger(rows))
+}
+
+function modelSwitchRows(rows: number | undefined): number {
   return rows === undefined ? 0 : Math.max(MIN_OVERLAY_ROWS, nonNegativeInteger(rows))
 }
 

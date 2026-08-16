@@ -2,32 +2,38 @@ import { describe, expect, it } from 'vitest'
 import { buildSessionTree, flattenSessionTree } from '../../src/runtime/session-tree.ts'
 import type { SessionSummary } from '../../src/runtime/sessions-fs.ts'
 
-function session(id: string, createdAt: number, parentSession?: string): SessionSummary {
+function session(
+  id: string,
+  createdAt: number,
+  parentSession?: string,
+  updatedAt?: number,
+): SessionSummary {
   return {
     id,
     createdAt,
     path: `/sessions/${id}/session.jsonl`,
     ...(parentSession === undefined ? {} : { parentSession }),
+    ...(updatedAt === undefined ? {} : { updatedAt }),
   }
 }
 
 describe('session tree', () => {
-  it('keeps legacy roots and orders descendants by creation time', () => {
+  it('keeps legacy roots and orders sessions by latest activity', () => {
     const rows = flattenSessionTree(
       buildSessionTree([
-        session('child-b', 30, 'root'),
+        session('child-b', 30, 'root', 50),
         session('legacy', 5),
-        session('root', 10),
-        session('child-a', 20, 'root'),
+        session('root', 10, undefined, 40),
+        session('child-a', 20, 'root', 45),
       ]),
       'child-b',
     )
 
     expect(rows.map((row) => [row.session.id, row.depth, row.current])).toEqual([
-      ['legacy', 0, false],
       ['root', 0, false],
-      ['child-a', 1, false],
       ['child-b', 1, true],
+      ['child-a', 1, false],
+      ['legacy', 0, false],
     ])
   })
 

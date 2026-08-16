@@ -2,13 +2,16 @@
  * Shared product constants for auth and cloud routing.
  */
 
+import { deviceKeyName } from './device-name.ts'
+
 export const DEFAULT_ORIGIN = 'https://cocode.agency'
 export const DEFAULT_PROVIDER = 'deepseek-official'
 export const DEFAULT_MODEL = 'deepseek-v4-flash'
 export const CLOUD_PROVIDER = 'cocode-cloud'
 export const CLOUD_KEY_REF = 'COCODE_CLOUD_API_KEY'
 export const DEEPSEEK_KEY_REF = 'DEEPSEEK_API_KEY'
-export const KEY_NAME = 'Cocode TUI'
+export { deviceKeyName } from './device-name.ts'
+export const KEY_NAME = deviceKeyName()
 
 export const DEVICE_SCOPES = [
   'profile:read',
@@ -27,6 +30,16 @@ export type MeProfile = {
 
 export type CloudModel = { id: string; name: string }
 
+export const CLOUD_API = 'openai-responses'
+
+export type CloudProviderProfile = {
+  displayName: string
+  api: typeof CLOUD_API
+  baseURL: string
+  apiKeyEnv: typeof CLOUD_KEY_REF
+  models: CloudModel[]
+}
+
 export type AccountRecord = {
   origin: string
   accessToken: string
@@ -42,7 +55,9 @@ export type ResolvedAuth = {
   model: string
   cwd: string
   origin: string
-  home: string
+  accountHome: string
+  dshHome: string
+  cloudProvider?: CloudProviderProfile
   env: NodeJS.ProcessEnv
 }
 

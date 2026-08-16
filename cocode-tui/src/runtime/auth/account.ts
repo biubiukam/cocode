@@ -34,9 +34,12 @@ export async function readAccount(home: string): Promise<AccountRecord | undefin
 
 export async function writeAccount(home: string, record: AccountRecord): Promise<void> {
   const origin = normalizeAgencyOrigin(record.origin)
+  const existing = await readYamlUnknown(accountPath(home), { secret: true })
+  const preserved = !existing.missing && isRecord(existing.value) ? existing.value : {}
   await writeYamlFile(
     accountPath(home),
     {
+      ...preserved,
       origin,
       access_token: record.accessToken,
       refresh_token: record.refreshToken,

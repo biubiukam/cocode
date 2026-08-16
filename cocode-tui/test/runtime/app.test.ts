@@ -10,12 +10,16 @@ import type {
   TuiQuestionRequest,
   TuiRuntime,
   TuiPromptMode,
+  TuiModelCatalog,
+  TuiImageInput,
 } from '@cocode/tui-connection'
 import { createTuiApp } from '../../src/runtime/app.ts'
 import { P0_CAPABILITIES } from '../../src/runtime/capabilities.ts'
 
 function fakeRuntime(): TuiRuntime & {
   prompts: { sessionId: string; text: string }[]
+  promptBlocks: { sessionId: string; blocks: { type: string; [key: string]: unknown }[]; mode: TuiPromptMode }[]
+  savedImages: TuiImageInput[][]
   emit: (n: TuiNotification) => void
   emitClose: (error?: string) => void
   closeCount: number
@@ -28,6 +32,8 @@ function fakeRuntime(): TuiRuntime & {
   failStart?: Error
   cancelError?: Error
   failRestartModels: Set<string>
+  modelCatalog: TuiModelCatalog
+  modelListError?: Error
 } {
   const handlers = new Set<(n: TuiNotification) => void>()
   const closeHandlers = new Set<(error?: string) => void>()
@@ -38,12 +44,15 @@ function fakeRuntime(): TuiRuntime & {
     failStart?: Error
   } = {
     prompts: [],
+    promptBlocks: [],
+    savedImages: [],
     closeCount: 0,
     restarts: [],
     cancels: [],
     opens: [],
     rewinds: [],
     failRestartModels: new Set(),
+    modelCatalog: { groups: [], failures: [] },
     emit(n) {
       for (const handler of handlers) handler(n)
     },
@@ -68,7 +77,23 @@ function fakeRuntime(): TuiRuntime & {
     async prompt(sessionId, blocks, mode = 'normal') {
       const text = typeof blocks[0]?.text === 'string' ? blocks[0].text : ''
       runtime.prompts.push({ sessionId, text, ...(mode === 'normal' ? {} : { mode }) })
+      runtime.promptBlocks.push({ sessionId, blocks, mode })
       return 'mid-1'
+    },
+    async saveImages(images) {
+      runtime.savedImages.push([...images])
+      return images.map((image, index) => ({
+        attachmentId: `fake-image-${index}`,
+        mediaType: image.mediaType,
+        bytes: image.data.byteLength,
+        width: 1,
+        height: 1,
+        ...(image.name === undefined ? {} : { name: image.name }),
+      }))
+    },
+    async listModels() {
+      if (runtime.modelListError !== undefined) throw runtime.modelListError
+      return runtime.modelCatalog
     },
     async cancel(sessionId, keepInbox = false) {
       if (runtime.cancelError !== undefined) throw runtime.cancelError
@@ -134,6 +159,80 @@ function fakeRuntime(): TuiRuntime & {
 }
 
 describe('TuiApp', () => {
+  it('opens the file picker mention at the cursor', async () => {
+    const runtime = fakeRuntime()
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+    })
+    await app.start()
+
+    app.dispatch({ type: 'setDraft', text: 'review this' })
+    app.dispatch({ type: 'file.open' })
+
+    expect(app.snapshot().composer.text).toBe('review this @')
+  })
+
+  it('notifies when a question needs attention', async () => {
+    const runtime = fakeRuntime()
+    const values: string[] = []
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+      terminalNotify: {
+        mode: 'osc777',
+        platform: 'darwin',
+        env: {},
+        write: (value) => values.push(value),
+      },
+    })
+    await app.start()
+
+    const answer = runtime.askQuestion({
+      sessionId: 's1',
+      questions: [{ id: 'choice', question: 'Choose?', options: [{ label: 'A' }] }],
+    })
+    const nextAnswer = runtime.askQuestion({
+      sessionId: 's1',
+      questions: [{ id: 'next', question: 'Next?', options: [{ label: 'B' }] }],
+    })
+
+    expect(values).toContain('\u001b]777;notify;Cocode;question ready for interaction\u0007')
+    expect(values).toHaveLength(1)
+    app.dispatch({ type: 'question.answer', selected: ['A'] })
+    await answer
+    expect(values).toHaveLength(2)
+    app.dispatch({ type: 'question.answer', selected: ['B'] })
+    await nextAnswer
+  })
+
+  it('prevents starting a new session while the current turn is running', async () => {
+    const runtime = fakeRuntime()
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+    })
+    await app.start()
+    runtime.emit({ method: 'session.status', params: { sessionId: 's1', status: 'running' } })
+
+    app.dispatch({ type: 'session.new' })
+
+    expect(app.snapshot().header.sessionId).toBe('s1')
+    expect(app.snapshot().notice?.message).toContain('Turn in progress')
+    runtime.emit({ method: 'session.status', params: { sessionId: 's1', status: 'idle' } })
+    app.dispatch({ type: 'session.new' })
+    expect(app.snapshot().header.sessionId).not.toBe('s1')
+  })
+
   it('toggles latest-turn focus without changing the assembled transcript', async () => {
     const runtime = fakeRuntime()
     const app = createTuiApp({
@@ -145,6 +244,11 @@ describe('TuiApp', () => {
       locale: 'zh',
     })
     await app.start()
+    expect(app.snapshot().runtimeInfo).toMatchObject({
+      name: 'fake-runtime',
+      capabilitySource: 'unknown',
+      mcp: { status: 'unknown' },
+    })
     runtime.emit({
       method: 'session.event',
       params: {
@@ -189,15 +293,22 @@ describe('TuiApp', () => {
         open: false,
         fork: false,
         rewind: false,
-        skills: false,
+        skills: true,
         onRequest: false,
+        approval: false,
+        permissionMode: false,
+        planMode: false,
+        sessionList: false,
+        modelList: false,
         queueMode: false,
+        promptMode: false,
       },
       errors: {
         cancel: 'protocol method is not supported by the runtime',
       },
     }
     runtime.getCapabilities = () => liveCapabilities
+    runtime.listSkills = async () => []
     const app = createTuiApp({
       runtime,
       cwd: '/tmp',
@@ -210,8 +321,14 @@ describe('TuiApp', () => {
     expect(app.snapshot().capabilities).toMatchObject({
       cancel: false,
       rewind: false,
-      skills: false,
+      skills: true,
     })
+    expect(
+      app.snapshot().runtimeInfo.capabilities.find((capability) => capability.name === 'onRequest'),
+    ).toEqual({ name: 'onRequest', enabled: false })
+    expect(
+      app.snapshot().runtimeInfo.capabilities.find((capability) => capability.name === 'skills'),
+    ).toEqual({ name: 'skills', enabled: true })
     app.dispatch({ type: 'command', line: '/doctor' })
     expect(app.snapshot().notice?.message).toContain('caps-configured cancel=true')
     expect(app.snapshot().notice?.message).toContain('caps-runtime cancel=false')
@@ -266,6 +383,28 @@ describe('TuiApp', () => {
     expect(app.snapshot().question).toBeUndefined()
   })
 
+  it('keeps dispatch bound when a question panel invokes it as a callback', async () => {
+    const runtime = fakeRuntime()
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+    })
+    await app.start()
+    const answer = runtime.askQuestion({
+      sessionId: 's1',
+      questions: [{ id: 'choice', question: 'Choose?', options: [{ label: 'A' }] }],
+    })
+    const dispatch = app.dispatch
+
+    expect(() => dispatch({ type: 'question.answer', selected: ['A'] })).not.toThrow()
+    await expect(answer).resolves.toEqual({
+      answers: [{ id: 'choice', selected: ['A'] }],
+    })
+  })
+
   it('queues question batches FIFO and rejects the active one on cancel', async () => {
     const runtime = fakeRuntime()
     const app = createTuiApp({
@@ -294,6 +433,28 @@ describe('TuiApp', () => {
     })
   })
 
+  it('keeps dispatch bound when passed to a question panel', async () => {
+    const runtime = fakeRuntime()
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+    })
+    await app.start()
+    const answer = runtime.askQuestion({
+      sessionId: 's1',
+      questions: [{ id: 'plan', question: 'Accept this plan?' }],
+    })
+    const panel = { dispatch: app.dispatch }
+
+    panel.dispatch({ type: 'question.cancel' })
+
+    await expect(answer).rejects.toThrow('interrupted')
+    expect(app.snapshot().question).toBeUndefined()
+  })
+
   it('loads a real skill catalog and inserts the selected invocation', async () => {
     const runtime = fakeRuntime() as TuiRuntime & {
       listSkills(sessionId: string): Promise<{ name: string; description: string }[]>
@@ -316,6 +477,116 @@ describe('TuiApp', () => {
     expect(app.snapshot().skillsPicker?.open).toBe(true)
     app.dispatch({ type: 'skills.confirm' })
     expect(app.snapshot().composer.text).toBe('/review ')
+    app.dispatch({ type: 'submit', text: app.snapshot().composer.text + 'security' })
+    await expect.poll(() => runtime.prompts).toContainEqual({
+      sessionId: 's1',
+      text: '/review security',
+    })
+  })
+
+  it('exposes user-invocable skills in the slash menu and sends them as prompts', async () => {
+    const runtime = fakeRuntime() as TuiRuntime & {
+      listSkills(sessionId: string): Promise<{ name: string; description: string }[]>
+    }
+    runtime.listSkills = async (sessionId) => {
+      expect(sessionId).toBe('s1')
+      return [{ name: 'audit', description: 'Inspect the current change' }]
+    }
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+    })
+    await app.start()
+
+    expect(app.snapshot().commands).toContainEqual({
+      name: 'audit',
+      summary: 'Inspect the current change',
+    })
+    app.dispatch({ type: 'command', line: '/audit focus on security' })
+
+    await expect.poll(() => runtime.prompts).toContainEqual({
+      sessionId: 's1',
+      text: '/audit focus on security',
+    })
+  })
+
+  it('namespaces discovered skill commands and keeps the wire invocation unprefixed', async () => {
+    const runtime = fakeRuntime() as TuiRuntime & {
+      listSkills(sessionId: string): Promise<{ name: string; description: string; source: string }[]>
+    }
+    runtime.listSkills = async () => [
+      { name: 'review', description: 'Review a change', source: 'project-agents' },
+    ]
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+    })
+    await app.start()
+
+    expect(app.snapshot().commands).toContainEqual({
+      name: 'project:review',
+      summary: 'Review a change',
+    })
+    app.dispatch({ type: 'command', line: '/project:review security' })
+
+    await expect.poll(() => runtime.prompts).toContainEqual({
+      sessionId: 's1',
+      text: '/review security',
+    })
+  })
+
+  it('keeps pasted images in the draft until send and then sends attachment blocks', async () => {
+    const runtime = fakeRuntime()
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+      capabilities: { ...P0_CAPABILITIES, imageAttachments: true },
+      readClipboardImage: async () => ({
+        data: Uint8Array.of(1, 2, 3),
+        mediaType: 'image/png',
+      }),
+    })
+    await app.start()
+
+    app.dispatch({ type: 'image.paste' })
+    await expect.poll(() => app.snapshot().composer.images).toHaveLength(1)
+    expect(app.snapshot().composer.text).toMatch(/^\[Image: clipboard-1\.png\] /)
+    expect(runtime.savedImages).toEqual([])
+
+    app.dispatch({ type: 'setDraft', text: 'ask about this' })
+    expect(app.snapshot().composer.images).toEqual([])
+    app.dispatch({ type: 'setDraft', text: '' })
+
+    app.dispatch({ type: 'image.paste' })
+    await expect.poll(() => app.snapshot().composer.images).toHaveLength(1)
+    app.dispatch({ type: 'submit', text: `${app.snapshot().composer.text}describe it` })
+
+    await expect.poll(() => runtime.savedImages).toHaveLength(1)
+    await expect.poll(() => runtime.promptBlocks).toHaveLength(1)
+    expect(runtime.promptBlocks[0]?.blocks).toEqual([
+      { type: 'text', text: 'describe it' },
+      {
+        type: 'image',
+        attachment: {
+          attachmentId: 'fake-image-0',
+          mediaType: 'image/png',
+          bytes: 3,
+          width: 1,
+          height: 1,
+          name: 'clipboard-2.png',
+        },
+      },
+    ])
+    expect(app.snapshot().composer.images).toEqual([])
   })
 
   it('switches interface language with /lang', async () => {
@@ -335,6 +606,9 @@ describe('TuiApp', () => {
 
   it('switches model through runtime restart and starts a new session', async () => {
     const runtime = fakeRuntime()
+    runtime.open = async () => {
+      throw new Error('session persistence is unavailable')
+    }
     const app = createTuiApp({
       runtime,
       cwd: '/tmp',
@@ -347,12 +621,66 @@ describe('TuiApp', () => {
     await expect.poll(() => app.snapshot().header.model).toBe('m2')
     expect(runtime.restarts).toEqual([{ provider: 'deepseek-official', model: 'm2' }])
     expect(app.snapshot().header.sessionId).not.toBe('s1')
+    expect(app.snapshot().notice?.message).toContain('persistence is unavailable')
     expect(app.snapshot().agent).toBe('idle')
+  })
+
+  it('keeps the current session when the restarted runtime supports durable session open', async () => {
+    const runtime = fakeRuntime()
+    runtime.getCapabilities = () => ({
+      source: 'runtime',
+      capabilities: {
+        cancel: true,
+        open: true,
+        fork: true,
+        rewind: true,
+        skills: false,
+        onRequest: false,
+        approval: false,
+        permissionMode: false,
+        planMode: false,
+        sessionList: false,
+        modelList: false,
+        promptMode: false,
+        queueMode: false,
+      },
+      errors: {},
+    })
+    const seed: SessionEvent[] = [
+      {
+        type: 'user/message',
+        seq: 1,
+        time: 1,
+        data: { content: [{ type: 'text', text: 'keep this context' }] },
+      },
+    ]
+    runtime.open = async (sessionId) => {
+      expect(sessionId).toBe('s1')
+      return { opened: true, seed, seedLength: seed.length }
+    }
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm1',
+      sessionId: 's1',
+    })
+    await app.start()
+    app.dispatch({ type: 'command', line: '/model m2' })
+
+    await expect.poll(() => app.snapshot().header.model).toBe('m2')
+    expect(app.snapshot().header.sessionId).toBe('s1')
+    expect(app.snapshot().nodes).toHaveLength(1)
+    expect(app.snapshot().nodes[0]?.text).toContain('keep this context')
+    expect(app.snapshot().notice?.message).toContain('current session continued')
   })
 
   it('restores the previous model when switching fails', async () => {
     const runtime = fakeRuntime()
     runtime.failRestartModels.add('m2')
+    runtime.open = async () => {
+      throw new Error('session persistence is unavailable')
+    }
     const app = createTuiApp({
       runtime,
       cwd: '/tmp',
@@ -369,8 +697,83 @@ describe('TuiApp', () => {
       { provider: 'deepseek-official', model: 'm1' },
     ])
     expect(app.snapshot().header.model).toBe('m1')
+    expect(app.snapshot().header.sessionId).not.toBe('s1')
+    expect(app.snapshot().nodes).toHaveLength(0)
+    expect(app.snapshot().notice?.message).toContain('持久化不可用')
+  })
+
+  it('opens a model picker from /model and switches provider and model', async () => {
+    const runtime = fakeRuntime()
+    runtime.modelCatalog = {
+      groups: [
+        {
+          id: 'p2',
+          name: 'Provider 2',
+          models: [{ id: 'm2', name: 'Model 2' }],
+        },
+      ],
+      failures: [],
+    }
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p1',
+      model: 'm1',
+      sessionId: 's1',
+      capabilities: { ...P0_CAPABILITIES, modelList: true },
+    })
+    await app.start()
+    app.dispatch({ type: 'command', line: '/model' })
+    await expect.poll(() => app.snapshot().modelPicker?.open).toBe(true)
+    expect(app.snapshot().modelPicker?.groups[0]?.id).toBe('p2')
+    app.dispatch({ type: 'model.confirm' })
+    await expect.poll(() => app.snapshot().header.provider).toBe('p2')
+    expect(runtime.restarts).toEqual([{ provider: 'p2', model: 'm2' }])
+    expect(app.snapshot().header.model).toBe('m2')
     expect(app.snapshot().header.sessionId).toBe('s1')
-    expect(app.snapshot().notice?.message).toBe('模型切换失败，已恢复为 m1。')
+  })
+
+  it('opens the manual model input for /models when the runtime has no catalog', async () => {
+    const runtime = fakeRuntime()
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm1',
+      capabilities: P0_CAPABILITIES,
+    })
+    await app.start()
+    app.dispatch({ type: 'command', line: '/models' })
+    expect(app.snapshot().modelInputOpen).toBe(true)
+  })
+
+  it('restores both provider and model when a cross-provider switch fails', async () => {
+    const runtime = fakeRuntime()
+    runtime.failRestartModels.add('m2')
+    runtime.modelCatalog = {
+      groups: [{ id: 'p2', name: 'Provider 2', models: [{ id: 'm2', name: 'Model 2' }] }],
+      failures: [],
+    }
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p1',
+      model: 'm1',
+      sessionId: 's1',
+      capabilities: { ...P0_CAPABILITIES, modelList: true },
+      locale: 'zh',
+    })
+    await app.start()
+    app.dispatch({ type: 'command', line: '/model' })
+    await expect.poll(() => app.snapshot().modelPicker?.open).toBe(true)
+    app.dispatch({ type: 'model.confirm' })
+    await expect.poll(() => app.snapshot().agent).toBe('idle')
+    expect(runtime.restarts).toEqual([
+      { provider: 'p2', model: 'm2' },
+      { provider: 'p1', model: 'm1' },
+    ])
+    expect(app.snapshot().header.provider).toBe('p1')
+    expect(app.snapshot().header.model).toBe('m1')
   })
 
   it('resumes a searchable local session from its event log', async () => {
@@ -602,12 +1005,12 @@ describe('TuiApp', () => {
       params: { sessionId: 's1', status: 'running' },
     })
 
-    expect(app.snapshot().status.line).toBe('fake-runtime · 思考中…')
+    expect(app.snapshot().status.line).toBe('思考中…')
     runtime.emit({
       method: 'session.status',
       params: { sessionId: 's1', status: 'idle' },
     })
-    expect(app.snapshot().status.line).toBe('fake-runtime · 空闲')
+    expect(app.snapshot().status.line).toBe('就绪')
   })
 
   it('sends /compact through the prompt path', async () => {
@@ -1462,6 +1865,60 @@ describe('TuiApp', () => {
       { content: 'two', status: 'pending' },
     ])
     expect(app.snapshot().status.goal?.phase).toBe('active')
+  })
+
+  it('opens and navigates the current checklist without mutating todos', async () => {
+    const runtime = fakeRuntime()
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+    })
+    await app.start()
+    runtime.emit({
+      method: 'session.event',
+      params: {
+        sessionId: 's1',
+        event: {
+          type: 'todo/write',
+          seq: 1,
+          time: 1,
+          data: {
+            todos: [
+              { content: 'done', status: 'completed' },
+              { content: 'active', status: 'in_progress' },
+              { content: 'next', status: 'pending' },
+            ],
+          },
+        },
+      },
+    })
+
+    app.dispatch({ type: 'command', line: '/todos' })
+    expect(app.snapshot().checklist).toEqual({ open: true, selected: 1 })
+
+    app.dispatch({ type: 'checklist.move', delta: 1 })
+    expect(app.snapshot().checklist?.selected).toBe(2)
+    expect(app.snapshot().status.todos.map((todo) => todo.content)).toEqual([
+      'done',
+      'active',
+      'next',
+    ])
+
+    runtime.emit({
+      method: 'session.event',
+      params: {
+        sessionId: 's1',
+        event: { type: 'turn/start', seq: 2, time: 2, data: {} },
+      },
+    })
+    expect(app.snapshot().status.todos).toEqual([])
+    expect(app.snapshot().checklist).toBeUndefined()
+
+    app.dispatch({ type: 'checklist.close' })
+    expect(app.snapshot().checklist).toBeUndefined()
   })
 
   it('projects subagent lifecycle into status without leaking other sessions', async () => {

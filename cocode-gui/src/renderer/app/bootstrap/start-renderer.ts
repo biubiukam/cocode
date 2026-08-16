@@ -7,6 +7,9 @@ import { resolveLocalDshClientBundleUrl } from "./local-dsh-client-bundles"
 
 export async function startRenderer(element: HTMLElement): Promise<void> {
 	try {
+		if (window.desktopApi?.dsh === undefined) {
+			throw new Error("Electron preload bridge is unavailable. Start the GUI with `pnpm run dev` instead of opening the Renderer Vite page directly.")
+		}
 		const bootstrap = await window.desktopApi.dsh.getBootstrap()
 		applyInitialTheme(bootstrap.themePreference)
 		markThemeReady()

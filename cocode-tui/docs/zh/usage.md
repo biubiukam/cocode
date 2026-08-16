@@ -35,14 +35,14 @@ TTY，可以用于安装脚本和故障排查。
 
 ## 启动前
 
-不需要安装 Desktop，也不需要 sibling runtime checkout。第一个 TUI 或 Desktop
+不需要安装 Desktop，也不需要额外的 runtime checkout。第一个 TUI 或 Desktop
 客户端会为当前 scope 启动 Supervisor 与 DSH Host，后续客户端只获取新的 lease
 并连接同一个 Host。只有在需要自定义 Host 组合时才设置 `DSH_HOME`、`DSH_PROFILE`
 或 `COCODE_HOST_CONFIG_FINGERPRINT`。
 
-当前已验证的是 macOS 上的本地 sibling Harness 组合。Windows、Linux 和真实终端组合键仍需按 [平台说明](./platforms.md) 单独验收；自动化测试不会替代真实 TTY 验收。
+当前已验证的是 macOS 上的本地 Supervisor 与 DSH Host 流程。Windows、Linux 和真实终端组合键仍需按 [平台说明](./platforms.md) 单独验收；自动化测试不会替代真实 TTY 验收。
 
-密钥可以通过首屏登录配置，也可以临时设置 `DEEPSEEK_API_KEY`。开发环境可用 `COCODE_HOME` 指向单独的配置目录。会话目录默认使用 `$DSH_HOME/sessions`；未设置 `DSH_HOME` 时使用 `~/.dsh/sessions`，也可以用 `DSH_SESSION_ROOT` 覆盖。
+密钥可以通过首屏登录配置，也可以临时设置 `DEEPSEEK_API_KEY`。开发环境可用 `COCODE_HOME` 和 `DSH_HOME` 指向彼此隔离的目录。DSH 配置和凭据遵循官方 `$DSH_HOME` 目录规范。会话目录默认使用 `$DSH_HOME/sessions`；未设置 `DSH_HOME` 时使用 `~/.dsh/sessions`，也可以用 `DSH_SESSION_ROOT` 覆盖。
 
 同一份程序支持 Windows、macOS 和 Linux。Windows 未配置 `$VISUAL` 或 `$EDITOR` 时使用 `notepad.exe`；WSL 使用 Linux 进程语义，并可回退到 `clip.exe` 和 `explorer.exe`。使用 VS Code 等图形编辑器时，请配置带等待参数的命令。
 
@@ -55,8 +55,8 @@ TTY，可以用于安装脚本和故障排查。
 - 顶部显示工作区、git 分支、session、provider、model 和实时 Agent 状态。
 - 中间是会话投影：`you`、`cocode`、思考内容和工具结果按节点分组显示。
 - 底部状态栏显示运行状态、notice 以及已有的输入/输出 token 用量。
-- 输入区使用带边框的 `prompt` 面板；runtime 不可用时会显示 `locked`，不会继续伪装成可编辑状态。
-- `/` 命令菜单和 `?` 帮助面板显示在状态栏与输入区之间；消息区会先缩小，弹层高度也会受剩余空间限制。
+- 输入区使用带边框的 `prompt` 面板，并显示当前 `Build` / `Plan` 模式；runtime 不可用时会显示 `locked`，不会继续伪装成可编辑状态。
+- `/` 命令菜单、选择器和确认面板使用居中浮窗显示；消息区会先缩小，浮窗高度也会受剩余空间限制。
 - 多行草稿最多显示光标附近 6 行，完整草稿不会被删除；终端高度连固定区域都无法容纳时，会显示调整尺寸提示并暂停普通输入。
 
 ## 对话编辑
@@ -67,14 +67,17 @@ TTY，可以用于安装脚本和故障排查。
 - `Ctrl+R` 打开历史搜索；输入文字过滤最近消息，使用 `↑` `↓` 选择，回车回填到输入区，`Esc` 关闭。
 - `Ctrl+G` 使用 `$VISUAL` 或 `$EDITOR` 打开临时 Markdown 草稿；退出编辑器后内容回填到输入区。编辑器退出码非 0、草稿不是 UTF-8 或超过 256 KiB 时会显示错误。
 - `Shift+↑` 进入消息选择模式；使用 `↑` `↓` 移动，回车展开或收起当前消息，`Esc` 退出。
+- 默认不接管鼠标，保留终端原生的拖动选中文本。按 `Alt+M` 可切换鼠标菜单模式；此时点击带下划线的模型名称会打开模型选择器，点击顶部其他位置会打开命令菜单。模型选择器按 provider 分组展示 runtime 提供的模型，支持过滤、方向键、回车和鼠标选择；旧 runtime 不提供模型目录时会降级为手动输入 model id。模型切换仍通过 runtime restart 完成，并创建新 session。弹窗打开期间会临时接管鼠标，关闭后恢复终端原生文本选择。消息操作仍可通过 `Shift+↑` 进入消息选择模式后按 `m` 打开。
 - 在消息选择模式按 `c` 可复制当前消息；也可以使用 `/copy` 复制最近一条 assistant 回复。复制依次尝试 macOS `pbcopy`、Windows `clip.exe`，以及 Linux 的 `wl-copy`、`xclip`、`xsel`；命令不可用时只显示提示，不影响会话。
 - `/focus` 切换本地「最近一轮」视图。开启后，对话区只显示最近一条用户消息及其后续节点，状态栏显示「聚焦：最近一轮」。它只改变界面投影，不修改 `/clear`、`/resume`、`/rewind`、导出或持久化 session log 的语义；再次执行可恢复完整会话视图。
 - `/lang zh` 或 `/lang en` 立即切换界面语言；未指定时启动语言由 `COCODE_LANG`、`LANG` 等环境变量决定。
-- `/model <model-id>` 通过 runtime restart 切换当前模型，并创建新 session；切换失败会尝试恢复原模型。
-- `Ctrl+O` 切换详细模式，查看完整思考内容和工具输入输出。
+- `/model` 和 `/models` 无参数时打开模型选择器；`/model <model-id>` 直接切换当前 provider 下的模型。选择器可以同时切换 provider 和 model；所有切换都通过 runtime restart 创建新 session，失败会尝试恢复原 provider/model。旧 runtime 没有模型目录时仍可手动输入 model id。
+- 思考内容在流式生成期间默认展开，回复完成后自动收起为摘要；`Ctrl+O` 可保持完整思考内容和工具输入输出展开。
 - 对话运行中，状态栏会显示「思考中…」。即使下一段流式输出暂时没有到达，也能和空闲状态区分开。状态栏还会显示最近一次 assistant 的输入/输出 token，以及 wire 已报告的当前子代理活动。收到可选事件后，还会显示解码 TPS、缓存命中率、上下文窗口占用比例、推理等级、当前工作状态、紧凑的上下文分段（`S/P/A/T/X` 分别表示系统、输入、回复、思考和工具）、待办进度、目标阶段和当前 agent preset。分段数值按文本长度估算，不代表 provider 的计费数据。
-- 当前任务运行时按 `Tab` 可将输入加入队列，最多 8 条；收到 `session.status=idle` 后按顺序自动发送。这是本地排队，不会打断当前任务，也不是 steer。
+- runtime 支持计划模式时，输入区空闲状态按 `Tab` 可在 `Build` 与 `Plan` 之间切换；Slash 命令和 `@` 文件选择器打开时，`Tab` 仍用于移动选项。
+- 当前任务运行时，底部提示改为「按 Esc 终止」；此时输入草稿并按 `Tab` 可加入队列，最多 8 条。收到 `session.status=idle` 后按顺序自动发送。这是本地排队，不会打断当前任务，也不是 steer。
 - 队列中有输入时使用 `/queue` 管理。输入文字可过滤，使用 `↑`/`↓` 选择，按 `Enter` 将选中项恢复到队首，按 `Ctrl+D` 删除，按 `Esc` 关闭。发送失败且 runtime 已空闲时，按 `Enter` 会立即重试选中项。队列为空时只显示提示，不打开空弹层。输入实际发送前不会写入 session log；发送失败会自动恢复到队首。runtime 重启或切换 session 时，本地队列会清空。
+- 主区域会在对话内容下方持续显示当前回合的 Checklist 摘要；`/todos` 可打开完整清单面板。面板显示每项任务的完成、进行中或待处理状态，使用 `↑`/`↓` 选择，鼠标模式下可点击任务，按 `Esc` 关闭。任务清单由 Host 的 `todo/write` 事件驱动，TUI 不直接修改任务；下一回合开始时清空上一回合的清单。
 - `/review` 打开只读 Git Review。选择 `working-tree`、`staged`、`last-commit` 或 `branch`，查看受限的文件与 Diff 摘要后按回车，将结构化 Review 上下文发送到当前会话。
 - `Esc` 在帮助、命令菜单等弹层中先关闭弹层；任务运行时第一次请求取消，第二次退出；空闲时连续按两次退出 TUI。
 - `Ctrl+L` 重绘界面，不清除会话内容。
@@ -111,6 +114,7 @@ TTY，可以用于安装脚本和故障排查。
 | `/focus`                       | 显示或隐藏最近一轮用户消息及其后续节点                               |
 | `/review`                      | 使用受限的只读 Diff 预览检查当前 Git 改动                            |
 | `/queue`                       | 查看、调整顺序或删除本地待发送输入                                   |
+| `/todos`                       | 查看当前回合的 Checklist 任务清单                                    |
 | `/permissions` / `/plan`       | 在运行时支持时切换权限模式或计划模式                                 |
 | `/fork`                        | 选择一条用户消息，再从该位置创建子会话                               |
 | `/clone`                       | 从当前对话末尾创建子会话                                             |
@@ -119,7 +123,9 @@ TTY，可以用于安装脚本和故障排查。
 | `/init`                        | 仅在缺少 `AGENTS.md` 时创建最小工作区模板                            |
 | `/theme dark` / `/theme light` | 切换显示主题                                                         |
 | `/lang zh` / `/lang en`        | 切换中英文界面                                                       |
-| `/model <model-id>`            | 切换模型并创建新 session                                             |
+| `/model`                      | 打开模型选择器                                                         |
+| `/models`                     | 打开模型选择器                                                         |
+| `/model <model-id>`            | 直接切换当前 provider 下的模型并创建新 session                         |
 | `/resume`                      | 打开当前工作区的 session 选择器并回放选中会话                        |
 | `/skills`                      | 浏览当前工作区中可由用户调用的技能                                   |
 | `/use byok` / `/use cocode`    | 在自己的 Key 和 Cocode 之间切换；切换即新会话                        |
@@ -127,6 +133,8 @@ TTY，可以用于安装脚本和故障排查。
 | `/exit`                        | 关闭 TUI 并恢复终端                                                  |
 
 `/resume` 会读取本地 session header，支持关键词过滤和 `↑` `↓` 选择，以流式方式将选中 JSONL 的事件回放到临时投影，并要求 runtime 重新打开同一个持久化 session 后再替换当前 TUI。后续输入会继续写入选中的 session id。TUI 不负责跨进程写入锁；如果其它客户端正在写同一 session，请不要同时恢复。
+
+运行时会话树会用 `✓` 标记当前附加的 session，用 `◉` 标记当前 runtime 报告为运行中的 session，用 `·` 标记已知空闲的 session。这些 activity 标记来自当前 runtime 的实时通知，不表示跨进程写入锁。
 
 `/fork` 会打开用户消息选择器，按最新消息在前排列。使用 `↑`/`↓` 选择分支边界，再连续按两次回车确认。runtime 会通过 fork wire 创建子会话并替换当前活动 session。如果需要复制完整当前对话而不选择边界，使用 `/clone`。
 
@@ -148,8 +156,10 @@ TTY，可以用于安装脚本和故障排查。
 
 ## Runtime capability 边界
 
-只有 harness 的 `skills/list` 返回真实目录后，TUI 才会启用 `/skills`。如果 composition 没有挂载 `@deepseek-ai/dsh-skill` 及其 provider（例如 `@deepseek-ai/dsh-skill-filesystem`），命令会保持隐藏；探测失败或目录为空不会被展示成可用能力。
+只有 Host 的 `skills/list` 返回真实目录后，TUI 才会启用 `/skills`。如果 Host composition 没有挂载技能 provider，命令会保持隐藏；探测失败或目录为空不会被展示成可用能力。
+
+Host 默认挂载 Cocode 自己的 `cocode-vision` 插件，并启用 `autoRead`。发送的 `image` block 会先转换为视觉证据，再交给当前文本模型；同时保留原始附件引用，支持原生视觉模型继续读取。视觉 provider 有两种：`cocode` 使用 Cocode 服务，默认视觉模型为 `gpt-luna`；`user` 使用用户配置的 OpenAI-compatible endpoint。用户配置可以写入 `$COCODE_HOME/vision.yaml`（默认 `~/.cocode/vision.yaml`），可参考 [vision.yaml.example](./vision.yaml.example)。`COCODE_VISION_PROVIDER`、`COCODE_VISION_USER_MODEL` 等环境变量优先级更高。账号切换到 Cocode 后，插件会自动复用账号生成的 `COCODE_LLM_PROVIDERS.cocode-cloud` endpoint 和 credential reference，不使用 cloud model 列表的首项。凭证只填写引用名，实际值由 Host credentials service 管理，不进入 session log 或 TUI 设置。
 
 `/doctor` 中的 `caps-configured` 表示 TUI 根据配置和本地实现预期的能力，`caps-runtime` 表示初始化后对真实 JSON-RPC runtime 的探测结果。两者不一致时，以运行时结果为准；`caps-errors` 会列出被禁用能力的原因。探测使用随机、不存在的 session id，不会创建或修改用户会话。
 
-交互式问卷要求 harness composition 挂载 user-questions service 和对应的 ask-user consumer。SDK server 会把 `question/ask` 转发给 TUI，并等待完整答案批次；未挂载该 service 时不会把终端注册为问卷 provider。
+交互式问卷要求 Host composition 挂载 user-questions service 和对应的 ask-user consumer。JSON-RPC service 会把 `question/ask` 转发给 TUI，并等待完整答案批次；未挂载该 service 时不会把终端注册为问卷 provider。

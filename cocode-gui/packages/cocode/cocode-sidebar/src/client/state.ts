@@ -9,6 +9,7 @@
  * divides the space row- or column-wise with fractional sizes. All tree
  * operations are pure functions over the node, unit-tested in tests/state.spec.ts.
  */
+import { isReconciledBrowserTabId } from '../browser/protocol.ts'
 import { SIDEBAR_PREFS_DEFAULTS, type SidebarPrefs } from '../prefs-shared.ts'
 import { isNarrowWidth } from './breakpoints.ts'
 
@@ -142,11 +143,11 @@ function maxCounterId(parsed: unknown): number {
 /** A fresh default state: one explorer tab in one pane, open per the caller's
  * preference. `width` is the caller's preferred panel width (default
  * PANEL_DEFAULT) and `panelOpen` whether the panel starts expanded (default
- * true); the store seeds new sessions from the user's side card prefs.
+ * false); the store seeds new sessions from the user's side card prefs.
  * `seedExplorer` places the default explorer tab — the store passes false
  * when the user disabled the explorer tab type in settings, so a fresh
  * session starts with an empty pane instead of a tab they turned off. */
-export function makeDefaultState(width = PANEL_DEFAULT, panelOpen = true, seedExplorer = true): SidebarState {
+export function makeDefaultState(width = PANEL_DEFAULT, panelOpen = false, seedExplorer = true): SidebarState {
   const leaf: SidebarLeaf = { kind: 'leaf', id: uid('pane'), tabs: [], active: null }
   if (seedExplorer) {
     leaf.tabs = [{ id: uid('tab'), type: 'explorer', title: 'Explorer' }]
@@ -412,7 +413,8 @@ export function removeLeafAt(node: SplitNode, paneId: string): SplitNode {
   return { ...node, sizes: [...node.sizes], children }
 }
 
-/** Close a tab; an emptied leaf is removed (unless it is the only pane). */
+/** Close a tab; an emptied leaf is removed (unless it is the only pane).
+ *  Closing the final tab in either tree also collapses its panel. */
 export function closeTab(state: SidebarState, paneId: string, tabId: string): SidebarState {
   const key = treeOf(state, paneId)
   let emptied = false
@@ -421,7 +423,15 @@ export function closeTab(state: SidebarState, paneId: string, tabId: string): Si
     if (leaf.active === tabId) leaf.active = leaf.tabs[leaf.tabs.length - 1]?.id ?? null
     if (leaf.tabs.length === 0) emptied = true
   })
-  return { ...state, [key]: emptied ? removeLeafAt(splits, paneId) : splits }
+  const nextSplits = emptied ? removeLeafAt(splits, paneId) : splits
+  const closedLastTab = allLeaves(nextSplits).every(leaf => leaf.tabs.length === 0)
+  return {
+    ...state,
+    [key]: nextSplits,
+    ...(closedLastTab
+      ? key === 'bottomSplits' ? { bottomOpen: false } : { panelOpen: false }
+      : {}),
+  }
 }
 
 /** Activate a tab in its pane (the pane's own tree). */
@@ -724,6 +734,47 @@ export function reconcileAgentTerminals(
   return next
 }
 
+/** Whether a tab id belongs to a browser page the model opened. */
+export function isAgentBrowserTabId(tabId: string): boolean {
+  return isReconciledBrowserTabId(tabId)
+}
+
+/**
+ * Mirror the host's live list of host-opened browser pages into tabs: pages
+ * the model opened, and popups (`window.open` / OAuth) the current page
+ * opened. User-created `browser:N` tabs stay client-owned — reconciling
+ * those would delete a fresh tab the moment it was created.
+ * @param state - the current per-session sidebar state.
+ * @param agentTabs - the live host-opened browser tabs from the host.
+ * @returns the next state (or the same reference when nothing changed).
+ */
+export function reconcileAgentBrowserTabs(
+  state: SidebarState,
+  agentTabs: ReadonlyArray<{ tabId: string; title: string; url: string }>,
+): SidebarState {
+  const existingTabs = allLeaves(state.splits).concat(allLeaves(state.bottomSplits)).flatMap(leaf => leaf.tabs)
+  const existing = existingTabs.filter(tab => isReconciledBrowserTabId(tab.id))
+  const serverIds = new Set(agentTabs.map(tab => tab.tabId))
+  const toAdd = agentTabs.filter(tab => !existing.some(open => open.id === tab.tabId))
+  const toRemove = existing.filter(tab => !serverIds.has(tab.id))
+  if (toAdd.length === 0 && toRemove.length === 0) return state
+  let splits = state.splits
+  for (const tab of toRemove) {
+    const leaf = leafWithTab(splits, tab.id)
+    if (leaf !== undefined) splits = closeTab({ ...state, splits }, leaf.id, tab.id).splits
+  }
+  let next: SidebarState = { ...state, splits }
+  for (const tab of toAdd) {
+    next = openTabInActivePane(next, {
+      id: tab.tabId,
+      type: 'browser',
+      title: tab.title === '' ? tab.url : tab.title,
+      path: tab.url === '' ? undefined : tab.url,
+    })
+  }
+  return next
+}
+
 // ── The per-session store ──────────────────────────────────────────────────
 
 const STORAGE_PREFIX = 'dsh-sidebar:v1'
@@ -747,7 +798,7 @@ export function defaultWidthFor(viewport: number, percent: number): number {
   return Math.min(viewport, Math.max(PANEL_MIN, Math.round(viewport * percent / 100)))
 }
 
-function loadState(sessionId: string, prefs: SidebarPrefs): SidebarState {
+function loadState(sessionId: string, prefs: SidebarPrefs, restorePanelOpen = true): SidebarState {
   try {
     const raw = localStorage.getItem(`${STORAGE_PREFIX}:${sessionId}`)
     if (raw !== null) {
@@ -756,7 +807,9 @@ function loadState(sessionId: string, prefs: SidebarPrefs): SidebarState {
       // sanitize re-ids any duplicates the pre-seeding counter left behind.
       nextIdCounter = maxCounterId(parsed)
       const sanitized = sanitizeState(parsed)
-      if (sanitized !== undefined) return sanitized
+      if (sanitized !== undefined) {
+        return restorePanelOpen ? sanitized : { ...sanitized, panelOpen: false }
+      }
     }
   } catch {
     // Corrupt or unavailable storage: fall through to the default.
@@ -941,6 +994,9 @@ export class SidebarStore {
   /** Per-session persist debounce timers (v0.12.0+: one per session, so a
    *  targeted open never cancels another session's pending write). */
   private readonly persistTimers = new Map<string, number>()
+  /** The first persisted session shown after a page load starts collapsed.
+   *  Other sessions still restore their own saved visibility normally. */
+  private hasSelectedInitialSession = false
   /** User-facing side card prefs seeding brand-new session states (defaults until the settings RPC resolves). */
   private prefs: SidebarPrefs = { ...SIDEBAR_PREFS_DEFAULTS }
 
@@ -969,14 +1025,19 @@ export class SidebarStore {
     } else {
       let state = this.bySession.get(sessionId)
       if (state === undefined) {
-        state = loadState(sessionId, this.prefs)
+        state = loadState(sessionId, this.prefs, this.hasSelectedInitialSession)
         this.bySession.set(sessionId, state)
       } else {
         // Cache hit: another session's load/ops may have left the uid
         // counter below THIS session's persisted ids — re-seed so fresh
         // pane/split ids can never collide with its tree.
         nextIdCounter = maxCounterId(state)
+        if (!this.hasSelectedInitialSession && state.panelOpen) {
+          state = { ...state, panelOpen: false }
+          this.bySession.set(sessionId, state)
+        }
       }
+      this.hasSelectedInitialSession = true
       this.snapshot = { sessionId, state, prefs: this.prefs }
     }
     this.notify()

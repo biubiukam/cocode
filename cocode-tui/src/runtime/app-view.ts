@@ -21,19 +21,16 @@ export function composerPlaceholder(agent: TuiSnapshot['agent'], locale: UiLocal
 
 export function statusLine(
   agent: TuiSnapshot['agent'],
-  runtimeName: string,
+  _runtimeName: string,
   locale: UiLocale = 'en',
 ): string {
-  const name = runtimeName === '' ? 'runtime' : runtimeName
-  const label =
-    agent === 'idle'
-      ? text(locale, 'agentIdle')
-      : agent === 'running'
-      ? text(locale, 'agentThinking')
-      : agent === 'starting'
-      ? text(locale, 'agentStarting')
-      : text(locale, 'agentDead')
-  return `${name} · ${label}`
+  return agent === 'idle'
+    ? text(locale, 'agentIdle')
+    : agent === 'running'
+    ? text(locale, 'agentThinking')
+    : agent === 'starting'
+    ? text(locale, 'agentStarting')
+    : text(locale, 'agentDead')
 }
 
 export function latestUsage(

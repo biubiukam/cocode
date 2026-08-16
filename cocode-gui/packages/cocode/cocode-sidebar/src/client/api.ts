@@ -7,7 +7,7 @@
  * request). Failures surface as {@link SidebarApiError} with the wire code.
  */
 import { encodeHtmlUrl } from '../html-route.ts'
-import type { BrowserProbeResult } from './browser.ts'
+import type { BrowserEngineStatus } from '../browser/protocol.ts'
 import { desktopRuntimeUrl } from './desktop-runtime.ts'
 
 /** One wire failure. */
@@ -183,10 +183,17 @@ export const api = {
       patch,
       ...(expectedRevision !== undefined ? { expectedRevision } : {}),
     }),
-  /** Probe a URL's response headers (the sidebar browser's embeddability
-   *  check; see the host's browser.probe route). */
-  browserProbe: (url: string, signal?: AbortSignal) =>
-    call<BrowserProbeResult>('browser.probe', { url }, signal),
+  /** Current readiness of the Chromium build the sidebar browser drives. */
+  browserEngine: (signal?: AbortSignal) =>
+    call<BrowserEngineStatus>('browser.engine', {}, signal),
+  /**
+   * Download the Chromium build. Resolves once it is ready and rejects with
+   * the installer's own failure, so the first-run panel can show it verbatim.
+   */
+  browserInstall: () => call<BrowserEngineStatus>('browser.install', {}),
+  /** Release a browser tab's page (the user closed the sidebar tab). */
+  browserClose: (scope: SessionScope, tabId: string) =>
+    call<{ closed: boolean }>('browser.close', scopePayload(scope, { tabId })),
 }
 
 /** Absolute URL of the media route for one path (images only). */

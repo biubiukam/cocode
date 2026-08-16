@@ -11,9 +11,21 @@ describe('keymap', () => {
     expect(matchKey({ raw: 'g', ctrl: true, empty: true })).toEqual({ id: 'editor.open' })
   })
 
-  it('preserves the default help and redraw bindings', () => {
+  it('keeps Ctrl+L model switching and a slash redraw fallback', () => {
     expect(matchKey({ raw: '?', shift: true, empty: true })).toEqual({ id: 'help.toggle' })
-    expect(matchKey({ raw: 'l', ctrl: true, empty: false })).toEqual({ id: 'app.redraw' })
+    expect(matchKey({ raw: 'l', ctrl: true, empty: false })).toEqual({ id: 'model.open' })
+    const keymap = resolveKeymap({ COCODE_TUI_KEYMAP: '{"model.open":"alt+l"}' })
+    expect(matchKey({ raw: 'l', ctrl: true, empty: false }, keymap)).toBeUndefined()
+    expect(matchKey({ raw: 'l', alt: true, empty: false }, keymap)).toEqual({ id: 'model.open' })
+  })
+
+  it('matches Crush session and permission shortcuts', () => {
+    expect(matchKey({ raw: 'n', ctrl: true, empty: false })).toEqual({ id: 'session.new' })
+    expect(matchKey({ raw: 's', ctrl: true, empty: false })).toEqual({ id: 'session.open' })
+    expect(matchKey({ raw: 'y', ctrl: true, empty: false })).toEqual({
+      id: 'permission.toggle',
+    })
+    expect(matchKey({ raw: 'f', ctrl: true, empty: false })).toEqual({ id: 'file.open' })
   })
 
   it('allows known commands to override their default bindings', () => {
@@ -26,6 +38,17 @@ describe('keymap', () => {
     })
     expect(matchKey({ raw: 'e', alt: true, empty: false }, keymap)).toEqual({ id: 'editor.open' })
     expect(matchKey({ raw: 'r', ctrl: true, empty: false }, keymap)).toBeUndefined()
+  })
+
+  it('removes conflicting defaults when a custom binding takes the key', () => {
+    const keymap = resolveKeymap({ COCODE_TUI_KEYMAP: '{"fileOpen":"ctrl+r"}' })
+    expect(matchKey({ raw: 'r', ctrl: true, empty: false }, keymap)).toEqual({ id: 'file.open' })
+    expect(matchKey({ raw: 'f', ctrl: true, empty: false }, keymap)).toBeUndefined()
+
+    const emptyConflict = resolveKeymap({ COCODE_TUI_KEYMAP: '{"fileOpen":"ctrl+d"}' })
+    expect(matchKey({ raw: 'd', ctrl: true, empty: true }, emptyConflict)).toEqual({
+      id: 'file.open',
+    })
   })
 
   it('keeps defaults and reports malformed or unknown values', () => {

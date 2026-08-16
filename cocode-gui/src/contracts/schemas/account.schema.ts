@@ -14,6 +14,14 @@ const accountSnapshotSchema = z.object({
 		status: z.enum(["absent", "ready", "conflict", "error"]),
 		providerId: z.literal("cocode-cloud"),
 	}),
+	usage: z.object({
+		plan: z.string().optional(),
+		fiveHour: z.number().min(0).max(100).optional(),
+		week: z.number().min(0).max(100).optional(),
+		month: z.number().min(0).max(100).optional(),
+		syncedAt: z.string().optional(),
+		error: z.string().optional(),
+	}).optional(),
 	error: z.object({ code: z.string(), message: z.string() }).optional(),
 })
 

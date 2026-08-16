@@ -1,12 +1,23 @@
-import { createElement, useEffect, useRef, useSyncExternalStore } from "react"
-import type { ReactNode } from "react"
+import { createElement, Fragment, useEffect, useRef, useState, useSyncExternalStore } from "react"
+import type { MouseEvent as ReactMouseEvent, ReactNode } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import type { ClientContext } from "@deepseek-ai/dsh-client-runtime/client"
+import type { ConfigurableProviderView, ConnectionHandle } from "@deepseek-ai/dsh-api-remotes/client"
+import type {} from "@deepseek-ai/dsh-api-remotes/client"
+import {
+  IconApiOutline14,
+  IconChevronUpOutline14,
+  IconUserOutline16,
+  Menu,
+  type MenuEntry,
+} from "@deepseek-ai/dsh-client-ui-primitives"
+import css from "./account.module.css"
 
 type AccountSnapshot = {
   phase: "signed-out" | "signing-in" | "provisioning" | "signed-in" | "error"
   profile: { displayName: string; email?: string } | null
   cloud: { status: "absent" | "ready" | "conflict" | "error"; providerId: "cocode-cloud" }
+  usage?: { plan?: string; fiveHour?: number; week?: number; month?: number; syncedAt?: string; error?: string }
   error?: { code: string; message: string }
 }
 
@@ -23,7 +34,15 @@ declare global {
   }
 }
 
-type AccountProps = { readonly wide: boolean; readonly store: AccountStore }
+type ProviderSummary = { readonly id: string; readonly name: string }
+
+type AccountProps = {
+  readonly wide: boolean
+  readonly store: AccountStore
+  readonly providers: ProviderStore
+}
+
+type AccountPanelKind = "usage" | "help"
 
 type OnboardingProps = {
   readonly complete: () => void
@@ -52,6 +71,16 @@ const COPY = {
     conflict: "本机已有同名 Provider 或凭证，请先在模型设置中处理冲突。",
     cleanupPending: "本地账号已退出，Cocode Cloud 配置将在运行时恢复后继续清理。",
     reauthentication: "请在浏览器中重新认证 Cocode 账号（十分钟内完成），然后点击重试。",
+    account: "Cocode 账号",
+    accountPlan: "账户与计划",
+    planUsage: "套餐用量",
+    customProvider: "自定义 Provider",
+    noProvider: "登录或配置 Provider",
+    models: "模型与 Provider",
+    settings: "设置",
+    help: "帮助与反馈",
+    signOut: "退出登录",
+    providerId: "Provider ID：",
   },
   en: {
     signIn: "Sign in to Cocode",
@@ -67,8 +96,21 @@ const COPY = {
     conflict: "A provider or credential with the reserved Cocode name already exists. Resolve it in Models settings first.",
     cleanupPending: "The local account is signed out. Cloud configuration cleanup will resume when the runtime is available.",
     reauthentication: "Reauthenticate your Cocode account in the browser within ten minutes, then retry.",
+    account: "Cocode account",
+    accountPlan: "Account & plan",
+    planUsage: "Plan usage",
+    customProvider: "Custom provider",
+    noProvider: "Sign in or configure a provider",
+    models: "Models & providers",
+    settings: "Settings",
+    help: "Help & feedback",
+    signOut: "Sign out",
+    providerId: "Provider ID: ",
   },
 } as const
+
+/** Stable DOM hook owned by the settings shell's trigger. */
+const SETTINGS_TRIGGER = "[data-dsh-settings-trigger]"
 
 function copy(): typeof COPY.zh | typeof COPY.en {
   return document.documentElement.lang.toLowerCase().startsWith("zh") || navigator.language.toLowerCase().startsWith("zh")
@@ -138,6 +180,16 @@ class AccountStore {
     }
   }
 
+  async refresh(): Promise<void> {
+    const account = window.desktopApi?.account
+    if (account === undefined) return
+    try {
+      this.set(await account.snapshot())
+    } catch (error) {
+      this.set({ ...this.snapshot, usage: { ...this.snapshot.usage, error: safeMessage(error) } })
+    }
+  }
+
   dispose(): void {
     this.off?.()
     this.off = undefined
@@ -156,6 +208,53 @@ class AccountStore {
 
   private set(snapshot: AccountSnapshot): void {
     this.snapshot = snapshot
+    for (const listener of [...this.listeners]) listener()
+  }
+}
+
+class ProviderStore {
+  private snapshot: ProviderSummary | null = null
+  private providers: readonly ConfigurableProviderView[] = []
+  private listeners = new Set<() => void>()
+  private generation = 0
+
+  constructor(private readonly connection: ConnectionHandle) {}
+
+  getSnapshot = (): ProviderSummary | null => this.snapshot
+
+  subscribe = (listener: () => void): (() => void) => {
+    this.listeners.add(listener)
+    return () => this.listeners.delete(listener)
+  }
+
+  refreshSelection(): void {
+    this.publish(this.select(this.providers))
+  }
+
+  async load(): Promise<void> {
+    const generation = ++this.generation
+    try {
+      const response = await this.connection.api.llm.providers({})
+      if (!response.result.ok || generation !== this.generation) return
+      this.providers = response.result.value.providers
+      this.publish(this.select(this.providers))
+    } catch {
+      // Keep the last confirmed provider while the runtime reconnects.
+    }
+  }
+
+  private select(providers: readonly ConfigurableProviderView[]): ProviderSummary | null {
+    const active = providers.filter(provider => provider.active)
+    const preferred = this.connection.hostDescription.getSnapshot()?.provider
+    const provider = active.find(candidate => candidate.provider === preferred)
+      ?? active.find(candidate => candidate.provider !== "cocode-cloud")
+      ?? active[0]
+    return provider === undefined ? null : { id: provider.provider, name: provider.displayName }
+  }
+
+  private publish(next: ProviderSummary | null): void {
+    if (this.snapshot?.id === next?.id && this.snapshot?.name === next?.name) return
+    this.snapshot = next
     for (const listener of [...this.listeners]) listener()
   }
 }
@@ -242,44 +341,232 @@ function AccountOnboarding({ complete, openSection, store }: OnboardingProps): R
   )
 }
 
-function AccountAction({ wide, store }: AccountProps): ReturnType<typeof createElement> {
-  const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
-  const signedIn = snapshot.phase === "signed-in" || snapshot.phase === "provisioning"
-  const canSignOut = signedIn || snapshot.error?.code === "cleanup-pending"
+function requestSettings(sectionId?: string): void {
+  const trigger = document.querySelector<HTMLButtonElement>(SETTINGS_TRIGGER)
+  if (trigger === null) return
+  if (sectionId === undefined) delete trigger.dataset.dshSettingsSectionRequest
+  else trigger.dataset.dshSettingsSectionRequest = sectionId
+  trigger.click()
+}
+
+function initialOf(value: string): string {
+  return [...value.trim()][0]?.toUpperCase() ?? "C"
+}
+
+const ACCOUNT_CENTER_URL = "https://cocode.agency/account"
+
+function openAccountCenter(): void {
+  window.open(ACCOUNT_CENTER_URL, "_blank", "noopener,noreferrer")
+}
+
+function snapshotUsage(snapshot: AccountSnapshot, key: "fiveHour" | "week" | "month"): number | undefined {
+  return snapshot.usage?.[key]
+}
+
+function usageSyncLabel(snapshot: AccountSnapshot): string {
+  if (snapshot.usage?.error !== undefined) return `同步失败：${snapshot.usage.error}`
+  if (snapshot.usage?.syncedAt === undefined) return "正在同步账号用量…"
+  const date = new Date(snapshot.usage.syncedAt)
+  return Number.isNaN(date.getTime()) ? "账号用量已同步" : `更新于 ${date.toLocaleString()}`
+}
+
+type MenuGlyphKind = "account" | "usage" | "settings" | "help" | "logout"
+
+function MenuGlyph({ kind }: { readonly kind: MenuGlyphKind }): ReturnType<typeof createElement> {
+  const paths: Record<MenuGlyphKind, ReturnType<typeof createElement>> = {
+    account: createElement("path", { d: "M3 13.5c.7-1.9 2.5-3 5-3s4.3 1.1 5 3M8 8.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" }),
+    usage: createElement("path", { d: "M3 13V9.5M6.5 13V6.5M10 13V3M13.5 13V8M2 13.5h12" }),
+    settings: createElement("g", null,
+      createElement("path", { d: "m6.55 2.05.35 1.42a4.9 4.9 0 0 0-1.26.73l-1.36-.56-1.28 2.22 1.01.99a4.8 4.8 0 0 0 0 1.46L3 9.3l1.28 2.22 1.36-.56a4.9 4.9 0 0 0 1.26.73l-.35 1.42h2.56l-.35-1.42a4.9 4.9 0 0 0 1.26-.73l1.36.56 1.28-2.22-1.01-.99a4.8 4.8 0 0 0 0-1.46l1.01-.99-1.28-2.22-1.36.56a4.9 4.9 0 0 0-1.26-.73l.35-1.42Z" }),
+      createElement("circle", { cx: 8, cy: 7.58, r: 1.65 }),
+    ),
+    help: createElement("path", { d: "M5.9 5.8a2.15 2.15 0 1 1 3.65 1.54c-.9.78-1.55 1.15-1.55 2.16M8 12.25v.1" }),
+    logout: createElement("path", { d: "M8.5 3H4.25A1.25 1.25 0 0 0 3 4.25v7.5A1.25 1.25 0 0 0 4.25 13H8.5M9 8h5M11.5 5.5 14 8l-2.5 2.5" }),
+  }
+  return createElement("svg", { className: css.menuGlyph, viewBox: "0 0 16 16", width: 16, height: 16, fill: "none", stroke: "currentColor", "stroke-width": 1.6, "stroke-linecap": "round", "stroke-linejoin": "round", "aria-hidden": true }, paths[kind])
+}
+
+function AccountPanel({ kind, snapshot, provider, onClose }: {
+  readonly kind: AccountPanelKind
+  readonly snapshot: AccountSnapshot
+  readonly provider: ProviderSummary | null
+  readonly onClose: () => void
+}): ReturnType<typeof createElement> {
   const t = copy()
-  const title = accountError(snapshot) ?? (canSignOut ? t.signOutTitle : t.signInTitle)
-  return createElement(
-    "button",
-    {
-      type: "button",
-      title,
-      onClick: () => { void (canSignOut ? store.deactivate() : snapshot.phase === "error" ? store.retry() : store.activate()) },
-      disabled: snapshot.phase === "signing-in" || snapshot.phase === "provisioning",
-      style: {
-        width: wide ? "100%" : "40px",
-        minHeight: "32px",
-        padding: wide ? "0 10px" : "0",
-        border: "1px solid var(--dsw-alias-border-l2, rgba(128,128,128,.25))",
-        borderRadius: "8px",
-        background: "transparent",
-        color: "var(--dsw-alias-label-secondary, currentColor)",
-        cursor: "pointer",
-        font: "inherit",
-        fontSize: "12px",
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-        whiteSpace: "nowrap",
-      },
-    },
-    labelOf(snapshot, wide),
+  const title = kind === "usage" ? t.planUsage : t.help
+  const isCloud = provider?.id === "cocode-cloud"
+    || (provider === null && (snapshot.cloud.status === "ready" || snapshot.cloud.status === "conflict"))
+  const providerLabel = isCloud ? "Cocode Cloud" : provider?.name ?? "当前 Provider"
+  const usageMetric = (label: string, value: number | undefined): ReturnType<typeof createElement> => {
+    const percentage = typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(100, Math.round(value))) : undefined
+    return createElement("div", { className: css.usageMetric },
+      createElement("div", { className: css.usageMetricHeader },
+        createElement("span", { className: css.usageMetricLabel }, label),
+        createElement("strong", { className: css.usageMetricPercent }, percentage === undefined ? "—" : `${percentage}%`),
+      ),
+      createElement("div", { className: css.usageTrack }, createElement("span", { className: css.usageFill, style: { width: `${percentage ?? 0}%` } })),
+      createElement("span", { className: css.panelSecondary }, percentage === undefined ? (snapshot.usage?.error === undefined ? "正在同步" : "同步失败") : "已使用"),
+    )
+  }
+  const body = kind === "usage"
+      ? createElement("div", { className: css.panelStack },
+          createElement("div", { className: css.planCard },
+            createElement("span", { className: css.panelEyebrow }, "当前套餐"),
+            createElement("strong", { className: css.planName }, snapshot.usage?.plan?.toUpperCase() ?? (snapshot.usage?.error === undefined ? "正在同步…" : "同步失败")),
+            createElement("span", { className: css.panelSecondary }, usageSyncLabel(snapshot)),
+          ),
+          createElement("div", { className: css.usageGrid },
+            usageMetric("5 小时限额", snapshotUsage(snapshot, "fiveHour")),
+            usageMetric("周限额", snapshotUsage(snapshot, "week")),
+            usageMetric("月限额", snapshotUsage(snapshot, "month")),
+          ),
+          createElement("p", { className: css.panelHint }, "百分比代表当前周期已使用额度。本地 Provider 的请求不会计入 Cocode Cloud 用量。"),
+        )
+      : createElement("div", { className: css.panelStack },
+          createElement("div", { className: css.providerHelpCard },
+            createElement("span", { className: css.panelEyebrow }, "当前 Provider"),
+            createElement("strong", { className: css.planName }, providerLabel),
+            createElement("span", { className: css.panelSecondary }, isCloud ? "账号云模型与 Cocode Cloud 服务" : "本地 Provider 与凭证配置"),
+          ),
+          createElement("p", { className: css.panelIntro }, isCloud
+            ? "Cocode Cloud 的账号、套餐和云模型问题，可以先打开个人中心；模型选择和本地配置仍在模型设置中管理。"
+            : "当前使用的是本地 Provider。连接、模型不可用或凭证问题，可以从 Provider 设置开始排查。"),
+          isCloud ? createElement("a", { className: css.panelAction, href: ACCOUNT_CENTER_URL, target: "_blank", rel: "noreferrer" }, "打开 Cocode 个人中心") : null,
+          createElement("a", { className: css.panelAction, href: "https://cocode.agency", target: "_blank", rel: "noreferrer" }, "访问 Cocode 文档"),
+          createElement("a", { className: css.panelAction, href: "mailto:support@cocode.agency?subject=Cocode%20反馈" }, "发送反馈邮件"),
+        )
+  return createElement("div", { className: css.panelOverlay, role: "presentation", onMouseDown: (event: ReactMouseEvent<HTMLDivElement>) => { if (event.target === event.currentTarget) onClose() } },
+    createElement("section", { className: css.panel, role: "dialog", "aria-modal": "true", "aria-label": title },
+      createElement("header", { className: css.panelHeader },
+        createElement("h2", { className: css.panelTitle }, title),
+        createElement("button", { type: "button", className: css.panelClose, onClick: onClose, "aria-label": "关闭" }, "×"),
+      ),
+      body,
+    ),
   )
 }
 
-export const inject = ["slots"]
+function AccountAction({ wide, store, providers }: AccountProps): ReturnType<typeof createElement> {
+  const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
+  const provider = useSyncExternalStore(providers.subscribe, providers.getSnapshot, providers.getSnapshot)
+  const [open, setOpen] = useState(false)
+  const [panel, setPanel] = useState<AccountPanelKind | null>(null)
+  const signedIn = snapshot.phase === "signed-in" || snapshot.phase === "provisioning"
+  const t = copy()
+  const busy = snapshot.phase === "signing-in" || snapshot.phase === "provisioning"
+  const primary = signedIn
+    ? snapshot.profile?.displayName ?? "Cocode"
+    : provider?.name ?? labelOf(snapshot, true)
+  const secondary = signedIn ? null : provider === null ? t.noProvider : t.customProvider
+  const title = accountError(snapshot) ?? primary
+  const entries: MenuEntry[] = signedIn
+    ? [
+        { id: "account", label: t.accountPlan, icon: createElement(MenuGlyph, { kind: "account" }) },
+        { id: "usage", label: t.planUsage, icon: createElement(MenuGlyph, { kind: "usage" }) },
+        { type: "separator", id: "account-separator" },
+        { id: "settings", label: t.settings, icon: createElement(MenuGlyph, { kind: "settings" }) },
+        { id: "help", label: t.help, icon: createElement(MenuGlyph, { kind: "help" }) },
+        { id: "sign-out", label: t.signOut, danger: true, icon: createElement(MenuGlyph, { kind: "logout" }) },
+      ]
+    : provider === null
+      ? [
+          { type: "label", id: "identity", text: "Cocode" },
+          { id: "sign-in", label: t.signIn, icon: createElement(IconUserOutline16, { size: 16 }) },
+          { id: "models", label: t.models, icon: createElement(MenuGlyph, { kind: "usage" }) },
+          { type: "separator", id: "settings-separator" },
+          { id: "settings", label: t.settings, icon: createElement(MenuGlyph, { kind: "settings" }) },
+        ]
+      : [
+          { type: "label", id: "provider", text: provider.name },
+          ...(provider.id === provider.name
+            ? []
+            : [{ type: "label" as const, id: "provider-id", text: `${t.providerId}${provider.id}` }]),
+          { type: "separator", id: "provider-separator" },
+          { id: "models", label: t.models, icon: createElement(MenuGlyph, { kind: "usage" }) },
+          { id: "help", label: t.help, icon: createElement(MenuGlyph, { kind: "help" }) },
+          { id: "sign-in", label: t.signIn, icon: createElement(MenuGlyph, { kind: "account" }) },
+          { id: "settings", label: t.settings, icon: createElement(MenuGlyph, { kind: "settings" }) },
+        ]
+  const select = (id: string): void => {
+    setOpen(false)
+    if (id === "sign-in") void store.activate()
+    else if (id === "sign-out") void store.deactivate()
+    else if (id === "models") requestSettings("models")
+    else if (id === "settings") requestSettings()
+    else if (id === "account") openAccountCenter()
+    else if (id === "usage") {
+      setPanel(id)
+      void store.refresh()
+    } else if (id === "help") setPanel(id)
+  }
+  return createElement(
+    Fragment,
+    null,
+    createElement(
+      Menu,
+      {
+        open,
+        side: "top",
+        align: "start",
+        portal: true,
+        dense: true,
+        items: entries,
+        onClose: () => { setOpen(false) },
+        onSelect: select,
+        className: `${css.menuRoot} ${css.actionRoot} ${wide ? "" : css.actionRootRail}`,
+        anchor: createElement(
+          "button",
+          {
+            type: "button",
+            title,
+            className: wide ? css.trigger : `${css.trigger} ${css.rail}`,
+            "aria-haspopup": "menu",
+            "aria-expanded": open,
+            disabled: busy,
+            onClick: () => { setOpen(value => !value) },
+          },
+          createElement(
+            "span",
+            { className: `${css.avatar} ${signedIn ? css.accountAvatar : provider === null ? css.guestAvatar : css.providerAvatar}` },
+            signedIn
+              ? initialOf(primary)
+              : provider === null
+                ? createElement(IconUserOutline16, { size: 18 })
+                : createElement(IconApiOutline14, { size: 18 }),
+          ),
+          wide && createElement(
+            "span",
+            { className: css.copy },
+            createElement("span", { className: css.primary }, primary),
+            secondary === null ? null : createElement("span", { className: css.secondary }, secondary),
+          ),
+          wide && createElement(IconChevronUpOutline14, { className: css.chevron, size: 14 }),
+        ),
+      },
+    ),
+    panel === null ? null : createElement(AccountPanel, { kind: panel, snapshot, provider, onClose: () => setPanel(null) }),
+  )
+}
+
+export const inject = ["slots", "connection", "remote"]
 
 export function apply(ctx: ClientContext): void {
   const store = new AccountStore()
+  const connection = ctx.get("connection") as ConnectionHandle
+  const providers = new ProviderStore(connection)
   ctx.effect(() => () => store.dispose(), "cocode-account: dispose store")
+  ctx.effect(() => {
+    const refresh = (): void => { void providers.load() }
+    const disposers = [
+      connection.hostDescription.subscribe(() => { providers.refreshSelection() }),
+      ctx.remote.$on("llm/adapters-updated", refresh),
+      ctx.remote.$on("settings/document-updated", refresh),
+      ctx.remote.$on("credentials/updated", refresh),
+      ctx.on("connection/reset", refresh),
+    ]
+    refresh()
+    return () => { for (const dispose of disposers) dispose() }
+  }, "cocode-account: provider summary")
   const slots = ctx.slots as unknown as {
     inject(name: string, factory: () => unknown): unknown
     register(options: unknown, component: unknown): unknown
@@ -288,7 +575,7 @@ export function apply(ctx: ClientContext): void {
     name: "sidebar.footer.action",
     id: "cocode-account",
     order: -100,
-    inject: () => ({ store }),
+    inject: () => ({ store, providers }),
   }, AccountAction))
   slots.inject("settings.onboarding", () => slots.register({
     name: "settings.onboarding",
@@ -301,8 +588,12 @@ export function apply(ctx: ClientContext): void {
 // Keep the host plugin's default export shape compatible with older loaders.
 export function mountStandalone(target: HTMLElement): () => void {
   const store = new AccountStore()
+  const providers = new ProviderStore({
+    api: { llm: { models: async () => ({ result: { ok: true, value: { groups: [], failures: [] } } }) } },
+    hostDescription: { getSnapshot: () => undefined, subscribe: () => () => {} },
+  } as unknown as ConnectionHandle)
   let root: Root | undefined
   root = createRoot(target)
-  root.render(createElement(AccountAction, { wide: true, store }))
+  root.render(createElement(AccountAction, { wide: true, store, providers }))
   return () => root?.unmount()
 }

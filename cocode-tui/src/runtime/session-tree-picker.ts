@@ -4,6 +4,7 @@ export type SessionTreePickerItem = SessionTreeRow & {
   path?: string
   source: 'rpc' | 'jsonl'
   updatedAt?: number
+  activity?: 'idle' | 'running'
 }
 
 export type SessionTreePickerState = {
@@ -46,6 +47,20 @@ export function selectedSessionTreeItem(
 
 export function closeSessionTreePicker(state: SessionTreePickerState): SessionTreePickerState {
   return { ...state, open: false }
+}
+
+export function setSessionTreeActivity(
+  state: SessionTreePickerState,
+  sessionId: string,
+  activity: 'idle' | 'running',
+): SessionTreePickerState {
+  let changed = false
+  const items = state.items.map((item) => {
+    if (item.session.id !== sessionId || item.activity === activity) return item
+    changed = true
+    return { ...item, activity }
+  })
+  return changed ? { ...state, items } : state
 }
 
 export function visibleSessionTreeItems(state: SessionTreePickerState): SessionTreePickerItem[] {

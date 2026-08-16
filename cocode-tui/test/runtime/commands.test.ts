@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { TuiAction } from '../../src/runtime/app.ts'
 import { createBuiltinCommands, helpText, parseSlash } from '../../src/runtime/commands.ts'
 import { P0_CAPABILITIES } from '../../src/runtime/capabilities.ts'
+import { resolveKeymap } from '../../src/runtime/keymap-config.ts'
 
 describe('commands', () => {
   it('parses slash name and args', () => {
@@ -18,13 +19,16 @@ describe('commands', () => {
       'help',
       'exit',
       'clear',
+      'redraw',
       'status',
       'doctor',
       'theme',
       'lang',
       'model',
+      'models',
       'export',
       'copy',
+      'todos',
       'review',
       'focus',
       'init',
@@ -60,6 +64,36 @@ describe('commands', () => {
     expect(helpText(P0_CAPABILITIES, createBuiltinCommands(), 'zh')).toContain(
       '/focus  切换最近一轮聚焦视图',
     )
+  })
+
+  it('shows capability-gated Crush shortcuts in help', () => {
+    const capabilities = {
+      ...P0_CAPABILITIES,
+      sessionList: 'rpc' as const,
+      open: true,
+      permissionMode: true,
+    }
+    expect(helpText(capabilities, createBuiltinCommands(), 'zh')).toContain(
+      'Ctrl+N 新会话 · Ctrl+S 会话 · Ctrl+Y 权限',
+    )
+  })
+
+  it('shows configured shortcut labels in help', () => {
+    const keymap = resolveKeymap({
+      COCODE_TUI_KEYMAP:
+        '{"inputSubmit":"alt+enter","sessionInterruptOrQuit":"ctrl+x","helpToggle":"alt+h","sessionNew":"alt+n","sessionOpen":"ctrl+e","permissionToggle":"shift+y","transcriptToggleVerbose":"alt+o","editorOpen":"alt+g","historySearch":"alt+r","messagesSelect":"shift+up"}',
+    })
+    const help =
+      helpText(
+        { ...P0_CAPABILITIES, sessionList: 'rpc', open: true, permissionMode: true },
+        createBuiltinCommands(),
+        'zh',
+        [],
+        keymap,
+      )
+    expect(help).toContain('Alt+N 新会话 · Ctrl+E 会话 · Shift+Y 权限')
+    expect(help).toContain('Alt+Enter 发送 · Ctrl+X 中断或退出 · Alt+H 帮助')
+    expect(help).toContain('Alt+O 详情 · Alt+G 编辑 · ↑/↓ 历史 · Alt+R 搜索 · Shift+↑ 消息选择')
   })
 
   it('/exit dispatches quit', () => {
@@ -115,6 +149,14 @@ describe('commands', () => {
     expect(models).toEqual(['m2'])
   })
 
+  it('/model without an argument and /models open the model picker', () => {
+    const opened: string[] = []
+    const registry = createBuiltinCommands()
+    registry.find('model', P0_CAPABILITIES)?.run(commandCtx({ showModelPicker: () => opened.push('model') }), '')
+    registry.find('models', P0_CAPABILITIES)?.run(commandCtx({ showModelPicker: () => opened.push('models') }), '')
+    expect(opened).toEqual(['model', 'models'])
+  })
+
   it('/compact sends a prompt-path request', () => {
     const actions: TuiAction[] = []
     const command = createBuiltinCommands().find('compact', P0_CAPABILITIES)
@@ -135,6 +177,13 @@ describe('commands', () => {
     command?.run(commandCtx({ toggleFocus: () => (called = true) }), '')
     expect(called).toBe(true)
   })
+
+  it('/todos opens the checklist panel', () => {
+    let called = false
+    const command = createBuiltinCommands().find('todos', P0_CAPABILITIES)
+    command?.run(commandCtx({ showChecklist: () => (called = true) }), '')
+    expect(called).toBe(true)
+  })
 })
 
 function commandCtx(
@@ -144,8 +193,10 @@ function commandCtx(
     useAuth: (target: 'byok' | 'cocode' | 'login') => void
     setLocale: (value: string) => void
     setModel: (value: string) => void
+    showModelPicker: () => void
     copyLatestAssistant: () => void
     toggleFocus: () => void
+    showChecklist: () => void
   }> = {},
 ) {
   return {
@@ -158,7 +209,9 @@ function commandCtx(
     useAuth: overrides.useAuth,
     setLocale: overrides.setLocale,
     setModel: overrides.setModel,
+    showModelPicker: overrides.showModelPicker,
     copyLatestAssistant: overrides.copyLatestAssistant,
     toggleFocus: overrides.toggleFocus,
+    showChecklist: overrides.showChecklist,
   }
 }

@@ -1,4 +1,4 @@
-import type { TuiApp } from '../runtime/app.ts'
+import type { TuiApp, TuiSnapshot } from '../runtime/app.ts'
 
 /** Wrap a selection index while keeping empty menus at index zero. */
 export function moveSelection(index: number, delta: number, count: number): number {
@@ -18,11 +18,26 @@ export function dispatchKeyCommand(app: TuiApp, id: string, draft: string): void
     case 'session.interruptOrQuit':
       app.dispatch({ type: 'interruptOrQuit' })
       return
+    case 'session.new':
+      app.dispatch({ type: 'session.new' })
+      return
+    case 'session.open':
+      app.dispatch({ type: 'session.open' })
+      return
+    case 'file.open':
+      app.dispatch({ type: 'file.open' })
+      return
     case 'app.quit':
       app.dispatch({ type: 'quit' })
       return
     case 'app.redraw':
       app.dispatch({ type: 'redraw' })
+      return
+    case 'model.open':
+      app.dispatch({ type: 'model.open' })
+      return
+    case 'image.paste':
+      app.dispatch({ type: 'image.paste' })
       return
     case 'transcript.toggleVerbose':
       app.dispatch({ type: 'toggleVerbose' })
@@ -36,7 +51,36 @@ export function dispatchKeyCommand(app: TuiApp, id: string, draft: string): void
     case 'history.next':
       app.dispatch({ type: 'historyNext' })
       return
+    case 'permission.toggle':
+      app.dispatch({ type: 'permission.toggle' })
+      return
   }
+}
+
+type HelpKey = {
+  escape?: boolean
+  ctrl?: boolean
+}
+
+/** Close the help overlay before the general interrupt/quit policy runs. */
+export function dispatchHelpInput(app: TuiApp, input: string, key: HelpKey): boolean {
+  if (key.escape || (key.ctrl && input === 'c')) {
+    app.dispatch({ type: 'interruptOrQuit' })
+  }
+  return true
+}
+
+/** Route the composer Tab key without stealing Tab from open completion panels. */
+export function dispatchComposerTab(app: TuiApp, snapshot: TuiSnapshot): boolean {
+  if (snapshot.agent === 'running' && snapshot.composer.text.trim() !== '') {
+    app.dispatch({ type: 'queuePrompt' })
+    return true
+  }
+  if (snapshot.agent === 'idle' && snapshot.capabilities.planMode) {
+    app.dispatch({ type: 'plan.toggle' })
+    return true
+  }
+  return false
 }
 
 type PickerKey = {

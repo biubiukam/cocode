@@ -25,6 +25,7 @@ import { AuthGate } from './present/auth-gate.tsx'
 import { Chat } from './present/chat.tsx'
 import { clearViewport, enterScreen, parseScreenMode } from './present/clear-screen.ts'
 import { resolveUiLocale } from './runtime/ui-locale.ts'
+import { detectTerminalEnvironment } from './runtime/platform.ts'
 
 loadDotenv(resolve(process.cwd(), '.env'))
 
@@ -42,6 +43,12 @@ async function main(): Promise<void> {
   const launch = parseLaunchFromEnv()
 
   const leaveScreen = enterScreen(parseScreenMode(process.env.COCODE_TUI_SCREEN))
+  const terminal = detectTerminalEnvironment({
+    stdinIsTTY: process.stdin.isTTY === true,
+    stdoutIsTTY: process.stdout.isTTY === true,
+    stdoutColumns: process.stdout.columns,
+    stdoutRows: process.stdout.rows,
+  })
   process.once('exit', () => leaveScreen())
 
   const auth = await createAuthStore()
@@ -55,9 +62,9 @@ async function main(): Promise<void> {
   }
 
   const resolved = auth.resolved()
-  await registerLiveInstance(resolved.home)
+  await registerLiveInstance(resolved.dshHome)
   process.on('exit', () => {
-    releaseLiveInstanceSync(resolved.home)
+    releaseLiveInstanceSync(resolved.dshHome)
   })
   const init = parseInitFromEnv({
     ...process.env,
@@ -88,10 +95,10 @@ async function main(): Promise<void> {
       envLocked: auth.snapshot().envLocked,
       accountLabel: auth.snapshot().profile?.displayName,
       logout: () => auth.logout(),
-      exclusiveHome: async () => (await otherLiveCount(resolved.home)) === 0,
+      exclusiveHome: async () => (await otherLiveCount(resolved.dshHome)) === 0,
       selectMode: (mode) => auth.selectMode(mode),
       login: () => auth.dispatch({ type: 'chooseCocode' }),
-      submitByok: (key) => saveByokKey(resolved.home, key),
+      submitByok: (key) => saveByokKey(resolved.dshHome, key),
       resolved: () => auth.resolved(),
       snapshot: () => auth.snapshot(),
       subscribe: (listener) => auth.subscribe(listener),
@@ -108,7 +115,7 @@ async function main(): Promise<void> {
   })
 
   clearViewport()
-  const screen = render(<Chat app={app} />)
+  const screen = render(<Chat app={app} mouseSupported={terminal.supportsMouse} />)
   let exitStarted = false
   const finish = async (): Promise<void> => {
     if (exitStarted) return
@@ -122,11 +129,11 @@ async function main(): Promise<void> {
     await screen.unmount()
     leaveScreen()
     try {
-      await releaseLiveInstance(resolved.home)
+      await releaseLiveInstance(resolved.dshHome)
       await app.close()
       process.exit(0)
     } catch (error) {
-      await releaseLiveInstance(resolved.home).catch(() => undefined)
+      await releaseLiveInstance(resolved.dshHome).catch(() => undefined)
       process.stderr.write(`Cocode TUI shutdown failed: ${displayError(error)}\n`)
       process.exit(1)
     }

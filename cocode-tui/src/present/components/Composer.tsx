@@ -4,15 +4,36 @@ import { formatFileMention } from '../../runtime/file-mentions.ts'
 import { clipComposerRow, renderComposerRows, visibleComposerRows } from '../composer-layout.ts'
 import { theme } from '../theme.ts'
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
+import {
+  COMPOSER_META_SEPARATOR,
+  COMPOSER_ROUTE_SEPARATOR,
+  composerHeaderLayout,
+} from '../composer-header.ts'
 
 export function Composer(props: {
   composer: TuiSnapshot['composer']
+  agent: TuiSnapshot['agent']
+  planMode: boolean
+  planModeAvailable: boolean
+  provider: string
+  model: string
   locale: UiLocale
   maxRows?: number
   maxColumns?: number
 }) {
   const { composer } = props
   const empty = composer.text === ''
+  const header = composerHeaderLayout({
+    composer,
+    agent: props.agent,
+    planMode: props.planMode,
+    planModeAvailable: props.planModeAvailable,
+    locale: props.locale,
+    provider: props.provider,
+    model: props.model,
+    columns: props.maxColumns,
+  })
+  const titleColor = !composer.mask && props.planMode ? theme.info : theme.brand
   const rows = empty
     ? []
     : visibleComposerRows(
@@ -26,12 +47,44 @@ export function Composer(props: {
       borderColor={composer.disabled ? theme.border : theme.brand}
       paddingX={1}
     >
-      <Box width="100%" justifyContent="space-between">
-        <Text color={composer.disabled ? theme.mute : theme.brand} bold>
-          {composer.mask ? text(props.locale, 'secret') : text(props.locale, 'prompt')}
-        </Text>
-        <Text color={theme.mute}>
-          {composer.disabled ? text(props.locale, 'locked') : text(props.locale, 'send')}
+      <Box width="100%" height={1} overflowY="hidden" justifyContent="space-between">
+        <Box minWidth={0} flexShrink={1} height={1} overflowY="hidden">
+          <Box flexShrink={0}>
+            <Text color={composer.disabled ? theme.mute : titleColor} bold>
+              {header.title}
+            </Text>
+          </Box>
+          {header.showRoute ? (
+            <>
+              <Box flexShrink={0}>
+                <Text color={theme.mute}>{COMPOSER_META_SEPARATOR}</Text>
+              </Box>
+              {!header.compact ? (
+                <>
+                  <Box flexShrink={0}>
+                    <Text color={composer.disabled ? theme.mute : theme.dim}>
+                      {props.provider}
+                    </Text>
+                  </Box>
+                  <Box flexShrink={0}>
+                    <Text color={theme.mute}>{COMPOSER_ROUTE_SEPARATOR}</Text>
+                  </Box>
+                </>
+              ) : null}
+              <Box minWidth={0} flexShrink={1}>
+                <Text
+                  color={composer.disabled ? theme.mute : theme.brand}
+                  underline={!composer.disabled}
+                  wrap="truncate-end"
+                >
+                  {props.model}
+                </Text>
+              </Box>
+            </>
+          ) : null}
+        </Box>
+        <Text color={theme.mute} wrap="truncate-end">
+          {header.hint}
         </Text>
       </Box>
       <Box flexDirection="column" marginTop={1}>
@@ -66,6 +119,11 @@ export function Composer(props: {
         <Text color={theme.info} wrap="truncate-end">
           {text(props.locale, 'attached')} ·{' '}
           {composer.attachments.map(formatFileMention).join(' · ')}
+        </Text>
+      ) : null}
+      {composer.images.length > 0 ? (
+        <Text color={theme.info} wrap="truncate-end">
+          image · {composer.images.map((image) => image.name).join(' · ')}
         </Text>
       ) : null}
     </Box>

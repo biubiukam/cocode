@@ -20,7 +20,7 @@ Cocode 产品由三个 **同级目录** 组成：桌面/Web GUI、终端 TUI、A
 | --- | --- | --- |
 | **cocode-gui/** | 品牌 UI、设计系统、Host 客户端 | HTTP POST + 双 WebSocket → `dsh web` |
 | **cocode-tui/** | 终端 UI、JSON-RPC 客户端 | stdio NDJSON-RPC → jsonrpc-agent 子进程 |
-| **cocode-harness/** | Cordis 插件树、`@cocode/dsh-*` 运行时 | — |
+| **cocode-harness/** | Cordis 插件树、`@deepseek-ai/dsh-*` 运行时 | — |
 
 跨目录需求：harness 侧实现能力，GUI/TUI 侧消费 wire API。
 
@@ -64,7 +64,7 @@ cocode-tui/
     connection/          JSON-RPC 传输（@cocode/tui-connection）
 ```
 
-TUI 通过 `@cocode/dsh-sdk-client` 封装 spawn + `session.event` 流；技能/slash 走 `session.prompt` 文本路径。RFC 写在 `cocode-tui/.dev/rfc/`。
+TUI 通过 `@deepseek-ai/dsh-sdk-client` 封装 spawn + `session.event` 流；技能/slash 走 `session.prompt` 文本路径。RFC 写在 `cocode-tui/.dev/rfc/`。
 
 ```sh
 cd cocode-tui
@@ -89,7 +89,7 @@ pnpm dsh web          # GUI 联调
 
 ## 约定
 
-- **包名**：GUI 用 `@cocode/gui-*`、`@cocode/ui`；TUI 用 `@cocode/tui-*`；harness 用 `@cocode/dsh-*`。
+- **包名**：GUI 用 `@cocode/gui-*`、`@cocode/ui`；TUI 用 `@cocode/tui-*`；harness 用 `@deepseek-ai/dsh-*`。
 - **ESM**：`"type": "module"`；跨包用 package name，包内用 `.ts` 相对路径。
 - **配置**：可变项走环境变量（见各目录 `.env.example`），禁止硬编码 harness 路径、模型、API Key。
 - **密钥**：`.env` 不入库；key 只走 harness credentials。
