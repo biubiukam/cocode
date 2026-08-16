@@ -978,7 +978,7 @@ describe('TuiApp', () => {
     expect(app.snapshot().agent).toBe('idle')
   })
 
-  it('keeps the current session when the restarted runtime supports durable session open', async () => {
+  it('starts a fresh session when the restarted runtime supports durable session open', async () => {
     const runtime = fakeRuntime()
     runtime.getCapabilities = () => ({
       source: 'runtime',
@@ -999,18 +999,6 @@ describe('TuiApp', () => {
       },
       errors: {},
     })
-    const seed: SessionEvent[] = [
-      {
-        type: 'user/message',
-        seq: 1,
-        time: 1,
-        data: { content: [{ type: 'text', text: 'keep this context' }] },
-      },
-    ]
-    runtime.open = async (sessionId) => {
-      expect(sessionId).toBe('s1')
-      return { opened: true, seed, seedLength: seed.length }
-    }
     const app = createTuiApp({
       runtime,
       cwd: '/tmp',
@@ -1022,10 +1010,10 @@ describe('TuiApp', () => {
     app.dispatch({ type: 'command', line: '/model m2' })
 
     await expect.poll(() => app.snapshot().header.model).toBe('m2')
-    expect(app.snapshot().header.sessionId).toBe('s1')
-    expect(app.snapshot().nodes).toHaveLength(1)
-    expect(app.snapshot().nodes[0]?.text).toContain('keep this context')
-    expect(app.snapshot().notice?.message).toContain('current session continued')
+    expect(app.snapshot().header.sessionId).not.toBe('s1')
+    expect(runtime.opens).toEqual([])
+    expect(app.snapshot().nodes).toEqual([])
+    expect(app.snapshot().notice?.message).toContain('new session')
   })
 
   it('restores the previous model when switching fails', async () => {
@@ -1083,7 +1071,8 @@ describe('TuiApp', () => {
     await expect.poll(() => app.snapshot().header.provider).toBe('p2')
     expect(runtime.restarts).toEqual([{ provider: 'p2', model: 'm2' }])
     expect(app.snapshot().header.model).toBe('m2')
-    expect(app.snapshot().header.sessionId).toBe('s1')
+    expect(app.snapshot().header.sessionId).not.toBe('s1')
+    expect(runtime.opens).toEqual([])
   })
 
   it('opens the manual model input for /models when the runtime has no catalog', async () => {
