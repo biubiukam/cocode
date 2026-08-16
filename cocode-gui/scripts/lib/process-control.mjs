@@ -9,7 +9,7 @@ import { spawnSync } from "node:child_process"
 
 const POLL_INTERVAL_MS = 100
 /** Long enough for Electron and Vite to unwind, short enough to stay snappy. */
-export const DEFAULT_STOP_GRACE_MS = 8_000
+const DEFAULT_STOP_GRACE_MS = 8_000
 const KILL_GRACE_MS = 2_000
 
 export function isProcessAlive(pid) {
@@ -23,7 +23,7 @@ export function isProcessAlive(pid) {
 	}
 }
 
-export async function waitForProcessExit(pid, timeoutMs) {
+async function waitForProcessExit(pid, timeoutMs) {
 	const deadline = Date.now() + timeoutMs
 	while (Date.now() < deadline && isProcessAlive(pid)) {
 		await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS))
@@ -62,7 +62,7 @@ export function readProcessCommand(pid) {
 	return result.stdout?.trim() ?? ""
 }
 
-export function resolveProcessCwd(pid) {
+function resolveProcessCwd(pid) {
 	if (process.platform === "win32") return undefined
 	const result = spawnSync("lsof", ["-a", "-p", String(pid), "-d", "cwd", "-Fn"], {
 		encoding: "utf8",
@@ -74,7 +74,7 @@ export function resolveProcessCwd(pid) {
 }
 
 /** Every running process as `{ pid, command }`; empty where `ps` is unavailable. */
-export function listProcesses() {
+function listProcesses() {
 	if (process.platform === "win32") return []
 	const result = spawnSync("ps", ["-axo", "pid=,command="], { encoding: "utf8" })
 	const processes = []
