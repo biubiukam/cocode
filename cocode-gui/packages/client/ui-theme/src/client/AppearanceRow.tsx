@@ -92,7 +92,7 @@ export function AppearanceRow({ t, setTheme, setLogo, useStore }: AppearanceRowC
       <div className={css.cubeRow}>
         <button
           type="button"
-          className={clsx(css.logoCube, logoPreference === 'cocode' && css.selected)}
+          className={clsx(css.themeCube, css.logoCube, logoPreference === 'cocode' && css.selected)}
           aria-pressed={logoPreference === 'cocode'}
           onClick={() => { setLogo('cocode') }}
         >
@@ -101,7 +101,7 @@ export function AppearanceRow({ t, setTheme, setLogo, useStore }: AppearanceRowC
         </button>
         <button
           type="button"
-          className={clsx(css.logoCube, logoPreference === 'deepseek' && css.selected)}
+          className={clsx(css.themeCube, css.logoCube, logoPreference === 'deepseek' && css.selected)}
           aria-pressed={logoPreference === 'deepseek'}
           onClick={() => { setLogo('deepseek') }}
         >
