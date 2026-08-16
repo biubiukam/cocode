@@ -17,7 +17,7 @@ function createContext(options = {}) {
           session: {
             id: agentOptions.sessionId,
             events: [],
-            header: { id: agentOptions.sessionId, createdAt: 1 },
+            header: { id: agentOptions.sessionId, createdAt: 1, cwd: agentOptions.meta?.cwd },
           },
           status: 'idle',
           followup(message) {
@@ -61,6 +61,7 @@ function createContext(options = {}) {
         }
       }
       if (name === 'cocodeVision') return options.vision
+      if (name === 'skills') return options.skills
       if (name === 'loader') {
         return options.loader ?? {
           entries() {
@@ -173,6 +174,41 @@ test('uses exact model capabilities when a native vision model is not listed', a
   await gateway.prompt({ sessionId: 's1', contentBlocks: [imageBlock] })
 
   assert.deepEqual(followed[0]?.content, [imageBlock])
+})
+
+test('lists skills from the current agent scope', async () => {
+  const lookups = []
+  const { ctx } = createContext({
+    skills: {
+      async list(lookup) {
+        lookups.push(lookup)
+        if (lookup.scope === undefined) return []
+        return [
+          {
+            name: 'code-review',
+            description: 'Review the current change',
+            source: 'user-agents',
+            invocation: { userInvocable: true },
+          },
+        ]
+      },
+    },
+  })
+  const gateway = createGateway(ctx)
+  await initialize(gateway)
+
+  assert.deepEqual(await gateway.listSkills({ sessionId: 's1' }), {
+    skills: [
+      {
+        name: 'code-review',
+        description: 'Review the current change',
+        source: 'user-agents',
+      },
+    ],
+  })
+  assert.equal(lookups.length, 1)
+  assert.equal(lookups[0].cwd, '/tmp')
+  assert.equal(lookups[0].scope.session.id, 's1')
 })
 
 test('lists non-group loader entries with enablement and fiber phase', async () => {

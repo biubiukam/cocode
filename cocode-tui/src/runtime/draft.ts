@@ -1,6 +1,6 @@
-/**
- * Pure draft editing over UTF-16 code units.
- */
+/** Pure draft editing with UTF-16 offsets normalized to grapheme boundaries. */
+
+import { moveByGraphemes, normalizeGraphemeOffset } from './grapheme.ts'
 
 export type DraftState = {
   text: string
@@ -14,7 +14,7 @@ export type DraftSelection = {
 }
 
 export function createDraft(text = '', cursor = text.length): DraftState {
-  return { text, cursor: clampCursor(cursor, text.length) }
+  return { text, cursor: normalizeGraphemeOffset(text, cursor) }
 }
 
 export function replaceDraft(_state: DraftState, text: string, cursor = text.length): DraftState {
@@ -28,7 +28,7 @@ export function insertDraft(state: DraftState, input: string): DraftState {
   if (selection !== undefined) {
     return replaceDraftRange(state, selection.start, selection.end, text)
   }
-  const cursor = clampCursor(state.cursor, state.text.length)
+  const cursor = normalizeGraphemeOffset(state.text, state.cursor)
   return {
     text: state.text.slice(0, cursor) + text + state.text.slice(cursor),
     cursor: cursor + text.length,
@@ -41,8 +41,11 @@ export function replaceDraftRange(
   end: number,
   replacement: string,
 ): DraftState {
-  const safeStart = clampCursor(start, state.text.length)
-  const safeEnd = Math.max(safeStart, Math.min(Math.trunc(end), state.text.length))
+  const safeStart = normalizeGraphemeOffset(state.text, start, 'previous')
+  const safeEnd = Math.max(
+    safeStart,
+    normalizeGraphemeOffset(state.text, end, 'next'),
+  )
   const text = state.text.slice(0, safeStart) + replacement + state.text.slice(safeEnd)
   return createDraft(text, safeStart + replacement.length)
 }
@@ -56,16 +59,16 @@ export function moveDraftCursor(
   delta: number,
   extendSelection = false,
 ): DraftState {
-  const cursor = clampCursor(state.cursor, state.text.length)
+  const cursor = normalizeGraphemeOffset(state.text, state.cursor)
   if (!extendSelection) {
     const selection = selectedDraftRange(state)
     if (selection !== undefined) {
       return createDraft(state.text, delta < 0 ? selection.start : selection.end)
     }
-    return createDraft(state.text, cursor + Math.trunc(delta))
+    return createDraft(state.text, moveByGraphemes(state.text, cursor, delta))
   }
-  const selectionAnchor = clampCursor(state.selectionAnchor ?? cursor, state.text.length)
-  const nextCursor = clampCursor(cursor + Math.trunc(delta), state.text.length)
+  const selectionAnchor = normalizeGraphemeOffset(state.text, state.selectionAnchor ?? cursor)
+  const nextCursor = moveByGraphemes(state.text, cursor, delta)
   return {
     text: state.text,
     cursor: nextCursor,
@@ -78,11 +81,12 @@ export function backspaceDraft(state: DraftState): DraftState {
   if (selection !== undefined) {
     return replaceDraftRange(state, selection.start, selection.end, '')
   }
-  const cursor = clampCursor(state.cursor, state.text.length)
+  const cursor = normalizeGraphemeOffset(state.text, state.cursor)
   if (cursor === 0) return { text: state.text, cursor }
+  const previous = moveByGraphemes(state.text, cursor, -1)
   return {
-    text: state.text.slice(0, cursor - 1) + state.text.slice(cursor),
-    cursor: cursor - 1,
+    text: state.text.slice(0, previous) + state.text.slice(cursor),
+    cursor: previous,
   }
 }
 
@@ -93,8 +97,8 @@ export function selectAllDraft(state: DraftState): DraftState {
 
 export function selectedDraftRange(state: DraftState): DraftSelection | undefined {
   if (state.selectionAnchor === undefined) return undefined
-  const cursor = clampCursor(state.cursor, state.text.length)
-  const anchor = clampCursor(state.selectionAnchor, state.text.length)
+  const cursor = normalizeGraphemeOffset(state.text, state.cursor)
+  const anchor = normalizeGraphemeOffset(state.text, state.selectionAnchor)
   if (cursor === anchor) return undefined
   return {
     start: Math.min(cursor, anchor),
@@ -124,18 +128,13 @@ export function filterPrintableInput(input: string): string {
 }
 
 function normalizeDraft(state: DraftState): DraftState {
-  const cursor = clampCursor(state.cursor, state.text.length)
+  const cursor = normalizeGraphemeOffset(state.text, state.cursor)
   const selectionAnchor = state.selectionAnchor === undefined
     ? undefined
-    : clampCursor(state.selectionAnchor, state.text.length)
+    : normalizeGraphemeOffset(state.text, state.selectionAnchor)
   return {
     text: state.text,
     cursor,
     ...(selectionAnchor === undefined || selectionAnchor === cursor ? {} : { selectionAnchor }),
   }
-}
-
-function clampCursor(cursor: number, length: number): number {
-  if (!Number.isFinite(cursor)) return length
-  return Math.max(0, Math.min(Math.trunc(cursor), length))
 }

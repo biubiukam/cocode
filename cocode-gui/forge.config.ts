@@ -37,10 +37,12 @@ const releaseTarget =
 	process.env.RELEASE_PLATFORM || process.env.RELEASE_ARCH || process.env.RELEASE_REQUIRE_SIGNING
 		? resolveReleaseTarget()
 		: undefined
+const defaultIconRoot = path.resolve("resources/icons")
+const targetPlatform = releaseTarget?.platform ?? process.platform
 const appIcon =
-	releaseTarget?.platform === "win32"
-		? process.env.WINDOWS_ICON_PATH
-		: process.env.MACOS_ICON_PATH
+	targetPlatform === "win32"
+		? process.env.WINDOWS_ICON_PATH?.trim() || path.join(defaultIconRoot, "cocode.ico")
+		: process.env.MACOS_ICON_PATH?.trim() || path.join(defaultIconRoot, "cocode.icns")
 const macSignOptions = releaseTarget?.platform === "win32" ? undefined : createMacSignOptions()
 const macNotarizeOptions =
 	releaseTarget?.platform === "win32" ? undefined : createMacNotarizeOptions()
@@ -129,7 +131,12 @@ const config: ForgeConfig = {
 			return appendChecksumManifest(selectGitHubReleaseArtifacts(normalized))
 		},
 	},
-	rebuildConfig: {},
+	// Use the final headers host directly. The default electronjs.org URL
+	// redirects there, and node-gyp's fetch can fail on that redirect when a
+	// proxy resets the connection.
+	rebuildConfig: {
+		headerURL: "https://artifacts.electronjs.org/headers/dist",
+	},
 	makers: [
 		new MakerSquirrel(
 			createSquirrelConfig(packageMetadata.version, process.env, windowsSignOptions),

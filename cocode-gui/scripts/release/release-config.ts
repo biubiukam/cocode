@@ -245,7 +245,10 @@ export function requireReleaseCredentials(target: ReleaseTarget, environment = p
 export function createDmgConfig(environment = process.env): MakerDMGConfig {
 	return {
 		format: (environment.DMG_FORMAT?.trim() as MakerDMGConfig["format"]) || "UDZO",
-		icon: resolveReleasePath(environment.DMG_ICON_PATH, "DMG_ICON_PATH"),
+		icon: resolveReleasePath(
+			environment.DMG_ICON_PATH?.trim() || "resources/icons/cocode.icns",
+			"DMG_ICON_PATH",
+		),
 		background: resolveReleasePath(environment.DMG_BACKGROUND_PATH, "DMG_BACKGROUND_PATH"),
 		iconSize: parsePositiveInteger(environment.DMG_ICON_SIZE, 96),
 	}
@@ -264,7 +267,10 @@ export function createSquirrelConfig(
 	return {
 		noMsi: false,
 		noDelta: false,
-		setupIcon: resolveReleasePath(environment.WINDOWS_ICON_PATH, "WINDOWS_ICON_PATH"),
+		setupIcon: resolveReleasePath(
+			environment.WINDOWS_ICON_PATH?.trim() || "resources/icons/cocode.ico",
+			"WINDOWS_ICON_PATH",
+		),
 		setupExe: `${artifactRoot}-Setup.exe`,
 		setupMsi: `${artifactRoot}-Setup.msi`,
 		windowsSign: windowsSignOptions,

@@ -74,6 +74,10 @@
   z-index: 50;
   display: flex;
   flex-direction: column;
+  /* The layout push and the bottom-panel seam use the panel's declared
+     width as the outer occupied width. Keep the left border inside that
+     geometry instead of letting the default content-box model add a pixel. */
+  box-sizing: border-box;
   /* The native sidebar surface: bluish-50 over white / bluish-900 over dark,
      exactly like the app's own sidebar column (SidebarRoot .root). */
   background: var(--dsw-specific-sidebar-fill);
@@ -135,6 +139,9 @@
   z-index: 50;
   display: flex;
   flex-direction: column;
+  /* Match .panel: left/right and height describe the outer panel box, so the
+     top/right hairlines land on the same coordinates as the adjacent panel. */
+  box-sizing: border-box;
   background: var(--dsw-specific-sidebar-fill);
   border-top: 1px solid var(--dsw-alias-border-l2);
   /* Expand/collapse slides the panel; height drags animate the height. */

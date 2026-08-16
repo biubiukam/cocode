@@ -1,17 +1,10 @@
 /**
- * Bottom-panel first-expand auto-terminal tests — the TRIGGER CHAIN behind
- * issue #42 (bottom panel first expand + auto terminal → whole panel blank).
+ * Bottom-panel expansion tests. Expanding the panel must not create tabs;
+ * terminals are created only by an explicit + menu action.
  *
- * #42's crash itself was the zero-size xterm open (the same root cause as
- * #25, fixed by openWhenSized — see tests/open-when-sized.spec.ts), and the
- * "whole panel blank" amplification is covered by the per-tab containment
- * tests (tests/sidebar-crash.spec.tsx). What no test pinned was the trigger:
- * the Sidebar effect that opens a terminal tab the FIRST time the bottom
- * panel expands (`bottomOpenedOnce`), its pref / enable-switch gates, and
- * the once-per-session semantics. These tests render the REAL Sidebar shell
- * against a minimal fake context (the repo's jsdom pattern) and drive the
- * bottom panel through the store, asserting the tab lands in the bottom
- * workbench, renders, and the panel itself survives.
+ * These tests render the real Sidebar shell against a minimal fake context
+ * (the repo's jsdom pattern) and drive the bottom panel through the store,
+ * asserting the panel survives without creating an implicit terminal tab.
  */
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -105,7 +98,7 @@ function registerStubTerminal(service: BetterSidebarService, renders: { count: n
   })
 }
 
-describe('bottom-panel first-expand auto terminal (issue #42 trigger chain)', () => {
+describe('bottom-panel expansion', () => {
   it('measures a conversation slot that mounts later below the root wrapper', async () => {
     class FakeResizeObserver {
       constructor(_callback: ResizeObserverCallback) {}
@@ -154,7 +147,7 @@ describe('bottom-panel first-expand auto terminal (issue #42 trigger chain)', ()
     expect(bottomPanel.style.right).toBe(`${window.innerWidth - 900}px`)
   })
 
-  it('auto-opens exactly one terminal tab in the bottom workbench on the FIRST expansion', () => {
+  it('does not auto-open a terminal tab on expansion', () => {
     const { container, store, service } = mountSidebar()
     const renders = { count: 0 }
     registerStubTerminal(service, renders)
@@ -163,14 +156,10 @@ describe('bottom-panel first-expand auto terminal (issue #42 trigger chain)', ()
 
     const state = store.getSnapshot().state!
     expect(state.bottomOpen).toBe(true)
-    // The once-flag is set atomically with the first fire.
-    expect(state.bottomOpenedOnce).toBe(true)
-    // The terminal tab landed in the BOTTOM workbench (the effect pins the
-    // active pane to the bottom tree's first leaf before opening).
-    expect(bottomTabs(store).map(tab => tab.type)).toEqual(['terminal'])
-    // The tab actually mounted and rendered — the chain is live end to end.
-    expect(renders.count).toBeGreaterThanOrEqual(1)
-    expect(container.textContent).toContain('terminal-stub-content')
+    expect(state.bottomOpenedOnce).toBe(false)
+    expect(bottomTabs(store)).toHaveLength(0)
+    expect(renders.count).toBe(0)
+    expect(container.textContent).not.toContain('terminal-stub-content')
     // The panel itself survived (the #42 symptom was a WHOLE blank panel):
     // the close control is present and the layout push for the bottom panel
     // height is live.
@@ -180,39 +169,17 @@ describe('bottom-panel first-expand auto terminal (issue #42 trigger chain)', ()
     )
   })
 
-  it('never repeats the auto-open on later expansions (once per session)', () => {
+  it('does not create a terminal on later expansions either', () => {
     const { store, service } = mountSidebar()
     registerStubTerminal(service, { count: 0 })
 
     act(() => { store.reduce(toggleBottomPanel) })
-    expect(bottomTabs(store)).toHaveLength(1)
+    expect(bottomTabs(store)).toHaveLength(0)
 
-    // Collapse → expand again: the once-flag suppresses any second terminal.
+    // Collapse → expand again: no implicit terminal is created either time.
     act(() => { store.reduce(toggleBottomPanel) })
     expect(store.getSnapshot().state!.bottomOpen).toBe(false)
     act(() => { store.reduce(toggleBottomPanel) })
-    expect(bottomTabs(store)).toHaveLength(1)
-  })
-
-  it('does not auto-open when the bottomPanelAutoTerminal pref is off', () => {
-    const { store, service } = mountSidebar()
-    registerStubTerminal(service, { count: 0 })
-    // setPrefs REPLACES the prefs record — spread the current one so only
-    // the toggle moves.
-    act(() => { store.setPrefs({ ...store.getPrefs(), bottomPanelAutoTerminal: false }) })
-
-    act(() => { store.reduce(toggleBottomPanel) })
-    expect(store.getSnapshot().state!.bottomOpen).toBe(true)
-    expect(bottomTabs(store)).toHaveLength(0)
-  })
-
-  it('does not auto-open when the terminal tab type is disabled in settings', () => {
-    const { store, service } = mountSidebar()
-    registerStubTerminal(service, { count: 0 })
-    act(() => { store.setPrefs({ ...store.getPrefs(), tabsEnabled: { terminal: false } }) })
-
-    act(() => { store.reduce(toggleBottomPanel) })
-    expect(store.getSnapshot().state!.bottomOpen).toBe(true)
     expect(bottomTabs(store)).toHaveLength(0)
   })
 })

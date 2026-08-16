@@ -72,6 +72,15 @@ describe('displayError', () => {
     expect(message).toMatch(/^RUNTIME_UNKNOWN · /)
     expect(message).not.toMatch(/sk-secret|API_KEY=/)
   })
+
+  it('includes the underlying transport cause', () => {
+    const error = new TypeError('fetch failed', {
+      cause: new Error('connect ECONNRESET 203.0.113.1:443'),
+    })
+    expect(displayError(error, 'en')).toBe(
+      'RUNTIME_UNKNOWN · Unexpected error: fetch failed: connect ECONNRESET 203.0.113.1:443.',
+    )
+  })
 })
 
 describe('startErrorMessage', () => {

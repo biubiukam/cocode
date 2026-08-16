@@ -244,6 +244,12 @@
   display: none;
 }
 
+/* The pixel C has built-in left and bottom whitespace. Its element is
+   geometrically centered, so optically offset only the visible mark. */
+.cocodeRailLogo {
+  transform: translate(-1px, 1px);
+}
+
 /* Rail icons ride the primary ink (figma rail spec); expanded keeps the
    secondary icon-button ink. */
 .collapsed .iconButton {

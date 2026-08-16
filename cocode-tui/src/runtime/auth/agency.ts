@@ -2,6 +2,8 @@
  * Agency HTTP helper. Logs never include token bodies.
  */
 
+import { errorDetail, TuiError } from '../errors/index.ts'
+
 export type AgencyResponse<T> = { status: number; value: T }
 
 export class AgencyError extends Error {
@@ -30,16 +32,21 @@ export async function jsonRequest<T>(
   if (init.body !== undefined) headers['content-type'] = 'application/json'
   if (init.token !== undefined) headers.authorization = `Bearer ${init.token}`
   const fetchImpl = init.fetch ?? fetch
-  const response = await fetchImpl(url, {
-    method: init.method,
-    headers,
-    body: init.body === undefined ? undefined : JSON.stringify(init.body),
-    signal:
-      init.signal === undefined
-        ? AbortSignal.timeout(15_000)
-        : AbortSignal.any([init.signal, AbortSignal.timeout(15_000)]),
-    redirect: 'error',
-  })
+  let response: Response
+  try {
+    response = await fetchImpl(url, {
+      method: init.method,
+      headers,
+      body: init.body === undefined ? undefined : JSON.stringify(init.body),
+      signal:
+        init.signal === undefined
+          ? AbortSignal.timeout(15_000)
+          : AbortSignal.any([init.signal, AbortSignal.timeout(15_000)]),
+      redirect: 'error',
+    })
+  } catch (error) {
+    throw new TuiError('AUTH_NETWORK_FAILED', { detail: errorDetail(error) })
+  }
   const text = await response.text()
   let value: T
   try {

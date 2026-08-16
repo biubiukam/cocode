@@ -1,9 +1,15 @@
 import { Box, Text } from 'ink'
 import type { TuiSnapshot } from '../../runtime/app.ts'
 import { formatFileMention } from '../../runtime/file-mentions.ts'
-import { clipComposerRow, renderComposerRows, visibleComposerRows } from '../composer-layout.ts'
-import { theme } from '../theme.ts'
+import { isAppleTerminalEnvironment } from '../../runtime/platform.ts'
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
+import {
+  clipComposerRow,
+  composerCursorStyle,
+  renderComposerRows,
+  visibleComposerRows,
+} from '../composer-layout.ts'
+import { theme } from '../theme.ts'
 import {
   COMPOSER_META_SEPARATOR,
   COMPOSER_ROUTE_SEPARATOR,
@@ -22,6 +28,7 @@ export function Composer(props: {
   maxColumns?: number
 }) {
   const { composer } = props
+  const cursorStyle = composerCursorStyle(isAppleTerminalEnvironment(), composer.disabled)
   const empty = composer.text === ''
   const header = composerHeaderLayout({
     composer,
@@ -104,7 +111,8 @@ export function Composer(props: {
               {row.spans.map((span, spanIndex) => (
                 <Text
                   key={`${spanIndex}:${span.text}`}
-                  inverse={!composer.disabled && span.cursor === true}
+                  inverse={cursorStyle.inverse && span.cursor === true}
+                  underline={cursorStyle.underline && span.cursor === true}
                   color={composer.disabled ? theme.mute : theme.text}
                   backgroundColor={
                     !composer.disabled && span.selected === true ? theme.border : undefined

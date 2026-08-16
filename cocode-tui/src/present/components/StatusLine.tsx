@@ -32,7 +32,10 @@ export function StatusLine(props: {
 }) {
   const notice = props.notice
   const telemetry = props.status.telemetry
-  const telemetryBits = [
+  const metricsBits = [
+    props.status.tokens === undefined
+      ? undefined
+      : `${props.status.tokens.input} ${text(props.locale, 'tokensInShort')} · ${props.status.tokens.output} ${text(props.locale, 'tokensOutShort')}`,
     telemetry.tps === undefined
       ? undefined
       : text(props.locale, 'telemetryTps', { value: formatMetric(telemetry.tps) }),
@@ -44,6 +47,8 @@ export function StatusLine(props: {
     telemetry.reasoningEffort === undefined
       ? undefined
       : text(props.locale, 'telemetryReasoning', { value: telemetry.reasoningEffort }),
+  ].filter((value): value is string => value !== undefined)
+  const telemetryBits = [
     telemetry.activity === undefined
       ? undefined
       : text(props.locale, 'telemetryActivity', {
@@ -80,11 +85,9 @@ export function StatusLine(props: {
               {text(props.locale, 'focusStatusOn')}
             </Text>
           ) : null}
-          {props.status.tokens !== undefined ? (
+          {metricsBits.length > 0 ? (
             <Text color={theme.mute} wrap="truncate-end">
-              {props.status.focusMode ? ' · ' : null}
-              {text(props.locale, 'tokensIn')} {props.status.tokens.input} ·{' '}
-              {text(props.locale, 'tokensOut')} {props.status.tokens.output}
+              {props.status.focusMode ? ' · ' : null}{metricsBits.join(' · ')}
             </Text>
           ) : null}
           {props.status.subagents !== undefined && props.status.subagents.running > 0 ? (

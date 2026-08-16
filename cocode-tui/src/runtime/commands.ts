@@ -11,6 +11,7 @@ export type Command = {
   name: string
   summary: string
   summaryZh?: string
+  input?: { hint: string }
   kind: 'local' | 'prompt-text'
   available: (caps: TuiCapabilities) => boolean
   run: (app: TuiCommandCtx, args: string) => void
@@ -56,6 +57,23 @@ export function createBuiltinCommands(): CommandRegistry {
       run,
     })
   }
+  const localWithInput = (
+    name: string,
+    summary: string,
+    input: string,
+    run: Command['run'],
+    summaryZh?: string,
+  ): void => {
+    registry.register({
+      name,
+      summary,
+      ...(summaryZh === undefined ? {} : { summaryZh }),
+      input: { hint: input },
+      kind: 'local',
+      available: () => true,
+      run,
+    })
+  }
 
   local('help', 'Show keyboard and command help', (ctx) => {
     ctx.dispatch({ type: 'toggleHelp' })
@@ -81,7 +99,7 @@ export function createBuiltinCommands(): CommandRegistry {
   local('doctor', 'Show safe launch and initialize diagnostics', (ctx) => {
     ctx.showDoctor?.()
   })
-  local('theme', 'Switch the terminal theme', (ctx, args) => {
+  localWithInput('theme', 'Switch the terminal theme', 'dark | light', (ctx, args) => {
     const name = args.trim().toLowerCase()
     if (name !== 'dark' && name !== 'light') {
       ctx.notice('info', 'Use /theme dark or /theme light.')
@@ -89,7 +107,7 @@ export function createBuiltinCommands(): CommandRegistry {
     }
     ctx.setTheme?.(name)
   })
-  local('lang', 'Switch the interface language', (ctx, args) => {
+  localWithInput('lang', 'Switch the interface language', 'zh | en', (ctx, args) => {
     const value = args.trim().toLowerCase()
     if (value !== 'zh' && value !== 'en') {
       ctx.setLocale?.(value)
@@ -97,7 +115,7 @@ export function createBuiltinCommands(): CommandRegistry {
     }
     ctx.setLocale?.(value)
   })
-  local('model', 'Switch the active model and start a new session', (ctx, args) => {
+  localWithInput('model', 'Switch the active model and start a new session', '<model>', (ctx, args) => {
     const value = args.trim()
     if (value === '') ctx.showModelPicker?.()
     else ctx.setModel?.(value)
@@ -186,7 +204,7 @@ export function createBuiltinCommands(): CommandRegistry {
   local('compact', 'Request host compaction through the prompt path', (ctx) => {
     ctx.dispatch({ type: 'compact' })
   })
-  local('use', 'Switch between API Key and Cocode', (ctx, args) => {
+  localWithInput('use', 'Switch between API Key and Cocode', 'byok | cocode', (ctx, args) => {
     const target = args.trim().toLowerCase()
     if (target !== 'byok' && target !== 'cocode') {
       ctx.notice('info', 'Use /use byok or /use cocode.')
@@ -218,6 +236,14 @@ export function createBuiltinCommands(): CommandRegistry {
     run: (ctx, args) => {
       ctx.showPlugins?.(args)
     },
+  })
+  registry.register({
+    name: 'permission',
+    summary: 'Choose a runtime permission preset',
+    summaryZh: '选择运行时权限 preset',
+    kind: 'local',
+    available: (caps) => caps.permissionMode,
+    run: (ctx) => ctx.dispatch({ type: 'permission.open' }),
   })
   registry.register({
     name: 'permissions',

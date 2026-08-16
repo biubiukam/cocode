@@ -82,6 +82,10 @@ export function detectTerminalEnvironment(options: PlatformOptions = {}): Termin
   }
 }
 
+export function isAppleTerminalEnvironment(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.TERM_PROGRAM === 'Apple_Terminal'
+}
+
 export function isWslEnvironment(env: NodeJS.ProcessEnv): boolean {
   return Boolean(env.WSL_DISTRO_NAME || env.WSL_INTEROP || env.WSLENV)
 }

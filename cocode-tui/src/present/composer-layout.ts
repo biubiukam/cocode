@@ -1,8 +1,7 @@
 /** Pure row projection for the multiline composer. */
 
 import stringWidth from 'string-width'
-
-const GRAPHEME_SEGMENTER = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
+import { graphemeSegments, normalizeGraphemeOffset } from '../runtime/grapheme.ts'
 
 export type ComposerSpan = {
   text: string
@@ -12,6 +11,16 @@ export type ComposerSpan = {
 
 export type ComposerRow = {
   spans: ComposerSpan[]
+}
+
+export function composerCursorStyle(
+  appleTerminal: boolean,
+  disabled: boolean,
+): { inverse: boolean; underline: boolean } {
+  return {
+    inverse: !appleTerminal && !disabled,
+    underline: appleTerminal && !disabled,
+  }
 }
 
 type ComposerSelection = {
@@ -24,8 +33,8 @@ export function renderComposerRows(
   cursor: number,
   selection?: ComposerSelection,
 ): ComposerRow[] {
-  const safeCursor = Math.max(0, Math.min(cursor, text.length))
-  const safeSelection = normalizeSelection(selection, text.length)
+  const safeCursor = normalizeGraphemeOffset(text, cursor)
+  const safeSelection = normalizeSelection(selection, text)
   const rows: ComposerRow[] = []
   let cursorRendered = false
   let offset = 0
@@ -33,11 +42,11 @@ export function renderComposerRows(
   for (const line of text.split('\n')) {
     const lineEnd = offset + line.length
     const spans: ComposerSpan[] = []
-    for (let index = 0; index < line.length; index += 1) {
-      const absoluteIndex = offset + index
+    for (const entry of graphemeSegments(line)) {
+      const absoluteIndex = offset + entry.index
       const isCursor = !cursorRendered && safeCursor === absoluteIndex
       appendSpan(spans, {
-        text: line[index] ?? '',
+        text: entry.segment,
         ...(isSelected(absoluteIndex, safeSelection) ? { selected: true } : {}),
         ...(isCursor ? { cursor: true } : {}),
       })
@@ -127,7 +136,7 @@ function takeSpanGraphemes(
   fromEnd: boolean,
 ): ComposerSpan[] {
   const graphemes = spans.flatMap((span) =>
-    Array.from(GRAPHEME_SEGMENTER.segment(span.text), (entry) => ({
+    graphemeSegments(span.text).map((entry) => ({
       text: entry.segment,
       ...(span.selected === true ? { selected: true } : {}),
       ...(span.cursor === true ? { cursor: true } : {}),
@@ -170,11 +179,12 @@ function appendSpan(spans: ComposerSpan[], span: ComposerSpan): void {
 
 function normalizeSelection(
   selection: ComposerSelection | undefined,
-  length: number,
+  text: string,
 ): ComposerSelection | undefined {
   if (selection === undefined) return undefined
-  const start = Math.max(0, Math.min(Math.trunc(selection.start), length))
-  const end = Math.max(start, Math.min(Math.trunc(selection.end), length))
+  if (selection.start === selection.end) return undefined
+  const start = normalizeGraphemeOffset(text, selection.start, 'previous')
+  const end = Math.max(start, normalizeGraphemeOffset(text, selection.end, 'next'))
   return start === end ? undefined : { start, end }
 }
 

@@ -13,6 +13,36 @@ import { createTuiApp } from '../../src/runtime/app.ts'
 import { P0_CAPABILITIES } from '../../src/runtime/capabilities.ts'
 
 describe('Chat', () => {
+  it('shows a quit confirmation for the first idle Ctrl+C', async () => {
+    const runtime = createTestRuntime()
+    const chat = await renderChat(runtime.value, { locale: 'en', startBeforeRender: true })
+
+    try {
+      chat.stdin.write('\u0003')
+      await renderFlush()
+
+      expect(chat.app.snapshot().quitConfirmation).toBe(true)
+      expect(chat.app.snapshot().quitConfirmationSelection).toBe('confirm')
+      expect(plainOutput(chat.stdout.output)).toContain('Are you sure you want to quit?')
+
+      chat.stdin.write('\u001B[C')
+      await renderFlush()
+      expect(chat.app.snapshot().quitConfirmationSelection).toBe('cancel')
+
+      chat.stdin.write('\u001B')
+      await renderFlush()
+      expect(chat.app.snapshot().quitConfirmation).toBe(false)
+
+      chat.stdin.write('\u0003')
+      await renderFlush()
+      chat.stdin.write('\r')
+      await renderFlush()
+      expect(chat.app.snapshot().exiting).toBe(true)
+    } finally {
+      await closeChat(chat)
+    }
+  })
+
   it('sends session cancellation when Esc is pressed during a running turn', async () => {
     const cancel = vi.fn(async () => true)
     const runtime = createTestRuntime({ cancel })
@@ -85,6 +115,38 @@ describe('Chat', () => {
       await expect.poll(() => runtime.plugins[1]?.enabled).toBe(true)
       expect(chat.app.snapshot().pluginPicker?.open).toBe(true)
       expect(plainOutput(chat.stdout.output)).toContain('Runtime plugins')
+    } finally {
+      await closeChat(chat)
+    }
+  })
+
+  it('routes arrow keys to the permission picker instead of history', async () => {
+    const runtime = createTestRuntime()
+    let currentMode = 'manual'
+    runtime.value.permissionMode = async (_sessionId, mode) => {
+      if (mode !== undefined) currentMode = mode
+      return { mode: currentMode, supportedModes: ['manual', 'workspace-write', 'allow-all'] }
+    }
+    const chat = await renderChat(runtime.value, {
+      capabilities: { ...P0_CAPABILITIES, permissionMode: true },
+      startBeforeRender: true,
+    })
+
+    try {
+      await flush()
+      chat.app.dispatch({ type: 'command', line: '/permission' })
+      await expect.poll(() => chat.app.snapshot().permissionPicker?.open).toBe(true)
+      await renderFlush()
+      expect(chat.app.snapshot().permissionPicker?.selected).toBe(0)
+
+      chat.stdin.write('\u001B[B')
+      await renderFlush()
+      expect(chat.app.snapshot().permissionPicker?.selected).toBe(1)
+      expect(chat.app.snapshot().composer.text).toBe('')
+
+      chat.stdin.write('\u001B[A')
+      await renderFlush()
+      expect(chat.app.snapshot().permissionPicker?.selected).toBe(0)
     } finally {
       await closeChat(chat)
     }

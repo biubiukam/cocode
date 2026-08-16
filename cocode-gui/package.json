@@ -30,7 +30,7 @@
 		"dev:web": "vite --config vite.renderer.config.ts --port 5273",
 		"prestart": "node scripts/harden-electron-default-app.mjs && pnpm run build:cocode-plugins",
 		"start": "node scripts/start-with-dsh-runtime.mjs",
-		"build:cocode-plugins": "node scripts/cocode-plugins.mjs build && corepack pnpm@10.34.5 --dir ../cocode-host-supervisor run build",
+		"build:cocode-plugins": "node scripts/cocode-plugins.mjs build && corepack pnpm@10.34.5 --dir ../cocode-host-supervisor run build:with-gui-plugins",
 		"test:cocode-plugins": "node scripts/cocode-plugins.mjs test && corepack pnpm@10.34.5 --dir ../cocode-host-supervisor run test",
 		"typecheck:cocode-plugins": "node scripts/cocode-plugins.mjs typecheck && corepack pnpm@10.34.5 --dir ../cocode-host-supervisor run typecheck",
 		"stage:dsh": "node scripts/stage-dsh-runtime.mjs",

@@ -27,6 +27,23 @@ describe('visibleTail', () => {
     expect(visibleTail([hidden, notice('2')], 2)).toEqual([notice('2')])
   })
 
+  it('hides context in compact mode and budgets its dedicated debug row', () => {
+    const context: ConversationNode = {
+      kind: 'context',
+      id: 'context-1',
+      seq: 1,
+      time: 1,
+      text: 'Current runtime context.',
+      source: { kind: 'plugin', plugin: 'runtime' },
+      provenance: { role: 'inject', label: 'runtime' },
+      form: 'snapshot',
+      sections: [{ name: 'sandbox:policy', text: 'danger-full-access' }],
+    }
+    expect(visibleTail([context], 4, false)).toEqual([])
+    expect(visibleTail([context], 2, true)).toEqual([context])
+    expect(visibleTail([context], 4, true, new Set(['context:context-1']))).toEqual([context])
+  })
+
   it('budgets expanded tool rows as detailed content', () => {
     const tool: ConversationNode = {
       kind: 'tool',

@@ -1,9 +1,9 @@
 import { Box, Text } from 'ink'
 import type { UserNode } from '../../runtime/nodes/types.ts'
 import { theme } from '../theme.ts'
-import { text, type UiLocale } from '../../runtime/ui-locale.ts'
+import type { UiLocale } from '../../runtime/ui-locale.ts'
 
-export function UserRow(props: { node: UserNode; locale: UiLocale }) {
+export function UserRow(props: { node: UserNode; locale?: UiLocale }) {
   return (
     <Box
       flexDirection="column"
@@ -16,8 +16,7 @@ export function UserRow(props: { node: UserNode; locale: UiLocale }) {
       paddingLeft={1}
     >
       <Text color={theme.accent} bold>
-        ◆ {props.locale === 'zh' ? '你' : 'you'}{' '}
-        <Text color={theme.mute}>· {text(props.locale, 'prompt')}</Text>
+        ◆ {props.locale === 'zh' ? '你' : 'you'}
       </Text>
       <Text color={theme.user}>{props.node.text}</Text>
     </Box>

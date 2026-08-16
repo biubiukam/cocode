@@ -21,12 +21,32 @@ describe('draft editing', () => {
     expect(draft).toEqual({ text: 'abXcd', cursor: 3 })
   })
 
-  it('moves within UTF-16 code-unit bounds', () => {
+  it('moves by grapheme boundaries', () => {
     let draft = createDraft('hello', 2)
     draft = moveDraftCursor(draft, -20)
     expect(draft.cursor).toBe(0)
     draft = moveDraftCursor(draft, 20)
     expect(draft.cursor).toBe(5)
+
+    draft = createDraft('a🙂b', 3)
+    expect(moveDraftCursor(draft, -1).cursor).toBe(1)
+    expect(backspaceDraft(createDraft('a🙂b', 3))).toEqual({ text: 'ab', cursor: 1 })
+    expect(createDraft('🙂', 1).cursor).toBe(2)
+
+    const extendedHan = 'a𠀀b'
+    expect(backspaceDraft(createDraft(extendedHan, 3))).toEqual({ text: 'ab', cursor: 1 })
+  })
+
+  it('keeps combining characters as one cursor unit', () => {
+    const text = 'e\u0301x'
+    expect(moveDraftCursor(createDraft(text, text.length), -1).cursor).toBe(2)
+    expect(backspaceDraft(createDraft(text, 2))).toEqual({ text: 'x', cursor: 0 })
+
+    const family = '👨‍👩‍👧‍👦'
+    expect(backspaceDraft(createDraft(`${family}x`, family.length))).toEqual({
+      text: 'x',
+      cursor: 0,
+    })
   })
 
   it('keeps newlines and removes ASCII controls', () => {
@@ -53,5 +73,13 @@ describe('draft editing', () => {
     draft = moveDraftCursor(draft, -1, true)
     expect(selectedDraftRange(draft)).toEqual({ start: 2, end: 3 })
     expect(moveDraftCursor(draft, -1)).toEqual({ text: 'hello', cursor: 2 })
+  })
+
+  it('keeps selections on grapheme boundaries', () => {
+    let draft = createDraft('a🙂b', 3)
+    draft = moveDraftCursor(draft, -1, true)
+    expect(selectedDraftRange(draft)).toEqual({ start: 1, end: 3 })
+    expect(selectedDraftText(draft)).toBe('🙂')
+    expect(deleteDraftSelection(draft)).toEqual({ text: 'ab', cursor: 1 })
   })
 })

@@ -32,9 +32,33 @@ export function displayError(error: unknown, locale: Locale = resolveLocale()): 
   if (error instanceof TuiError) return formatError(error.code, error.params, locale)
   const code = errorCodeOf(error)
   if (code !== undefined) return formatError(code, {}, locale)
-  const raw = error instanceof Error ? error.message : String(error)
+  const raw = errorDetail(error)
   if (isErrorCode(raw)) return formatError(raw, {}, locale)
   return formatError('RUNTIME_UNKNOWN', { detail: redactSecrets(raw) }, locale)
+}
+
+export function errorDetail(value: unknown): string {
+  const path = new Set<unknown>()
+  const render = (current: unknown): string => {
+    if (path.has(current)) return '<circular cause>'
+    path.add(current)
+    try {
+      if (!(current instanceof Error)) return String(current)
+      const message = current.message === '' ? current.name : current.message
+      const members = current instanceof AggregateError && current.errors.length > 0
+        ? ` [${current.errors.map(render).join('; ')}]`
+        : ''
+      const cause = current.cause === undefined || current.cause === null
+        ? ''
+        : render(current.cause)
+      return `${message}${members}${cause === '' || cause === message ? '' : `: ${cause}`}`
+    } catch {
+      return '<unreadable error>'
+    } finally {
+      path.delete(current)
+    }
+  }
+  return render(value)
 }
 
 export function errorNotice(

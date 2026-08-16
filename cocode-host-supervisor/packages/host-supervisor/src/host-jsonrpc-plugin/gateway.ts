@@ -66,7 +66,7 @@ type PlanService = {
   set(agent: Agent, active: boolean): string
 }
 type SkillService = {
-  list(options?: { cwd?: string }): Promise<
+  list(options?: { cwd?: string; scope?: Agent }): Promise<
     readonly {
       name: string
       description: string
@@ -624,7 +624,13 @@ export class TuiCompanionGateway {
     if (params.sessionId.trim() === '') throw new Error('skills/list requires a session id')
     const registry = this.ctx.get('skills') as SkillService | undefined
     if (registry === undefined) throw new Error('skills registry is not configured')
-    const skills = await registry.list({ cwd: this.cwd })
+    const record = await this.getOrCreateSession(params.sessionId)
+    this.assertLive(params.sessionId, record)
+    const agent = record.handle.agent
+    const skills = await registry.list({
+      cwd: agent.session.header.cwd ?? this.cwd,
+      scope: agent,
+    })
     return {
       skills: skills
         .filter((skill) => skill.invocation?.userInvocable !== false)

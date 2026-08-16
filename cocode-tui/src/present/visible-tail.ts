@@ -35,7 +35,13 @@ export function visibleTail(
     start = index
     if (used >= budget) break
   }
-  return nodes.slice(start)
+  return nodes.slice(start).filter(
+    (node) => estimateNodeRows(
+      node,
+      verbose,
+      expandedNodeIds.has(nodeKey(node.kind, node.id)),
+    ) > 0,
+  )
 }
 
 export function estimateNodeRows(
@@ -48,6 +54,17 @@ export function estimateNodeRows(
   switch (node.kind) {
     case 'user':
       return 2 + lineCount(node.text, contentColumns(maxColumns, 2))
+    case 'context': {
+      if (!verbose) return 0
+      if (!expanded) return 2
+      const columns = contentColumns(maxColumns, 2)
+      if (node.sections.length === 0) return 2 + lineCount(node.text, columns)
+      return 2 + node.sections.reduce(
+        (rows, section, index) =>
+          rows + Number(index > 0) + 1 + lineCount(section.text, columns),
+        0,
+      )
+    }
     case 'assistant': {
       const reasoning = formatReasoning(node.reasoning, detailed, node.streaming)
       const columns = contentColumns(maxColumns, 3)

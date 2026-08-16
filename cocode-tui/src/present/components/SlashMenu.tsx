@@ -4,13 +4,22 @@ import { theme } from '../theme.ts'
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
 import { PanelFrame } from './PanelFrame.tsx'
 import { panelCapacity } from '../panel-layout.ts'
-import { filterSearchItems } from '../search.ts'
 import { SearchQueryLine } from './SearchQueryLine.tsx'
 import { SelectionRow } from './SelectionRow.tsx'
 
 export type SlashMenuItem = {
   name: string
   summary: string
+  input?: { hint: string }
+}
+
+export function slashCommandLabel(item: SlashMenuItem): string {
+  return item.input === undefined ? `/${item.name}` : `/${item.name} ${item.input.hint}`
+}
+
+/** Return the command text that Tab should place into the composer. */
+export function slashCommandCompletion(item: SlashMenuItem): string {
+  return item.input === undefined ? `/${item.name}` : `/${item.name} `
 }
 
 export function filterSlashItems<T extends SlashMenuItem>(
@@ -18,7 +27,8 @@ export function filterSlashItems<T extends SlashMenuItem>(
   draft: string,
 ): readonly T[] {
   if (!isSlashDraft(draft)) return []
-  return filterSearchItems(items, draft.slice(1), (item) => `${item.name} ${item.summary}`)
+  const prefix = draft.slice(1).toLocaleLowerCase()
+  return items.filter((item) => item.name.toLocaleLowerCase().startsWith(prefix))
 }
 
 export function isSlashDraft(draft: string): boolean {
@@ -71,7 +81,7 @@ export function SlashMenu(props: {
           <SelectionRow
             key={item.name}
             active={active}
-            label={`/${item.name}`}
+            label={slashCommandLabel(item)}
             description={item.summary}
           />
         )
