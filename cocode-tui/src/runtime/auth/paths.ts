@@ -1,7 +1,8 @@
 /** Product home resolution. Tests inject the environment and homedir. */
 
 import { homedir as osHomedir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
+import { resolveUserPath } from '@cocode/host-supervisor'
 
 export type HomeContext = {
   env: NodeJS.ProcessEnv
@@ -24,13 +25,13 @@ export type ProductHomes = {
 
 export function accountHome(ctx: HomeContext = defaultHomeContext()): string {
   const fromCocode = nonempty(ctx.env.COCODE_HOME)
-  if (fromCocode !== undefined) return resolve(fromCocode)
+  if (fromCocode !== undefined) return resolveUserPath(fromCocode, ctx.homedir)
   return join(ctx.homedir, '.cocode')
 }
 
 export function dshHome(ctx: HomeContext = defaultHomeContext()): string {
   const fromDsh = nonempty(ctx.env.DSH_HOME)
-  if (fromDsh !== undefined) return resolve(fromDsh)
+  if (fromDsh !== undefined) return resolveUserPath(fromDsh, ctx.homedir)
   return join(ctx.homedir, '.dsh')
 }
 

@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import {
   canReuseOlderSupervisor,
@@ -82,6 +83,24 @@ test('resolveHostScope applies the same environment-derived scope for every clie
   assert.equal(scope.profile, 'web')
   assert.equal(scope.runtimeChannel, 'stable')
   assert.match(scope.hostConfigFingerprint, /^cocode-web-jsonrpc-v1:[0-9a-f]{32}$/)
+})
+
+test('resolveHostScope expands a tilde-prefixed DSH_HOME', () => {
+  assert.equal(
+    resolveHostScope({ DSH_HOME: '~/.dsh' }).dshHome,
+    join(homedir(), '.dsh'),
+  )
+})
+
+test('resolveHostRuntimeEnv expands tilde-prefixed vision paths', () => {
+  assert.deepEqual(
+    resolveHostRuntimeEnv({ COCODE_HOME: '~/.cocode' }),
+    { COCODE_VISION_CONFIG: join(homedir(), '.cocode', 'vision.yaml') },
+  )
+  assert.deepEqual(
+    resolveHostRuntimeEnv({ COCODE_VISION_CONFIG: '~/.cocode/vision.yaml' }),
+    { COCODE_VISION_CONFIG: join(homedir(), '.cocode', 'vision.yaml') },
+  )
 })
 
 test('resolveHostScope ignores blank runtime configuration and secrets', () => {

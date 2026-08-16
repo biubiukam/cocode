@@ -90,9 +90,9 @@ export function resolveHostRuntimeEnv(env: NodeJS.ProcessEnv): HostRuntimeEnv {
 
 function resolveVisionConfigPath(env: NodeJS.ProcessEnv): string | undefined {
   const configured = nonemptyEnv(env.COCODE_VISION_CONFIG)
-  if (configured !== undefined) return resolve(configured)
+  if (configured !== undefined) return resolveUserPath(configured)
   const home = nonemptyEnv(env.COCODE_HOME)
-  return home === undefined ? undefined : join(resolve(home), 'vision.yaml')
+  return home === undefined ? undefined : join(resolveUserPath(home), 'vision.yaml')
 }
 
 function nonemptyEnv(value: string | undefined): string | undefined {
@@ -116,13 +116,24 @@ export function resolveHostScope(env: NodeJS.ProcessEnv = process.env): HostScop
 }
 
 export function canonicalizeScope(scope: HostScope): HostScope {
-  const dshHome = resolve(scope.dshHome.trim() || `${homedir()}/.dsh`)
+  const dshHome = resolveUserPath(scope.dshHome.trim() || `${homedir()}/.dsh`)
   const profile = scope.profile.trim() || 'web'
   const fingerprint = scope.hostConfigFingerprint.trim() || 'default'
   const runtimeChannel = scope.runtimeChannel === 'preview' || scope.runtimeChannel === 'dev'
     ? scope.runtimeChannel
     : 'stable'
   return { dshHome, profile, hostConfigFingerprint: fingerprint, runtimeChannel }
+}
+
+export function expandTildePath(value: string, userHome: string = homedir()): string {
+  const trimmed = value.trim()
+  if (trimmed === '~') return userHome
+  if (!/^~[\\/]/.test(trimmed)) return trimmed
+  return `${userHome.replace(/[\\/]$/, '')}${trimmed.slice(1)}`
+}
+
+export function resolveUserPath(value: string, userHome: string = homedir()): string {
+  return resolve(expandTildePath(value, userHome))
 }
 
 export function hostKey(scope: HostScope): string {

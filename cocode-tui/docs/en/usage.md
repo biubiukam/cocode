@@ -70,7 +70,8 @@ Linux, and real terminal key combinations still require separate acceptance as
 described in [platform notes](./platforms.md); automated tests are not a
 substitute for a real TTY check.
 
-Configure a key on the first-run gate, or set `DEEPSEEK_API_KEY` for this process.
+Configure a key on the first-run gate; it is stored in the official Harness credentials file
+`$DSH_HOME/.credentials.yaml`. The TUI does not add a separate API-key environment variable.
 For development, point `COCODE_HOME` and `DSH_HOME` at separate directories.
 DSH settings and credentials follow the official `$DSH_HOME` layout; sessions
 default to `$DSH_HOME/sessions`, or `~/.dsh/sessions` when `DSH_HOME` is unset.

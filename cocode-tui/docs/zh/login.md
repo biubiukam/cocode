@@ -44,14 +44,13 @@
 `~/.dsh`。Cocode 账号 token 保存在 `~/.cocode/account.yaml`；TUI 只在当前
 进程中动态生成 Cocode provider，不会把它写进 `settings.yaml`。
 
-## 临时覆盖
+## 配置目录
 
-偶尔想用另一把 Key、又不改本机保存的内容时，可以在启动环境里设置：
+自己的 API Key 会写入官方 Harness 凭据文件 `$DSH_HOME/.credentials.yaml`，默认路径是
+`~/.dsh/.credentials.yaml`。TUI 不新增单独的 Cocode API Key 环境变量，也不会把文件中的
+Key 复制到进程环境中。
 
-- `DEEPSEEK_API_KEY` — 这次只用这把 DeepSeek Key
-- `COCODE_HOME` — 换一个 Cocode 账号目录（默认是 `~/.cocode`）
-- `DSH_HOME` — 换一个遵循官方规范的 Harness 目录，用于 settings 和 credentials（默认是 `~/.dsh`）
-
-日常使用不需要碰这些。开发启动参数见 `.env.example`。
+需要隔离配置时，可以设置 `COCODE_HOME`（默认 `~/.cocode`）或 `DSH_HOME`（默认 `~/.dsh`）。
+开发启动参数见 `.env.example`。
 
 登录或切换失败时，状态栏显示 `CODE · 解释`。完整目录见 [错误码](./errors.md)。

@@ -30,6 +30,12 @@ describe('home resolution', () => {
     ).toBe(resolve('.dev/home'))
   })
 
+  it('expands tilde-prefixed COCODE_HOME and DSH_HOME against the user home', () => {
+    const context = ctx({ env: { COCODE_HOME: '~/.cocode', DSH_HOME: '~/.dsh' } })
+    expect(accountHome(context)).toBe(join(testHome, '.cocode'))
+    expect(dshHome(context)).toBe(join(testHome, '.dsh'))
+  })
+
   it('keeps COCODE_HOME and DSH_HOME independent', () => {
     const cocodeHome = resolve('tmp', 'cocode')
     const dshRoot = resolve('tmp', 'dsh')

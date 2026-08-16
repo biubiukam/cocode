@@ -110,8 +110,9 @@ describe('AuthStore', () => {
   })
 
   it('writes a BYOK key in harness mapping form', async () => {
-    const home = await tempHome()
-    const store = await createAuthStore({ home, env: {} })
+    const accountHome = await tempHome()
+    const dshHome = await tempHome()
+    const store = await createAuthStore({ accountHome, dshHome, env: {} })
     store.dispatch({
       type: 'submitByok',
       provider: 'deepseek-official',
@@ -121,9 +122,11 @@ describe('AuthStore', () => {
     expect(store.snapshot().phase).toBe('ready')
     expect(store.snapshot().mode).toBe('byok')
     expect(JSON.stringify(store.snapshot())).not.toMatch(/sk-user/)
-    expect(await readCredentials(home)).toEqual({
+    expect(await readAccount(accountHome)).toBeUndefined()
+    expect(await readCredentials(dshHome)).toEqual({
       DEEPSEEK_API_KEY: 'sk-user',
     })
+    expect(store.resolved().env.DEEPSEEK_API_KEY).toBeUndefined()
   })
 
   it('logs in with device flow and keeps an existing BYOK key', async () => {
