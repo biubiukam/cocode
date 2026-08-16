@@ -60,6 +60,10 @@ out/
 release/
 *.tsbuildinfo
 
+# Cocode package build artifacts
+/cocode-host-supervisor/packages/host-supervisor/lib/
+/cocode-host-supervisor/runtime/plugins/*/lib/
+
 # Vite / local overrides
 *.local
 
