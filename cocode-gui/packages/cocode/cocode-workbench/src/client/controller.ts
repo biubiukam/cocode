@@ -8,6 +8,7 @@ import type {
   WorkbenchSplitNode,
   WorkbenchService,
   WorkbenchSnapshot,
+  WorkbenchTarget,
 } from "./model.ts"
 
 export interface WorkbenchLayoutFace {
@@ -44,6 +45,12 @@ function safeDocument(raw: string | null): PersistedDocument {
 
 function titleOf(descriptor: WorkbenchPanelDescriptor): string {
   return typeof descriptor.title === "function" ? descriptor.title() : descriptor.title
+}
+
+function panelTargetsMatch(left: WorkbenchTarget | undefined, right: WorkbenchTarget | undefined): boolean {
+  if (left === undefined || right === undefined) return false
+  if (left.path !== right.path) return false
+  return JSON.stringify(left.data) === JSON.stringify(right.data)
 }
 
 function rootPaneId(key: string, dock: WorkbenchDock): string {
@@ -189,14 +196,14 @@ export class WorkbenchController implements WorkbenchService {
         && (options.dock === undefined || instance.dock === options.dock)
         && (options.paneId === undefined || paneIdOf(instance, key) === options.paneId))
       if (existing !== undefined) {
-        this.#sessions[key] = {
-          ...current,
-          active: { ...current.active, [existing.dock]: existing.id },
-          activePane: { ...current.activePane, [existing.dock]: paneIdOf(existing, key) },
-        }
-        this.#layout.openWorkbench(existing.dock)
-        this.#publish()
-        return existing.id
+        return this.#activateInstance(current, key, existing)
+      }
+    }
+    if (type === "preview" && options.target?.path !== undefined) {
+      const existing = current.instances.find(instance =>
+        instance.type === "preview" && panelTargetsMatch(instance.target, options.target))
+      if (existing !== undefined) {
+        return this.#activateInstance(current, key, existing)
       }
     }
     const dock = options.dock ?? descriptor.defaultDock
@@ -257,6 +264,11 @@ export class WorkbenchController implements WorkbenchService {
     const current = normalizeSession(this.#sessions[key] ?? EMPTY_SESSION, key)
     const instance = current.instances.find(candidate => candidate.id === instanceId)
     if (instance === undefined) return
+    this.#activateInstance(current, key, instance)
+  }
+
+  /** 复用既有实例：让它成为所在 dock 的当前页，并把 id 交回给调用方。 */
+  #activateInstance(current: SessionWorkbenchState, key: string, instance: WorkbenchPanelInstance): string {
     this.#sessions[key] = {
       ...current,
       active: { ...current.active, [instance.dock]: instance.id },
@@ -264,6 +276,7 @@ export class WorkbenchController implements WorkbenchService {
     }
     this.#layout.openWorkbench(instance.dock)
     this.#publish()
+    return instance.id
   }
 
   move(instanceId: string, dock: WorkbenchDock, sessionId?: string): void {

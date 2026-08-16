@@ -53,8 +53,8 @@
   cursor: pointer;
 }
 
+/* Size override on top of `.themeCube` (same pattern as `.logoCube`). */
 .fontCube {
-  composes: themeCube;
   flex: 1 1 96px;
   padding: 16px 20px;
 }

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { CodeBlock, MarkdownText } from "@deepseek-ai/dsh-client-ui-primitives"
 import type { WorkbenchPanelProps } from "./model.ts"
-import { PreviewIcon } from "./icons.tsx"
+import { PreviewIcon, ReloadIcon } from "./icons.tsx"
 import { State, message, useRemote } from "./panel-state.tsx"
 import { fileUrl, workbenchRequest } from "./runtime-api.ts"
 import { resolveMarkdownImages } from "./markdown-assets.ts"
@@ -87,6 +87,13 @@ function workspaceRelativePath(root: string | undefined, path: string): string {
   return relative === "" ? fileName(path) : relative
 }
 
+/** Cache-bust binary previews when the user explicitly reloads from disk. */
+function previewFileUrl(sessionId: string | undefined, path: string, revision: number): string {
+  const url = new URL(fileUrl(sessionId, path))
+  if (revision > 0) url.searchParams.set("_", String(revision))
+  return url.href
+}
+
 /** 源代码管理面板打开一行时带来的差异请求，其余目标一律按文件预览处理。 */
 interface DiffTarget {
   readonly repoPath: string
@@ -130,6 +137,11 @@ function FilePreview(props: WorkbenchPanelProps) {
   const [choice, setChoice] = useState<{ readonly path: string; readonly mode: ViewMode }>()
   const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState<string>()
+  const [confirmRefresh, setConfirmRefresh] = useState(false)
+
+  useEffect(() => {
+    setConfirmRefresh(false)
+  }, [path])
 
   const file = remote.value
   const stored = file?.content ?? ""
@@ -153,6 +165,23 @@ function FilePreview(props: WorkbenchPanelProps) {
   const editable = hasSource && file?.truncated !== true
   const dirty = editable && text !== stored
   const mode = choice !== undefined && choice.path === path ? choice.mode : preferredMode(kind, hasSource)
+
+  const refresh = (): void => {
+    if (remote.loading) return
+    setDraft(undefined)
+    setNotice(undefined)
+    setConfirmRefresh(false)
+    setRevision(value => value + 1)
+  }
+
+  const requestRefresh = (): void => {
+    if (remote.loading) return
+    if (dirty) {
+      setConfirmRefresh(true)
+      return
+    }
+    refresh()
+  }
 
   const save = (): void => {
     if (sessionId === undefined || !dirty || saving) return
@@ -185,14 +214,14 @@ function FilePreview(props: WorkbenchPanelProps) {
       case "html":
         return <iframe className={css.frame} sandbox="allow-forms allow-scripts" srcDoc={text} title={props.instance.title} />
       case "pdf":
-        return <iframe className={css.frame} src={fileUrl(sessionId, path)} title={props.instance.title} />
+        return <iframe className={css.frame} src={previewFileUrl(sessionId, path, revision)} title={props.instance.title} />
       case "image":
-        return <div className={css.canvas}><img className={css.image} src={fileUrl(sessionId, path)} alt={props.instance.title} /></div>
+        return <div className={css.canvas}><img className={css.image} src={previewFileUrl(sessionId, path, revision)} alt={props.instance.title} /></div>
       case "code":
         return <div className={css.scroll}><CodeBlock code={text} lang={extension} className={css.code} /></div>
       default:
         return <div className={css.canvas}>
-          <a className={css.download} href={fileUrl(sessionId, path)} download>{t("preview.download")}</a>
+          <a className={css.download} href={previewFileUrl(sessionId, path, revision)} download>{t("preview.download")}</a>
         </div>
     }
   })()
@@ -202,6 +231,14 @@ function FilePreview(props: WorkbenchPanelProps) {
       <span className={css.name} title={path}>{workspaceRelativePath(cwd, path)}</span>
       {file?.truncated === true && <span className={css.flag}>{t("preview.truncated")}</span>}
       <span className={css.spacer} />
+      <button
+        type="button"
+        className={css.refresh}
+        title={t("preview.refresh")}
+        aria-label={t("preview.refresh")}
+        disabled={remote.loading}
+        onClick={requestRefresh}
+      ><ReloadIcon size={16} /></button>
       {hasSource && kind !== undefined && <div className={css.modes} data-mode={mode} role="group" aria-label={t("preview.viewMode")}>
         <div className={css.modeThumb} aria-hidden="true" />
         <button type="button" className={css.mode} data-active={mode === "source" || undefined} onClick={() => setChoice({ path, mode: "source" })}>{t("preview.source")}</button>
@@ -209,7 +246,14 @@ function FilePreview(props: WorkbenchPanelProps) {
       </div>}
       {dirty && <button type="button" className={css.save} disabled={saving} onClick={save}>{t(saving ? "preview.saving" : "preview.save")}</button>}
     </div>
-    {notice === undefined ? null : <div className={css.notice}>{notice}</div>}
+    {confirmRefresh && <div className={css.confirm}>
+      <span className={css.confirmText}>{t("preview.confirmRefresh", { name: workspaceRelativePath(cwd, path) })}</span>
+      <span className={css.confirmActions}>
+        <button type="button" className={css.confirmButton} onClick={() => setConfirmRefresh(false)}>{t("common.cancel")}</button>
+        <button type="button" className={css.confirmButton} data-danger onClick={refresh}>{t("common.confirm")}</button>
+      </span>
+    </div>}
+    {notice !== undefined && !confirmRefresh && <div className={css.notice}>{notice}</div>}
     <ModeCrossfade mode={mode} path={path} source={sourceView} preview={previewView} />
   </div>
 }

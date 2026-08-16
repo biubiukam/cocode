@@ -255,9 +255,12 @@
      (768 against 776) — worth 2 to 5 wrapped lines on a long draft. */
 }
 
-/* figma 34:10434: #ADB2B8 light / #81858C dark — the caption pair exactly. */
+/* figma 34:10434: #ADB2B8 light / #81858C dark — the caption pair exactly.
+   Placeholder one step below draft text (13/20 matches footer .select chips). */
 .input::placeholder {
   color: var(--dsw-alias-label-caption);
+  font-size: 13px;
+  line-height: 20px;
   user-select: none;
 }
 

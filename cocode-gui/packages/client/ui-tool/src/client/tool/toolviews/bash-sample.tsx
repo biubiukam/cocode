@@ -127,7 +127,6 @@ export function BashRow({ toolName, block, sessionId, useSessions, inspect, t }:
         <span className={css.leading}>{leading}</span>
         {status !== null && <span className={css.visuallyHidden}>{status}</span>}
         <span className={css.title}>{model.title}</span>
-        <span className={css.sep} aria-hidden />
         {/* The terminal presenter's description is the contractual
             above-card summary; a failure's first line outranks both. */}
         <span className={clsx(css.summary, failureLine !== null && css.errorSummary)}>

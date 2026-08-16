@@ -93,6 +93,15 @@
   cursor: pointer;
 }
 
+.viewportShell {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
 .viewport {
   position: relative;
   min-width: 0;
@@ -100,6 +109,10 @@
   flex: 1;
   overflow: hidden;
   background: var(--dsw-alias-bg-base);
+}
+
+.viewport[data-hidden] .keyboard {
+  visibility: hidden;
 }
 
 .canvas {
@@ -256,4 +269,89 @@
 
 .gateAction:hover {
   background: var(--dsw-alias-interactive-bg-active);
+}
+
+/* New tab: invitation overlay, not the dashed §4.5 empty-state card. */
+.startPage {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  min-height: 0;
+  padding: 24px 16px;
+  overflow: auto;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: center;
+  cursor: text;
+  background: var(--dsw-alias-bg-base);
+}
+
+.startPage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse 58% 48% at 50% 38%,
+    color-mix(in srgb, var(--dsw-alias-state-business-primary) 9%, transparent),
+    transparent 72%
+  );
+  pointer-events: none;
+}
+
+.startPage:focus-visible {
+  outline: none;
+}
+
+.startPage:focus-visible .startBlock {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 4px;
+}
+
+.startBlock {
+  position: relative;
+  display: grid;
+  gap: 14px;
+  width: min(100%, 360px);
+  justify-items: center;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .startBlock {
+    animation: browserStartEnter 420ms cubic-bezier(.22, 1, .36, 1) both;
+  }
+}
+
+@keyframes browserStartEnter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 7px, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.startMark {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--ds-radius-sm);
+  color: var(--dsw-alias-label-tertiary);
+  background: var(--dsw-alias-fill-l2);
+  place-items: center;
+}
+
+.startTitle {
+  margin: 0;
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-xs-13);
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }

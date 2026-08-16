@@ -1,6 +1,7 @@
 import { BrowserWindow, shell } from "electron"
 import path from "node:path"
 import { registerDshWebSocketTransport } from "../security/register-dsh-websocket-transport"
+import { resolveAppIcon } from "./app-icon"
 import type { DesktopLogger } from "../../shared/logging/desktop-logger"
 
 /**
@@ -17,11 +18,14 @@ const WINDOW_CONTROL_DIAMETER_PX = 14
 const WINDOW_CONTROL_INSET_X_PX = 9
 
 export const createMainWindow = (dshRuntimeUrl: string, logger?: DesktopLogger): BrowserWindow => {
+	// Windows/Linux take the frame icon from the window itself; macOS uses the Dock image.
+	const windowIcon = process.platform === "darwin" ? undefined : resolveAppIcon()
 	const mainWindow = new BrowserWindow({
 		width: 1280,
 		height: 840,
 		minWidth: 960,
 		minHeight: 640,
+		...(windowIcon ? { icon: windowIcon } : {}),
 		// macOS keeps the native traffic-light controls while removing the
 		// separate title-bar/drag strip so the Renderer can own the full top edge.
 		// AppKit centers those controls in a title bar of its own height, which is
@@ -34,7 +38,7 @@ export const createMainWindow = (dshRuntimeUrl: string, logger?: DesktopLogger):
 						x: WINDOW_CONTROL_INSET_X_PX,
 						y: (SHELL_HEADER_ROW_PX - WINDOW_CONTROL_DIAMETER_PX) / 2,
 					},
-				}
+			  }
 			: {}),
 		webPreferences: {
 			preload: path.join(__dirname, "preload.js"),

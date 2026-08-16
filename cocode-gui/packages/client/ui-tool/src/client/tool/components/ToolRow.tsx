@@ -1,6 +1,6 @@
 // ToolRow: the single-line tool summary row (figma component set 122:9479) —
 // 16px leading slot (state dot / tool icon, chevron on hover or expanded) + title +
-// separator dot + FILL-truncated summary, drawn through the shared
+// FILL-truncated summary, drawn through the shared
 // DisclosureRow chrome with the whole row as the expand toggle (click /
 // Enter / Space, icon→chevron hover preview). The collapsed row is always
 // one line; every row with body, output, or a card material (terminal, diff,
@@ -89,7 +89,7 @@ export interface ToolRowProps {
   state: ToolRowState
   /**
    * Filesystem path from tool args; when set with onOpenFile, the summary
-   * renders as a hover-underline link that opens the host default app.
+   * renders as a link that opens the host default app.
    */
   filePath?: string | undefined
   /** Open the path with the host OS default application (already cwd-resolved). */
@@ -226,10 +226,7 @@ export function ToolRow({
         keepContentWhenOpen
         onToggle={toggleExpand}
         collapsedContent={summaryText !== '' && (
-          /* An empty summary drops the separator with it (a row that is only
-             its title shows no trailing dot). */
           <>
-            <span className={css.sep} aria-hidden />
             {fileLink ? (
               <button
                 type="button"

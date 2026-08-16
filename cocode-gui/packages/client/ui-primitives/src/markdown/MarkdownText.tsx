@@ -11,6 +11,7 @@
  * full parse self-heals it.
  */
 
+import clsx from 'clsx'
 import { memo, useMemo, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { IncrementalMarkdownParser } from './incremental.ts'
@@ -153,11 +154,15 @@ class StreamingRenderer {
  * relative links, and unsafe protocols are disabled, while absolute HTTP(S)
  * images render directly.
  */
-export const MarkdownText = memo(function MarkdownText({ text, streaming = false, codeLabels, fileMentions }: {
+export const MarkdownText = memo(function MarkdownText({
+  text, streaming = false, codeLabels, fileMentions, inheritMetrics = false,
+}: {
   text: string
   streaming?: boolean
   codeLabels?: MarkdownCodeLabels | undefined
   fileMentions?: MarkdownFileMentions | undefined
+  /** Inherit font-size/line-height from a conversation transcript parent. */
+  inheritMetrics?: boolean
 }) {
   const streamRef = useRef<StreamingRenderer | null>(null)
   const streamLabelsRef = useRef<MarkdownCodeLabels | undefined>(codeLabels)
@@ -172,5 +177,5 @@ export const MarkdownText = memo(function MarkdownText({ text, streaming = false
     }
     return streamRef.current.render(text)
   }, [text, streaming, codeLabels, fileMentions])
-  return <div className={css.markdown}>{children}</div>
+  return <div className={clsx(css.markdown, inheritMetrics && css.inheritMetrics)}>{children}</div>
 })

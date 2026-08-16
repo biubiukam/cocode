@@ -127,7 +127,7 @@ export function AppearanceSection({
             <button
               key={id}
               type="button"
-              className={clsx(css.fontCube, messageFontSize === id && css.selected)}
+              className={clsx(css.themeCube, css.fontCube, messageFontSize === id && css.selected)}
               aria-pressed={messageFontSize === id}
               onClick={() => { setMessageFontSize(id) }}
             >

@@ -220,7 +220,7 @@ export function toolRowModel(toolName: string, block: ToolCallBlock, cwd?: strin
   // Others keeps the static "Tool call" title (figma literal); the real tool
   // name rides the mutable summary slot unless the tool owns a specific title.
   const summary = variant === 'others' && toolName !== '' && toolTitle === undefined
-    ? `${toolName} · ${base}`
+    ? `${toolName} ${base}`
     : base
   // The empty string is "no text" for both derived result fields: a settled
   // call with blank content has nothing to expand, and a blank first line

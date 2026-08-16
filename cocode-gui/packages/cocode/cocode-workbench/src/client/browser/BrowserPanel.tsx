@@ -11,6 +11,7 @@ import type { BrowserFrameHeader, BrowserInputEvent } from "../../browser/protoc
 import { BrowserConnection } from "./connection.ts"
 import { BrowserToolbar } from "./toolbar.tsx"
 import { BrowserViewport } from "./viewport.tsx"
+import { BrowserStartPage } from "./start-page.tsx"
 import { t } from "../locales.ts"
 import css from "./browser.module.css"
 
@@ -28,6 +29,7 @@ export function BrowserPanel(props: WorkbenchPanelProps) {
   const panelId = props.instance.id
   const adopt = adoptedTabId(props.instance.target)
   const sink = useRef<FrameSink>()
+  const addressRef = useRef<HTMLInputElement>(null)
   const connection = useMemo(() => {
     const conn: BrowserConnection = new BrowserConnection((header, payload) => {
       const current = sink.current
@@ -67,6 +69,11 @@ export function BrowserPanel(props: WorkbenchPanelProps) {
 
   const active = state.tab
   const engine = state.engine
+  const showStartPage = active?.url === "about:blank" && active.loading !== true
+  const focusAddress = useCallback(() => {
+    addressRef.current?.focus()
+    addressRef.current?.select()
+  }, [])
 
   if (engine !== undefined && !engine.ready) {
     return <EngineGate
@@ -78,7 +85,7 @@ export function BrowserPanel(props: WorkbenchPanelProps) {
   }
 
   return <div className={css.panel}>
-    <BrowserToolbar tab={active} send={send} />
+    <BrowserToolbar tab={active} send={send} addressRef={addressRef} />
     {state.status === "open" ? null : <div className={css.notice}>{t(state.status === "connecting" ? "browser.connecting" : "browser.reconnecting")}</div>}
     {state.error === undefined ? null : <div className={css.error}>{state.error}</div>}
     {state.detached.map(tab => <div key={tab.id} className={css.notice}>
@@ -96,13 +103,17 @@ export function BrowserPanel(props: WorkbenchPanelProps) {
       defaultValue={active.dialog.defaultValue}
       send={send}
     />}
-    <BrowserViewport
-      send={send}
-      registerFrameSink={registerFrameSink}
-      active={props.visible}
-      attachedTabId={state.attachedTabId}
-      attachSeq={state.attachSeq}
-    />
+    <div className={css.viewportShell}>
+      <BrowserViewport
+        send={send}
+        registerFrameSink={registerFrameSink}
+        active={props.visible}
+        attachedTabId={state.attachedTabId}
+        attachSeq={state.attachSeq}
+        hidden={showStartPage}
+      />
+      {showStartPage ? <BrowserStartPage onFocusAddress={focusAddress} /> : null}
+    </div>
     {state.downloads.filter(download => download.state === "active").map(download => <div key={download.id} className={css.download}>
       <span className={css.title}>{t("browser.downloadingFile", { name: download.filename })}</span>
       <button type="button" onClick={() => { send({ kind: "cancelDownload", id: download.id }) }}>{t("common.cancel")}</button>

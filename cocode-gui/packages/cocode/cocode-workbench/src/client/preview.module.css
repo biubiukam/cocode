@@ -43,6 +43,37 @@
   flex: 1;
 }
 
+.refresh {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  color: var(--dsw-alias-label-secondary);
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.refresh:hover:not(:disabled) {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.refresh:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.refresh:focus-visible {
+  outline: 2px solid var(--dsw-alias-interactive-bg-hover-accent);
+  outline-offset: 2px;
+}
+
 .modes {
   position: relative;
   display: grid;
@@ -123,6 +154,52 @@
   border-bottom: 1px solid var(--dsw-alias-border-l2);
   color: var(--dsw-alias-state-error-primary);
   font-size: 11px;
+}
+
+.confirm {
+  display: flex;
+  flex: none;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+  color: var(--dsw-alias-state-warn-primary);
+  background: var(--dsw-alias-interactive-bg-hover-danger);
+  font-size: 11px;
+}
+
+.confirmText {
+  min-width: 0;
+  flex: 1;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.confirmActions {
+  display: flex;
+  flex: none;
+  gap: 4px;
+}
+
+.confirmButton {
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 5px;
+  color: inherit;
+  background: var(--dsw-alias-bg-base);
+  font: inherit;
+  cursor: pointer;
+}
+
+.confirmButton:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.confirmButton[data-danger] {
+  color: var(--dsw-alias-label-inverse);
+  border-color: transparent;
+  background: var(--dsw-alias-state-error-primary);
 }
 
 .body {

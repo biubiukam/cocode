@@ -17,6 +17,7 @@ import {
 	registerApplicationUpdates,
 	type ApplicationUpdateRegistration,
 } from "../shell/updater/register-application-updates"
+import { applyDockIcon } from "../shell/windows/app-icon"
 import { createMainWindow } from "../shell/windows/create-main-window"
 import { createDatabaseModule, type DatabaseModule } from "./create-database-module"
 import { ShortcutService } from "../contexts/shortcuts/application/shortcut-service"
@@ -65,6 +66,7 @@ export const startApplication = (): void => {
 		},
 		onReady: async () => {
 			observability.logger.log("info", "app.ready.started")
+			applyDockIcon()
 			databaseModule = createDatabaseModule(app.getPath("home"), observability.logger)
 			try {
 				databaseModule.initialize()
