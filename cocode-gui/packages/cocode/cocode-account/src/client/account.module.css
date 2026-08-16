@@ -30,6 +30,21 @@
   background: var(--dsw-alias-border-l2);
 }
 
+/* Keep the inline menu anchor's footer seat explicit. Without this, the
+   collapsed sidebar's auto-sized footer can shrink the trigger's 100%-wide
+   layout while the rail is settling. */
+.actionRoot {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+}
+
+.actionRootRail {
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+}
+
 .menuGlyph {
   display: block;
   flex: none;

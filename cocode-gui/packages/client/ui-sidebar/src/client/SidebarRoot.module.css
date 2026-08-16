@@ -152,8 +152,12 @@
   animation: rail-in 150ms var(--ds-ease-in-out) backwards;
 }
 
+/* Footer occupants own their visibility and may mount through a portal-backed
+   menu. Do not leave the whole foot transparent when the rail class is
+   re-applied during a live collapse. */
 .railIn .footArea {
-  animation: rail-fade-in 150ms var(--ds-ease-in-out) backwards;
+  animation: none;
+  opacity: 1;
 }
 
 @keyframes rail-in {

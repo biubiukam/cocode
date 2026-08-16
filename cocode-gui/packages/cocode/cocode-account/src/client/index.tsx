@@ -513,7 +513,7 @@ function AccountAction({ wide, store, providers }: AccountProps): ReturnType<typ
         items: entries,
         onClose: () => { setOpen(false) },
         onSelect: select,
-        className: css.menuRoot,
+        className: `${css.menuRoot} ${css.actionRoot} ${wide ? "" : css.actionRootRail}`,
         anchor: createElement(
           "button",
           {
