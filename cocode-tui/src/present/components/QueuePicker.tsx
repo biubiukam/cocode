@@ -52,12 +52,12 @@ export function QueuePicker(props: {
               wrap="truncate-end"
             >
               {active ? '›' : ' '} {sanitizeSingleLine(item.text) || '…'}
-              {item.attachments.length > 0 ? (
+              {item.attachments.length + item.images.length > 0 ? (
                 <Text color={active ? theme.text : theme.dim}>
                   {' '}
                   ·{' '}
                   {text(props.locale, 'queueAttachments', {
-                    count: String(item.attachments.length),
+                    count: String(item.attachments.length + item.images.length),
                   })}
                 </Text>
               ) : null}

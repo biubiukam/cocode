@@ -4,8 +4,8 @@ import { PromptQueueCoordinator } from '../../src/runtime/prompt-queue-coordinat
 describe('prompt queue coordinator', () => {
   it('keeps queue order and picker projection synchronized', () => {
     const queue = new PromptQueueCoordinator()
-    expect(queue.add('second', [])).toBe(true)
-    expect(queue.add('third', [])).toBe(true)
+    expect(queue.add('second', [], [])).toBe(true)
+    expect(queue.add('third', [], [])).toBe(true)
     expect(queue.open()).toBe(true)
 
     queue.move(1)
@@ -19,7 +19,7 @@ describe('prompt queue coordinator', () => {
 
   it('rejects restores from a cleared queue generation', () => {
     const queue = new PromptQueueCoordinator()
-    queue.add('queued', [])
+    queue.add('queued', [], [])
     const ticket = queue.take()
     expect(ticket).toBeDefined()
 

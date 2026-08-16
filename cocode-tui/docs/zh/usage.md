@@ -66,28 +66,30 @@ TTY，可以用于安装脚本和故障排查。
 - `↑` `↓` 查看本地输入历史。
 - `Ctrl+R` 打开历史搜索；输入文字过滤最近消息，使用 `↑` `↓` 选择，回车回填到输入区，`Esc` 关闭。
 - `Ctrl+G` 使用 `$VISUAL` 或 `$EDITOR` 打开临时 Markdown 草稿；退出编辑器后内容回填到输入区。编辑器退出码非 0、草稿不是 UTF-8 或超过 256 KiB 时会显示错误。
+- `Ctrl+V` 从系统剪贴板读取 PNG、JPEG、WebP 或 GIF 图片，也可以执行 `/paste-image`。图片先保留在本地草稿中，发送时才写入 Host attachment store；删除输入区中的 `[Image: ...]` 标记会移除对应草稿图片。单张图片上限为 5 MiB，一条输入最多 20 张。部分终端会占用 `Ctrl+V`，此时使用 `/paste-image`。
 - `Shift+↑` 进入消息选择模式；使用 `↑` `↓` 移动，回车展开或收起当前消息，`Esc` 退出。
-- 默认不接管鼠标，保留终端原生的拖动选中文本。按 `Alt+M` 可切换鼠标菜单模式；此时点击带下划线的模型名称会打开模型选择器，点击顶部其他位置会打开命令菜单。模型选择器按 provider 分组展示 runtime 提供的模型，支持过滤、方向键、回车和鼠标选择；旧 runtime 不提供模型目录时会降级为手动输入 model id。模型切换仍通过 runtime restart 完成，并创建新 session。弹窗打开期间会临时接管鼠标，关闭后恢复终端原生文本选择。消息操作仍可通过 `Shift+↑` 进入消息选择模式后按 `m` 打开。
+- 窄屏布局不开启鼠标追踪。终端宽度达到 120 列时，Inspector 会启用鼠标以支持调整宽度和面板交互，部分终端的原生拖动选择可能受影响。模型、命令、问题和消息操作仍可使用键盘；命令菜单使用 `Ctrl+P` 打开，消息操作可通过 `Shift+↑` 进入消息选择模式后按 `m` 打开。
 - 在消息选择模式按 `c` 可复制当前消息；也可以使用 `/copy` 复制最近一条 assistant 回复。复制依次尝试 macOS `pbcopy`、Windows `clip.exe`，以及 Linux 的 `wl-copy`、`xclip`、`xsel`；命令不可用时只显示提示，不影响会话。
 - `/focus` 切换本地「最近一轮」视图。开启后，对话区只显示最近一条用户消息及其后续节点，状态栏显示「聚焦：最近一轮」。它只改变界面投影，不修改 `/clear`、`/resume`、`/rewind`、导出或持久化 session log 的语义；再次执行可恢复完整会话视图。
 - `/lang zh` 或 `/lang en` 立即切换界面语言；未指定时启动语言由 `COCODE_LANG`、`LANG` 等环境变量决定。
-- `/model` 和 `/models` 无参数时打开模型选择器；`/model <model-id>` 直接切换当前 provider 下的模型。选择器可以同时切换 provider 和 model；所有切换都通过 runtime restart 创建新 session，失败会尝试恢复原 provider/model。旧 runtime 没有模型目录时仍可手动输入 model id。
+- `/model` 和 `/models` 无参数时打开模型选择器；`/model <model-id>` 直接切换当前 provider 下的模型。选择器可以同时切换 provider 和 model；如果重启后的 runtime 支持持久会话重新打开，TUI 会恢复当前 session 上下文，否则才创建新 session。失败会尝试恢复原 provider/model。旧 runtime 没有模型目录时仍可手动输入 model id。
 - 思考内容在流式生成期间默认展开，回复完成后自动收起为摘要；`Ctrl+O` 可保持完整思考内容和工具输入输出展开。
 - 对话运行中，状态栏会显示「思考中…」。即使下一段流式输出暂时没有到达，也能和空闲状态区分开。状态栏还会显示最近一次 assistant 的输入/输出 token，以及 wire 已报告的当前子代理活动。收到可选事件后，还会显示解码 TPS、缓存命中率、上下文窗口占用比例、推理等级、当前工作状态、紧凑的上下文分段（`S/P/A/T/X` 分别表示系统、输入、回复、思考和工具）、待办进度、目标阶段和当前 agent preset。分段数值按文本长度估算，不代表 provider 的计费数据。
 - runtime 支持计划模式时，输入区空闲状态按 `Tab` 可在 `Build` 与 `Plan` 之间切换；Slash 命令和 `@` 文件选择器打开时，`Tab` 仍用于移动选项。
+- `/permissions` 在 `read-only`、`workspace-write` 和 `danger-full-access` 之间切换当前会话的权限。默认值为 `workspace-write`，可通过 `DSH_PERMISSION_MODE` 修改；Shell 与文件写入使用同一份会话权限。`workspace-write` 下的单次越界升级需要审批，`danger-full-access` 不再询问。
 - 当前任务运行时，底部提示改为「按 Esc 终止」；此时输入草稿并按 `Tab` 可加入队列，最多 8 条。收到 `session.status=idle` 后按顺序自动发送。这是本地排队，不会打断当前任务，也不是 steer。
 - 队列中有输入时使用 `/queue` 管理。输入文字可过滤，使用 `↑`/`↓` 选择，按 `Enter` 将选中项恢复到队首，按 `Ctrl+D` 删除，按 `Esc` 关闭。发送失败且 runtime 已空闲时，按 `Enter` 会立即重试选中项。队列为空时只显示提示，不打开空弹层。输入实际发送前不会写入 session log；发送失败会自动恢复到队首。runtime 重启或切换 session 时，本地队列会清空。
-- 主区域会在对话内容下方持续显示当前回合的 Checklist 摘要；`/todos` 可打开完整清单面板。面板显示每项任务的完成、进行中或待处理状态，使用 `↑`/`↓` 选择，鼠标模式下可点击任务，按 `Esc` 关闭。任务清单由 Host 的 `todo/write` 事件驱动，TUI 不直接修改任务；下一回合开始时清空上一回合的清单。
+- 主区域会在对话内容下方持续显示当前回合的 Checklist 摘要；`/todos` 可打开完整清单面板。面板显示每项任务的完成、进行中或待处理状态，使用 `↑`/`↓` 选择，按 `Esc` 关闭。任务清单由 Host 的 `todo/write` 事件驱动，TUI 不直接修改任务；下一回合开始时清空上一回合的清单。
 - `/review` 打开只读 Git Review。选择 `working-tree`、`staged`、`last-commit` 或 `branch`，查看受限的文件与 Diff 摘要后按回车，将结构化 Review 上下文发送到当前会话。
 - `Esc` 在帮助、命令菜单等弹层中先关闭弹层；任务运行时第一次请求取消，第二次退出；空闲时连续按两次退出 TUI。
-- `Ctrl+L` 重绘界面，不清除会话内容。
+- `Ctrl+L` 打开模型切换面板，对齐 Crush 的模型切换流程；使用 `/redraw` 可以在不清除会话内容的情况下重绘界面。
 - 可用 `COCODE_TUI_KEYMAP` 以 JSON 对象覆盖快捷键，例如
   `COCODE_TUI_KEYMAP='{"historySearch":"ctrl+f","editorOpen":"alt+e"}'`。键名支持帮助中的 command id（如
   `history.search`）和对应的驼峰别名。只有已存在的 command id 会生效；JSON、键名或按键格式非法时保留默认键位，并向 stderr 输出诊断。配置使用 `ctrl`、`alt`、`shift` 与 `enter`、`escape`、`up`、`down` 等跨平台写法，Windows、macOS、Linux 均按同一规则解析。
 - 在消息任意位置输入 `@` 可搜索工作区文件和目录；使用 `Tab`、`↑`、`↓` 选择，回车插入引用。
 - 发送时会在消息末尾附加选中文件内容，目录则附加受限的目录列表；文件必须位于当前工作区内。
-- 当 runtime 挂载 Skills registry 时，`/skills` 会打开可搜索的工作区技能目录。选择技能后会向输入区插入 `/技能名 `，可以继续编辑 prompt 再发送；未挂载 registry 时不会显示该命令。
-- Agent 调用 `ask_user_question` 时，输入区会切换为问卷面板。使用 `↑` `↓` 移动，空格勾选多个选项，`Tab` 切换到自定义答案，回车回答，`Esc` 取消。批量问题和并发请求按 FIFO 顺序显示。
+- Host 提供可由用户调用的 Skill 时，`/skills` 会打开可搜索的工作区技能目录；选择后向输入区插入 `/技能名 `，可以继续编辑 prompt 再发送。可由用户调用的 Skill 也会出现在 `/` 命令菜单中，执行时通过 `session.prompt` 文本路径发送。目录为空时不会显示该命令。
+- Agent 调用 `ask_user_question` 时，会先在消息区流式显示正在生成的问题；完整请求到达后，输入区切换为问卷面板。使用 `↑` `↓` 移动，空格勾选多个选项，`Tab` 切换到自定义答案，回车回答，`Backspace` 或 `Delete` 删除自定义输入，`Esc` 取消。批量问题和并发请求按 FIFO 顺序显示。
 
 工具输出会按显示模式截断；未被投影缓存淘汰时，原始内容仍保留在节点状态，完整事件始终保存在 session log 中。对话区空间不足时，输入区保持可见。
 
@@ -125,7 +127,8 @@ TTY，可以用于安装脚本和故障排查。
 | `/lang zh` / `/lang en`        | 切换中英文界面                                                       |
 | `/model`                      | 打开模型选择器                                                         |
 | `/models`                     | 打开模型选择器                                                         |
-| `/model <model-id>`            | 直接切换当前 provider 下的模型并创建新 session                         |
+| `/redraw`                     | 在不清除会话内容的情况下重绘界面                                     |
+| `/model <model-id>`            | 直接切换当前 provider 下的模型；支持持久会话时保留当前 session        |
 | `/resume`                      | 打开当前工作区的 session 选择器并回放选中会话                        |
 | `/skills`                      | 浏览当前工作区中可由用户调用的技能                                   |
 | `/use byok` / `/use cocode`    | 在自己的 Key 和 Cocode 之间切换；切换即新会话                        |

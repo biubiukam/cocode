@@ -513,6 +513,31 @@ describe('TuiApp', () => {
     })
   })
 
+  it('keeps a skill draft while another turn is running', async () => {
+    const runtime = fakeRuntime() as TuiRuntime & {
+      listSkills(sessionId: string): Promise<{ name: string; description: string }[]>
+    }
+    runtime.listSkills = async () => [
+      { name: 'audit', description: 'Inspect the current change' },
+    ]
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+    })
+    await app.start()
+    runtime.emit({ method: 'session.status', params: { sessionId: 's1', status: 'running' } })
+    app.dispatch({ type: 'setDraft', text: '/audit keep this draft' })
+
+    app.dispatch({ type: 'submit', text: app.snapshot().composer.text })
+
+    expect(runtime.prompts).toEqual([])
+    expect(app.snapshot().composer.text).toBe('/audit keep this draft')
+    expect(app.snapshot().notice?.tone).toBe('info')
+  })
+
   it('namespaces discovered skill commands and keeps the wire invocation unprefixed', async () => {
     const runtime = fakeRuntime() as TuiRuntime & {
       listSkills(sessionId: string): Promise<{ name: string; description: string; source: string }[]>

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createPromptQueue, type QueuedPrompt } from '../../src/runtime/prompt-queue.ts'
 
-const prompt = (text: string): QueuedPrompt => ({ id: text, text, attachments: [] })
+const prompt = (text: string): QueuedPrompt => ({ id: text, text, attachments: [], images: [] })
 
 describe('prompt queue', () => {
   it('preserves FIFO ordering and restores failed prompts at the front', () => {
