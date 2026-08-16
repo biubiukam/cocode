@@ -129,7 +129,12 @@ const config: ForgeConfig = {
 			return appendChecksumManifest(normalized)
 		},
 	},
-	rebuildConfig: {},
+	// Use the final headers host directly. The default electronjs.org URL
+	// redirects there, and node-gyp's fetch can fail on that redirect when a
+	// proxy resets the connection.
+	rebuildConfig: {
+		headerURL: "https://artifacts.electronjs.org/headers/dist",
+	},
 	makers: [
 		new MakerSquirrel(
 			createSquirrelConfig(packageMetadata.version, process.env, windowsSignOptions),
