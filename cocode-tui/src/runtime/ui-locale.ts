@@ -12,6 +12,7 @@ type UiKey =
   | 'usageCache'
   | 'usageContext'
   | 'usageTotals'
+  | 'runtimeContextDetail'
   | 'secret'
   | 'prompt'
   | 'locked'

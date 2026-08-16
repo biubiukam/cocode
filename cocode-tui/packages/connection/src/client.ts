@@ -288,7 +288,7 @@ class SdkTuiRuntime implements TuiRuntime {
     if (rows === undefined) {
       throw new Error(`plugins/list returned no plugin list: ${JSON.stringify(result)}`)
     }
-    return rows.map(parsePluginEntry)
+    return rows.map((value) => parsePluginEntry(value))
   }
 
   async setPluginEnabled(entryId: string, enabled: boolean): Promise<TuiPluginEntry> {

@@ -808,21 +808,6 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
       }
       return
     }
-    if (permissionOpen && snap.permissionPicker !== undefined) {
-      if (key.escape) {
-        app.dispatch({ type: 'permission.close' })
-        return
-      }
-      if (key.upArrow || key.downArrow) {
-        app.dispatch({ type: 'permission.move', delta: key.upArrow ? -1 : 1 })
-        return
-      }
-      if (key.return) {
-        app.dispatch({ type: 'permission.confirm' })
-        return
-      }
-      return
-    }
     if (rewindOpen && rewindState !== undefined) {
       const windowSize = pickerWindowSize(layout.overlayRows, REWIND_WINDOW_SIZE, 6)
       const start = listWindowStart(rewindState.selected, rewindState.items.length, windowSize)
