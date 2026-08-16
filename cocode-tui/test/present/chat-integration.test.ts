@@ -13,6 +13,18 @@ import { createTuiApp } from '../../src/runtime/app.ts'
 import { P0_CAPABILITIES } from '../../src/runtime/capabilities.ts'
 
 describe('Chat', () => {
+  it('enables Kitty keyboard protocol without probing the terminal', async () => {
+    const runtime = createTestRuntime()
+    const chat = await renderChat(runtime.value, { startBeforeRender: true })
+
+    try {
+      expect(chat.stdout.output).toContain('\u001B[>1u')
+      expect(chat.stdout.output).not.toContain('\u001B[?u')
+    } finally {
+      await closeChat(chat)
+    }
+  })
+
   it('shows a quit confirmation for the first idle Ctrl+C', async () => {
     const runtime = createTestRuntime()
     const chat = await renderChat(runtime.value, { locale: 'en', startBeforeRender: true })
@@ -242,6 +254,7 @@ async function renderChat(
     debug: true,
     patchConsole: false,
     exitOnCtrlC: false,
+    kittyKeyboard: { mode: 'enabled' },
   })
   return { app, stdin, stdout, screen }
 }
