@@ -13,6 +13,7 @@ import { FitAddon } from "@xterm/addon-fit"
 import "@xterm/xterm/css/xterm.css"
 import type { WorkbenchPanelProps } from "./model.ts"
 import { t } from "./locales.ts"
+import { TerminalIcon } from "./icons.tsx"
 import { State } from "./panel-state.tsx"
 import { TerminalConnection, type TerminalStatus } from "./terminal-connection.ts"
 import { readTerminalFont, readTerminalTheme, subscribeColorScheme } from "./terminal-theme.ts"
@@ -136,7 +137,7 @@ export function TerminalPanel(props: WorkbenchPanelProps) {
     handles.terminal.focus()
   }, [props.visible, status.kind])
 
-  if (sessionId === undefined) return <State loading={false} empty={t("terminal.noSession")} />
+  if (sessionId === undefined) return <State empty={t("terminal.noSession")} icon={<TerminalIcon size={18} />} />
   return <div className={css.panel}>
     <div className={css.surface} ref={containerRef} />
     <StatusBar status={status} onRestart={() => {

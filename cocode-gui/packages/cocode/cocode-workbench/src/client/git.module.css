@@ -190,12 +190,24 @@
   border-color: var(--dsw-alias-interactive-bg-primary);
 }
 
-/* 主操作与下拉共用一个外框，中间以细线分隔。 */
+/* 主操作与下拉共用一个外框，样式对齐 design-system 的 button-secondary button-sm。 */
 .commitBar {
   display: flex;
   align-items: stretch;
-  border-radius: 6px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--ds-radius-sm);
+  background: var(--dsw-alias-bg-layer-1);
+  box-shadow: var(--ds-shadow-sm);
   overflow: hidden;
+  transition:
+    background-color var(--ds-transition-fast),
+    border-color var(--ds-transition-fast);
+}
+
+.commitBar:has(.commitButton:not(:disabled):hover),
+.commitBar:has(.commitMore:not(:disabled):hover) {
+  border-color: var(--dsw-alias-border-l3);
+  background: var(--dsw-alias-interactive-bg-hover-solid);
 }
 
 .commitButton {
@@ -208,21 +220,23 @@
   height: 28px;
   padding: 0 10px;
   border: 0;
-  color: var(--dsw-alias-label-inverse);
-  background: var(--dsw-alias-button-primary-fill);
-  font: inherit;
+  color: var(--dsw-alias-label-primary);
+  background: transparent;
+  font: var(--dsw-font-xxs-strong-12);
   font-weight: 600;
   cursor: pointer;
 }
 
-.commitButton:hover:not(:disabled) {
-  background: var(--dsw-alias-button-primary-hover);
-}
-
 .commitButton:disabled {
   color: var(--dsw-alias-label-tertiary);
-  background: var(--dsw-alias-button-primary-dimmed);
   cursor: default;
+  opacity: 0.45;
+}
+
+.commitButton:focus-visible,
+.commitMore:focus-visible {
+  outline: 2px solid var(--cocode-ring);
+  outline-offset: -2px;
 }
 
 .commitMore {
@@ -230,20 +244,24 @@
   width: 26px;
   flex: none;
   border: 0;
-  border-left: 1px solid var(--dsw-alias-bg-mask-2);
+  border-left: 1px solid var(--dsw-alias-border-l2);
   place-items: center;
-  color: var(--dsw-alias-label-inverse);
-  background: var(--dsw-alias-button-primary-fill);
+  color: var(--dsw-alias-label-secondary);
+  background: transparent;
   cursor: pointer;
 }
 
 .commitMore:hover:not(:disabled) {
-  background: var(--dsw-alias-button-primary-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+/* 主按钮禁用时，下拉箭头同步变淡；仍保留点击以打开 amend 等变体。 */
+.commitBar:has(.commitButton:disabled) .commitMore {
+  color: var(--dsw-alias-label-tertiary);
 }
 
 .commitMore:disabled {
-  color: var(--dsw-alias-label-tertiary);
-  background: var(--dsw-alias-button-primary-dimmed);
+  opacity: 0.45;
   cursor: default;
 }
 
@@ -355,9 +373,7 @@
   color: var(--dsw-alias-label-secondary);
   background: var(--dsw-alias-bg-layer-1);
   font: var(--dsw-font-xxxs-strong-11);
-  letter-spacing: 0.02em;
   text-align: left;
-  text-transform: uppercase;
   cursor: pointer;
 }
 
@@ -500,12 +516,14 @@
 }
 
 .row:hover .rowActions,
-.row:focus-within .rowActions {
+.row:focus-within .rowActions,
+.row[data-selected] .rowActions {
   opacity: 1;
 }
 
-/* 操作出现时状态字母让位，避免行尾在 hover 时跳动。 */
-.row:hover .rowStatus {
+/* 操作出现时状态字母让位，避免行尾在 hover / 选中时跳动。 */
+.row:hover .rowStatus,
+.row[data-selected] .rowStatus {
   display: none;
 }
 
@@ -537,7 +555,7 @@
 .row[data-tone="deleted"] .rowStatus { color: var(--dsw-alias-state-error-primary); }
 .row[data-tone="conflict"] .rowStatus { color: var(--dsw-alias-state-error-primary); }
 
-/* ── 贮藏 ───────────────────────────────────────────────── */
+/* ── Stash（暂存） ──────────────────────────────────────── */
 
 .stashRow {
   display: grid;
@@ -553,7 +571,8 @@
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
-.stashRow:hover .rowActions {
+.stashRow:hover .rowActions,
+.stashRow:focus-within .rowActions {
   opacity: 1;
 }
 
@@ -565,33 +584,6 @@
 }
 
 /* ── 空状态 ─────────────────────────────────────────────── */
-
-.state {
-  display: grid;
-  min-height: 140px;
-  padding: 24px 16px;
-  gap: 10px;
-  place-content: center;
-  place-items: center;
-  color: var(--dsw-alias-label-tertiary);
-  text-align: center;
-}
-
-.stateAction {
-  height: 28px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 6px;
-  color: var(--dsw-alias-label-inverse);
-  background: var(--dsw-alias-button-primary-fill);
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.stateAction:hover {
-  background: var(--dsw-alias-button-primary-hover);
-}
 
 /* ── 提交历史 ───────────────────────────────────────────── */
 

@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react"
 import { CodeBlock, MarkdownText } from "@deepseek-ai/dsh-client-ui-primitives"
 import type { WorkbenchPanelProps } from "./model.ts"
+import { PreviewIcon } from "./icons.tsx"
 import { State, message, useRemote } from "./panel-state.tsx"
 import { fileUrl, workbenchRequest } from "./runtime-api.ts"
 import { resolveMarkdownImages } from "./markdown-assets.ts"
@@ -109,7 +110,7 @@ function FilePreview(props: WorkbenchPanelProps) {
   const copiedLabel = t("common.copied")
   const codeLabels = useMemo(() => ({ copyLabel, copiedLabel }), [copyLabel, copiedLabel])
 
-  if (path === undefined) return <State loading={false} empty={t("preview.pickFile")} />
+  if (path === undefined) return <State empty={t("preview.pickFile")} icon={<PreviewIcon size={18} />} />
   if (remote.loading || remote.error !== undefined) return <State loading={remote.loading} error={remote.error} />
 
   const hasSource = file?.kind === "text"

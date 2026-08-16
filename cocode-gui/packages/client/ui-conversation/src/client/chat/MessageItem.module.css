@@ -229,10 +229,45 @@
   overflow-wrap: anywhere;
 }
 
+.turnErrorHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 .turnErrorTitle {
-  margin-right: 6px;
+  min-width: 0;
   color: var(--dsw-alias-state-error-primary);
   font-weight: 600;
+}
+
+.turnErrorRetry {
+  flex: none;
+  margin: -2px 0 -2px auto;
+  height: 24px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--dsw-alias-state-business-primary);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.turnErrorRetry:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.turnErrorRetry:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--dsw-alias-state-business-primary);
+}
+
+.turnErrorRetry:disabled {
+  cursor: default;
+  opacity: 0.45;
 }
 
 .turnErrorMessage {

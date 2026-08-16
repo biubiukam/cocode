@@ -1,5 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis'
-import type { SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SessionId, SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import { NS } from '../locales.ts'
 import { AssistantNodeView } from './AssistantNodeView.tsx'
 import { CommandNodeView, ManualCompactionNodeView } from './CommandNodeView.tsx'
@@ -7,7 +7,7 @@ import {
   CompactionNodeView, ContextMessageNodeView, RetryNodeView, TurnErrorNodeView,
   TurnMaxTokensNodeView, UnknownNodeView, UserMessageNodeView,
 } from './MessageItem.tsx'
-import type { ContextMessageNodeInjected } from './MessageItem.tsx'
+import type { ContextMessageNodeInjected, TurnErrorNodeInjected } from './MessageItem.tsx'
 import { TurnTailNodeView } from './TurnTailNodeView.tsx'
 
 /**
@@ -39,8 +39,18 @@ export function registerChatNodeRenderers(ctx: Context, debugMode: SnapshotStore
     { name: 'conversation.chat.node', key: 'compaction', locale: NS }, CompactionNodeView))
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register(
     { name: 'conversation.chat.node', key: 'model-retry', locale: NS }, RetryNodeView))
-  ctx.slots.inject('conversation.chat.node', () => ctx.slots.register(
-    { name: 'conversation.chat.node', key: 'turn-error', locale: NS }, TurnErrorNodeView))
+  ctx.slots.inject('conversation.chat.node', () => ctx.slots.register({
+    name: 'conversation.chat.node',
+    key: 'turn-error',
+    locale: NS,
+    inject: (sessionId: SessionId): TurnErrorNodeInjected => {
+      const actx = ctx.sessions.scope(sessionId)
+      if (actx === undefined) throw new Error(`turn-error: session "${sessionId}" resolved no scope`)
+      const conversation = actx.get('conversation')
+      if (conversation === undefined) throw new Error('turn-error: conversation service unavailable')
+      return { retry: () => conversation.retry() }
+    },
+  }, TurnErrorNodeView))
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register(
     { name: 'conversation.chat.node', key: 'turn-max-tokens', locale: NS }, TurnMaxTokensNodeView))
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register({

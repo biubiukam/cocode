@@ -29,9 +29,9 @@ export function UnstageIcon(props: IconProps) {
   return Icon(props, <path d="M4 8h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />)
 }
 
-/** 放弃更改：回退箭头。 */
+/** 撤销更改：与 VS Code discard 同构的左弯箭头。 */
 export function DiscardIcon(props: IconProps) {
-  return Icon(props, <><path d="M3 8a5 5 0 1 0 1.6-3.66" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /><path d="M3 2.5V5h2.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></>)
+  return Icon(props, <><path d="M5.25 4.75 2.75 7.25 5.25 9.75" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /><path d="M2.75 7.25h6.75a3.25 3.25 0 1 1 0 6.5H8.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></>)
 }
 
 /** 打开文件：文档加外链角标。 */

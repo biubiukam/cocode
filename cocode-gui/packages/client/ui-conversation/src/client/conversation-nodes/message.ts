@@ -27,6 +27,11 @@ function isCompactionCheckpoint(event: Parameters<ConversationNodeDefinition['ma
   return source.kind === 'plugin' && source.plugin === 'compact'
 }
 
+/** Empty retry follow-ups carry no content; hide the air bubble. */
+function isBlankUserContent(content: UserMessageNode['content']): boolean {
+  return content.length === 0
+}
+
 /** User, steering, and injected-context message classification Definition. */
 export const messageDefinition: ConversationNodeDefinition<MessageNode> = {
   kind: 'input-message',
@@ -71,6 +76,11 @@ export const messageDefinition: ConversationNodeDefinition<MessageNode> = {
   update: context => context.state,
   buildViewNode: (context) => {
     if (context.state === undefined) return null
+    if (context.state.kind === 'user' && isBlankUserContent(context.state.content)) {
+      return chatNode(context, context.state.kind, context.state.seq, context.state, {
+        visibility: 'hidden',
+      })
+    }
     return chatNode(context, context.state.kind, context.state.seq, context.state)
   },
 }

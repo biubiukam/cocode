@@ -63,7 +63,7 @@ export function branchMenuEntries(
   return [{ type: "label", id: "branches-title", text: t("git.pickBranch") }, ...list]
 }
 
-/** 贮藏子菜单；没有贮藏记录时只保留“贮藏更改”。 */
+/** Stash 子菜单；没有记录时只保留“Stash 更改”。 */
 function stashEntries(repo: GitRepo, stashes: readonly GitStash[]): readonly MenuItem[] {
   const hasStash = stashes.length > 0
   return [
@@ -75,7 +75,7 @@ function stashEntries(repo: GitRepo, stashes: readonly GitStash[]): readonly Men
   ]
 }
 
-/** 工具栏“更多”菜单：远端同步、贮藏、历史，以及未完成操作的出口。 */
+/** 工具栏“更多”菜单：远端同步、Stash、历史，以及未完成操作的出口。 */
 export function moreMenuEntries(repo: GitRepo, stashes: readonly GitStash[]): readonly MenuEntry[] {
   const remote = repo.hasRemote
   const entries: MenuEntry[] = [

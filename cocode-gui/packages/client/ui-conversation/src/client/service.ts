@@ -40,6 +40,11 @@ export interface IConversation {
    */
   send(text: string): Promise<void>
   /**
+   * Re-run the latest failed turn without appending another user bubble.
+   * @returns completion; business failures reject (and land in promptError).
+   */
+  retry(): Promise<void>
+  /**
    * Apply one edit, remove, or strict steer operation to a pending queue occurrence.
    * @param itemId - agent-owned inbox occurrence identity.
    * @param action - requested queue operation.
@@ -130,6 +135,16 @@ export class ConversationController extends Service implements IConversation {
     const session = this.scopedSession('send')
     const result = await session.prompt([{ type: 'text', text }], 'queue')
     if (!result.ok) throw new Error(`conversation.send failed: ${result.error.code}: ${result.error.message}`)
+  }
+
+  /**
+   * Wake a new queued turn with empty content so the failed prompt is retried
+   * from existing history instead of duplicating the last user message.
+   */
+  async retry(): Promise<void> {
+    const session = this.scopedSession('retry')
+    const result = await session.prompt([], 'queue')
+    if (!result.ok) throw new Error(`conversation.retry failed: ${result.error.code}: ${result.error.message}`)
   }
 
   /**

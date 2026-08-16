@@ -23,7 +23,13 @@ export interface ContextMessageNodeInjected {
   hooks: { debugMode: SnapshotStore<boolean> }
 }
 
+/** Session-scoped retry for a terminal turn failure. */
+export interface TurnErrorNodeInjected {
+  retry: () => Promise<void>
+}
+
 type ContextMessageNodeViewProps = ChatNodeViewProps<'context'> & InjectFace<ContextMessageNodeInjected>
+type TurnErrorNodeViewProps = ChatNodeViewProps<'turn-error'> & InjectFace<TurnErrorNodeInjected>
 
 type UserImage = Extract<UserMessageNode['content'][number], { type: 'image' }>
 
@@ -122,15 +128,30 @@ function ModelRetryItem({ node, active, t }: {
 }
 
 /** Persistent, turn-positioned feedback for a terminal failure. */
-function TurnErrorItem({ node, t }: {
+function TurnErrorItem({ node, t, canRetry, retrying, onRetry }: {
   node: TurnErrorNode
   t: ChatViewSlotProps['t']
+  canRetry: boolean
+  retrying: boolean
+  onRetry: () => void
 }) {
   return (
     <div className={css.turnErrorRow} role="status">
       <StateDot state="error" className={css.turnErrorDot} />
       <div className={css.turnErrorCopy}>
-        <span className={css.turnErrorTitle}>{t('message.turnError')}</span>
+        <div className={css.turnErrorHead}>
+          <span className={css.turnErrorTitle}>{t('message.turnError')}</span>
+          {canRetry && (
+            <button
+              type="button"
+              className={css.turnErrorRetry}
+              disabled={retrying}
+              onClick={onRetry}
+            >
+              {t('message.turnError.retry')}
+            </button>
+          )}
+        </div>
         <span className={css.turnErrorMessage}>{node.message}</span>
       </div>
     </div>
@@ -292,8 +313,30 @@ export const RetryNodeView = memo(function RetryNodeView({ node, t }: ChatNodeVi
 })
 
 /** Terminal turn-error keyed Chat renderer. */
-export const TurnErrorNodeView = memo(function TurnErrorNodeView({ node, t }: ChatNodeViewProps<'turn-error'>) {
-  return <TurnErrorItem node={node.data} t={t} />
+export const TurnErrorNodeView = memo(function TurnErrorNodeView({
+  node, t, useSession, retry,
+}: TurnErrorNodeViewProps) {
+  const data = node.data
+  const canRetry = useSession(snapshot => (
+    !snapshot.running
+    && !snapshot.removed
+    && snapshot.subagent?.address.mode !== 'one-shot'
+    && snapshot.chat.timeline.turnOrder.at(-1) === data.turn
+  ))
+  const [retrying, setRetrying] = useState(false)
+  return (
+    <TurnErrorItem
+      node={data}
+      t={t}
+      canRetry={canRetry}
+      retrying={retrying}
+      onRetry={() => {
+        if (retrying) return
+        setRetrying(true)
+        void retry().finally(() => { setRetrying(false) })
+      }}
+    />
+  )
 })
 
 /** Max-tokens turn-end notice keyed Chat renderer. */

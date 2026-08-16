@@ -12,6 +12,8 @@ import { sectionsOf, statusLetter, statusTone, gitRequest, type GitCommit, type 
 import { useGitStore } from "./git-store.ts"
 import { branchMenuEntries, checkoutTarget, commitMenuEntries, moreMenuEntries, rowMenuEntries, sectionLabel, type GitCommand } from "./git-menus.ts"
 import { BranchIcon, DiscardIcon, MoreIcon, OpenFileIcon, RefreshIcon, SectionChevron, SparkleIcon, StageIcon, SyncIcon, UnstageIcon } from "./git-icons.tsx"
+import { GitIcon } from "./icons.tsx"
+import { State } from "./panel-state.tsx"
 import { localeRevision, subscribeLocale, t } from "./locales.ts"
 import css from "./git.module.css"
 
@@ -33,7 +35,7 @@ interface Confirm {
 interface Prompt {
   readonly label: string
   readonly value: string
-  /** 贮藏说明一类的可选输入允许留空，分支名这类必填的留空即取消。 */
+  /** Stash 说明一类的可选输入允许留空，分支名这类必填的留空即取消。 */
   readonly allowEmpty?: boolean
   readonly submit: (value: string) => Promise<unknown>
 }
@@ -142,11 +144,9 @@ export function GitPanel(props: WorkbenchPanelProps) {
     })
   }
 
-  const askDiscard = (row: GitRow): void => {
-    setConfirm({
-      text: t("git.confirmDiscard", { name: row.name }),
-      run: () => run("git.discard", { paths: [row.path], group: row.group }).then(report),
-    })
+  /** 单行撤销与 VS Code 一致：直接还原，不弹确认框。 */
+  const discardRow = (row: GitRow): void => {
+    void run("git.discard", { paths: [row.path], group: row.group }).then(report)
   }
 
   const askDiscardAll = (): void => {
@@ -222,7 +222,7 @@ export function GitPanel(props: WorkbenchPanelProps) {
       case "openChanges": if (row !== undefined) openChanges(row); return
       case "stage": if (row !== undefined) report(await run("git.stage", { paths: [row.path] })); return
       case "unstage": if (row !== undefined) report(await run("git.unstage", { paths: [row.path] })); return
-      case "discard": if (row !== undefined) askDiscard(row); return
+      case "discard": if (row !== undefined) discardRow(row); return
       case "ignore": if (row !== undefined) report(await run("git.ignore", { paths: [row.path] })); return
       case "copyPath": {
         const path = row === undefined ? undefined : absolutePathOf(row)
@@ -314,7 +314,7 @@ export function GitPanel(props: WorkbenchPanelProps) {
       </span>
       <span className={css.rowActions}>
         <IconAction label={t("git.openFile")} onClick={() => openFile(row)}><OpenFileIcon size={14} /></IconAction>
-        <IconAction label={t("git.discard")} onClick={() => askDiscard(row)}><DiscardIcon size={14} /></IconAction>
+        <IconAction label={t("git.discard")} onClick={() => discardRow(row)}><DiscardIcon size={14} /></IconAction>
         {staged
           ? <IconAction label={t("git.unstage")} onClick={() => void dispatch("unstage", row)}><UnstageIcon size={14} /></IconAction>
           : <IconAction label={t("git.stage")} onClick={() => void dispatch("stage", row)}><StageIcon size={14} /></IconAction>}
@@ -347,13 +347,21 @@ export function GitPanel(props: WorkbenchPanelProps) {
     </>
   }
 
-  if (sessionId === undefined) return <div className={css.state}>{t("git.noSession")}</div>
-  if (state.loading && state.status === undefined) return <div className={css.state}>{t("common.loading")}</div>
+  if (sessionId === undefined) {
+    return <State empty={t("git.noSession")} hint={t("git.noSessionHint")} icon={<GitIcon size={18} />} />
+  }
+  if (state.loading && state.status === undefined) return <State loading />
+  // 读状态失败与「不是仓库」是两回事：前者只能重试，后者才该给初始化。
+  if (state.error !== undefined) {
+    return <State error={state.error} action={{ label: t("common.retry"), onClick: () => void dispatch("refresh") }} />
+  }
   if (repo === undefined) {
-    return <div className={css.state}>
-      <span>{state.error ?? t("git.notRepo")}</span>
-      <button type="button" className={css.stateAction} onClick={() => void dispatch("init")}>{t("git.init")}</button>
-    </div>
+    return <State
+      empty={t("git.notRepo")}
+      hint={t("git.notRepoHint")}
+      icon={<GitIcon size={18} />}
+      action={{ label: t("git.init"), onClick: () => void dispatch("init") }}
+    />
   }
 
   const totalChanges = repo.files.length
@@ -465,7 +473,7 @@ export function GitPanel(props: WorkbenchPanelProps) {
           portal
           compact
           className={css.menuAnchor}
-          anchor={<button type="button" className={css.commitMore} aria-label={t("git.more")} aria-haspopup="menu" aria-expanded={commitMenuOpen} onClick={() => setCommitMenuOpen(open => !open)}>
+          anchor={<button type="button" className={css.commitMore} disabled={state.busy} aria-label={t("git.more")} aria-haspopup="menu" aria-expanded={commitMenuOpen} onClick={() => setCommitMenuOpen(open => !open)}>
             <SectionChevron size={12} />
           </button>}
         />
@@ -509,7 +517,8 @@ export function GitPanel(props: WorkbenchPanelProps) {
     </div>}
 
     <div className={css.body}>
-      {totalChanges === 0 && history === undefined && state.stashes.length === 0 && <div className={css.state}>{t("git.empty")}</div>}
+      {totalChanges === 0 && history === undefined && state.stashes.length === 0 &&
+        <State empty={t("git.empty")} hint={t("git.emptyHint")} icon={<GitIcon size={18} />} />}
       {sections.map(section => renderSection(
         section.id,
         sectionLabel(section.id),
@@ -534,7 +543,7 @@ export function GitPanel(props: WorkbenchPanelProps) {
           <span className={css.commitMeta}>{entry.date}</span>
         </div>,
       ))}
-      {history !== undefined && history.length === 0 && <div className={css.state}>{t("git.historyEmpty")}</div>}
+      {history !== undefined && history.length === 0 && <State empty={t("git.historyEmpty")} />}
     </div>
 
     <Menu

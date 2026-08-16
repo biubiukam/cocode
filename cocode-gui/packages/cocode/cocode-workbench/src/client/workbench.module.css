@@ -16,7 +16,7 @@
   display: flex;
   min-width: 0;
   flex: 1;
-  padding: 9px;
+  padding: 0 9px;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -201,6 +201,7 @@
 
 .actions {
   display: flex;
+  align-items: center;
   flex: none;
   gap: 2px;
   padding: 0 9px;
@@ -323,12 +324,15 @@
      buttons stay the topmost hit target while the dock is open. */
   z-index: 60;
   display: flex;
-  align-items: center;
+  align-items: stretch;
   flex: none;
   min-width: 0;
-  /* Same 46px box as the conversation header so the hairlines meet. */
-  height: 46px;
-  border-bottom: 1px solid transparent;
+  /* Same box as the conversation header (--dsh-shell-header-height on AppFrame)
+     so the hairlines meet across the center/workbench seam. */
+  height: var(--dsh-shell-header-height, 46px);
+  min-height: var(--dsh-shell-header-height, 46px);
+  max-height: var(--dsh-shell-header-height, 46px);
+  overflow: hidden;
   background: var(--dsw-alias-bg-layer-1);
   -webkit-app-region: no-drag;
 }
@@ -337,8 +341,9 @@
   content: '';
   position: absolute;
   right: 0;
-  bottom: 1px;
+  bottom: 0;
   left: 0;
+  z-index: 1;
   height: 1px;
   background: var(--dsw-alias-border-l2);
   pointer-events: none;

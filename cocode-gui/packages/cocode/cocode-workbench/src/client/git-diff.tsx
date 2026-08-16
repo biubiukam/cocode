@@ -85,8 +85,8 @@ export function GitDiffView(props: {
   const lines = useMemo(() => parsePatch(remote.value?.patch ?? ""), [remote.value?.patch])
 
   if (remote.loading || remote.error !== undefined) return <State loading={remote.loading} error={remote.error} />
-  if (isBinary(remote.value?.patch ?? "")) return <State loading={false} empty={t("git.diffBinary")} />
-  if (lines.length === 0) return <State loading={false} empty={t("git.diffEmpty")} />
+  if (isBinary(remote.value?.patch ?? "")) return <State empty={t("git.diffBinary")} />
+  if (lines.length === 0) return <State empty={t("git.diffEmpty")} />
 
   return <div className={css.diff}>
     <div className={css.summary}>

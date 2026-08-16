@@ -108,6 +108,23 @@ export function SubagentsIcon(props: IconProps) {
   </>)
 }
 
+/** 出错缺省态的标记。 */
+export function AlertIcon(props: IconProps) {
+  return Icon(props, <>
+    <path d="M8 2.6 14.4 13.4H1.6z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+    <path d="M8 6.4v3.1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    <circle cx="8" cy="11.4" r=".85" fill="currentColor" />
+  </>)
+}
+
+/** 面板没给专属图标时的通用空态标记：一个留白的容器。 */
+export function EmptyIcon(props: IconProps) {
+  return Icon(props, <>
+    <rect x="2.25" y="3.25" width="11.5" height="9.5" rx="2.5" stroke="currentColor" strokeWidth="1.3" strokeDasharray="2.6 2.2" />
+    <path d="M6 8h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+  </>)
+}
+
 export function PreviewIcon(props: IconProps) {
   return FileIcon(props, <>
     <path d="M6.6 7.4 8 8.5l1.4-1.1 1.7 2.1H4.9z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
