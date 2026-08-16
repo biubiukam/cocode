@@ -42,6 +42,7 @@ TUI 自己产生的失败会显示为 `CODE · 解释`。语言由 `COCODE_LANG`
 | `AUTH_CREDENTIAL_EMPTY`       | 凭证值为空                          | 凭证值为空。                                                 |
 | `AUTH_CREDENTIALS_PARSE`      | `.credentials.yaml` 不是合法映射    | 无法解析凭证文件。                                           |
 | `AUTH_SETTINGS_PARSE`         | `settings.yaml` 无法解析            | 无法解析 settings.yaml。                                     |
+| `AUTH_NETWORK_FAILED`         | Agency 请求尚未收到响应就失败       | 无法连接 Cocode Agency：{detail}。                            |
 
 ## RUNTIME
 

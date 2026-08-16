@@ -5,5 +5,5 @@ export {
   type ErrorParams,
   type Locale,
 } from './catalog.ts'
-export { TuiError, displayError, errorNotice, formatError, isErrorCode } from './format.ts'
+export { TuiError, displayError, errorDetail, errorNotice, formatError, isErrorCode } from './format.ts'
 export { resolveLocale } from './locale.ts'

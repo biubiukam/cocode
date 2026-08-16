@@ -29,6 +29,11 @@ export const ERROR_CATALOG = {
     en: 'Sign-in failed.',
     zh: '登录失败。',
   },
+  AUTH_NETWORK_FAILED: {
+    domain: 'AUTH',
+    en: 'Could not reach Cocode Agency: {detail}.',
+    zh: '无法连接 Cocode Agency：{detail}。',
+  },
   AUTH_LOGIN_CANCELLED: {
     domain: 'AUTH',
     en: 'Sign-in cancelled.',

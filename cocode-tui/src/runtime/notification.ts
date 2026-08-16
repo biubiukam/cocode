@@ -14,6 +14,7 @@ export function handleNotification(
     subagentFinished: (childSessionId: string) => string
     notice: (message: string) => void
     fail: (message: string) => void
+    recover: () => void
     emit: () => void
   },
 ): void {
@@ -28,6 +29,8 @@ export function handleNotification(
         host.setAgent('idle')
         host.clearInterrupt()
       }
+    } else if (event.type === 'turn/end' && !host.isDeadOrExiting()) {
+      host.recover()
     }
     host.emit()
     return

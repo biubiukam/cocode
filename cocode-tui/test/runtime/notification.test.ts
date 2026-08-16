@@ -13,6 +13,7 @@ describe('handleNotification', () => {
       subagentFinished: (id: string) => `finished:${id}`,
       notice: (message: string) => events.push(`notice:${message}`),
       fail: (message: string) => events.push(`fail:${message}`),
+      recover: () => events.push('recover'),
       emit: () => {},
     }
   }
@@ -72,6 +73,7 @@ describe('handleNotification', () => {
       },
       notice: (message: string) => events.push(`notice:${message}`),
       fail: (message: string) => events.push(`fail:${message}`),
+      recover: () => events.push('recover'),
       emit: () => {},
     }
     handleNotification(
@@ -107,5 +109,23 @@ describe('handleNotification', () => {
       'finish:child',
       'notice:finished:child',
     ])
+  })
+
+  it('clears a stale runtime failure after a later turn succeeds', () => {
+    const events: string[] = []
+    const host = hostWithEvents(events)
+    handleNotification({
+      method: 'session.event',
+      params: {
+        sessionId: 'parent',
+        event: {
+          type: 'turn/end',
+          seq: 1,
+          time: 1,
+          data: { reason: { kind: 'completed' } },
+        },
+      },
+    }, host)
+    expect(events).toEqual(['recover'])
   })
 })

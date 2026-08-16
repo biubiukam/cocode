@@ -445,6 +445,7 @@ class TuiAppImpl implements TuiApp {
   private verbose = false
   private focusMode = false
   private notice: TuiSnapshot['notice']
+  private runtimeFailureNotice: string | undefined
   private interruptArmed = false
   private exiting = false
   private runtimeName = ''
@@ -2750,7 +2751,19 @@ class TuiAppImpl implements TuiApp {
         this.notice = { tone: 'info', message }
       },
       fail: (message) => {
-        this.notice = { tone: 'error', message: redactSecrets(message) }
+        const safeMessage = redactSecrets(message)
+        this.runtimeFailureNotice = safeMessage
+        this.notice = { tone: 'error', message: safeMessage }
+      },
+      recover: () => {
+        if (
+          this.runtimeFailureNotice !== undefined &&
+          this.notice?.tone === 'error' &&
+          this.notice.message === this.runtimeFailureNotice
+        ) {
+          this.notice = undefined
+        }
+        this.runtimeFailureNotice = undefined
       },
       emit: () => this.scheduleEmit(),
     })

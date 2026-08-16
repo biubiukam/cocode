@@ -15,6 +15,18 @@ function json(status: number, body: unknown): Response {
 }
 
 describe('device-flow', () => {
+  it('classifies agency transport failures and keeps the underlying cause', async () => {
+    await expect(
+      startDeviceAuthorization('https://cocode.agency', {
+        fetch: async () => {
+          throw new TypeError('fetch failed', { cause: new Error('connect ECONNRESET') })
+        },
+      }),
+    ).rejects.toThrow(
+      'AUTH_NETWORK_FAILED · Could not reach Cocode Agency: fetch failed: connect ECONNRESET.',
+    )
+  })
+
   it('starts an authorization', async () => {
     let requestBody: Record<string, unknown> | undefined
     const fetchImpl: typeof fetch = async (_input, init) => {

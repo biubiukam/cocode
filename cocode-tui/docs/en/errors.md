@@ -42,6 +42,7 @@ Sign-in, device authorization, credentials, and the agency origin.
 | `AUTH_CREDENTIAL_EMPTY`       | Credential value is empty                          | Credential value is empty.                                                       |
 | `AUTH_CREDENTIALS_PARSE`      | `.credentials.yaml` is not a string mapping        | Could not parse credentials.                                                     |
 | `AUTH_SETTINGS_PARSE`         | `settings.yaml` could not be parsed                | Could not parse settings.yaml.                                                   |
+| `AUTH_NETWORK_FAILED`         | Agency request failed before receiving a response  | Could not reach Cocode Agency: {detail}.                                         |
 
 ## RUNTIME
 

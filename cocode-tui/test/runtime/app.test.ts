@@ -1328,6 +1328,20 @@ describe('TuiApp', () => {
       tone: 'error',
       message: 'The selected model does not support image content.',
     })
+
+    runtime.emit({
+      method: 'session.event',
+      params: {
+        sessionId: 's1',
+        event: {
+          type: 'turn/end',
+          seq: 3,
+          time: 3,
+          data: { turn: 2, reason: { kind: 'completed' } },
+        },
+      },
+    })
+    expect(app.snapshot().notice).toBeUndefined()
   })
 
   it('sends /compact through the prompt path', async () => {
