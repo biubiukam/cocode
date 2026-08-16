@@ -6,6 +6,8 @@ type UiKey =
   | 'session'
   | 'tokensIn'
   | 'tokensOut'
+  | 'tokensInShort'
+  | 'tokensOutShort'
   | 'usageEmpty'
   | 'usageCache'
   | 'usageContext'
@@ -250,6 +252,8 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     session: 'session',
     tokensIn: 'tokens in',
     tokensOut: 'out',
+    tokensInShort: 'in',
+    tokensOutShort: 'out',
     usageEmpty: 'No token usage is available for this session.',
     usageCache: 'cache read {read} · cache write {write}',
     usageContext: 'context {percent}% / {window}',
@@ -386,7 +390,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     cancelRequested: 'Cancel requested; waiting for the runtime to become idle.',
     cancelNotRunning: 'No active turn to cancel.',
     cancelFailed: 'Cancel request failed',
-    telemetryTps: 'TPS {value}',
+    telemetryTps: '{value} tok/s',
     telemetryCache: 'cache {value}%',
     telemetryReasoning: 'reasoning {value}',
     telemetryActivity: '{phase}: {line}',
@@ -493,6 +497,8 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     session: '会话',
     tokensIn: '输入 token',
     tokensOut: '输出',
+    tokensInShort: '输入',
+    tokensOutShort: '输出',
     usageEmpty: '当前会话暂无 token 用量。',
     usageCache: '缓存读取 {read} · 缓存写入 {write}',
     usageContext: 'context {percent}% / {window}',
@@ -629,7 +635,7 @@ const TEXT: Record<UiLocale, Record<UiKey, string>> = {
     cancelRequested: '已请求取消，等待运行时进入空闲状态。',
     cancelNotRunning: '当前没有可取消的任务。',
     cancelFailed: '取消请求失败',
-    telemetryTps: 'TPS {value}',
+    telemetryTps: '{value} tok/s',
     telemetryCache: '缓存命中 {value}%',
     telemetryReasoning: '推理 {value}',
     telemetryActivity: '{phase}：{line}',
