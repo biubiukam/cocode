@@ -10,7 +10,12 @@ import { parseDshRuntimeBootstrap } from "../../../../contracts/schemas/dsh-runt
 import { extractDshBootManifest, extractDshThemePreference } from "./dsh-runtime-bootstrap"
 import { assertRequiredCocodeWebEndpoints } from "./dsh-runtime-health"
 import { resolveDshHome } from "./dsh-home"
-import { createHostSupervisorClient, type HostLease, type HostScope } from "@cocode/host-supervisor"
+import {
+	createHostSupervisorClient,
+	resolveHostRuntimeEnv,
+	resolveHostScope,
+	type HostLease,
+} from "@cocode/host-supervisor"
 import { quarantineCorruptDshSessions } from "./dsh-session-recovery"
 import type { DesktopLogger } from "../../../shared/logging/desktop-logger"
 
@@ -41,17 +46,17 @@ export class DshRuntimeProcess {
 				},
 			})
 		})
-		const scope: HostScope = {
-			dshHome: resolveDshHome(),
-			profile: process.env.DSH_PROFILE?.trim() || "web",
-			hostConfigFingerprint:
-				process.env.COCODE_HOST_CONFIG_FINGERPRINT?.trim() || "cocode-web-jsonrpc-v1",
-			runtimeChannel:
-				process.env.COCODE_RUNTIME_CHANNEL === "preview" ||
-				process.env.COCODE_RUNTIME_CHANNEL === "dev"
-					? process.env.COCODE_RUNTIME_CHANNEL
-					: "stable",
-		}
+		const scope = resolveHostScope({ ...process.env, DSH_HOME: resolveDshHome() })
+		const runtimeEnv = resolveHostRuntimeEnv(process.env)
+		this.logger?.log("info", "dsh.host.scope.resolved", {
+			attributes: {
+				dshHome: scope.dshHome,
+				profile: scope.profile,
+				hostConfigFingerprint: scope.hostConfigFingerprint,
+				runtimeChannel: scope.runtimeChannel,
+				hasRuntimeEnv: Object.keys(runtimeEnv).length > 0,
+			},
+		})
 		const lease = await createHostSupervisorClient({
 			nodeExecutable: resolveBundledNode(),
 			serviceEntry: resolveSupervisorServiceEntry(),
@@ -60,12 +65,23 @@ export class DshRuntimeProcess {
 			clientKind: "gui",
 			requiredServices: ["web"],
 			minProtocolRevision: "1.0",
+			runtimeEnv,
 		})
 		const endpoint = lease.descriptor.services.find((service) => service.service === "web")
 		if (endpoint === undefined) {
 			await lease.release().catch(() => undefined)
 			throw new Error("shared Host did not advertise its Web service")
 		}
+		this.logger?.log("info", "dsh.host.scope.acquired", {
+			attributes: {
+				hostKey: lease.descriptor.hostKey,
+				dshHome: lease.descriptor.dshHome,
+				profile: lease.descriptor.profile,
+				hostConfigFingerprint: lease.descriptor.hostConfigFingerprint,
+				runtimeChannel: scope.runtimeChannel,
+				hostPid: lease.descriptor.hostPid,
+			},
+		})
 		this.lease = lease
 		this.runtimeUrl = endpoint.endpoint
 		this.hostLogDirectoryValue = lease.logDirectory

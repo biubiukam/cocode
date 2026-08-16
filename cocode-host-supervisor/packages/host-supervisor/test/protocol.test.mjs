@@ -5,6 +5,8 @@ import {
   canonicalizeScope,
   hostKey,
   isHostDescriptorCompatible,
+  resolveHostRuntimeEnv,
+  resolveHostScope,
   stableJson,
 } from '../lib/index.js'
 
@@ -58,6 +60,35 @@ test('canonicalizeScope follows the official empty DSH_HOME fallback', () => {
     hostConfigFingerprint: 'fingerprint',
     runtimeChannel: 'stable',
   }).dshHome.endsWith('/.dsh'), true)
+})
+
+test('resolveHostScope applies the same environment-derived scope for every client', () => {
+  const env = {
+    DSH_HOME: '/tmp/cocode-dsh',
+    DSH_PROFILE: 'web',
+    COCODE_HOST_CONFIG_FINGERPRINT: 'cocode-web-jsonrpc-v1',
+    COCODE_RUNTIME_CHANNEL: 'stable',
+    COCODE_LLM_PROVIDERS: ' {"cocode-cloud":{"api":"openai-responses"}} ',
+    COCODE_CLOUD_API_KEY: 'secret-is-not-part-of-the-scope',
+  }
+  const scope = resolveHostScope(env)
+  assert.deepEqual(resolveHostRuntimeEnv(env), {
+    COCODE_LLM_PROVIDERS: env.COCODE_LLM_PROVIDERS.trim(),
+  })
+  assert.equal(scope.dshHome, '/tmp/cocode-dsh')
+  assert.equal(scope.profile, 'web')
+  assert.equal(scope.runtimeChannel, 'stable')
+  assert.match(scope.hostConfigFingerprint, /^cocode-web-jsonrpc-v1:[0-9a-f]{32}$/)
+})
+
+test('resolveHostScope ignores blank runtime configuration and secrets', () => {
+  const scope = resolveHostScope({
+    DSH_HOME: '/tmp/cocode-dsh',
+    COCODE_LLM_PROVIDERS: '  ',
+    COCODE_CLOUD_API_KEY: 'secret',
+  })
+  assert.equal(scope.hostConfigFingerprint, 'cocode-web-jsonrpc-v1')
+  assert.deepEqual(resolveHostRuntimeEnv({ COCODE_CLOUD_API_KEY: 'secret' }), {})
 })
 
 test('hostKey is stable for equivalent scopes', () => {

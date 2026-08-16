@@ -154,7 +154,7 @@ export function rewriteDshWebSocketUrl(
 ): string {
 	const url = new URL(input, currentHref)
 	if (
-		(url.origin !== currentOrigin && url.origin !== runtimeOrigin) ||
+		(!matchesWebSocketOrigin(url, currentOrigin) && !matchesWebSocketOrigin(url, runtimeOrigin)) ||
 		!isDshDesktopWebSocketPath(url.pathname)
 	)
 		return url.href
@@ -194,6 +194,21 @@ function isDshDesktopHttpPath(pathname: string): boolean {
 
 function isDshDesktopWebSocketPath(pathname: string): boolean {
 	return isDshDesktopHttpPath(pathname)
+}
+
+/**
+ * `URL.origin` includes the transport scheme. A renderer page at
+ * `http://localhost:5173` therefore does not compare equal to the absolute
+ * WebSocket URL `ws://localhost:5173/...`, even though they are the same
+ * server. Compare the HTTP/WebSocket scheme pair plus host instead.
+ */
+function matchesWebSocketOrigin(url: URL, httpOrigin: string): boolean {
+	const origin = new URL(httpOrigin)
+	const expectedProtocol = origin.protocol === "https:" ? "wss:" : "ws:"
+	return (
+		url.host === origin.host &&
+		(url.protocol === origin.protocol || url.protocol === expectedProtocol)
+	)
 }
 
 function abortReason(signal: AbortSignal): unknown {
