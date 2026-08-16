@@ -40,7 +40,17 @@ jobs:
         with:
           node-version: 22.19.0
           cache: pnpm
-          cache-dependency-path: cocode-tui/pnpm-lock.yaml
+          cache-dependency-path: |
+            cocode-host-supervisor/pnpm-lock.yaml
+            cocode-tui/pnpm-lock.yaml
+
+      - name: Install Host supervisor dependencies
+        working-directory: cocode-host-supervisor
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Build Host supervisor
+        working-directory: cocode-host-supervisor
+        run: pnpm run build
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
