@@ -1,30 +1,30 @@
-[header] render-contract                                                session fixture-⌄ ╭────────────────────────────╮
-                                                                                          │ ⇄ inspector                │
-                                                                                          │ ↑ wheel / Alt+↑ · 0        │
-│ [transcript] inspect the terminal layout                                                │                            │
-                                                                                          │ activity                   │
-  Stable fixture reasoning.                                                               │ status: [status] running   │
-  The render contract is streaming.                                                       │ queue: 1                   │
-                                                                                          │                            │
-   ↳ ◌ read · running · 2s · /workspace/very/long/路径/README.md                          │ context                    │
-                                                                                          │ tokens: 1234 in · 567 out  │
-                                                                                          │ window: 33%                │
-                                                                                          │ speed: 18.8 t/s            │
-                                                                                          │ reasoning: high            │
-                                                                                          │ segments S0 P0 A0 T0 X0    │
-                                                                                          │                            │
-                                                                                          │ files                      │
-                                                                                          │ cwd: /workspace/[header] … │
-╭───────────────────────────────────────────────────────────────────────────────────────╮ │ no attachments             │
-│ Checklist · 1/3                                                                       │ │                            │
-│   ✓ [task] capture geometry                                                           │ │ session                    │
-│   ● verify wide characters                                                            │ │ model: fixture-model       │
-│   ○ record PTY evidence                                                               │ │ id: fixture-               │
-╰───────────────────────────────────────────────────────────────────────────────────────╯ │ todos: 1/3                 │
-◐ [status] running                                                             · queued 1 │                            │
-todos 1/3                                                                                 │ runtime / MCP              │
-                                                                                          │ runtime: unavailable       │
-                                                                                          │ MCP / companion: not repo… │
-Esc interrupt · tab queue draft                                                           │ capability source: unknown │
-Build · fixture-provider / fixture-model                                  tab queue draft │ ↓ wheel / Alt+↓ · 14       │
-> [composer] queue this next                                                              ╰────────────────────────────╯
+[header] render-contract                                               session fixture-⌄ │ ⇄ inspector
+                                                                                         │
+                                                                                         │ activity
+│ [transcript] inspect the terminal layout                                               │ status: [status] running
+                                                                                         │ queue: 1
+│ Stable fixture reasoning.                                                              │
+│ The render contract is streaming.                                                      │ context
+│ ◌ read · running · 2s · /workspace/very/long/路径/README.md                            │ tokens: 1234 in · 567 out
+                                                                                         │ window: 33%
+                                                                                         │ speed: 18.8 t/s
+                                                                                         │ reasoning: high
+                                                                                         │
+                                                                                         │ files
+                                                                                         │ cwd: /workspace/[header] r…
+                                                                                         │ no attachments
+                                                                                         │
+                                                                                         │ session
+┌──────────────────────────────────────────────────────────────────────────────────────┐ │ model: fixture-model
+│ Checklist · 1/3                                                                      │ │ id: fixture-
+│ · ✓ [task] capture geometry                                                          │ │ todos: 1/3
+│ · ● verify wide characters                                                           │ │
+│ · ○ record PTY evidence                                                              │ │ runtime / MCP
+└──────────────────────────────────────────────────────────────────────────────────────┘ │ runtime: unavailable
+◐ [status] running                                                            · queued 1 │ MCP / companion: not repor…
+todos 1/3                                                                                │ capability source: unknown
+                                                                                         │
+Build · fixture-provider / fixture-model                                 tab queue draft │ shortcuts
+> [composer] queue this next                                                             │ pgup / pgdn scroll
+                                                                                         │ ↓ wheel / Alt+↓ · 3
+Esc interrupt · tab queue draft                                                          │

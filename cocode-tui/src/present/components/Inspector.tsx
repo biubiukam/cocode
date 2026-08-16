@@ -2,10 +2,12 @@ import { Box, Text } from 'ink'
 import type { ReactNode } from 'react'
 import type { TuiSnapshot } from '../../runtime/app.ts'
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
+import { glyphs } from '../glyphs.ts'
 import {
   useInspectorScroll,
   type InspectorMouseInput,
 } from '../inspector-scroll.ts'
+import { PANEL_BORDER, PANEL_PADDING_X } from '../layout.ts'
 import { theme } from '../theme.ts'
 import { ScrollablePanel } from './ScrollablePanel.tsx'
 
@@ -43,34 +45,35 @@ export function Inspector(props: {
     telemetry.tps !== undefined ||
     telemetry.reasoningEffort !== undefined
   const hasFiles = snapshot.composer.attachments.length > 0
-  const { displayedSkills, skillsExpanded, scrollOffset, updateMetrics } = useInspectorScroll({
-    snapshot,
+  const { scrollOffset, updateMetrics } = useInspectorScroll({
+    sessionId: snapshot.header.sessionId,
     maxRows,
     mouseInput,
-    hasActivity,
-    hasContext,
-    hasFiles,
   })
 
   return (
+    // A shell region, not a floating card: one dividing rule instead of a
+    // rounded frame, which also returns two rows and two columns to content.
     <Box
       width={width}
       height={maxRows}
       flexShrink={0}
       flexDirection="column"
-      borderStyle="round"
-      borderColor={theme.border}
-      borderLeftColor={resizing ? theme.brand : theme.border}
-      paddingX={1}
+      borderStyle={PANEL_BORDER}
+      borderColor={resizing ? theme.accent : theme.border}
+      borderTop={false}
+      borderBottom={false}
+      borderRight={false}
+      paddingX={PANEL_PADDING_X}
       marginLeft={1}
       minHeight={0}
     >
-      <Text color={theme.brand} bold>
-        <Text color={resizing ? theme.brand : theme.mute}>⇄</Text>{' '}
+      <Text color={theme.text} bold>
+        <Text color={resizing ? theme.accent : theme.mute}>{glyphs.resizeMark}</Text>{' '}
         {text(locale, 'inspector')}
       </Text>
       <ScrollablePanel
-        height={Math.max(1, maxRows - 3)}
+        height={Math.max(1, maxRows - 1)}
         scrollOffset={scrollOffset}
         onMetricsChange={updateMetrics}
         upHint={locale === 'zh' ? '滚轮 / Alt+↑' : 'wheel / Alt+↑'}
@@ -84,7 +87,7 @@ export function Inspector(props: {
                 <Line
                   label={telemetry.activity.phase || text(locale, 'inspectorActivity')}
                   value={telemetry.activity.line}
-                  color={theme.info}
+                  color={theme.accent}
                 />
               ) : null}
               {snapshot.status.subagents?.running !== undefined &&
@@ -92,14 +95,14 @@ export function Inspector(props: {
                 <Line
                   label={text(locale, 'inspectorAgents')}
                   value={String(snapshot.status.subagents.running)}
-                  color={theme.info}
+                  color={theme.accent}
                 />
               ) : null}
               {snapshot.status.queueCount > 0 ? (
                 <Line
                   label={text(locale, 'inspectorQueue')}
                   value={String(snapshot.status.queueCount)}
-                  color={theme.running}
+                  color={theme.accent}
                 />
               ) : null}
             </>
@@ -191,50 +194,6 @@ export function Inspector(props: {
             value={snapshot.runtimeInfo.capabilitySource}
           />
         </Section>
-        <Section title={text(locale, 'inspectorSkills')}>
-          <Line
-            label={text(locale, 'inspectorLoadedSkill')}
-            value={text(locale, 'inspectorNotReported')}
-            color={theme.mute}
-          />
-          {snapshot.skills.length === 0 ? (
-            <Text color={theme.mute}>{text(locale, 'inspectorNone')}</Text>
-          ) : (
-            <>
-              <Line
-                label={text(locale, 'inspectorAvailable')}
-                value={String(snapshot.skills.length)}
-                color={theme.success}
-              />
-              {displayedSkills.map((skill) => (
-                <Text key={skill.name} color={theme.text} wrap="truncate-end">
-                  <Text color={theme.success}>●</Text> /{skill.name}
-                </Text>
-              ))}
-              {!skillsExpanded && snapshot.skills.length > 3 ? (
-                <Text color={theme.brand} bold underline>
-                  … +{snapshot.skills.length - 3}
-                </Text>
-              ) : null}
-            </>
-          )}
-        </Section>
-        <Section title={text(locale, 'inspectorCapabilities')}>
-          {snapshot.runtimeInfo.capabilities.length === 0 ? (
-            <Text color={theme.mute}>{text(locale, 'inspectorNone')}</Text>
-          ) : (
-            <>
-              <Text color={theme.text} wrap="truncate-end">
-                <Text color={theme.success}>●</Text> {text(locale, 'inspectorEnabled')}:{' '}
-                {capabilityNames(snapshot.runtimeInfo.capabilities, true)}
-              </Text>
-              <Text color={theme.mute} wrap="truncate-end">
-                <Text color={theme.mute}>○</Text> {text(locale, 'inspectorDisabled')}:{' '}
-                {capabilityNames(snapshot.runtimeInfo.capabilities, false)}
-              </Text>
-            </>
-          )}
-        </Section>
         <Section title={text(locale, 'inspectorShortcuts')}>
           <Shortcut text={text(locale, 'footerScroll')} />
           <Shortcut text={text(locale, 'footerMessages')} />
@@ -275,16 +234,4 @@ function Shortcut(props: { text: string }) {
 
 function formatMetric(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1)
-}
-
-function capabilityNames(
-  capabilities: TuiSnapshot['runtimeInfo']['capabilities'],
-  enabled: boolean,
-): string {
-  const names = capabilities
-    .filter((capability) => capability.enabled === enabled)
-    .map((capability) => capability.name)
-  return names.length === 0
-    ? '—'
-    : names.slice(0, 5).join(' ') + (names.length > 5 ? ` +${names.length - 5}` : '')
 }
