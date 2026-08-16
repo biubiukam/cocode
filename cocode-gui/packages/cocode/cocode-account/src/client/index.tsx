@@ -6,7 +6,6 @@ import type { ConfigurableProviderView, ConnectionHandle } from "@deepseek-ai/ds
 import type {} from "@deepseek-ai/dsh-api-remotes/client"
 import {
   IconApiOutline14,
-  IconChevronUpOutline14,
   IconUserOutline16,
   Menu,
   type MenuEntry,
@@ -458,9 +457,10 @@ function AccountAction({ wide, store, providers }: AccountProps): ReturnType<typ
     ? snapshot.profile?.displayName ?? "Cocode"
     : provider?.name ?? labelOf(snapshot, true)
   const secondary = signedIn ? null : provider === null ? t.noProvider : t.customProvider
-  const title = accountError(snapshot) ?? primary
+  const title = accountError(snapshot) ?? (secondary === null ? primary : `${primary} · ${secondary}`)
   const entries: MenuEntry[] = signedIn
     ? [
+        { type: "label", id: "identity", text: snapshot.profile?.email ?? primary },
         { id: "account", label: t.accountPlan, icon: createElement(MenuGlyph, { kind: "account" }) },
         { id: "usage", label: t.planUsage, icon: createElement(MenuGlyph, { kind: "usage" }) },
         { type: "separator", id: "account-separator" },
@@ -513,7 +513,7 @@ function AccountAction({ wide, store, providers }: AccountProps): ReturnType<typ
         items: entries,
         onClose: () => { setOpen(false) },
         onSelect: select,
-        className: `${css.menuRoot} ${css.actionRoot} ${wide ? "" : css.actionRootRail}`,
+        className: `${css.actionRoot} ${wide ? "" : css.actionRootRail}`,
         anchor: createElement(
           "button",
           {
@@ -531,16 +531,10 @@ function AccountAction({ wide, store, providers }: AccountProps): ReturnType<typ
             signedIn
               ? initialOf(primary)
               : provider === null
-                ? createElement(IconUserOutline16, { size: 18 })
-                : createElement(IconApiOutline14, { size: 18 }),
+                ? createElement(IconUserOutline16, { size: 16 })
+                : createElement(IconApiOutline14, { size: 16 }),
           ),
-          wide && createElement(
-            "span",
-            { className: css.copy },
-            createElement("span", { className: css.primary }, primary),
-            secondary === null ? null : createElement("span", { className: css.secondary }, secondary),
-          ),
-          wide && createElement(IconChevronUpOutline14, { className: css.chevron, size: 14 }),
+          wide && createElement("span", { className: css.primary }, primary),
         ),
       },
     ),

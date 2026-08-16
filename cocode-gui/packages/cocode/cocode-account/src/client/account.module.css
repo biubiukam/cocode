@@ -1,34 +1,6 @@
-.menuRoot {
-  display: flex;
-  width: min(280px, calc(100vw - 24px));
-  min-width: 260px;
-  padding: 8px;
-  gap: 2px;
-  border: 1px solid var(--dsw-alias-border-inverted);
-  border-radius: 16px;
-  background: var(--dsw-specific-menu);
-  box-shadow: 0 18px 44px rgba(0, 0, 0, .34), 0 2px 8px rgba(0, 0, 0, .18);
-  overflow: hidden;
-}
-
-.menuRoot [role="menuitem"] {
-  min-height: 40px;
-  padding: 8px 10px;
-  border-radius: 10px;
-  gap: 10px;
-  font-size: 14px;
-  line-height: 20px;
-}
-
-.menuRoot [role="menuitem"]:focus-visible {
-  outline: 2px solid var(--dsw-alias-state-focus, currentColor);
-  outline-offset: -2px;
-}
-
-.menuRoot [role="separator"] {
-  margin: 7px 4px;
-  background: var(--dsw-alias-border-l2);
-}
+/* The dropdown card itself is portal-rendered by the Menu primitive and keeps
+   the design-system menu styling untouched; only the anchor seat and trigger
+   are styled here. */
 
 /* Keep the inline menu anchor's footer seat explicit. Without this, the
    collapsed sidebar's auto-sized footer can shrink the trigger's 100%-wide
@@ -57,10 +29,10 @@
   gap: 8px;
   width: 100%;
   min-width: 0;
-  height: 40px;
-  padding: 4px 8px;
+  height: 36px;
+  padding: 0 8px;
   border: none;
-  border-radius: 14px;
+  border-radius: 10px;
   background: transparent;
   color: var(--dsw-alias-label-primary);
   cursor: pointer;
@@ -103,6 +75,23 @@
   line-height: 1;
 }
 
+/* Wide (expanded sidebar) trigger is a flat single-line row: a small round
+   initial for the signed-in account, bare monochrome glyphs otherwise. The
+   rail keeps the chip look below. */
+.trigger:not(.rail) .avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 11px;
+}
+
+.trigger:not(.rail) .providerAvatar,
+.trigger:not(.rail) .guestAvatar {
+  background: transparent;
+  box-shadow: none;
+  color: var(--dsw-alias-label-secondary);
+}
+
 .accountAvatar {
   background: var(--dsw-alias-accent-fill, #2f7cf6);
   color: var(--dsw-alias-label-on-color, white);
@@ -120,43 +109,16 @@
   color: var(--dsw-alias-label-secondary);
 }
 
-.copy {
+.primary {
   flex: 1;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.primary,
-.secondary {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.primary {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
-  line-height: 20px;
+  line-height: 18px;
   color: var(--dsw-alias-label-primary);
-}
-
-.secondary {
-  font-size: 11px;
-  line-height: 15px;
-  color: var(--dsw-alias-label-tertiary);
-}
-
-.chevron {
-  flex: none;
-  color: var(--dsw-alias-label-tertiary);
-  transform: translateY(1px);
-  transition: transform 140ms var(--ds-ease-in-out);
-}
-
-.trigger[aria-expanded='true'] .chevron {
-  transform: translateY(1px) rotate(180deg);
 }
 
 .trigger.rail {
@@ -434,8 +396,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .trigger,
-  .chevron {
+  .trigger {
     transition: none;
   }
 }
