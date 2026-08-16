@@ -4,8 +4,8 @@
  * `prefers-color-scheme`, and publishes immutable snapshots; it never touches
  * the DOM — ui-layout's presenter consumes the resolved snapshot. The Host
  * settings scope loads and stores the preference in the user-settings
- * document. The plugin also registers the Appearance preference row into the
- * settings General section — the theme feature owns its own settings surface.
+ * document. The plugin also registers the Appearance settings section — the
+ * theme feature owns its own settings surface.
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { BoundActions } from '@deepseek-ai/dsh-client-ui-slots'
@@ -15,23 +15,24 @@ import type { ClientContext, SettingsScope } from '@deepseek-ai/dsh-client-runti
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
-import type { AppearanceRowInjected } from './AppearanceRow.tsx'
-import { AppearanceRow } from './AppearanceRow.tsx'
-import { createAppearanceRowStore } from './settings-store.ts'
+import type { AppearanceSectionInjected } from './AppearanceSection.tsx'
+import { AppearanceSection } from './AppearanceSection.tsx'
+import { createAppearanceSectionStore } from './settings-store.ts'
 import { en, zh, type ThemeKey } from './locales.ts'
 import {
   isLogoPreference, readLogoPreference, writeLogoPreference, type LogoPreference,
 } from './logo-settings.ts'
 import {
-  DEFAULT_PREFERENCE, isThemePreference, THEME_PREFERENCE_FIELD, THEME_SETTINGS_NAMESPACE,
-  type ThemePreference, type ThemeSettings,
+  DEFAULT_MESSAGE_FONT_SIZE, DEFAULT_PREFERENCE, isMessageFontSize, isThemePreference,
+  MESSAGE_FONT_SIZE_FIELD, THEME_PREFERENCE_FIELD, THEME_SETTINGS_NAMESPACE,
+  type MessageFontSize, type ThemePreference, type ThemeSettings,
 } from '../theme-settings.ts'
 
-export type { AppearanceRowComponentProps, AppearanceRowInjected } from './AppearanceRow.tsx'
-export type { AppearanceRowState } from './settings-store.ts'
+export type { AppearanceSectionComponentProps, AppearanceSectionInjected } from './AppearanceSection.tsx'
+export type { AppearanceSectionState } from './settings-store.ts'
 export type { ThemeKey } from './locales.ts'
 export type { LogoPreference } from './logo-settings.ts'
-export type { ThemePreference, ThemeSettings } from '../theme-settings.ts'
+export type { MessageFontSize, ThemePreference, ThemeSettings } from '../theme-settings.ts'
 
 /** Namespace owning this feature's settings-row copy. */
 export const SETTINGS_NS = 'settings.theme'
@@ -80,6 +81,8 @@ export interface ThemeSnapshot {
   preference: ThemePreference
   /** Persisted sidebar logo style. */
   logoPreference: LogoPreference
+  /** Conversation message-list font size in pixels. */
+  messageFontSize: MessageFontSize
   /**
    * The resolved active theme (`system` resolved via prefers-color-scheme)
    * with override layers folded into its tokens (seq order, later layers win
@@ -159,6 +162,7 @@ export class ThemeRuntime {
   private themes: ThemeDefinition[] = [...BUILTIN_THEMES]
   private preference: ThemePreference
   private logoPreference: LogoPreference
+  private messageFontSize: MessageFontSize
   private revision = 0
   private snapshot: ThemeSnapshot
   private readonly media: MediaQueryList | undefined
@@ -176,6 +180,7 @@ export class ThemeRuntime {
     this.host = host
     this.preference = DEFAULT_PREFERENCE
     this.logoPreference = readLogoPreference()
+    this.messageFontSize = DEFAULT_MESSAGE_FONT_SIZE
     // Non-browser runs (node e2e booting the client tree) have no matchMedia.
     this.media = typeof matchMedia === 'undefined' ? undefined : matchMedia('(prefers-color-scheme: dark)')
     this.snapshot = this.buildSnapshot()
@@ -246,12 +251,29 @@ export class ThemeRuntime {
     this.publish()
   }
 
-  /** Adopt the Host-backed color preference without touching device-local logo state. */
+  /** Switch the conversation message-list font size and persist the choice. */
+  setMessageFontSize(size: string): void {
+    if (!isMessageFontSize(size)) throw new Error(`message font size "${size}" is not supported`)
+    if (this.messageFontSize === size) return
+    this.messageFontSize = size
+    void this.host.set(MESSAGE_FONT_SIZE_FIELD, size)
+    this.publish()
+  }
+
+  /** Adopt the Host-backed appearance preferences without touching device-local logo state. */
   private adopt(): void {
     const section = this.host.getSnapshot().value
-    if (section === undefined || this.preference === section.preference) return
-    this.preference = section.preference
-    this.publish()
+    if (section === undefined) return
+    let changed = false
+    if (this.preference !== section.preference) {
+      this.preference = section.preference
+      changed = true
+    }
+    if (this.messageFontSize !== section.messageFontSize) {
+      this.messageFontSize = section.messageFontSize
+      changed = true
+    }
+    if (changed) this.publish()
   }
 
   /**
@@ -318,6 +340,7 @@ export class ThemeRuntime {
     return Object.freeze({
       preference: this.preference,
       logoPreference: this.logoPreference,
+      messageFontSize: this.messageFontSize,
       active: this.composeActive(active),
       themes: Object.freeze([...this.themes]),
       revision: this.revision,
@@ -388,15 +411,14 @@ function dynamicToken(name: string): ThemeTokenInspection {
 
 /**
  * Required services: settings transport plus slots/locale for the Appearance
- * row. `remote` carries the forwarded settings invalidation that
+ * section. `remote` carries the forwarded settings invalidation that
  * `bindSettingsScope` subscribes to on this context.
  */
 export const inject = ['slots', 'locale', 'connection', 'remote', 'settingsScope']
 
 /**
  * Client plugin body: provide the theme service and register the
- * feature-owned Appearance preference row into the General section's item
- * slot (a feature owns its settings surface).
+ * feature-owned Appearance settings section (a feature owns its surface).
  * @param ctx - client cordis context.
  */
 export function apply(ctx: ClientContext): void {
@@ -406,13 +428,19 @@ export function apply(ctx: ClientContext): void {
 
   ctx.effect(() => ctx.locale.register(SETTINGS_NS, { zh, en }), 'ui-theme: settings row dictionaries')
 
-  const store = createAppearanceRowStore()
+  const store = createAppearanceSectionStore()
   let bound: BoundActions<typeof store> | undefined
   const sync = (snapshot: ThemeSnapshot): void => {
-    bound?.sync(snapshot.preference, snapshot.active.colorScheme, snapshot.logoPreference, snapshot.revision)
+    bound?.sync(
+      snapshot.preference,
+      snapshot.active.colorScheme,
+      snapshot.logoPreference,
+      snapshot.messageFontSize,
+      snapshot.revision,
+    )
   }
   ctx.on('theme/change', sync)
-  const injected = (actions: BoundActions<typeof store>): AppearanceRowInjected => {
+  const injected = (actions: BoundActions<typeof store>): AppearanceSectionInjected => {
     bound = actions
     // Re-sync from the getter so no event is lost between registration and
     // first render (the store's revision guard drops stale duplicates).
@@ -420,14 +448,17 @@ export function apply(ctx: ClientContext): void {
     return {
       setTheme: (id) => { theme.setTheme(id) },
       setLogo: (id) => { theme.setLogo(id) },
+      setMessageFontSize: (size) => { theme.setMessageFontSize(size) },
     }
   }
-  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
-    name: 'settings.general.item',
+  const t = ctx.locale.bind(SETTINGS_NS)
+  ctx.slots.inject('settings.section', () => ctx.slots.register({
+    name: 'settings.section',
     id: 'appearance',
-    order: 10,
-    store,
+    order: 5,
+    label: () => t('nav'),
     locale: SETTINGS_NS,
+    store,
     inject: injected,
-  }, AppearanceRow))
+  }, AppearanceSection))
 }

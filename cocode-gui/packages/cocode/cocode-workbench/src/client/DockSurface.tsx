@@ -3,6 +3,7 @@ import { Menu, Tooltip, type MenuEntry } from "@deepseek-ai/dsh-client-ui-primit
 import type { WorkbenchController } from "./controller.ts"
 import type { WorkbenchDock, WorkbenchPanelDescriptor, WorkbenchPanelInstance, WorkbenchPanelProps, WorkbenchSplitNode } from "./model.ts"
 import { bindWorkbenchCwd } from "./runtime-api.ts"
+import { t } from "./locales.ts"
 import css from "./workbench.module.css"
 import { CloseIcon, FileGlyph, fileTypeIcon, PanelBottomIcon, PanelRightIcon, PlusIcon } from "./icons.tsx"
 
@@ -68,16 +69,27 @@ function panelMenuItems(snapshot: ReturnType<WorkbenchController["snapshot"]>) {
   }))
 }
 
+/**
+ * 空 pane 是邀请，不是缺失：这里按设计系统的 conversation-welcome 语言排布
+ * （标题 + 一句说明 + 芯片网格），而不是面板内部那种虚线空态卡片——后者表示
+ * “本该有内容却没有”，会和“请挑一个面板”混为一谈。
+ */
 function EmptyDock(props: {
   catalog: readonly WorkbenchPanelDescriptor[]
   onOpen: (id: string) => void
 }) {
   return <div className={css.emptyDock}>
-    <div className={css.emptyCards}>
-      {props.catalog.map(candidate => <button key={candidate.id} type="button" className={css.emptyCard} onClick={() => props.onOpen(candidate.id)}>
-        <span className={css.emptyCardIcon}>{panelIcon(candidate)}</span>
-        <span>{panelTitle(candidate)}</span>
-      </button>)}
+    <div className={css.emptyBlock}>
+      <div className={css.emptyCopy}>
+        <p className={css.emptyTitle}>{t("dock.emptyTitle")}</p>
+        <p className={css.emptyHint}>{t("dock.emptyHint")}</p>
+      </div>
+      <div className={css.emptyCards}>
+        {props.catalog.map(candidate => <button key={candidate.id} type="button" className={css.emptyCard} onClick={() => props.onOpen(candidate.id)}>
+          <span className={css.emptyCardIcon}>{panelIcon(candidate)}</span>
+          <span className={css.emptyCardLabel}>{panelTitle(candidate)}</span>
+        </button>)}
+      </div>
     </div>
   </div>
 }

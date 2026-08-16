@@ -23,8 +23,8 @@
   border-radius: var(--ds-radius);
   /* 44px single-line bubble: 24 line + 10 vertical padding each side. */
   padding: 10px 16px;
-  font-size: 16px;
-  line-height: 24px;
+  font-size: var(--dsw-conversation-message-font-size, 16px);
+  line-height: calc(var(--dsw-conversation-message-font-size, 16px) * 1.5);
   color: var(--dsw-alias-label-primary);
 }
 

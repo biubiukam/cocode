@@ -47,9 +47,15 @@
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
+/* Dock tab 活跃态用整块圆角底：tab 宽度随可用空间伸缩，还会进入紧凑模式，
+   底部指示条在窄 tab 上读不出来；铺满的圆角矩形窄到 min-width 也认得出。
+   底色保持中性——这一栏里的蓝色已经指派给拖放插入线和未读圆点，活跃 tab
+   再铺蓝底就会淹掉那两个信号。与 hover 共用同一个中性底，靠文字色和字重
+   区分选中，和侧栏 nav-link 的当前项同一套语言。 */
 .tab[data-active] {
   color: var(--dsw-alias-label-primary);
-  background: var(--dsw-alias-interactive-bg-active);
+  background: var(--dsw-alias-fill-l2);
+  font-weight: 600;
 }
 
 /* 紧凑模式：tab 被压窄后彼此贴近，用一条竖线把相邻 tab 分开。
@@ -153,13 +159,14 @@
   text-align: left;
 }
 
+/* 图标跟随标签自身的色阶：非活跃 label-secondary，活跃 label-primary。 */
 .tabIcon {
   display: grid;
   width: 16px;
   height: 16px;
   flex: none;
   place-items: center;
-  color: var(--dsw-alias-label-tertiary);
+  color: inherit;
 }
 
 .tabLabel {
@@ -349,17 +356,6 @@
   pointer-events: none;
 }
 
-.paneEmptyLabel {
-  min-width: 0;
-  flex: 1;
-  padding-left: 12px;
-  overflow: hidden;
-  color: var(--dsw-alias-label-tertiary);
-  font: var(--dsw-font-xxxs-11);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .paneBody {
   position: relative;
   min-width: 0;
@@ -477,54 +473,127 @@
   font-size: 12px;
 }
 
+/* 空 pane：邀请式空态。整块居中，pane 被压矮时降级为滚动而不是裁掉内容。 */
 .emptyDock {
   display: grid;
   align-content: center;
   justify-items: center;
   min-height: 100%;
   padding: 24px 16px;
-  color: var(--dsw-alias-label-secondary);
+  overflow: auto;
+  scrollbar-width: none;
 }
 
+.emptyDock::-webkit-scrollbar { display: none; }
+
+.emptyBlock {
+  display: grid;
+  gap: 16px;
+  width: min(100%, 400px);
+  justify-items: center;
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .emptyBlock {
+    animation: emptyEnter 420ms cubic-bezier(.22, 1, .36, 1) both;
+  }
+}
+
+@keyframes emptyEnter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 7px, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.emptyCopy {
+  display: grid;
+  gap: 5px;
+}
+
+.emptyTitle {
+  margin: 0;
+  color: var(--dsw-alias-label-primary);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.emptyHint {
+  max-width: 300px;
+  margin: 0;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+/* auto-fit：右侧 dock 拖窄到一列宽度放不下时自动塌成单列。 */
 .emptyCards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(116px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(124px, 1fr));
   gap: 8px;
-  width: min(100%, 360px);
+  width: 100%;
 }
 
 .emptyCard {
   display: flex;
-  min-height: 58px;
+  min-height: 36px;
   align-items: center;
   gap: 8px;
-  padding: 0 10px;
-  border: 1px solid var(--dsw-alias-border-l1);
-  border-radius: 7px;
-  color: var(--dsw-alias-label-secondary);
-  background: var(--dsw-alias-bg-layer-1);
-  font: var(--dsw-font-xxs-12);
+  padding: 8px 10px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--ds-radius-sm);
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-fill-l2);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
   text-align: left;
   cursor: pointer;
-  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
+  transition: background var(--ds-transition-fast), border-color var(--ds-transition-fast), color var(--ds-transition-fast), transform var(--ds-transition-fast);
 }
 
+/* hover 把 accent 混进芯片自身底色，而不是换成不透明的 accent-soft：后者在暗色
+   主题下比静止态更暗，hover 会“沉下去”；混色则两套主题都朝 accent 方向提亮。 */
 .emptyCard:hover {
-  border-color: var(--dsw-alias-border-l2);
-  color: var(--dsw-alias-label-primary);
-  background: var(--dsw-alias-interactive-bg-hover);
-  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--dsw-alias-state-business-primary) 22%, var(--dsw-alias-border-l2));
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 12%, var(--dsw-alias-fill-l2));
+}
+
+.emptyCard:hover .emptyCardIcon {
+  color: var(--dsw-alias-label-primary-bluish);
 }
 
 .emptyCard:active { transform: scale(0.98); }
 
+.emptyCard:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 2px;
+}
+
 .emptyCardIcon {
   display: grid;
-  width: 20px;
-  height: 20px;
+  width: 15px;
+  height: 15px;
   flex: none;
   place-items: center;
-  color: var(--dsw-alias-brand-primary);
+  color: var(--dsw-alias-label-tertiary);
+  transition: color var(--ds-transition-fast);
+}
+
+.emptyCardLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .empty button {

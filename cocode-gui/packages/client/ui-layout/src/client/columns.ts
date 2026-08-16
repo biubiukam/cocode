@@ -42,8 +42,6 @@ export const DETAILS_MAX = 520
 export const DETAILS_DEFAULT = 360
 /** Workbench right-dock drag clamp floor. */
 export const WORKBENCH_MIN = 300
-/** Workbench right-dock drag clamp ceiling. */
-export const WORKBENCH_MAX = 560
 /** Workbench right-dock initial width. */
 export const WORKBENCH_DEFAULT = 360
 /** Workbench bottom-dock drag clamp floor. */
@@ -64,6 +62,11 @@ export function clampWidth(px: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, Math.round(px)))
 }
 
+/** Clamp a panel width to a minimum only (no upper bound — viewport solver caps rendered width). */
+export function clampMin(px: number, min: number): number {
+  return Math.max(min, Math.round(px))
+}
+
 /**
  * Solve the three column widths for one viewport frame. Pure: no hysteresis —
  * the output is a function of (viewport, preferences) only, so recovery on
@@ -79,7 +82,7 @@ export function computeColumns(viewport: number, sidebar: number, details: numbe
   // The sidebar is fixed at its preference (or the rail) — it never concedes.
   const s = sidebar === 0 ? SIDEBAR_COLLAPSED : clampWidth(sidebar, SIDEBAR_MIN, SIDEBAR_MAX)
   const d0 = details === 0 ? 0 : clampWidth(details, DETAILS_MIN, DETAILS_MAX)
-  const w0 = workbench === 0 ? 0 : clampWidth(workbench, WORKBENCH_MIN, WORKBENCH_MAX)
+  const w0 = workbench === 0 ? 0 : clampMin(workbench, WORKBENCH_MIN)
 
   // Step 1: everything fits at preferred widths.
   if (s + w0 + d0 + CENTER_MIN <= viewport) {

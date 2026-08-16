@@ -78,8 +78,12 @@
 }
 
 .accountAvatar {
-  background: var(--dsw-alias-button-primary-fill);
-  color: var(--dsw-alias-brand-primary-invert);
+  /* Avoid button-primary-fill: in dark mode it resolves to near-white and
+     reads too bright against the sidebar footer. A recessed plate with a
+     light accent tint keeps the initial legible without a glare spot. */
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 12%, var(--dsw-alias-bg-layer-2));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--dsw-alias-state-business-primary) 20%, var(--dsw-alias-border-l2));
+  color: var(--dsw-alias-label-primary);
 }
 
 .providerAvatar {

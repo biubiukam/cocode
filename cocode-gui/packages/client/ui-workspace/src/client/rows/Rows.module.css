@@ -144,8 +144,11 @@
   white-space: nowrap;
 }
 
+/* Expanded group holding the current session: the accent is reserved for links,
+   focus and attention (design system §11), so the active group reads through
+   contrast — the folder glyph steps up from tertiary to the primary label. */
 .folderActive {
-  color: var(--dsw-alias-state-business-primary);
+  color: var(--dsw-alias-label-primary);
 }
 
 
