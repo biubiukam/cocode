@@ -1,4 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis'
+import type { SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import { NS } from '../locales.ts'
 import { AssistantNodeView } from './AssistantNodeView.tsx'
 import { CommandNodeView, ManualCompactionNodeView } from './CommandNodeView.tsx'
@@ -6,19 +7,24 @@ import {
   CompactionNodeView, ContextMessageNodeView, RetryNodeView, TurnErrorNodeView,
   TurnMaxTokensNodeView, UnknownNodeView, UserMessageNodeView,
 } from './MessageItem.tsx'
+import type { ContextMessageNodeInjected } from './MessageItem.tsx'
 import { TurnTailNodeView } from './TurnTailNodeView.tsx'
 
 /**
  * Register this package's business renderers behind the keyed Chat Node seat.
  * @param ctx - owning UI Conversation context.
  */
-export function registerChatNodeRenderers(ctx: Context): void {
+export function registerChatNodeRenderers(ctx: Context, debugMode: SnapshotStore<boolean>): void {
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register(
     { name: 'conversation.chat.node', key: 'user', locale: NS }, UserMessageNodeView))
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register(
     { name: 'conversation.chat.node', key: 'steering', locale: NS }, UserMessageNodeView))
-  ctx.slots.inject('conversation.chat.node', () => ctx.slots.register(
-    { name: 'conversation.chat.node', key: 'context', locale: NS }, ContextMessageNodeView))
+  ctx.slots.inject('conversation.chat.node', () => ctx.slots.register({
+    name: 'conversation.chat.node',
+    key: 'context',
+    locale: NS,
+    inject: (): ContextMessageNodeInjected => ({ hooks: { debugMode } }),
+  }, ContextMessageNodeView))
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register(
     { name: 'conversation.chat.node', key: 'assistant-step', locale: NS }, AssistantNodeView))
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register({
