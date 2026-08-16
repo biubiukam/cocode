@@ -3,7 +3,9 @@
 import {
   connectJsonRpc,
   createHostSupervisorClient,
+  fingerprint,
   type HostLease,
+  type HostRuntimeEnv,
   type HostScope,
   type JsonRpcPeer,
 } from '@cocode/host-supervisor'
@@ -74,6 +76,7 @@ class SdkTuiRuntime implements TuiRuntime {
         clientKind: 'standalone-tui',
         requiredServices: ['jsonrpc'],
         minProtocolRevision: '1.0',
+        runtimeEnv: resolveHostRuntimeEnv(this.launch.env ?? process.env),
       })
       this.lease = lease
       const endpoint = lease.descriptor.services.find((service) => service.service === 'jsonrpc')
@@ -522,13 +525,25 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function resolveHostScope(launch: TuiLaunch): HostScope {
+export function resolveHostRuntimeEnv(env: NodeJS.ProcessEnv): HostRuntimeEnv {
+  const providers = env.COCODE_LLM_PROVIDERS?.trim()
+  return providers === undefined || providers === ''
+    ? {}
+    : { COCODE_LLM_PROVIDERS: providers }
+}
+
+export function resolveHostScope(launch: TuiLaunch): HostScope {
   const env = launch.env ?? process.env
   const configuredHome = env.DSH_HOME?.trim()
+  const baseFingerprint = env.COCODE_HOST_CONFIG_FINGERPRINT?.trim() || 'cocode-web-jsonrpc-v1'
+  const runtimeEnv = resolveHostRuntimeEnv(env)
   return {
     dshHome: resolve(configuredHome || `${homedir()}/.dsh`),
     profile: env.DSH_PROFILE?.trim() || 'web',
-    hostConfigFingerprint: env.COCODE_HOST_CONFIG_FINGERPRINT?.trim() || 'cocode-web-jsonrpc-v1',
+    hostConfigFingerprint:
+      Object.keys(runtimeEnv).length === 0
+        ? baseFingerprint
+        : `${baseFingerprint}:${fingerprint(runtimeEnv)}`,
     runtimeChannel: env.COCODE_RUNTIME_CHANNEL === 'preview' || env.COCODE_RUNTIME_CHANNEL === 'dev'
       ? env.COCODE_RUNTIME_CHANNEL
       : 'stable',

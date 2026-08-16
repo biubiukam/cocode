@@ -2500,6 +2500,9 @@ class TuiAppImpl implements TuiApp {
       notice: (message) => {
         this.notice = { tone: 'info', message }
       },
+      fail: (message) => {
+        this.notice = { tone: 'error', message: redactSecrets(message) }
+      },
       emit: () => this.scheduleEmit(),
     })
   }

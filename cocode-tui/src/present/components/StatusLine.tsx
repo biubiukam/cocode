@@ -3,20 +3,17 @@ import type { TuiSnapshot } from '../../runtime/app.ts'
 import { AgentStatusIndicator } from './AgentStatusIndicator.tsx'
 import { theme } from '../theme.ts'
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
-import { formatNoticeLine } from '../status-format.ts'
+import stringWidth from 'string-width'
 
-const NOTICE_MAX_LINES = 12
+export function noticeLines(message: string): string[] {
+  return message.split('\n')
+}
 
-export function noticeLines(message: string, maxLines = NOTICE_MAX_LINES): string[] {
-  const limit = Number.isFinite(maxLines)
-    ? Math.max(1, Math.floor(maxLines))
-    : NOTICE_MAX_LINES
-  const lines = message.split('\n')
-  if (lines.length <= limit) return lines
-  return [
-    ...lines.slice(0, limit - 1),
-    `… (${String(lines.length - limit + 1)} more lines)`,
-  ]
+export function noticeRows(message: string, maxColumns = 80): number {
+  const columns = Math.max(1, Math.trunc(maxColumns))
+  return noticeLines(message).reduce((rows, line) => {
+    return rows + Math.max(1, Math.ceil((2 + stringWidth(line)) / columns))
+  }, 0)
 }
 
 export function StatusLine(props: {
@@ -24,7 +21,6 @@ export function StatusLine(props: {
   agent: TuiSnapshot['agent']
   notice?: TuiSnapshot['notice']
   locale: UiLocale
-  maxColumns?: number
 }) {
   const notice = props.notice
   const telemetry = props.status.telemetry
@@ -111,7 +107,7 @@ export function StatusLine(props: {
           {telemetryBits.join(' · ')}
         </Text>
       ) : null}
-      {notice ? <Notice notice={notice} maxColumns={props.maxColumns} /> : null}
+      {notice ? <Notice notice={notice} /> : null}
     </Box>
   )
 }
@@ -122,13 +118,16 @@ function formatMetric(value: number): string {
 
 function Notice(props: {
   notice: NonNullable<TuiSnapshot['notice']>
-  maxColumns?: number
 }) {
   const color = props.notice.tone === 'error' ? theme.error : theme.info
-  const compact = formatNoticeLine(props.notice, props.maxColumns ?? 80)
+  const mark = props.notice.tone === 'error' ? '!' : '·'
   return (
-    <Text color={color} wrap="truncate-end">
-      {compact}
-    </Text>
+    <Box flexDirection="column">
+      {noticeLines(props.notice.message).map((line, index) => (
+        <Text key={`${String(index)}:${line}`} color={color}>
+          {index === 0 ? `${mark} ` : '  '}{line}
+        </Text>
+      ))}
+    </Box>
   )
 }

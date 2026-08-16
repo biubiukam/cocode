@@ -2,6 +2,7 @@
   "plugins": [
     "cocode-account",
     "cocode-shortcuts",
-    "cocode-sidebar"
+    "cocode-sidebar",
+    "cocode-vision"
   ]
 }

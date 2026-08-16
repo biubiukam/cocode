@@ -129,4 +129,22 @@ describe('cocode vision bridge', () => {
       { type: 'image', attachment },
     ])
   })
+
+  it('removes the native image block after producing evidence for a text-only model', async () => {
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify({ choices: [{ message: { content: 'visible text' } }] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    ))
+    const service = createVisionService(context(), {
+      provider: 'user',
+      user: { endpoint: 'https://vision.example/v1/chat/completions', model: 'vision-model' },
+    })
+
+    await expect(service.prepareBlocks(
+      [{ type: 'image', attachment }],
+      { preserveImages: false },
+    )).resolves.toEqual([{ type: 'text', text: '[Image evidence]\nvisible text' }])
+  })
 })

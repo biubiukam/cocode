@@ -3,7 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
 var SUPERVISOR_PROTOCOL_REVISION = "1.0";
-var SUPERVISOR_BUILD_REVISION = "runtime-plugin-resolution-v2";
+var SUPERVISOR_BUILD_REVISION = "runtime-lifecycle-v4";
 var HOST_PROTOCOL_REVISION = "1.0";
 var LEASE_TTL_MS = 3e4;
 function canonicalizeScope(scope) {
@@ -54,6 +54,9 @@ import { join, resolve as resolve2 } from "node:path";
 function supervisorHome() {
   return resolve2(process.env.COCODE_SUPERVISOR_HOME?.trim() || join(homedir2(), ".cocode", "host-supervisor"));
 }
+function runtimeHome() {
+  return resolve2(process.env.COCODE_HOST_RUNTIME_HOME?.trim() || join(homedir2(), ".cocode", "host-runtimes"));
+}
 function scopeDirectory(scope) {
   return join(supervisorHome(), hostKey(scope));
 }
@@ -66,11 +69,14 @@ function scopePath(directory) {
 function leaseDirectory(directory) {
   return join(directory, "leases");
 }
+function runtimeSlotDirectory(scope, runtimeVersion) {
+  return join(runtimeHome(), `${hostKey(scope)}-${runtimeVersion}`);
+}
 
 // packages/host-supervisor/src/ipc.ts
 import net from "node:net";
 function openLineConnection(endpoint) {
-  return new Promise((resolve3, reject) => {
+  return new Promise((resolve4, reject) => {
     const socket = net.createConnection(endpoint);
     const peer = new LinePeer(socket, socket);
     const onError = (error) => {
@@ -80,7 +86,7 @@ function openLineConnection(endpoint) {
     socket.once("error", onError);
     socket.once("connect", () => {
       socket.off("error", onError);
-      resolve3(peer);
+      resolve4(peer);
     });
   });
 }
@@ -104,14 +110,14 @@ var LinePeer = class {
   request(method, params = {}, timeoutMs = 3e4) {
     if (this.closed) return Promise.reject(new Error("IPC connection is closed"));
     const id = this.nextId++;
-    return new Promise((resolve3, reject) => {
+    return new Promise((resolve4, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);
         reject(new Error(`RPC request timed out: ${method}`));
       }, timeoutMs);
       this.pending.set(id, { resolve: (value) => {
         clearTimeout(timer);
-        resolve3(value);
+        resolve4(value);
       }, reject: (error) => {
         clearTimeout(timer);
         reject(error);
@@ -170,6 +176,14 @@ var LinePeer = class {
 };
 
 // packages/host-supervisor/src/client.ts
+function canReuseOlderSupervisor(request, doctor) {
+  if ((doctor.leaseCount ?? 0) <= 0) return false;
+  return doctor.descriptor !== void 0 && doctor.descriptor !== null && isHostDescriptorCompatible(
+    doctor.descriptor,
+    request.scope,
+    request
+  );
+}
 var LocalHostSupervisorClient = class {
   constructor(options = {}) {
     this.options = options;
@@ -181,7 +195,7 @@ var LocalHostSupervisorClient = class {
     const directory = scopeDirectory(scope);
     mkdirSync(directory, { recursive: true, mode: 448 });
     writeFileSync(scopePath(directory), JSON.stringify(scope) + "\n", { mode: 384 });
-    const peer = await this.connectOrStart(directory);
+    const peer = await this.connectOrStart(directory, request);
     let result;
     try {
       result = await peer.request("acquire", {
@@ -254,7 +268,7 @@ var LocalHostSupervisorClient = class {
     }
     throw new Error(`unknown lease: ${leaseId2}`);
   }
-  async connectOrStart(directory) {
+  async connectOrStart(directory, request) {
     const endpoint = endpointFor(directory);
     let existing;
     try {
@@ -265,6 +279,7 @@ var LocalHostSupervisorClient = class {
       try {
         const doctor = await existing.request("doctor");
         if (doctor.supervisorBuildRevision === SUPERVISOR_BUILD_REVISION) return existing;
+        if (canReuseOlderSupervisor(request, doctor)) return existing;
         existing.close();
         if ((doctor.leaseCount ?? 0) > 0) {
           throw new Error("Host Supervisor is running an older build while active clients still hold leases; release them before upgrading.");
@@ -290,7 +305,7 @@ var LocalHostSupervisorClient = class {
         return await openLineConnection(endpoint);
       } catch (error) {
         lastError = error;
-        await new Promise((resolve3) => setTimeout(resolve3, 100));
+        await new Promise((resolve4) => setTimeout(resolve4, 100));
       }
     }
     throw new Error(`Host Supervisor did not become ready: ${String(lastError)}`);
@@ -307,7 +322,7 @@ async function terminateProcess(pid, label) {
     if (error.code !== "ESRCH") throw new Error(`Unable to stop stale ${label} (${pid}): ${String(error)}`);
   }
   const deadline = Date.now() + 2e3;
-  while (Date.now() < deadline && isProcessAlive(pid)) await new Promise((resolve3) => setTimeout(resolve3, 100));
+  while (Date.now() < deadline && isProcessAlive(pid)) await new Promise((resolve4) => setTimeout(resolve4, 100));
   if (isProcessAlive(pid)) throw new Error(`Stale ${label} (${pid}) did not exit after SIGTERM.`);
 }
 function isProcessAlive(pid) {
@@ -330,7 +345,87 @@ function resolveNodeExecutable() {
   return process.execPath.includes("Electron") || process.execPath.endsWith("electron") ? "node" : process.execPath;
 }
 
+// packages/host-supervisor/src/lifecycle.ts
+function isLeaseActive(record, now, processAlive) {
+  return Date.parse(record.expiresAt) > now && processAlive(record.pid);
+}
+
 // packages/host-supervisor/src/runtime.ts
+import { createRequire } from "node:module";
+import { chmodSync, cpSync, existsSync as existsSync2, mkdirSync as mkdirSync2, readFileSync, readdirSync as readdirSync2, realpathSync, rmSync, writeFileSync as writeFileSync2 } from "node:fs";
+import { basename, dirname, join as join3, resolve as resolve3 } from "node:path";
+import { pathToFileURL } from "node:url";
+function mergeHostRuntimeEnv(baseEnv, runtimeEnv, dshHome) {
+  return {
+    ...baseEnv,
+    ...runtimeEnv ?? {},
+    DSH_HOME: dshHome
+  };
+}
+function resolveDshPackage() {
+  const require2 = createRequire(import.meta.url);
+  const entry = require2.resolve("@deepseek-ai/dsh/lib/bin.js");
+  let root = dirname(entry);
+  while (root !== dirname(root) && !existsSync2(join3(root, "package.json"))) root = dirname(root);
+  const manifest = JSON.parse(readFileSync(join3(root, "package.json"), "utf8"));
+  const buildId = typeof manifest.buildId === "string" ? manifest.buildId : typeof manifest.gitHead === "string" ? manifest.gitHead : process.env.COCODE_DSH_BUILD_ID?.trim() || void 0;
+  return { root, entry, version: String(manifest.version), ...buildId === void 0 ? {} : { buildId } };
+}
+function prepareRuntimeSlot(scope, jsonRpcEndpoint, pluginPath) {
+  const dsh = resolveDshPackage();
+  const slot = runtimeSlotDirectory(scope, dsh.version);
+  const entry = join3(slot, "node_modules", "@deepseek-ai", "dsh", "lib", "bin.js");
+  const pluginRoot = resolve3(dirname(pluginPath), "../../../runtime/plugins");
+  const pluginSources = existsSync2(pluginRoot) ? readdirSync2(pluginRoot, { withFileTypes: true }).filter((item) => item.isDirectory()).map((item) => join3(pluginRoot, item.name)) : [];
+  if (!existsSync2(entry)) {
+    rmSync(slot, { recursive: true, force: true });
+    mkdirSync2(join3(slot, "node_modules", "@deepseek-ai"), { recursive: true });
+    copyPackageClosure(dsh.root, slot, pluginSources);
+    mkdirSync2(slot, { recursive: true });
+    writeFileSync2(join3(slot, "package.json"), JSON.stringify({ type: "module", private: true }) + "\n");
+  }
+  const pluginTarget = join3(slot, "cocode-host-jsonrpc-plugin.mjs");
+  cpSync(pluginPath, pluginTarget);
+  const pluginEntries = [];
+  if (existsSync2(pluginRoot)) {
+    for (const entry2 of readdirSync2(pluginRoot, { withFileTypes: true })) {
+      if (!entry2.isDirectory()) continue;
+      const source = join3(pluginRoot, entry2.name);
+      const target = join3(slot, "node_modules", ...entry2.name.split("/"));
+      mkdirSync2(dirname(target), { recursive: true });
+      cpSync(source, target, { recursive: true, dereference: true });
+      pluginEntries.push({ name: entry2.name, entry: join3(target, "lib", "index.js") });
+    }
+  }
+  registerRuntimePluginsInDshManifest(slot, pluginEntries);
+  restoreNodePtyHelper(slot);
+  const patch = join3(slot, "cocode-host.patch.yml");
+  const rows = createRuntimePatch(pathToFileURL(pluginTarget).href, jsonRpcEndpoint, pluginEntries);
+  writeFileSync2(patch, rows);
+  writeFileSync2(join3(slot, "active.json"), `${JSON.stringify({
+    schemaVersion: 1,
+    hostKey: hostKey(scope),
+    runtimeVersion: dsh.version,
+    ...dsh.buildId === void 0 ? {} : { buildId: dsh.buildId },
+    runtimeChannel: scope.runtimeChannel,
+    hostConfigFingerprint: scope.hostConfigFingerprint,
+    jsonRpcEndpoint,
+    plugins: pluginEntries
+  }, null, 2)}
+`);
+  return { root: slot, entry, version: dsh.version, ...dsh.buildId === void 0 ? {} : { buildId: dsh.buildId }, patch, jsonRpcEndpoint };
+}
+function registerRuntimePluginsInDshManifest(slot, pluginEntries) {
+  const manifestPath = join3(slot, "node_modules", "@deepseek-ai", "dsh", "package.json");
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  const pluginManifests = pluginEntries.map(({ name }) => {
+    const pluginManifestPath = join3(slot, "node_modules", ...name.split("/"), "package.json");
+    return JSON.parse(readFileSync(pluginManifestPath, "utf8"));
+  });
+  const next = addRuntimePluginDependencies(manifest, pluginManifests);
+  writeFileSync2(manifestPath, `${JSON.stringify(next, null, 2)}
+`);
+}
 function addRuntimePluginDependencies(manifest, pluginManifests) {
   const dependencies = { ...manifest.dependencies ?? {} };
   for (const plugin of pluginManifests) {
@@ -353,6 +448,65 @@ function createRuntimePatch(jsonRpcPluginUrl, jsonRpcEndpoint, pluginEntries) {
     ]),
     ""
   ].join("\n");
+}
+function restoreNodePtyHelper(root) {
+  for (const helper of [
+    join3(root, "node_modules", "node-pty", "prebuilds", `${process.platform}-${process.arch}`, "spawn-helper"),
+    join3(root, "node_modules", "node-pty", "build", "Release", "spawn-helper")
+  ]) {
+    if (existsSync2(helper)) chmodSync(helper, 493);
+  }
+}
+function copyPackageClosure(dshRoot, slot, additionalRoots = []) {
+  const targetModules = join3(slot, "node_modules");
+  const pending = [realpathSync(dshRoot), ...additionalRoots.map((root) => realpathSync(root))];
+  const copied = /* @__PURE__ */ new Set();
+  const resolved = /* @__PURE__ */ new Map();
+  while (pending.length > 0) {
+    const sourceRoot = pending.shift();
+    const manifestPath = join3(sourceRoot, "package.json");
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+    if (typeof manifest.name !== "string" || copied.has(manifest.name)) continue;
+    copied.add(manifest.name);
+    resolved.set(manifest.name, sourceRoot);
+    const destination = join3(targetModules, ...manifest.name.split("/"));
+    mkdirSync2(dirname(destination), { recursive: true });
+    cpSync(sourceRoot, destination, {
+      recursive: true,
+      dereference: true,
+      filter: (source) => basename(source) !== "node_modules"
+    });
+    const dependencies = {
+      ...manifest.dependencies,
+      ...manifest.optionalDependencies,
+      ...manifest.peerDependencies
+    };
+    const packageRequire = createRequire(manifestPath);
+    for (const dependency of Object.keys(dependencies)) {
+      if (resolved.has(dependency)) continue;
+      try {
+        const dependencyRoot = resolvePackageRoot(packageRequire, dependency, dshRoot);
+        pending.push(dependencyRoot);
+      } catch (error) {
+        if (manifest.optionalDependencies?.[dependency] !== void 0 || manifest.peerDependenciesMeta?.[dependency]?.optional === true) continue;
+        throw new Error(`Unable to resolve DSH runtime dependency ${dependency} from ${sourceRoot}: ${String(error)}`);
+      }
+    }
+  }
+}
+function resolvePackageRoot(require2, packageName, fallbackRoot) {
+  for (const searchPath of require2.resolve.paths(packageName) ?? []) {
+    const candidate = join3(searchPath, ...packageName.split("/"));
+    const manifestPath = join3(candidate, "package.json");
+    if (!existsSync2(manifestPath)) continue;
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+    if (manifest.name === packageName) return realpathSync(candidate);
+  }
+  if (fallbackRoot !== void 0 && fallbackRoot !== dirname(fallbackRoot)) {
+    const fallbackRequire = createRequire(join3(fallbackRoot, "package.json"));
+    if (fallbackRequire !== require2) return resolvePackageRoot(fallbackRequire, packageName);
+  }
+  throw new Error(`package root not found for ${packageName}`);
 }
 
 // packages/host-supervisor/src/socket-jsonrpc-client.ts
@@ -388,6 +542,7 @@ export {
   SUPERVISOR_BUILD_REVISION,
   SUPERVISOR_PROTOCOL_REVISION,
   addRuntimePluginDependencies,
+  canReuseOlderSupervisor,
   canonicalizeScope,
   connectJsonRpc,
   createHostSupervisorClient,
@@ -395,7 +550,10 @@ export {
   fingerprint,
   hostKey,
   isHostDescriptorCompatible,
+  isLeaseActive,
   leaseId,
+  mergeHostRuntimeEnv,
+  prepareRuntimeSlot,
   resolveNodeExecutable,
   stableJson
 };

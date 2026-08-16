@@ -3,13 +3,33 @@ import { spawn } from 'node:child_process'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { endpointFor, leaseDirectory, scopeDirectory, scopePath, supervisorHome } from './paths.js'
-import { canonicalizeScope, LEASE_TTL_MS, SUPERVISOR_BUILD_REVISION, type AcquireHostRequest, type HostDescriptor, type HostLease, type HostScope, type HostSupervisorClient } from './protocol.js'
+import { canonicalizeScope, isHostDescriptorCompatible, LEASE_TTL_MS, SUPERVISOR_BUILD_REVISION, type AcquireHostRequest, type HostDescriptor, type HostLease, type HostScope, type HostSupervisorClient } from './protocol.js'
 import { openLineConnection, type LinePeer } from './ipc.js'
 
 export type SupervisorClientOptions = {
   nodeExecutable?: string
   serviceEntry?: string
   startupTimeoutMs?: number
+}
+
+type SupervisorDoctor = {
+  supervisorBuildRevision?: string
+  leaseCount?: number
+  pid?: number
+  descriptor?: HostDescriptor | null
+}
+
+/** Keep an active compatible Host usable while its supervisor is being upgraded. */
+export function canReuseOlderSupervisor(
+  request: AcquireHostRequest,
+  doctor: SupervisorDoctor,
+): boolean {
+  if ((doctor.leaseCount ?? 0) <= 0) return false
+  return doctor.descriptor !== undefined && doctor.descriptor !== null && isHostDescriptorCompatible(
+    doctor.descriptor,
+    request.scope,
+    request,
+  )
 }
 
 export class LocalHostSupervisorClient implements HostSupervisorClient {
@@ -22,7 +42,7 @@ export class LocalHostSupervisorClient implements HostSupervisorClient {
     const directory = scopeDirectory(scope)
     mkdirSync(directory, { recursive: true, mode: 0o700 })
     writeFileSync(scopePath(directory), JSON.stringify(scope) + '\n', { mode: 0o600 })
-    const peer = await this.connectOrStart(directory)
+    const peer = await this.connectOrStart(directory, request)
     let result: { leaseId: string; expiresAt: string; descriptor: HostDescriptor }
     try {
       result = await peer.request<{ leaseId: string; expiresAt: string; descriptor: HostDescriptor }>('acquire', {
@@ -99,19 +119,15 @@ export class LocalHostSupervisorClient implements HostSupervisorClient {
     throw new Error(`unknown lease: ${leaseId}`)
   }
 
-  private async connectOrStart(directory: string): Promise<LinePeer> {
+  private async connectOrStart(directory: string, request: AcquireHostRequest): Promise<LinePeer> {
     const endpoint = endpointFor(directory)
     let existing: LinePeer | undefined
     try { existing = await openLineConnection(endpoint) } catch { /* start below */ }
     if (existing !== undefined) {
       try {
-        const doctor = await existing.request<{
-          supervisorBuildRevision?: string
-          leaseCount?: number
-          pid?: number
-          descriptor?: HostDescriptor | null
-        }>('doctor')
+        const doctor = await existing.request<SupervisorDoctor>('doctor')
         if (doctor.supervisorBuildRevision === SUPERVISOR_BUILD_REVISION) return existing
+        if (canReuseOlderSupervisor(request, doctor)) return existing
         existing.close()
         if ((doctor.leaseCount ?? 0) > 0) {
           throw new Error('Host Supervisor is running an older build while active clients still hold leases; release them before upgrading.')

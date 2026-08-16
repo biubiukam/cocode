@@ -227,10 +227,9 @@ var TuiCompanionGateway = class {
   }
   async prompt(params) {
     this.assertInitialized();
+    const contentBlocks = await this.preparePromptBlocks(params.contentBlocks);
     const record = await this.getOrCreateSession(params.sessionId);
     this.assertLive(params.sessionId, record);
-    const vision = this.ctx.get("cocodeVision");
-    const contentBlocks = vision === void 0 ? params.contentBlocks : await vision.prepareBlocks(params.contentBlocks);
     const message = createUserMessage(contentBlocks);
     switch (params.mode ?? "normal") {
       case "normal":
@@ -244,6 +243,43 @@ var TuiCompanionGateway = class {
         throw new Error(`session/prompt has unsupported mode: ${String(params.mode)}`);
     }
     return { messageId: message.id };
+  }
+  async preparePromptBlocks(blocks) {
+    if (!blocks.some((block) => block.type === "image")) return [...blocks];
+    if (await this.modelSupportsImages()) return [...blocks];
+    const vision = this.ctx.get("cocodeVision");
+    if (vision === void 0) {
+      throw new Error(
+        "The selected model does not support image content, and the Cocode vision bridge is unavailable."
+      );
+    }
+    const prepared = await vision.prepareBlocks(blocks, { preserveImages: false });
+    if (prepared.some((block) => block.type === "image")) {
+      throw new Error(
+        "The selected model does not support image content, and the Cocode vision bridge is not configured."
+      );
+    }
+    return prepared;
+  }
+  async modelSupportsImages() {
+    const llm = this.ctx.get("llm");
+    if (llm?.resolveModelInfo !== void 0) {
+      try {
+        const model = await llm.resolveModelInfo(this.provider, this.model);
+        return model.inputModalities?.includes("image") === true;
+      } catch {
+        return false;
+      }
+    }
+    if (llm === void 0) return false;
+    try {
+      const models = await llm.listModels(this.provider);
+      return models.some(
+        (model) => model.id === this.model && model.inputModalities?.includes("image") === true
+      );
+    } catch {
+      return false;
+    }
   }
   async saveImages(params) {
     this.assertInitialized();
@@ -989,6 +1025,7 @@ function apply(ctx, config = { endpoint: "" }) {
   }, "cocode-host-jsonrpc.serve");
 }
 export {
+  TuiCompanionGateway,
   apply,
   inject,
   name

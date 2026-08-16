@@ -1,0 +1,9 @@
+{
+  "name": "cocode-vision",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "lib/index.js",
+  "dependencies": {
+    "yaml": "^2.9.0"
+  }
+}

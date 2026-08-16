@@ -81,8 +81,16 @@ type CommandService = {
 type LlmService = {
   listProviders(): readonly { id: string; name?: string }[]
   listModels(provider: string): Promise<
-    readonly { id: string; name?: string; description?: string }[]
+    readonly {
+      id: string
+      name?: string
+      description?: string
+      inputModalities?: readonly string[]
+    }[]
   >
+  resolveModelInfo?: (provider: string, model: string) => Promise<{
+    inputModalities?: readonly string[]
+  }>
 }
 type AttachmentService = {
   imageLimits: {
@@ -292,14 +300,9 @@ export class TuiCompanionGateway {
 
   async prompt(params: PromptParams): Promise<{ messageId: string }> {
     this.assertInitialized()
+    const contentBlocks = await this.preparePromptBlocks(params.contentBlocks)
     const record = await this.getOrCreateSession(params.sessionId)
     this.assertLive(params.sessionId, record)
-    const vision = this.ctx.get('cocodeVision') as
-      | { prepareBlocks(blocks: readonly ContentBlock[]): Promise<ContentBlock[]> }
-      | undefined
-    const contentBlocks = vision === undefined
-      ? params.contentBlocks
-      : await vision.prepareBlocks(params.contentBlocks)
     const message = createUserMessage(contentBlocks)
     switch (params.mode ?? 'normal') {
       case 'normal':
@@ -313,6 +316,53 @@ export class TuiCompanionGateway {
         throw new Error(`session/prompt has unsupported mode: ${String(params.mode)}`)
     }
     return { messageId: message.id }
+  }
+
+  private async preparePromptBlocks(blocks: readonly ContentBlock[]): Promise<ContentBlock[]> {
+    if (!blocks.some((block) => block.type === 'image')) return [...blocks]
+    if (await this.modelSupportsImages()) return [...blocks]
+
+    const vision = this.ctx.get('cocodeVision') as
+      | {
+          prepareBlocks(
+            blocks: readonly ContentBlock[],
+            options?: { preserveImages?: boolean },
+          ): Promise<ContentBlock[]>
+        }
+      | undefined
+    if (vision === undefined) {
+      throw new Error(
+        'The selected model does not support image content, and the Cocode vision bridge is unavailable.',
+      )
+    }
+    const prepared = await vision.prepareBlocks(blocks, { preserveImages: false })
+    if (prepared.some((block) => block.type === 'image')) {
+      throw new Error(
+        'The selected model does not support image content, and the Cocode vision bridge is not configured.',
+      )
+    }
+    return prepared
+  }
+
+  private async modelSupportsImages(): Promise<boolean> {
+    const llm = this.ctx.get('llm') as LlmService | undefined
+    if (llm?.resolveModelInfo !== undefined) {
+      try {
+        const model = await llm.resolveModelInfo(this.provider, this.model)
+        return model.inputModalities?.includes('image') === true
+      } catch {
+        return false
+      }
+    }
+    if (llm === undefined) return false
+    try {
+      const models = await llm.listModels(this.provider)
+      return models.some(
+        (model) => model.id === this.model && model.inputModalities?.includes('image') === true,
+      )
+    } catch {
+      return false
+    }
   }
 
   async saveImages(params: Record<string, unknown>): Promise<{ attachments: ImageAttachmentRef[] }> {

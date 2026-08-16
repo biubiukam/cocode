@@ -25,17 +25,17 @@ describe('chat layout rows', () => {
         viewportRows: 30,
         composerLines: 1,
         hasAttachments: true,
-        hasNotice: true,
+        noticeRows: 3,
         hasStatusDetails: true,
         editorFeedbackRows: 2,
       }),
     ).toEqual({
-      baseRows: 16,
+      baseRows: 18,
       composerRows: 1,
       overlayRows: 0,
-      reservedRows: 16,
-      messageRows: 14,
-      minimumRows: 16,
+      reservedRows: 18,
+      messageRows: 12,
+      minimumRows: 18,
       tooSmall: false,
     })
   })

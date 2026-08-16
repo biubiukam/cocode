@@ -4,6 +4,14 @@ export type SupervisorClientOptions = {
     serviceEntry?: string;
     startupTimeoutMs?: number;
 };
+type SupervisorDoctor = {
+    supervisorBuildRevision?: string;
+    leaseCount?: number;
+    pid?: number;
+    descriptor?: HostDescriptor | null;
+};
+/** Keep an active compatible Host usable while its supervisor is being upgraded. */
+export declare function canReuseOlderSupervisor(request: AcquireHostRequest, doctor: SupervisorDoctor): boolean;
 export declare class LocalHostSupervisorClient implements HostSupervisorClient {
     private readonly options;
     private readonly activeLeases;
@@ -15,3 +23,4 @@ export declare class LocalHostSupervisorClient implements HostSupervisorClient {
 }
 export declare function createHostSupervisorClient(options?: SupervisorClientOptions): HostSupervisorClient;
 export declare function resolveNodeExecutable(): string;
+export {};

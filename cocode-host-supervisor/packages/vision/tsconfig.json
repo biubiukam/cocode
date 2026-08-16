@@ -1,0 +1,11 @@
+{
+  "extends": "../host-supervisor/tsconfig.json",
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "rootDir": "src",
+    "outDir": "lib"
+  },
+  "include": [
+    "src/**/*.ts"
+  ]
+}

@@ -7,6 +7,9 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "dependencies": {
+    "@cocode/host-vision": "link:../../../cocode-host-supervisor/packages/vision"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json"
   }

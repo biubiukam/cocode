@@ -8,7 +8,8 @@ import { resolve } from 'node:path'
 import { render } from 'ink'
 import { parseInitFromEnv, parseLaunchFromEnv } from '@cocode/tui-connection'
 import { createTuiApp } from './runtime/app.ts'
-import { displayError, formatError } from './runtime/errors/index.ts'
+import { displayError } from './runtime/errors/index.ts'
+import { startErrorMessage } from './runtime/app-view.ts'
 import { P0_CAPABILITIES } from './runtime/capabilities.ts'
 import { resolveSessionRoot } from './runtime/sessions-root.ts'
 import { setTheme } from './present/theme.ts'
@@ -34,7 +35,7 @@ if (process.stdin.isTTY !== true || process.stdout.isTTY !== true) {
   process.exitCode = 1
 } else {
   void main().catch((error: unknown) => {
-    process.stderr.write(`Cocode TUI failed to start: ${displayError(error)}\n`)
+    process.stderr.write(`Cocode TUI failed to start: ${startErrorMessage(error)}\n`)
     process.exitCode = 1
   })
 }
@@ -158,7 +159,7 @@ async function main(): Promise<void> {
   try {
     await app.start()
   } catch (error: unknown) {
-    process.stderr.write(`Cocode TUI failed to initialize: ${displayError(error)}\n`)
+    process.stderr.write(`Cocode TUI failed to initialize: ${startErrorMessage(error)}\n`)
     await finish()
     return
   }

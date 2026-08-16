@@ -4,6 +4,8 @@ import { CompanionTransport } from './transport.js'
 import { TuiCompanionGateway } from './gateway.js'
 import type { RuntimeContext } from './types.js'
 
+export { TuiCompanionGateway } from './gateway.js'
+
 export const name = 'cocode-host-jsonrpc'
 export const inject = ['agents']
 

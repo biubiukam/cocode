@@ -86,6 +86,36 @@ if (existsSync(pluginSourceRoot)) {
     plugins.push(manifest.name)
   }
 }
+
+const visionSourceRoot = resolve(packageRoot, '../vision')
+if (!existsSync(join(visionSourceRoot, 'src', 'index.ts'))) {
+  throw new Error(`Missing Cocode vision plugin source: ${visionSourceRoot}`)
+}
+const visionManifest = JSON.parse(readFileSync(join(visionSourceRoot, 'package.json'), 'utf8'))
+const visionTarget = join(runtimeRoot, 'plugins', 'cocode-vision')
+rmSync(visionTarget, { recursive: true, force: true })
+mkdirSync(join(visionTarget, 'lib'), { recursive: true })
+await build({
+  absWorkingDir: visionSourceRoot,
+  entryPoints: [join(visionSourceRoot, 'src', 'index.ts')],
+  outfile: join(visionTarget, 'lib', 'index.js'),
+  bundle: true,
+  format: 'esm',
+  platform: 'node',
+  target: 'node22',
+  external: Object.keys(visionManifest.dependencies ?? {}),
+  sourcemap: true,
+  tsconfig: join(visionSourceRoot, 'tsconfig.json'),
+})
+writeFileSync(join(visionTarget, 'package.json'), JSON.stringify({
+  name: 'cocode-vision',
+  version: visionManifest.version ?? '0.1.0',
+  type: 'module',
+  main: 'lib/index.js',
+  dependencies: visionManifest.dependencies ?? {},
+}, null, 2) + '\n')
+plugins.push('cocode-vision')
+
 writeFileSync(join(runtimeRoot, 'plugins.json'), JSON.stringify({ plugins }, null, 2) + '\n')
 
 const bin = join(packageRoot, 'bin')

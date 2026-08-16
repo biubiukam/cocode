@@ -1,4 +1,4 @@
-import { type HostScope } from './protocol.js';
+import { type HostRuntimeEnv, type HostScope } from './protocol.js';
 export type RuntimeSlot = {
     root: string;
     entry: string;
@@ -11,6 +11,7 @@ export type RuntimePluginEntry = {
     name: string;
     entry: string;
 };
+export declare function mergeHostRuntimeEnv(baseEnv: NodeJS.ProcessEnv, runtimeEnv: HostRuntimeEnv | undefined, dshHome: string): NodeJS.ProcessEnv;
 type RuntimePackageManifest = {
     name?: string;
     version?: string;

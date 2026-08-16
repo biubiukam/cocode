@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { noticeLines } from '../../src/present/components/StatusLine.tsx'
+import { noticeLines, noticeRows } from '../../src/present/components/StatusLine.tsx'
 
 describe('noticeLines', () => {
   it('keeps multiline runtime diagnostics visible', () => {
@@ -10,11 +10,11 @@ describe('noticeLines', () => {
     ])
   })
 
-  it('bounds unusually long diagnostics without hiding their beginning', () => {
-    expect(noticeLines('a\nb\nc\nd', 3)).toEqual(['a', 'b', '… (2 more lines)'])
+  it('does not omit unusually long diagnostics', () => {
+    expect(noticeLines('a\nb\nc\nd')).toEqual(['a', 'b', 'c', 'd'])
   })
 
-  it('falls back to the default limit for invalid line counts', () => {
-    expect(noticeLines('a\nb', Number.NaN)).toEqual(['a', 'b'])
+  it('reserves wrapped rows for every diagnostic line', () => {
+    expect(noticeRows('first line\nsecond diagnostic line', 10)).toBe(5)
   })
 })

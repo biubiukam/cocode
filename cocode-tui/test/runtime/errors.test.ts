@@ -8,6 +8,7 @@ import {
   formatError,
   resolveLocale,
 } from '../../src/runtime/errors/index.ts'
+import { startErrorMessage } from '../../src/runtime/app-view.ts'
 
 describe('resolveLocale', () => {
   it('prefers COCODE_LANG over LANG', () => {
@@ -70,6 +71,14 @@ describe('displayError', () => {
     const message = displayError(new Error('API_KEY=sk-secret failed'), 'en')
     expect(message).toMatch(/^RUNTIME_UNKNOWN · /)
     expect(message).not.toMatch(/sk-secret|API_KEY=/)
+  })
+})
+
+describe('startErrorMessage', () => {
+  it('keeps the runtime detail on following lines', () => {
+    expect(startErrorMessage(new Error('line one\nline two'))).toBe(
+      'RUNTIME_INIT_FAILED · Initialize failed. Check the shared DSH Host and Supervisor, then /exit.\nline one\nline two',
+    )
   })
 })
 

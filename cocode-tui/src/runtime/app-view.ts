@@ -50,7 +50,6 @@ export function errorMessage(error: unknown): string {
 }
 
 export function startErrorMessage(error: unknown): string {
-  return formatError('RUNTIME_INIT_FAILED', {
-    detail: redactSecrets(error instanceof Error ? error.message : String(error)),
-  })
+  const detail = redactSecrets(error instanceof Error ? error.message : String(error))
+  return `${formatError('RUNTIME_INIT_FAILED')}\n${detail}`
 }

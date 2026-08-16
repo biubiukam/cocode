@@ -5,11 +5,11 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { endpointFor, descriptorPath, leaseDirectory, lockPath, scopePath } from './paths.js'
 import { listenLineServer } from './ipc.js'
+import { isLeaseActive, type LeaseRecord } from './lifecycle.js'
 import { canonicalizeScope, HOST_PROTOCOL_REVISION, hostKey, isHostDescriptorCompatible, leaseId as makeLeaseId, LEASE_TTL_MS, SUPERVISOR_BUILD_REVISION, SUPERVISOR_PROTOCOL_REVISION, type AcquireHostRequest, type HostDescriptor, type HostScope } from './protocol.js'
-import { prepareRuntimeSlot } from './runtime.js'
+import { mergeHostRuntimeEnv, prepareRuntimeSlot } from './runtime.js'
 import { HostLogger } from './logging.js'
 
-type LeaseRecord = { leaseId: string; clientKind: string; pid: number; createdAt: string; expiresAt: string }
 type AcquireRequest = AcquireHostRequest & { clientPid?: number }
 type HostProcess = { child: ReturnType<typeof spawn> | null; descriptor: HostDescriptor; idleTimer?: NodeJS.Timeout }
 
@@ -37,6 +37,8 @@ class SupervisorService {
   private stopped = false
   private hadHost = false
   private lockOwned = false
+  private stopPromise: Promise<void> | null = null
+  private hostStopPromise: Promise<void> | null = null
 
   constructor(private readonly directory: string, private readonly scope: HostScope, private readonly logger: HostLogger) {}
 
@@ -57,9 +59,12 @@ class SupervisorService {
   wait(): Promise<void> {
     return new Promise((resolve) => {
       const poll = () => {
-        if (this.stopped) { resolve(); return }
+        if (this.stopped) { void (this.stopPromise ?? Promise.resolve()).then(resolve); return }
         this.cleanupLeases()
-        if (this.hadHost && !this.host && this.leases.size === 0) { this.stop(); resolve(); return }
+        if (this.hadHost && !this.host && this.hostStopPromise === null && this.leases.size === 0) {
+          void this.stop().then(resolve)
+          return
+        }
         setTimeout(poll, 2_000).unref()
       }
       poll()
@@ -114,6 +119,7 @@ class SupervisorService {
     if (JSON.stringify(requestedScope) !== JSON.stringify(this.scope)) {
       throw new Error('Host scope does not match this Supervisor scope')
     }
+    if (this.hostStopPromise !== null) await this.hostStopPromise
     if (!this.host || !isHostDescriptorCompatible(this.host.descriptor, this.scope, request)) {
       if (this.host && this.leases.size > 0) throw new Error('existing Host is incompatible while leases are active')
       if (this.host) await this.stopHost()
@@ -122,7 +128,7 @@ class SupervisorService {
       } catch (error) {
         // A failed first boot must not leave a Supervisor holding the scope
         // lock forever. The next client should be able to start fresh code.
-        this.stop()
+        await this.stop()
         throw error
       }
     }
@@ -147,7 +153,10 @@ class SupervisorService {
     this.logger.log('info', 'dsh.host.spawn.started', { profile: this.scope.profile, runtimeChannel: this.scope.runtimeChannel })
     const child = spawn(process.execPath, [slot.entry, ...args], {
       cwd: workspace,
-      env: { ...process.env, DSH_HOME: this.scope.dshHome, COCODE_DSH_PROFILE: this.scope.profile },
+      env: {
+        ...mergeHostRuntimeEnv(process.env, request.runtimeEnv, this.scope.dshHome),
+        COCODE_DSH_PROFILE: this.scope.profile,
+      },
       stdio: ['ignore', 'pipe', 'pipe'],
     })
     const startupBuffer = new RingBuffer(256 * 1024)
@@ -206,10 +215,18 @@ class SupervisorService {
         }
       })
     })
-    const webUrl = await ready
-    startupBuffer.clear()
-    await waitHttp(webUrl)
-    await waitJsonRpc(jsonRpcEndpoint)
+    let webUrl: string
+    try {
+      webUrl = await ready
+      startupBuffer.clear()
+      await waitHttp(webUrl)
+      await waitJsonRpc(jsonRpcEndpoint)
+    } catch (error) {
+      await terminateChild(child)
+      rmSync(descriptorPath(this.directory), { force: true })
+      if (process.platform !== 'win32') rmSync(jsonRpcEndpoint, { force: true })
+      throw error
+    }
     const runtimeVersion = slot.version
     const descriptor: HostDescriptor = {
       schemaVersion: 1,
@@ -240,38 +257,64 @@ class SupervisorService {
   private renew(id: string): { expiresAt: string } { const record = this.leases.get(id); if (!record) throw new Error('unknown lease'); record.expiresAt = new Date(Date.now() + LEASE_TTL_MS).toISOString(); this.persistLease(record); this.logger.log('debug', 'host.lease.renewed', { leaseId: shortId(id) }); return { expiresAt: record.expiresAt } }
   private async release(id: string): Promise<Record<string, never>> { const existed = this.leases.delete(id); rmSync(join(leaseDirectory(this.directory), `${id}.json`), { force: true }); this.logger.log(existed ? 'info' : 'warn', existed ? 'host.lease.released' : 'host.lease.release.unknown', { leaseId: shortId(id), leaseCount: this.leases.size }); if (this.leases.size === 0 && this.host) this.armIdleShutdown(); return {} }
   private armIdleShutdown(): void { if (!this.host || this.host.idleTimer) return; const timeoutMs = Number(process.env.COCODE_HOST_IDLE_TIMEOUT_MS ?? 20_000); this.logger.log('info', 'dsh.host.idle-shutdown.armed', { timeoutMs }); this.host.idleTimer = setTimeout(() => { void this.stopHost() }, timeoutMs); this.host.idleTimer.unref?.() }
-  private async stopHost(): Promise<void> {
+  private stopHost(): Promise<void> {
+    if (this.hostStopPromise !== null) return this.hostStopPromise
     const host = this.host
-    if (!host) return
-    this.host = null
-    const pid = host.child?.pid ?? host.descriptor.hostPid
-    this.logger.log('info', 'dsh.host.stop.started', { hostPid: pid })
-    if (pid > 0 && isProcessAlive(pid)) {
-      try {
-        if (host.child !== null) host.child.kill('SIGTERM')
-        else process.kill(pid, 'SIGTERM')
-      } catch { /* the process may have exited between checks */ }
-      await waitForProcessExit(pid, 2_000)
-      if (isProcessAlive(pid)) {
-        try { process.kill(pid, 'SIGKILL') } catch { /* already gone */ }
-      }
-    }
-    rmSync(descriptorPath(this.directory), { force: true })
-    this.logger.log('info', 'dsh.host.stop.completed', { hostPid: pid })
+    if (!host) return Promise.resolve()
+    this.hostStopPromise = this.terminateHost(host).finally(() => {
+      if (this.host === host) this.host = null
+      this.hostStopPromise = null
+      rmSync(descriptorPath(this.directory), { force: true })
+      this.logger.log('info', 'dsh.host.stop.completed', { hostPid: host.child?.pid ?? host.descriptor.hostPid })
+    })
+    this.logger.log('info', 'dsh.host.stop.started', { hostPid: host.child?.pid ?? host.descriptor.hostPid })
+    return this.hostStopPromise
   }
-  private cleanupLeases(): void { const now = Date.now(); for (const record of this.leases.values()) if (Date.parse(record.expiresAt) <= now) { this.leases.delete(record.leaseId); rmSync(join(leaseDirectory(this.directory), `${record.leaseId}.json`), { force: true }); this.logger.log('warn', 'host.lease.expired', { leaseId: shortId(record.leaseId), clientKind: record.clientKind }) } }
-  private loadLeases(): void { for (const file of readdirSync(leaseDirectory(this.directory), { withFileTypes: true })) { if (!file.name.endsWith('.json')) continue; try { const record = JSON.parse(readFileSync(join(leaseDirectory(this.directory), file.name), 'utf8')) as LeaseRecord; if (Date.parse(record.expiresAt) > Date.now()) this.leases.set(record.leaseId, record) } catch { rmSync(join(leaseDirectory(this.directory), file.name), { force: true }) } } }
+  private async terminateHost(host: HostProcess): Promise<void> {
+    const pid = host.child?.pid ?? host.descriptor.hostPid
+    await terminateProcess(pid, () => {
+      if (host.child !== null) host.child.kill('SIGTERM')
+      else process.kill(pid, 'SIGTERM')
+    })
+  }
+  private cleanupLeases(): void {
+    const now = Date.now()
+    let removed = false
+    for (const record of this.leases.values()) {
+      if (isLeaseActive(record, now, isProcessAlive)) continue
+      removed = true
+      this.leases.delete(record.leaseId)
+      rmSync(join(leaseDirectory(this.directory), `${record.leaseId}.json`), { force: true })
+      this.logger.log('warn', 'host.lease.expired', { leaseId: shortId(record.leaseId), clientKind: record.clientKind })
+    }
+    if (removed && this.leases.size === 0 && this.host) this.armIdleShutdown()
+  }
+  private loadLeases(): void {
+    const now = Date.now()
+    for (const file of readdirSync(leaseDirectory(this.directory), { withFileTypes: true })) {
+      if (!file.name.endsWith('.json')) continue
+      const path = join(leaseDirectory(this.directory), file.name)
+      try {
+        const record = JSON.parse(readFileSync(path, 'utf8')) as LeaseRecord
+        if (isLeaseActive(record, now, isProcessAlive)) this.leases.set(record.leaseId, record)
+        else rmSync(path, { force: true })
+      } catch { rmSync(path, { force: true }) }
+    }
+  }
   private persistLease(record: LeaseRecord): void { writeFileSync(join(leaseDirectory(this.directory), `${record.leaseId}.json`), JSON.stringify(record) + '\n', { mode: 0o600 }) }
   private writeDescriptor(descriptor: HostDescriptor): void { const temp = `${descriptorPath(this.directory)}.${process.pid}.tmp`; writeFileSync(temp, JSON.stringify(descriptor, null, 2) + '\n', { mode: 0o600 }); renameSync(temp, descriptorPath(this.directory)) }
   private readDescriptor(): HostDescriptor | null { try { return JSON.parse(readFileSync(descriptorPath(this.directory), 'utf8')) as HostDescriptor } catch { return null } }
   private doctor(): Record<string, unknown> { return { supervisorProtocolRevision: SUPERVISOR_PROTOCOL_REVISION, supervisorBuildRevision: SUPERVISOR_BUILD_REVISION, scope: this.scope, descriptor: this.readDescriptor(), leaseCount: this.leases.size, pid: process.pid } }
-  private stop(): void {
-    if (this.stopped) return
+  private stop(): Promise<void> {
+    if (this.stopPromise !== null) return this.stopPromise
     this.stopped = true
-    void this.stopHost()
-    this.server?.close()
-    if (this.lockOwned) rmSync(lockPath(this.directory), { force: true })
-    if (process.platform !== 'win32') rmSync(this.endpoint, { force: true })
+    this.stopPromise = (async () => {
+      await this.stopHost()
+      this.server?.close()
+      if (this.lockOwned) rmSync(lockPath(this.directory), { force: true })
+      if (process.platform !== 'win32') rmSync(this.endpoint, { force: true })
+    })()
+    return this.stopPromise
   }
 
   private acquireLock(): void {
@@ -372,6 +415,20 @@ function isProcessAlive(pid: number): boolean {
 async function waitForProcessExit(pid: number, timeoutMs: number): Promise<void> {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline && isProcessAlive(pid)) await new Promise((resolve) => setTimeout(resolve, 100))
+}
+
+async function terminateChild(child: ReturnType<typeof spawn>): Promise<void> {
+  if (child.pid === undefined) return
+  await terminateProcess(child.pid, () => child.kill('SIGTERM'))
+}
+
+async function terminateProcess(pid: number, terminate: () => void): Promise<void> {
+  if (pid <= 0 || !isProcessAlive(pid)) return
+  try { terminate() } catch { /* the process may have exited between checks */ }
+  await waitForProcessExit(pid, 2_000)
+  if (!isProcessAlive(pid)) return
+  try { process.kill(pid, 'SIGKILL') } catch { /* already gone */ }
+  await waitForProcessExit(pid, 2_000)
 }
 
 async function hostHealth(descriptor: HostDescriptor): Promise<boolean> {

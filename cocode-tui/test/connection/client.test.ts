@@ -3,11 +3,49 @@ import { probeRuntimeCapabilities } from '../../packages/connection/src/capabili
 import {
   createTuiRuntime,
   parseModelCatalogResult,
+  resolveHostRuntimeEnv,
+  resolveHostScope,
 } from '../../packages/connection/src/client.ts'
 
 type ProbeCall = { method: string; params: object; timeoutMs?: number }
 
 describe('runtime capability negotiation', () => {
+  it('passes the cloud provider route to the Host without forwarding credentials', () => {
+    const env = {
+      DSH_HOME: '/tmp/cocode-home',
+      COCODE_LLM_PROVIDERS: '{"cocode-cloud":{"api":"openai-responses"}}',
+      COCODE_CLOUD_API_KEY: 'ck_live_secret',
+    }
+
+    expect(resolveHostRuntimeEnv(env)).toEqual({
+      COCODE_LLM_PROVIDERS: env.COCODE_LLM_PROVIDERS,
+    })
+  })
+
+  it('changes the Host scope when the runtime provider route changes', () => {
+    const base = {
+      DSH_HOME: '/tmp/cocode-home',
+      COCODE_HOST_CONFIG_FINGERPRINT: 'cocode-web-jsonrpc-v1',
+    }
+    const first = resolveHostScope({
+      cwd: '/tmp',
+      env: {
+        ...base,
+        COCODE_LLM_PROVIDERS: '{"cocode-cloud":{"models":[{"id":"cloud-1"}]}}',
+      },
+    })
+    const second = resolveHostScope({
+      cwd: '/tmp',
+      env: {
+        ...base,
+        COCODE_LLM_PROVIDERS: '{"cocode-cloud":{"models":[{"id":"cloud-2"}]}}',
+      },
+    })
+
+    expect(first.dshHome).toBe(second.dshHome)
+    expect(first.hostConfigFingerprint).not.toBe(second.hostConfigFingerprint)
+  })
+
   it('does not enable steer when the runtime advertises queue only', async () => {
     const snapshot = await probeRuntimeCapabilities(
       {

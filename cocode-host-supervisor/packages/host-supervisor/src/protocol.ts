@@ -5,6 +5,9 @@ import { resolve } from 'node:path'
 export type HostClientKind = 'gui' | 'desktop-tui' | 'standalone-tui'
 export type HostServiceName = 'web' | 'jsonrpc'
 export type RuntimeChannel = 'stable' | 'preview' | 'dev'
+export type HostRuntimeEnv = Readonly<{
+  COCODE_LLM_PROVIDERS?: string
+}>
 
 export interface HostScope {
   dshHome: string
@@ -19,6 +22,8 @@ export interface AcquireHostRequest {
   requiredServices: readonly HostServiceName[]
   requiredCapabilities?: readonly string[]
   minProtocolRevision: string
+  /** Non-secret process configuration required when materializing a new Host. */
+  runtimeEnv?: HostRuntimeEnv
 }
 
 export interface HostServiceEndpoint {
@@ -62,7 +67,7 @@ export interface HostSupervisorClient {
 }
 
 export const SUPERVISOR_PROTOCOL_REVISION = '1.0'
-export const SUPERVISOR_BUILD_REVISION = 'runtime-plugin-resolution-v2'
+export const SUPERVISOR_BUILD_REVISION = 'runtime-lifecycle-v4'
 export const HOST_PROTOCOL_REVISION = '1.0'
 export const LEASE_TTL_MS = 30_000
 

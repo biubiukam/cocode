@@ -1,6 +1,9 @@
 export type HostClientKind = 'gui' | 'desktop-tui' | 'standalone-tui';
 export type HostServiceName = 'web' | 'jsonrpc';
 export type RuntimeChannel = 'stable' | 'preview' | 'dev';
+export type HostRuntimeEnv = Readonly<{
+    COCODE_LLM_PROVIDERS?: string;
+}>;
 export interface HostScope {
     dshHome: string;
     profile: string;
@@ -13,6 +16,8 @@ export interface AcquireHostRequest {
     requiredServices: readonly HostServiceName[];
     requiredCapabilities?: readonly string[];
     minProtocolRevision: string;
+    /** Non-secret process configuration required when materializing a new Host. */
+    runtimeEnv?: HostRuntimeEnv;
 }
 export interface HostServiceEndpoint {
     service: HostServiceName;
@@ -51,7 +56,7 @@ export interface HostSupervisorClient {
     release(leaseId: string): Promise<void>;
 }
 export declare const SUPERVISOR_PROTOCOL_REVISION = "1.0";
-export declare const SUPERVISOR_BUILD_REVISION = "runtime-plugin-resolution-v2";
+export declare const SUPERVISOR_BUILD_REVISION = "runtime-lifecycle-v4";
 export declare const HOST_PROTOCOL_REVISION = "1.0";
 export declare const LEASE_TTL_MS = 30000;
 export declare function canonicalizeScope(scope: HostScope): HostScope;

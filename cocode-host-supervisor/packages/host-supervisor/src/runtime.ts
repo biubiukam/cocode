@@ -3,11 +3,23 @@ import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, re
 import { basename, dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { runtimeSlotDirectory } from './paths.js'
-import { hostKey, type HostScope } from './protocol.js'
+import { hostKey, type HostRuntimeEnv, type HostScope } from './protocol.js'
 
 export type RuntimeSlot = { root: string; entry: string; version: string; buildId?: string; patch: string; jsonRpcEndpoint: string }
 
 export type RuntimePluginEntry = { name: string; entry: string }
+
+export function mergeHostRuntimeEnv(
+  baseEnv: NodeJS.ProcessEnv,
+  runtimeEnv: HostRuntimeEnv | undefined,
+  dshHome: string,
+): NodeJS.ProcessEnv {
+  return {
+    ...baseEnv,
+    ...(runtimeEnv ?? {}),
+    DSH_HOME: dshHome,
+  }
+}
 
 type RuntimePackageManifest = {
   name?: string
@@ -188,7 +200,7 @@ function copyPackageClosure(dshRoot: string, slot: string, additionalRoots: read
     for (const dependency of Object.keys(dependencies)) {
       if (resolved.has(dependency)) continue
       try {
-        const dependencyRoot = resolvePackageRoot(packageRequire, dependency)
+        const dependencyRoot = resolvePackageRoot(packageRequire, dependency, dshRoot)
         pending.push(dependencyRoot)
       } catch (error) {
         if (manifest.optionalDependencies?.[dependency] !== undefined || manifest.peerDependenciesMeta?.[dependency]?.optional === true) continue
@@ -198,7 +210,7 @@ function copyPackageClosure(dshRoot: string, slot: string, additionalRoots: read
   }
 }
 
-function resolvePackageRoot(require: NodeRequire, packageName: string): string {
+function resolvePackageRoot(require: NodeRequire, packageName: string, fallbackRoot?: string): string {
   // Do not use `require.resolve(`${name}/package.json`)`: many valid npm
   // packages intentionally do not export their manifest. Node still exposes
   // the package lookup roots, which lets us locate the package directory in
@@ -209,6 +221,10 @@ function resolvePackageRoot(require: NodeRequire, packageName: string): string {
     if (!existsSync(manifestPath)) continue
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as { name?: string }
     if (manifest.name === packageName) return realpathSync(candidate)
+  }
+  if (fallbackRoot !== undefined && fallbackRoot !== dirname(fallbackRoot)) {
+    const fallbackRequire = createRequire(join(fallbackRoot, 'package.json'))
+    if (fallbackRequire !== require) return resolvePackageRoot(fallbackRequire, packageName)
   }
   throw new Error(`package root not found for ${packageName}`)
 }

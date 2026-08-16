@@ -42,6 +42,8 @@ export declare class TuiCompanionGateway {
     prompt(params: PromptParams): Promise<{
         messageId: string;
     }>;
+    private preparePromptBlocks;
+    private modelSupportsImages;
     saveImages(params: Record<string, unknown>): Promise<{
         attachments: ImageAttachmentRef[];
     }>;

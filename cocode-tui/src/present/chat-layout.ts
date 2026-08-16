@@ -21,7 +21,7 @@ export type ChatLayoutInput = {
   viewportRows: number
   composerLines: number
   hasAttachments?: boolean
-  hasNotice?: boolean
+  noticeRows?: number
   hasStatusDetails?: boolean
   checklistStripRows?: number
   editorFeedbackRows?: number
@@ -67,7 +67,7 @@ export function calculateChatLayout(input: ChatLayoutInput): ChatLayout {
     FOOTER_ROWS +
     composerRows +
     optionalRow(input.hasAttachments) +
-    optionalRow(input.hasNotice) +
+    nonNegativeInteger(input.noticeRows) +
     optionalRow(input.hasStatusDetails) +
     nonNegativeInteger(input.checklistStripRows) +
     nonNegativeInteger(input.editorFeedbackRows)

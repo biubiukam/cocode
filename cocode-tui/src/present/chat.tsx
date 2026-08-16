@@ -27,7 +27,7 @@ import {
   planReviewPanelRows,
 } from './components/PlanReviewPanel.tsx'
 import { SkillsPicker } from './components/SkillsPicker.tsx'
-import { StatusLine } from './components/StatusLine.tsx'
+import { noticeRows, StatusLine } from './components/StatusLine.tsx'
 import {
   filterSlashItems,
   isSlashDraft,
@@ -266,11 +266,14 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
   })
   const inspectorLayout = inspectorResize.layout
   const mainColumns = wideInspector ? inspectorLayout.mainColumns : stdout.columns
+  const noticeRowCount = snap.notice === undefined
+    ? 0
+    : noticeRows(snap.notice.message, mainColumns)
   const layout = calculateChatLayout({
     viewportRows: stdout.rows,
     composerLines: snap.composer.text.split('\n').length,
     hasAttachments: snap.composer.attachments.length + snap.composer.images.length > 0,
-    hasNotice: snap.notice !== undefined,
+    noticeRows: noticeRowCount,
     hasStatusDetails: hasStatusDetails(snap.status),
     checklistStripRows: mainChecklistRows,
     editorFeedbackRows: Number(editorBusy) + Number(editorError !== undefined),
@@ -323,7 +326,7 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
     modelSwitchRows: modelPickerOpen ? 14 : modelInputOpen ? 6 : undefined,
   })
   const messageMaxRows = layout.messageRows
-  const statusRows = 2 + Number(snap.notice !== undefined) + Number(hasStatusDetails(snap.status))
+  const statusRows = 2 + noticeRowCount + Number(hasStatusDetails(snap.status))
   const editorRows = Number(editorBusy) + Number(editorError !== undefined)
   const contentOverlayStartRow =
     CHAT_HEADER_ROWS + 1 + messageMaxRows + mainChecklistRows + statusRows + editorRows
@@ -1542,7 +1545,6 @@ export function Chat(props: { app: TuiApp; keymap?: Keymap; mouseSupported?: boo
           agent={snap.agent}
           notice={snap.notice}
           locale={snap.locale}
-          maxColumns={mainColumns}
         />
         {editorBusy ? (
           <Text color={theme.info} wrap="truncate-end">

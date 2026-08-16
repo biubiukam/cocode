@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  canReuseOlderSupervisor,
   canonicalizeScope,
   hostKey,
   isHostDescriptorCompatible,
@@ -87,4 +88,32 @@ test('descriptor compatibility rejects mismatched scope, protocol, service, and 
   assert.equal(isHostDescriptorCompatible(descriptor({ hostProtocolRevision: '2.0' }), scope, request), false)
   assert.equal(isHostDescriptorCompatible(descriptor({ services: [{ service: 'web', transport: 'tcp', endpoint: 'http://127.0.0.1:3080', protocolRevision: '1.0' }] }), scope, request), false)
   assert.equal(isHostDescriptorCompatible(descriptor({ capabilities: ['web', 'jsonrpc'] }), scope, request), false)
+})
+
+test('older supervisor can be reused for an active compatible host', () => {
+  assert.equal(
+    canReuseOlderSupervisor(
+      {
+        scope,
+        clientKind: 'standalone-tui',
+        requiredServices: ['jsonrpc'],
+        minProtocolRevision: '1.0',
+      },
+      { leaseCount: 1, descriptor: descriptor() },
+    ),
+    true,
+  )
+  assert.equal(
+    canReuseOlderSupervisor(
+      {
+        scope,
+        clientKind: 'standalone-tui',
+        requiredServices: ['jsonrpc'],
+        minProtocolRevision: '1.0',
+        runtimeEnv: { COCODE_LLM_PROVIDERS: '{"cocode-cloud":{}}' },
+      },
+      { leaseCount: 1, descriptor: descriptor() },
+    ),
+    true,
+  )
 })
