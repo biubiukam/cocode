@@ -467,7 +467,9 @@
   flex: none;
   display: flex;
   align-items: stretch;
-  height: 46px;
+  /* Match the conversation header's outer height: its 46px content box has
+     7px vertical padding, while this strip has 8px padding plus a border. */
+  height: 44px;
   padding: 8px 0;
   border-bottom: 1px solid var(--dsw-alias-border-l1);
   background: var(--dsw-alias-bg-layer-1);
@@ -505,7 +507,7 @@
   font: var(--dsw-font-xxs-12);
   color: var(--dsw-alias-label-secondary);
   border: 1px solid transparent;
-  border-radius: 16px;
+  border-radius: 12px;
   background: transparent;
   cursor: pointer;
   user-select: none;
