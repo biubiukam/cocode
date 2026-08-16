@@ -656,6 +656,20 @@ describe('sidebar state', () => {
     expect(tabOpenIn(s, (s.splits as { tabs: { id: string }[] }).tabs[0]!.id)).toBe(true)
   })
 
+  it('closing the final bottom tab collapses the bottom panel', () => {
+    let s = state()
+    s = toggleBottomPanel(s)
+    const bottomPane = (s.bottomSplits as { id: string }).id
+    s = openTabInActivePane({ ...s, activePane: bottomPane }, { id: 'terminal:1', type: 'terminal', title: 'T1' })
+
+    s = closeTab(s, bottomPane, 'terminal:1')
+
+    expect(allLeaves(s.bottomSplits).flatMap(leaf => leaf.tabs)).toHaveLength(0)
+    expect(s.bottomOpen).toBe(false)
+    // Closing a bottom tab does not affect the right panel.
+    expect(s.panelOpen).toBe(true)
+  })
+
   it('moveTabToEdge splits within the bottom tree', () => {
     let s = state()
     s = toggleBottomPanel(s)

@@ -413,7 +413,7 @@ export function removeLeafAt(node: SplitNode, paneId: string): SplitNode {
 }
 
 /** Close a tab; an emptied leaf is removed (unless it is the only pane).
- *  Closing the final tab in the right tree also collapses the right panel. */
+ *  Closing the final tab in either tree also collapses its panel. */
 export function closeTab(state: SidebarState, paneId: string, tabId: string): SidebarState {
   const key = treeOf(state, paneId)
   let emptied = false
@@ -423,12 +423,13 @@ export function closeTab(state: SidebarState, paneId: string, tabId: string): Si
     if (leaf.tabs.length === 0) emptied = true
   })
   const nextSplits = emptied ? removeLeafAt(splits, paneId) : splits
-  const closedLastRightTab = key === 'splits'
-    && allLeaves(nextSplits).every(leaf => leaf.tabs.length === 0)
+  const closedLastTab = allLeaves(nextSplits).every(leaf => leaf.tabs.length === 0)
   return {
     ...state,
     [key]: nextSplits,
-    ...(closedLastRightTab ? { panelOpen: false } : {}),
+    ...(closedLastTab
+      ? key === 'bottomSplits' ? { bottomOpen: false } : { panelOpen: false }
+      : {}),
   }
 }
 
