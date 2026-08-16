@@ -69,11 +69,13 @@ test('resolveHostScope applies the same environment-derived scope for every clie
     COCODE_HOST_CONFIG_FINGERPRINT: 'cocode-web-jsonrpc-v1',
     COCODE_RUNTIME_CHANNEL: 'stable',
     COCODE_LLM_PROVIDERS: ' {"cocode-cloud":{"api":"openai-responses"}} ',
+    COCODE_HOME: '/tmp/cocode-account',
     COCODE_CLOUD_API_KEY: 'secret-is-not-part-of-the-scope',
   }
   const scope = resolveHostScope(env)
   assert.deepEqual(resolveHostRuntimeEnv(env), {
     COCODE_LLM_PROVIDERS: env.COCODE_LLM_PROVIDERS.trim(),
+    COCODE_VISION_CONFIG: '/tmp/cocode-account/vision.yaml',
   })
   assert.equal(scope.dshHome, '/tmp/cocode-dsh')
   assert.equal(scope.profile, 'web')
@@ -85,10 +87,25 @@ test('resolveHostScope ignores blank runtime configuration and secrets', () => {
   const scope = resolveHostScope({
     DSH_HOME: '/tmp/cocode-dsh',
     COCODE_LLM_PROVIDERS: '  ',
+    COCODE_HOME: '  ',
     COCODE_CLOUD_API_KEY: 'secret',
   })
   assert.equal(scope.hostConfigFingerprint, 'cocode-web-jsonrpc-v1')
   assert.deepEqual(resolveHostRuntimeEnv({ COCODE_CLOUD_API_KEY: 'secret' }), {})
+})
+
+test('vision config location isolates shared Hosts by account home', () => {
+  const first = resolveHostScope({
+    DSH_HOME: '/tmp/cocode-dsh',
+    COCODE_HOME: '/tmp/cocode-account-a',
+  })
+  const second = resolveHostScope({
+    DSH_HOME: '/tmp/cocode-dsh',
+    COCODE_HOME: '/tmp/cocode-account-b',
+  })
+
+  assert.notEqual(first.hostConfigFingerprint, second.hostConfigFingerprint)
+  assert.notEqual(hostKey(first), hostKey(second))
 })
 
 test('hostKey is stable for equivalent scopes', () => {

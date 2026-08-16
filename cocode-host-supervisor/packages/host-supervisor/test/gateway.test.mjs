@@ -133,6 +133,10 @@ test('uses vision evidence without retaining images for text-only models', async
 
   assert.deepEqual(visionCalls[0]?.options, { preserveImages: false })
   assert.deepEqual(followed[0]?.content, [{ type: 'text', text: '[Image evidence]\na diagram' }])
+  assert.deepEqual(followed[0]?.source, {
+    kind: 'user',
+    displayContent: [{ type: 'text', text: 'Read this image' }, imageBlock],
+  })
 })
 
 test('rejects an unconfigured vision bridge before persisting the image', async () => {

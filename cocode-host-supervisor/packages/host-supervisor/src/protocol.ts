@@ -1,12 +1,13 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { homedir } from 'node:os'
-import { resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 
 export type HostClientKind = 'gui' | 'desktop-tui' | 'standalone-tui'
 export type HostServiceName = 'web' | 'jsonrpc'
 export type RuntimeChannel = 'stable' | 'preview' | 'dev'
 export type HostRuntimeEnv = Readonly<{
   COCODE_LLM_PROVIDERS?: string
+  COCODE_VISION_CONFIG?: string
 }>
 
 export interface HostScope {
@@ -78,10 +79,25 @@ export const LEASE_TTL_MS = 30_000
  * Host keys from the same process environment.
  */
 export function resolveHostRuntimeEnv(env: NodeJS.ProcessEnv): HostRuntimeEnv {
-  const providers = env.COCODE_LLM_PROVIDERS?.trim()
-  return providers === undefined || providers === ''
-    ? {}
-    : { COCODE_LLM_PROVIDERS: providers }
+  const providers = nonemptyEnv(env.COCODE_LLM_PROVIDERS)
+  const visionConfig = resolveVisionConfigPath(env)
+
+  return {
+    ...(providers === undefined ? {} : { COCODE_LLM_PROVIDERS: providers }),
+    ...(visionConfig === undefined ? {} : { COCODE_VISION_CONFIG: visionConfig }),
+  }
+}
+
+function resolveVisionConfigPath(env: NodeJS.ProcessEnv): string | undefined {
+  const configured = nonemptyEnv(env.COCODE_VISION_CONFIG)
+  if (configured !== undefined) return resolve(configured)
+  const home = nonemptyEnv(env.COCODE_HOME)
+  return home === undefined ? undefined : join(resolve(home), 'vision.yaml')
+}
+
+function nonemptyEnv(value: string | undefined): string | undefined {
+  const trimmed = value?.trim()
+  return trimmed === undefined || trimmed === '' ? undefined : trimmed
 }
 
 export function resolveHostScope(env: NodeJS.ProcessEnv = process.env): HostScope {

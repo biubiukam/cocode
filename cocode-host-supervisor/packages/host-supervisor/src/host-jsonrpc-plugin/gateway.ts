@@ -317,7 +317,7 @@ export class TuiCompanionGateway {
     const contentBlocks = await this.preparePromptBlocks(params.contentBlocks)
     const record = await this.getOrCreateSession(params.sessionId)
     this.assertLive(params.sessionId, record)
-    const message = createUserMessage(contentBlocks)
+    const message = createUserMessage(contentBlocks, params.contentBlocks)
     switch (params.mode ?? 'normal') {
       case 'normal':
       case 'queue':
@@ -1045,12 +1045,12 @@ function safeModelCatalogError(error: unknown): string {
   return redacted.length > 240 ? `${redacted.slice(0, 237)}...` : redacted
 }
 
-function createUserMessage(content: ContentBlock[]): UserMessage {
+function createUserMessage(content: ContentBlock[], displayContent: ContentBlock[]): UserMessage {
   const message = {
     id: randomUUID(),
     role: 'user' as const,
     content,
-    source: { kind: 'user' as const },
+    source: { kind: 'user' as const, displayContent },
   }
   return deepFreeze(message)
 }

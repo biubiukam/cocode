@@ -2,7 +2,8 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { apply } from '../../packages/vision/src/index.ts'
+import { mergeHostRuntimeEnv, resolveHostRuntimeEnv } from '@cocode/host-supervisor'
+import { apply, createVisionService } from '../../packages/vision/src/index.ts'
 import type { CocodeVisionService, RuntimeContext } from '../../packages/vision/src/index.ts'
 import { loadVisionConfig, mergeVisionConfig, visionConfigPath } from '../../packages/vision/src/config.ts'
 
@@ -38,6 +39,35 @@ describe('vision user configuration', () => {
     expect(visionConfigPath({ COCODE_HOME: home })).toBe(join(home, 'vision.yaml'))
   })
 
+  it('keeps the vision config when a shared Host lacks the client COCODE_HOME', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'cocode-vision-'))
+    temporaryDirectories.push(home)
+    writeFileSync(join(home, 'vision.yaml'), [
+      'provider: user',
+      'user:',
+      '  endpoint: https://vision.example/v1/chat/completions',
+      '  model: vision-model',
+      '  credentialRef: VISION_KEY',
+    ].join('\n'))
+
+    const runtimeEnv = resolveHostRuntimeEnv({ COCODE_HOME: home })
+    const hostEnv = mergeHostRuntimeEnv({}, runtimeEnv, join(home, 'dsh'))
+    const stored = loadVisionConfig(hostEnv)
+    const service = createVisionService({
+      get(name) {
+        if (name !== 'credentials') return undefined
+        return { resolve: async (ref: string) => ref === 'VISION_KEY' ? { value: 'test-only' } : undefined }
+      },
+    }, mergeVisionConfig(stored, { provider: 'user' }))
+
+    await expect(service.status()).resolves.toMatchObject({
+      provider: 'user',
+      configured: true,
+      model: 'vision-model',
+      endpoint: 'https://vision.example/v1/chat/completions',
+    })
+  })
+
   it('lets explicit runtime values override persisted values', () => {
     expect(mergeVisionConfig({
       provider: 'user',
@@ -58,7 +88,7 @@ describe('vision user configuration', () => {
     expect(() => loadVisionConfig({ COCODE_HOME: home })).toThrow('invalid provider')
   })
 
-  it('applies the persisted file and lets environment variables override it', async () => {
+  it('uses the persisted file as the vision configuration source', async () => {
     const home = mkdtempSync(join(tmpdir(), 'cocode-vision-'))
     temporaryDirectories.push(home)
     writeFileSync(join(home, 'vision.yaml'), [
@@ -69,7 +99,6 @@ describe('vision user configuration', () => {
       '  credentialRef: STORED_KEY',
     ].join('\n'))
     vi.stubEnv('COCODE_HOME', home)
-    vi.stubEnv('COCODE_VISION_USER_MODEL', 'env-model')
 
     const provided = new Map<string, unknown>()
     const context: RuntimeContext = {
@@ -87,7 +116,7 @@ describe('vision user configuration', () => {
     await expect(service.status()).resolves.toMatchObject({
       provider: 'user',
       configured: true,
-      model: 'env-model',
+      model: 'stored-model',
       endpoint: 'https://stored.example/v1/chat/completions',
     })
   })
@@ -96,7 +125,6 @@ describe('vision user configuration', () => {
     const home = mkdtempSync(join(tmpdir(), 'cocode-vision-'))
     temporaryDirectories.push(home)
     vi.stubEnv('COCODE_HOME', home)
-    vi.stubEnv('COCODE_VISION_PROVIDER', 'user')
 
     type RegisteredCommand = { handler(input: { rawInput: string; signal: AbortSignal }): Promise<unknown> }
     let registered: RegisteredCommand | undefined
@@ -120,6 +148,9 @@ describe('vision user configuration', () => {
     }
     apply(context)
 
+    await expect(registered?.handler({ rawInput: 'provider user', signal: new AbortController().signal })).resolves.toMatchObject({
+      kind: 'success',
+    })
     await expect(registered?.handler({ rawInput: 'model vision-model', signal: new AbortController().signal })).resolves.toMatchObject({
       kind: 'success',
     })

@@ -44,7 +44,7 @@ export type UserMessage = {
   id: string
   role: 'user'
   content: ContentBlock[]
-  source: { kind: 'user' }
+  source: { kind: 'user'; displayContent?: ContentBlock[] }
 }
 
 export type RuntimeContext = {

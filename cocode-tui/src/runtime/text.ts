@@ -12,6 +12,17 @@ export function blocksToText(blocks: unknown): string {
     .join('')
 }
 
+/** Hide legacy vision-bridge evidence when the original display content is unavailable. */
+export function blocksToUserDisplayText(blocks: unknown): string {
+  if (!Array.isArray(blocks)) return ''
+  return blocks
+    .filter((block): block is { type: string; text: string } => {
+      return isRecord(block) && block.type === 'text' && typeof block.text === 'string'
+    })
+    .map((block) => block.text.split('[Image evidence]', 1)[0])
+    .join('')
+}
+
 export function reasoningToText(blocks: unknown): string {
   if (!Array.isArray(blocks)) return ''
   return blocks
