@@ -33,7 +33,7 @@ export const zh = {
   refresh: '刷新',
   save: '保存',
   saved: '已保存',
-  unsaved: '未保存',
+  unsaved: '待保存',
   saveFailed: '保存失败',
   truncation: '文件过大，仅显示前 512KB',
   binary: '二进制文件，无法预览',

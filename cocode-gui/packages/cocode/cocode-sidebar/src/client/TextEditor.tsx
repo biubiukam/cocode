@@ -130,6 +130,7 @@ export function TextEditor(props: FileViewerProps) {
           if (update.docChanged) {
             setDraft(update.state.doc.toString())
             setDirty(true)
+            setSaveState('idle')
           }
         }),
         keymap.of([
@@ -267,7 +268,13 @@ export function TextEditor(props: FileViewerProps) {
     )
   }
   const editable = content !== undefined
-  const saveLabel = saveState === 'saving' ? t('loading') : saveState === 'saved' ? t('saved') : saveState === 'failed' ? t('saveFailed') : ''
+  const saveLabel = saveState === 'saving'
+    ? t('loading')
+    : saveState === 'failed'
+      ? t('saveFailed')
+      : dirty
+        ? t('unsaved')
+        : t('saved')
   // Per-feature sandbox escape hatch: the global side card setting (warned)
   // plus a per-surface temporary unlock. The unlock state starts at the
   // "default unsafe" pref so a preview can open straight into the red
@@ -299,19 +306,31 @@ export function TextEditor(props: FileViewerProps) {
             </button>
           </div>
         )}
-        {dirty && <span className={css.dirtyDot} title={t('unsaved')} />}
         {editable && (
-          <button
-            type="button"
-            className={css.iconButton}
-            aria-label={t('save')}
-            title={`${t('save')} (Ctrl/Cmd+S)`}
-            onClick={save}
-          >
-            <IconCheckOutline16 />
-          </button>
+          <div className={css.editorSaveCluster}>
+            {dirty && <span className={css.dirtyDot} title={t('unsaved')} />}
+            {(dirty || saveState === 'failed') && (
+              <button
+                type="button"
+                className={css.iconButton}
+                aria-label={t('save')}
+                title={`${t('save')} (Ctrl/Cmd+S)`}
+                onClick={save}
+                disabled={saveState === 'saving'}
+              >
+                <IconCheckOutline16 />
+              </button>
+            )}
+            <span className={clsx(
+              css.editorStatus,
+              saveState === 'failed' && css.editorStatusError,
+              !dirty && saveState !== 'failed' && saveState !== 'saving' && css.editorStatusSuccess,
+            )}>
+              {!dirty && saveState !== 'failed' && saveState !== 'saving' && <IconCheckOutline16 />}
+              {saveLabel}
+            </span>
+          </div>
         )}
-        {saveLabel !== '' && <span className={clsx(css.editorStatus, saveState === 'failed' && css.editorStatusError)}>{saveLabel}</span>}
       </div>
       {editable && (
         <>

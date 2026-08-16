@@ -753,6 +753,30 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
+.editorSaveCluster {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+}
+
+.editorStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.editorStatus :global(svg) {
+  display: block;
+  flex: none;
+}
+
+.editorStatusSuccess {
+  color: var(--dsw-alias-state-success-primary);
+}
+
 .editorStatusError {
   color: var(--dsw-alias-state-error-primary);
 }
