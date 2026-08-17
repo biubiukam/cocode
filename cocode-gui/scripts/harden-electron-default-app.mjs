@@ -1,5 +1,6 @@
+import { spawn } from "node:child_process"
 import { createRequire } from "node:module"
-import { mkdtemp, readFile, readdir, rename, rm, writeFile } from "node:fs/promises"
+import { access, mkdtemp, readFile, readdir, rename, rm, writeFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { createPackage, extractAll } from "@electron/asar"
@@ -17,6 +18,8 @@ const welcomeBranchStart = "\nelse {\n    if (!option.noHelp) {"
 const sourceMapComment = "\n//# sourceMappingURL=main.js.map"
 const silentExitBranch = `\nelse {\n    // ${marker}\n    process.exit(0);\n}`
 
+await ensureElectronBinary()
+
 const resourcesRoots = configuredResourcesRoot
 	? [path.resolve(configuredResourcesRoot)]
 	: await discoverElectronResourcesRoots()
@@ -27,6 +30,12 @@ for (const resourcesRoot of resourcesRoots) {
 
 async function hardenDefaultApp(resourcesRoot) {
 	const defaultAppArchive = path.join(resourcesRoot, "default_app.asar")
+	if (!(await pathExists(defaultAppArchive))) {
+		throw new Error(
+			`Electron default app archive is missing: ${defaultAppArchive}. ` +
+				"The Electron binary installation did not complete; remove node_modules/electron and reinstall.",
+		)
+	}
 	const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "cocode-electron-default-app-"))
 	const extractedDefaultApp = path.join(temporaryRoot, "default-app")
 	const replacementArchive = path.join(temporaryRoot, "default_app.asar")
@@ -74,11 +83,11 @@ async function hardenDefaultApp(resourcesRoot) {
 }
 
 async function discoverElectronResourcesRoots() {
-	const roots = [
+	const primaryRoot =
 		process.platform === "darwin"
 			? path.join(electronPackageRoot, "dist", "Electron.app", "Contents", "Resources")
-			: path.join(electronPackageRoot, "dist", "resources"),
-	]
+			: path.join(electronPackageRoot, "dist", "resources")
+	const roots = [primaryRoot]
 	const pnpmStoreRoot = path.join(path.dirname(electronPackageRoot), ".pnpm")
 	let entries
 	try {
@@ -89,11 +98,85 @@ async function discoverElectronResourcesRoots() {
 	for (const entry of entries) {
 		if (!entry.isDirectory() || !entry.name.startsWith("electron@")) continue
 		const packageRoot = path.join(pnpmStoreRoot, entry.name, "node_modules", "electron")
-		roots.push(
+		const resourcesRoot =
 			process.platform === "darwin"
 				? path.join(packageRoot, "dist", "Electron.app", "Contents", "Resources")
-				: path.join(packageRoot, "dist", "resources"),
+				: path.join(packageRoot, "dist", "resources")
+		if (await pathExists(path.join(resourcesRoot, "default_app.asar")))
+			roots.push(resourcesRoot)
+	}
+	if (!(await pathExists(path.join(primaryRoot, "default_app.asar")))) {
+		throw new Error(
+			`Electron default app archive is missing: ${path.join(
+				primaryRoot,
+				"default_app.asar",
+			)}. ` +
+				"The Electron binary installation did not complete; remove node_modules/electron and reinstall.",
 		)
 	}
 	return [...new Set(roots)]
+}
+
+async function ensureElectronBinary() {
+	if (await electronBinaryExists()) return
+
+	const installerPath = path.join(electronPackageRoot, "install.js")
+	console.log("[electron] downloading the Electron binary")
+	await runNodeScript(installerPath)
+	if (!(await electronBinaryExists())) {
+		throw new Error(
+			"Electron binary installation finished without producing the expected executable. " +
+				"Check the Electron download mirror/proxy and retry after removing node_modules/electron.",
+		)
+	}
+}
+
+async function electronBinaryExists() {
+	try {
+		const version = (await readFile(path.join(electronPackageRoot, "dist", "version"), "utf8"))
+			.trim()
+			.replace(/^v/, "")
+		const packageVersion = require(path.join(electronPackageRoot, "package.json")).version
+		if (version !== packageVersion) return false
+
+		const platformPath = (
+			await readFile(path.join(electronPackageRoot, "path.txt"), "utf8")
+		).trim()
+		const distRoot = process.env.ELECTRON_OVERRIDE_DIST_PATH
+			? path.resolve(process.env.ELECTRON_OVERRIDE_DIST_PATH)
+			: path.join(electronPackageRoot, "dist")
+		await access(path.join(distRoot, platformPath))
+		return true
+	} catch {
+		return false
+	}
+}
+
+function runNodeScript(scriptPath) {
+	return new Promise((resolve, reject) => {
+		const child = spawn(process.execPath, [scriptPath], { stdio: "inherit", env: process.env })
+		child.once("error", reject)
+		child.once("close", (code, signal) => {
+			if (code === 0) {
+				resolve()
+			} else {
+				reject(
+					new Error(
+						`Electron installer exited with ${
+							signal ? `signal ${signal}` : `code ${code}`
+						}.`,
+					),
+				)
+			}
+		})
+	})
+}
+
+async function pathExists(filePath) {
+	try {
+		await access(filePath)
+		return true
+	} catch {
+		return false
+	}
 }
