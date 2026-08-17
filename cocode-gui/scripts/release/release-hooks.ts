@@ -353,9 +353,10 @@ function findFirstByExtension(root: string, extension: string): string | undefin
 	return undefined
 }
 
-function findMacAppWithTui(root: string): string | undefined {
+export function findMacAppWithTui(root: string): string | undefined {
 	if (!existsSync(root)) return undefined
-	if (root.endsWith(".app") && statSync(root).isDirectory()) {
+	if (!statSync(root).isDirectory()) return undefined
+	if (root.endsWith(".app")) {
 		return existsSync(path.join(root, "Contents", "Resources", "tui", "manifest.json"))
 			? root
 			: undefined

@@ -1,10 +1,11 @@
 import assert from "node:assert/strict"
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import test from "node:test"
 import type { ForgeMakeResult } from "@electron-forge/shared-types"
 import {
+	findMacAppWithTui,
 	normalizeArtifactNames,
 	selectGitHubReleaseArtifacts,
 } from "../../scripts/release/release-hooks"
@@ -44,4 +45,19 @@ test("does not publish Windows arm64 Squirrel feed metadata to the shared feed",
 	}
 	const [selected] = selectGitHubReleaseArtifacts([result])
 	assert.deepEqual(selected?.artifacts, ["/tmp/arm64-Setup.exe"])
+})
+
+test("skips files while searching for the packaged macOS app", () => {
+	const root = mkdtempSync(path.join(os.tmpdir(), "cocode-release-hooks-"))
+	try {
+		mkdirSync(path.join(root, "runtime"), { recursive: true })
+		writeFileSync(path.join(root, "runtime", "README.md"), "runtime")
+		const appPath = path.join(root, "Cocode.app")
+		mkdirSync(path.join(appPath, "Contents", "Resources", "tui"), { recursive: true })
+		writeFileSync(path.join(appPath, "Contents", "Resources", "tui", "manifest.json"), "{}")
+
+		assert.equal(findMacAppWithTui(root), appPath)
+	} finally {
+		rmSync(root, { recursive: true, force: true })
+	}
 })
