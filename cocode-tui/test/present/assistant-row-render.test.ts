@@ -2,12 +2,15 @@ import { Writable } from 'node:stream'
 import React from 'react'
 import { Box, render } from 'ink'
 import stringWidth from 'string-width'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import type { AssistantNode } from '../../src/runtime/nodes/types.ts'
 import { AssistantRow } from '../../src/present/components/AssistantRow.tsx'
 import { messageContentColumns } from '../../src/present/layout.ts'
+import { setTheme } from '../../src/present/theme.ts'
 
 describe('AssistantRow rendering', () => {
+  afterEach(() => setTheme('dark'))
+
   it('keeps the assistant body two cells from the message track', () => {
     expect(messageContentColumns(40)).toBe(38)
     expect(messageContentColumns(undefined)).toBeUndefined()
@@ -62,6 +65,99 @@ describe('AssistantRow rendering', () => {
     expect(lines.some((line) => /^│ Done\./.test(line))).toBe(true)
     expect(Math.max(...lines.map((line) => stringWidth(line)))).toBeLessThanOrEqual(40)
   })
+
+  it('highlights a partial thinking range without hiding the reply', async () => {
+    setTheme('dark', true)
+    const stdout = new CaptureStream(80, 20)
+    const node: AssistantNode = {
+      kind: 'assistant',
+      id: 'assistant-1',
+      seq: 1,
+      time: 1,
+      turn: 1,
+      step: 1,
+      text: 'answer',
+      reasoning: 'thoughts',
+      streaming: false,
+    }
+    const app = render(
+      React.createElement(
+        Box,
+        { width: 80 },
+        React.createElement(AssistantRow, {
+          node,
+          verbose: true,
+          locale: 'en',
+          maxColumns: 40,
+          textSelection: { start: 0, end: 8 },
+        }),
+      ),
+      {
+        stdout: stdout as unknown as NodeJS.WriteStream,
+        debug: true,
+        patchConsole: false,
+        exitOnCtrlC: false,
+      },
+    )
+
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    app.unmount()
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    app.cleanup()
+
+    const plain = stdout.output.replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, '')
+    expect(plain).toContain('thoughts')
+    expect(plain).toContain('answer')
+  })
+
+  it('separates thinking from the reply with a blank rail row', async () => {
+    const stdout = new CaptureStream(80, 20)
+    const node: AssistantNode = {
+      kind: 'assistant',
+      id: 'assistant-1',
+      seq: 1,
+      time: 1,
+      turn: 1,
+      step: 1,
+      text: 'answer',
+      reasoning: 'thoughts',
+      streaming: false,
+    }
+    const app = render(
+      React.createElement(
+        Box,
+        { width: 80 },
+        React.createElement(AssistantRow, {
+          node,
+          verbose: true,
+          locale: 'en',
+          maxColumns: 40,
+        }),
+      ),
+      {
+        stdout: stdout as unknown as NodeJS.WriteStream,
+        debug: true,
+        patchConsole: false,
+        exitOnCtrlC: false,
+      },
+    )
+
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    app.unmount()
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    app.cleanup()
+
+    const lines = stdout.output
+      .replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, '')
+      .replaceAll('\r', '')
+      .split('\n')
+    const thoughts = lines.findIndex((line) => line.includes('thoughts'))
+    const answer = lines.findIndex((line) => line.includes('answer'))
+
+    expect(thoughts).toBeGreaterThanOrEqual(0)
+    expect(answer).toBe(thoughts + 2)
+    expect(lines[thoughts + 1]?.replace(/[│▌ ]/g, '')).toBe('')
+  })
 })
 
 class CaptureStream extends Writable {
@@ -74,6 +170,10 @@ class CaptureStream extends Writable {
     readonly rows: number,
   ) {
     super()
+  }
+
+  getColorDepth(): number {
+    return 24
   }
 
   override _write(

@@ -100,6 +100,13 @@ type ComposerShortcutKey = {
   ctrl?: boolean
   meta?: boolean
   super?: boolean
+  shift?: boolean
+}
+
+/** Bare C, or Ctrl/Meta/Super+C. Shift+C is not a copy chord. */
+export function isCopyShortcut(input: string, key: ComposerShortcutKey): boolean {
+  if (input.toLowerCase() !== 'c' || key.shift === true) return false
+  return true
 }
 
 /** Handle standard text-selection shortcuts before global Ctrl+C routing. */

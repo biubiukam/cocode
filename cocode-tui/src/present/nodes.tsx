@@ -10,6 +10,7 @@ import { NoticeRow } from './components/NoticeRow.tsx'
 import { ToolCard } from './components/ToolCard.tsx'
 import { UserRow } from './components/UserRow.tsx'
 import type { UiLocale } from '../runtime/ui-locale.ts'
+import type { MessageTextRange } from './message-text-selection.ts'
 
 export type NodeRenderOptions = {
   expanded?: boolean
@@ -19,6 +20,7 @@ export type NodeRenderOptions = {
   locale?: UiLocale
   maxColumns?: number
   expandedLevel?: 0 | 1 | 2
+  textSelection?: MessageTextRange
 }
 
 export type NodeView = (
@@ -33,6 +35,7 @@ const views: Record<string, NodeView> = {
       <UserRow
         node={node}
         selected={options.selected === true}
+        textSelection={options.textSelection}
         locale={options.locale ?? 'en'}
         maxColumns={options.maxColumns}
       />
@@ -54,6 +57,7 @@ const views: Record<string, NodeView> = {
         locale={options.locale ?? 'en'}
         maxColumns={options.maxColumns}
         expandedLevel={options.expandedLevel}
+        textSelection={options.textSelection}
       />
     ) : null,
   tool: (node, verbose, options) =>
@@ -63,6 +67,7 @@ const views: Record<string, NodeView> = {
         verbose={verbose || options.expanded === true}
         selected={options.selected === true}
         attached={options.attached === true}
+        textSelection={options.textSelection}
         locale={options.locale ?? 'en'}
         maxColumns={options.maxColumns}
       />

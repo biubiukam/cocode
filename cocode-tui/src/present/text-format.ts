@@ -19,16 +19,15 @@ export function formatReasoning(
   // Keep the active reasoning visible so the user can tell the model is making
   // progress. Once the assistant message is sealed, the default view folds it
   // back to a compact summary; verbose mode still keeps it expanded.
+  // Duration is metadata, not part of the transcript text.
+  void thinkingDurationMs
   if (verbose || viewMode === 2) return text
   const limit = streaming
     ? STREAMING_REASONING_LINES
     : viewMode === 1
       ? EXPANDED_REASONING_LINES
       : COLLAPSED_REASONING_LINES
-  const visible = reasoningTail(text, limit)
-  if (streaming) return visible
-  const duration = formatThinkingDuration(thinkingDurationMs)
-  return duration === undefined ? visible : `${visible}\n\nThought for ${duration}`
+  return reasoningTail(text, limit)
 }
 
 export function formatThinkingDuration(durationMs: number | undefined): string | undefined {
