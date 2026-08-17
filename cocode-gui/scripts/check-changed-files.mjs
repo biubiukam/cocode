@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process"
+import { existsSync } from "node:fs"
 import { extname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -71,6 +72,7 @@ const lintExtensions = new Set([".cjs", ".js", ".mjs", ".ts", ".tsx"])
 const candidates = changedFiles().filter(
 	(file) =>
 		file.startsWith("cocode-gui/") &&
+		existsSync(resolve(repositoryRoot, file)) &&
 		!ignoredPrefixes.some((prefix) => file.startsWith(prefix)) &&
 		file !== "cocode-gui/pnpm-lock.yaml",
 )
@@ -84,11 +86,18 @@ if (relativeFiles.length === 0) {
 }
 
 const packageManager = process.platform === "win32" ? "pnpm.cmd" : "pnpm"
-const command = mode === "format" ? "prettier" : "eslint"
+const command = mode === "format" ? "prettier" : "oxlint"
 const args =
 	mode === "format"
 		? ["exec", command, "--check", ...relativeFiles]
-		: ["exec", command, "--max-warnings=0", ...relativeFiles]
+		: [
+				"exec",
+				command,
+				"--deny-warnings",
+				"--react-plugin",
+				"--import-plugin",
+				...relativeFiles,
+		  ]
 
 execFileSync(packageManager, args, {
 	cwd: guiRoot,

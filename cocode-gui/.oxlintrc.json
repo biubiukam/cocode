@@ -1,0 +1,140 @@
+{
+	"$schema": "./node_modules/oxlint/configuration_schema.json",
+	"plugins": ["import", "react", "typescript"],
+	"categories": {
+		"correctness": "off"
+	},
+	"options": {
+		"reportUnusedDisableDirectives": "warn",
+		"typeAware": false
+	},
+	"env": {
+		"builtin": true
+	},
+	"ignorePatterns": [
+		"**/lib/**",
+		"**/node_modules/**",
+		"**/.cache/**",
+		"**/.vite/**",
+		"**/coverage/**",
+		"**/dist/**",
+		"**/dist-electron/**",
+		"**/out/**",
+		"**/release/**",
+		"docs/**",
+		"packages/client/**",
+		"packages/cocode/**",
+		"vendor/**"
+	],
+	"rules": {
+		"no-var": "error",
+		"prefer-const": "error",
+		"prefer-rest-params": "error",
+		"prefer-spread": "error",
+		"no-array-constructor": "error",
+		"no-unused-expressions": "error",
+		"no-unused-vars": [
+			"error",
+			{
+				"argsIgnorePattern": "^_",
+				"varsIgnorePattern": "^_",
+				"caughtErrorsIgnorePattern": "^_"
+			}
+		],
+		"no-useless-constructor": "error",
+		"react/react-in-jsx-scope": "off",
+		"typescript/no-array-delete": "error",
+		"typescript/no-base-to-string": "error",
+		"typescript/no-deprecated": "error",
+		"typescript/no-duplicate-enum-values": "error",
+		"typescript/no-duplicate-type-constituents": "error",
+		"typescript/no-explicit-any": "error",
+		"typescript/no-extra-non-null-assertion": "error",
+		"typescript/no-floating-promises": "error",
+		"typescript/no-for-in-array": "error",
+		"typescript/no-implied-eval": "error",
+		"typescript/no-meaningless-void-operator": "error",
+		"typescript/no-misused-new": "error",
+		"typescript/no-misused-promises": "error",
+		"typescript/no-mixed-enums": "error",
+		"typescript/no-require-imports": "error",
+		"typescript/no-redundant-type-constituents": "error",
+		"typescript/no-this-alias": "error",
+		"typescript/no-unnecessary-type-assertion": "error",
+		"typescript/no-unnecessary-type-constraint": "error",
+		"typescript/no-unsafe-argument": "error",
+		"typescript/no-unsafe-assignment": "error",
+		"typescript/no-unsafe-call": "error",
+		"typescript/no-unsafe-member-access": "error",
+		"typescript/no-unsafe-return": "error",
+		"typescript/prefer-as-const": "error",
+		"typescript/prefer-promise-reject-errors": "error",
+		"typescript/restrict-plus-operands": "error",
+		"typescript/return-await": ["error", "error-handling-correctness-only"],
+		"typescript/unified-signatures": "error"
+	},
+	"overrides": [
+		{
+			"files": ["src/renderer/**/*.{ts,tsx}"],
+			"rules": {
+				"no-restricted-imports": [
+					"error",
+					{
+						"paths": [
+							{
+								"name": "electron",
+								"message": "Renderer must use the allow-listed Preload API instead of importing Electron."
+							}
+						],
+						"patterns": [
+							{
+								"group": [
+									"node:*",
+									"assert",
+									"buffer",
+									"child_process",
+									"crypto",
+									"events",
+									"fs",
+									"http",
+									"https",
+									"module",
+									"net",
+									"os",
+									"path",
+									"process",
+									"stream",
+									"url",
+									"util",
+									"worker_threads",
+									"zlib"
+								],
+								"message": "Renderer must not import Node.js built-ins; move privileged work to Main/Preload."
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"files": ["src/main/**/*.{ts,tsx}", "src/preload/**/*.{ts,tsx}", "tests/**/*.{ts,tsx}"],
+			"rules": {
+				"no-restricted-imports": [
+					"error",
+					{
+						"paths": [
+							{
+								"name": "path",
+								"message": "Import pathe instead: it keeps logical paths forward-slash on every platform."
+							},
+							{
+								"name": "node:path",
+								"message": "Import pathe instead: it keeps logical paths forward-slash on every platform."
+							}
+						]
+					}
+				]
+			}
+		}
+	]
+}
