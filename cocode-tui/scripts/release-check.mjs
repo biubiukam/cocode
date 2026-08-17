@@ -18,6 +18,7 @@ const packageJson = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8
 const failures = []
 const releaseFiles = [
   'bin/cocode-tui.mjs',
+  'bin/cli.mjs',
   'dist/cocode-tui.mjs',
   'dist/cocode-tui.meta.json',
 ]

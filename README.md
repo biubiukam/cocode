@@ -117,6 +117,23 @@ make dev dsh
 
 Run `make` with no arguments to list every target.
 
+### The `cocode` command
+
+After installing the TUI or desktop build, `cocode` is the unified entry point. With no subcommand it keeps the existing behavior and opens the TUI. GUI, TUI, and Host management use the same environment-derived Host scope, so different clients can attach to the same Host.
+
+```sh
+cocode --version                 # Show the installed version
+cocode gui                       # Open the GUI
+cocode tui                       # Open the TUI
+cocode host status               # Inspect the shared Host without starting it
+cocode host status --json        # Print machine-readable status
+cocode host stop                 # Stop Host and Supervisor when no clients hold leases
+cocode host stop --force         # Explicitly interrupt GUI/TUI clients that hold leases
+cocode doctor                    # Check TUI, Supervisor, and Host connectivity
+```
+
+`--dsh-home <path>`, `--profile <name>`, and `--runtime-channel stable|preview|dev` can be placed before or after a subcommand to select the Host scope. If the GUI cannot be located automatically on a platform, set `COCODE_GUI_EXECUTABLE` (or the `COCODE_GUI_PATH` alias) to its executable path.
+
 The GUI reuses a staged runtime in the OS cache directory. Two escape hatches
 when that cache goes stale:
 

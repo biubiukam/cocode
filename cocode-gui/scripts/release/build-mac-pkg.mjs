@@ -91,7 +91,7 @@ export function buildMacPkg({ appPath, outputPath, version, environment = proces
 export function macCliWrapper(environment = process.env) {
 	const resources = "/Applications/Cocode.app/Contents/Resources"
 	const executable = `${resources}/cocode-node`
-	const entry = `${resources}/tui/cocode-tui.mjs`
+	const entry = `${resources}/tui/cocode-cli.mjs`
 	const supervisorEntry = `${resources}/dsh-runtime/packages/host-supervisor/lib/bin.js`
 	return [
 		"#!/bin/sh",

@@ -105,6 +105,23 @@ make dev dsh
 
 直接执行 `make` 会列出所有目标。
 
+### `cocode` 命令
+
+安装 TUI 或桌面版后，`cocode` 是统一入口。没有子命令时保持原行为，直接打开 TUI；GUI、TUI 和 Host 管理使用同一组环境变量，因此不同端可以访问同一个 Host 作用域。
+
+```sh
+cocode --version                 # 查询安装版本
+cocode gui                       # 打开 GUI
+cocode tui                       # 打开 TUI
+cocode host status               # 查询共享 Host，不会启动 Host
+cocode host status --json        # 输出机器可读状态
+cocode host stop                 # 无活动客户端时停止 Host 和 Supervisor
+cocode host stop --force         # 明确中断仍持有 lease 的 GUI/TUI 客户端
+cocode doctor                    # 检查 TUI、Supervisor 和 Host 能否联通
+```
+
+`--dsh-home <path>`、`--profile <name>` 和 `--runtime-channel stable|preview|dev` 可以放在子命令前或后，用来选择需要管理的 Host 作用域。跨平台无法自动定位 GUI 时，设置 `COCODE_GUI_EXECUTABLE`（也支持别名 `COCODE_GUI_PATH`）指定 GUI 可执行文件。
+
 GUI 会复用系统缓存目录里已暂存的运行时。缓存过期时有两个逃生口：
 
 ```sh
