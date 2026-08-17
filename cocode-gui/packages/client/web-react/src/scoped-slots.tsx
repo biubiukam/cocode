@@ -417,11 +417,13 @@ function standardKit(
   const store = scope === 'session-maybe' && info?.sessionId === undefined
     ? undefined
     : host.storeOf(entry, info?.sessionId)
-  if (store !== undefined) {
-    // The instance IS an observable snapshot source (contract getSnapshot/
-    // subscribe); the useStore hook binds here, cached per instance.
-    kit['useStore'] = observableHook(store)
-    kit['actions'] = store.actions
+  if (entry.store !== undefined) {
+    // Session-maybe entries still call their store hook before a session is
+    // selected. Bind the framework's absent source in that phase so the
+    // component's hook order stays stable across adoption; the selector then
+    // returns undefined until the real session-scoped store is available.
+    kit['useStore'] = maybeObservableHook(store)
+    if (store !== undefined) kit['actions'] = store.actions
   }
   if (entry.children !== undefined) {
     kit['renderSlot'] = boundRenderSlot(host, entry)

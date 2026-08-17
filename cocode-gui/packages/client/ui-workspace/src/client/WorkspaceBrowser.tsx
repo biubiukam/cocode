@@ -265,7 +265,7 @@ function SessionTree({
   const sessionDropCommitted = useRef(false)
   const [workspaceDrag, setWorkspaceDrag] = useState<WorkspaceDragState | null>(null)
   const workspaceDropCommitted = useRef(false)
-  const [archivingWorkspaceIds, setArchivingWorkspaceIds] = useState<ReadonlySet<WorkspaceId>>(new Set())
+  const [archivingGroupKeys, setArchivingGroupKeys] = useState<ReadonlySet<string>>(new Set())
   const previousOrderBy = useRef(orderBy)
   const nativeDragActive = drag !== null || workspaceDrag !== null
   useNativeDragAcceptance(nativeDragActive)
@@ -281,12 +281,12 @@ function SessionTree({
     () => Object.entries(groupExpansion).filter(([, expanded]) => expanded).map(([key]) => key),
     [groupExpansion],
   )
-  const archiveReadWorkspaceSessions = async (
-    workspaceId: WorkspaceId,
+  const archiveReadGroupSessions = async (
+    groupKey: string,
     candidateIds: readonly SessionId[],
   ): Promise<void> => {
-    if (candidateIds.length === 0 || archivingWorkspaceIds.has(workspaceId)) return
-    setArchivingWorkspaceIds(currentIds => new Set(currentIds).add(workspaceId))
+    if (candidateIds.length === 0 || archivingGroupKeys.has(groupKey)) return
+    setArchivingGroupKeys(currentIds => new Set(currentIds).add(groupKey))
     const failures: { sessionId: SessionId; reason: unknown }[] = []
     try {
       for (const sessionId of candidateIds) {
@@ -302,13 +302,13 @@ function SessionTree({
         }
       }
     } finally {
-      setArchivingWorkspaceIds(currentIds => {
+      setArchivingGroupKeys(currentIds => {
         const next = new Set(currentIds)
-        next.delete(workspaceId)
+        next.delete(groupKey)
         return next
       })
     }
-    if (failures.length > 0) console.warn('workspace session archive partially rejected:', failures)
+    if (failures.length > 0) console.warn('session group archive partially rejected:', failures)
   }
   const ungroupedSessionIds = useMemo(() => {
     const accounted = new Set(workspaces.flatMap(workspace => workspace.sessionIds))
@@ -498,27 +498,26 @@ function SessionTree({
                   }
                 }}
                 drag={workspaceDragProps}
-                actions={group.workspaceId === undefined
-                  ? undefined
-                  : {
+                actions={{
+                  ...(group.workspaceId === undefined ? {} : {
                     rename: () => {
-                    /* v8 ignore next -- narrowing guard: the actions object exists only for real-workspace groups. */
+                      /* v8 ignore next -- narrowing guard: the actions object exists only for real-workspace groups. */
                       if (group.workspaceId !== undefined) onRenameRequest(group.workspaceId, group.label)
                     },
-                    archiveReadSessions: () => {
-                    /* v8 ignore next -- narrowing guard: the actions object exists only for real-workspace groups. */
-                      if (group.workspaceId !== undefined) {
-                        void archiveReadWorkspaceSessions(group.workspaceId, group.archivableSessionIds)
-                      }
-                    },
-                    archiveReadSessionsDisabled: group.archivableSessionIds.length === 0
-                      || archivingWorkspaceIds.has(group.workspaceId),
-                    archiveReadSessionsPending: archivingWorkspaceIds.has(group.workspaceId),
+                  }),
+                  archiveReadSessions: () => {
+                    void archiveReadGroupSessions(group.key, group.archivableSessionIds)
+                  },
+                  archiveReadSessionsDisabled: group.archivableSessionIds.length === 0
+                    || archivingGroupKeys.has(group.key),
+                  archiveReadSessionsPending: archivingGroupKeys.has(group.key),
+                  ...(group.workspaceId === undefined ? {} : {
                     delete: () => {
-                    /* v8 ignore next -- narrowing guard: the actions object exists only for real-workspace groups. */
+                      /* v8 ignore next -- narrowing guard: the actions object exists only for real-workspace groups. */
                       if (group.workspaceId !== undefined) onDeleteRequest(group.workspaceId, group.label)
                     },
-                  }}
+                  }),
+                }}
               />
               {(expandedSessionGroups.includes(group.key)
                 ? group.sessions
