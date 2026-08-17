@@ -9,6 +9,7 @@ import { apply } from '../lib/host-jsonrpc-plugin.js'
 function createContext(options = {}) {
   const agents = new Map()
   const cleanups = []
+  const hooks = Object.create(null)
   let questionProvider
   const userQuestions = {
     provider: undefined,
@@ -66,6 +67,9 @@ function createContext(options = {}) {
       if (name === 'userQuestions') {
         return userQuestions
       }
+      if (name === 'approval') {
+        return options.approval === true ? {} : undefined
+      }
       if (name === 'llm') {
         return {
           listProviders() {
@@ -75,12 +79,22 @@ function createContext(options = {}) {
       }
       return undefined
     },
-    on() {
-      return () => undefined
+    on(name, listener, options) {
+      const prepend = options === true || options?.prepend === true
+      const list = (hooks[name] ??= [])
+      if (prepend) list.unshift(listener)
+      else list.push(listener)
+      return () => {
+        const index = list.indexOf(listener)
+        if (index >= 0) list.splice(index, 1)
+      }
     },
     effect(factory) {
       cleanups.push(factory())
     },
+  }
+  if (options.webApprovalAsk !== undefined) {
+    ctx.on('approval/request', (request, next) => options.webApprovalAsk(request, next))
   }
   return {
     ctx,
@@ -92,6 +106,12 @@ function createContext(options = {}) {
     },
     askQuestion(request) {
       return userQuestions.ask(request)
+    },
+    askApproval(request) {
+      const cbs = [...(hooks['approval/request'] ?? [])]
+      const inner = () => Promise.resolve('unavailable')
+      const next = () => (cbs.shift() ?? inner)(request, next)
+      return next()
     },
     async cleanup() {
       for (const cleanup of cleanups.reverse()) await cleanup()
@@ -292,4 +312,78 @@ test('routes questions by session id when the agent object is not the stored ins
   await ask
 
   assert.equal(frame.params.sessionId, 'tui-session')
+})
+
+test('routes approvals to the TUI that owns the session before the web handler', async t => {
+  const directory = mkdtempSync(join(tmpdir(), 'cocode-host-jsonrpc-'))
+  const endpoint = join(directory, 'host.sock')
+  const webAsks = []
+  const runtime = createContext({
+    approval: true,
+    webApprovalAsk() {
+      webAsks.push('web')
+      return new Promise(() => {})
+    },
+  })
+  apply(runtime.ctx, { endpoint })
+  const client = createRpcClient(endpoint)
+  t.after(async () => {
+    client.close()
+    await runtime.cleanup()
+    rmSync(directory, { recursive: true, force: true })
+  })
+
+  await connectAndInitialize(client)
+  await client.request('session/prompt', {
+    sessionId: 'tui-session',
+    contentBlocks: [{ type: 'text', text: 'escalate permissions' }],
+  })
+
+  const live = runtime.agent('tui-session')
+  const ask = runtime.askApproval({
+    agent: live,
+    toolName: 'bash',
+    reason: 'escalate to danger-full-access',
+  })
+  const frame = await client.notification('cocode/approval/request', 200)
+  await client.request('cocode/approval/respond', {
+    requestId: frame.params.requestId,
+    outcome: 'allowed-once',
+  })
+  await ask
+
+  assert.equal(frame.params.sessionId, 'tui-session')
+  assert.equal(frame.params.toolName, 'bash')
+  assert.equal(webAsks.length, 0)
+})
+
+test('falls through to the web approval handler when no TUI owns the session', async t => {
+  const directory = mkdtempSync(join(tmpdir(), 'cocode-host-jsonrpc-'))
+  const endpoint = join(directory, 'host.sock')
+  const webAsks = []
+  const runtime = createContext({
+    approval: true,
+    webApprovalAsk(request) {
+      webAsks.push(request.agent.session.id)
+      return Promise.resolve('rejected')
+    },
+  })
+  apply(runtime.ctx, { endpoint })
+  const client = createRpcClient(endpoint)
+  t.after(async () => {
+    client.close()
+    await runtime.cleanup()
+    rmSync(directory, { recursive: true, force: true })
+  })
+
+  await connectAndInitialize(client)
+
+  const outcome = await runtime.askApproval({
+    agent: { id: 'foreign', session: { id: 'foreign', events: [] } },
+    toolName: 'bash',
+  })
+
+  assert.equal(outcome, 'rejected')
+  assert.deepEqual(webAsks, ['foreign'])
+  await assert.rejects(client.notification('cocode/approval/request', 20), /timed out/)
 })

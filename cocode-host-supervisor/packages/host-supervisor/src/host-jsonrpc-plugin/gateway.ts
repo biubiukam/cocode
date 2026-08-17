@@ -95,7 +95,7 @@ function isUnownedQuestionError(error: unknown): boolean {
   );
 }
 
-type ApprovalRequest = {
+export type ApprovalRequest = {
   agent: Agent;
   toolName: string;
   callId?: string;
@@ -248,7 +248,6 @@ export class TuiCompanionGateway {
   private readonly pendingApprovals = new Map<string, PendingApproval>();
   private readonly disposers: (() => void)[] = [];
   private questionDisposer: (() => void) | undefined;
-  private approvalDisposer: (() => void) | undefined;
 
   constructor(
     private readonly ctx: RuntimeContext,
@@ -290,7 +289,6 @@ export class TuiCompanionGateway {
         });
       }),
     );
-    this.approvalDisposer = this.registerApprovalProvider();
     if (options.registerQuestionProvider !== false)
       this.tryRegisterQuestionProvider();
   }
@@ -310,25 +308,6 @@ export class TuiCompanionGateway {
   unregisterQuestionProvider(): void {
     this.questionDisposer?.();
     this.questionDisposer = undefined;
-  }
-
-  private registerApprovalProvider(): (() => void) | undefined {
-    if (this.ctx.get("approval") === undefined) return undefined;
-    return this.ctx.on(
-      "approval/request",
-      (request: ApprovalRequest, next: () => Promise<string>) => {
-        const sessionId = String(request.agent.session.id);
-        if (!this.sessions.has(sessionId)) return next();
-        const turn = openTurnOf(request.agent.session.events);
-        if (
-          turn !== undefined &&
-          this.hasTurnAllowance(sessionId, request.toolName, turn)
-        ) {
-          return Promise.resolve("allowed-once");
-        }
-        return this.askApproval(request, turn);
-      },
-    );
   }
 
   /** Advertise only services that are actually present in this composition. */
@@ -1096,10 +1075,15 @@ export class TuiCompanionGateway {
     });
   }
 
-  private async askApproval(
-    request: ApprovalRequest,
-    turn: number | undefined,
-  ): Promise<ApprovalOutcome> {
+  async askApproval(request: ApprovalRequest): Promise<ApprovalOutcome> {
+    const sessionId = String(request.agent.session.id);
+    const turn = openTurnOf(request.agent.session.events);
+    if (
+      turn !== undefined &&
+      this.hasTurnAllowance(sessionId, request.toolName, turn)
+    ) {
+      return "allowed-once";
+    }
     const requestId = `approval-${randomUUID()}`;
     const pending = createDeferred<ApprovalOutcome>();
     this.pendingApprovals.set(requestId, {
@@ -1291,8 +1275,6 @@ export class TuiCompanionGateway {
     this.sessionCreations.clear();
     this.sessionOpenings.clear();
     this.unregisterQuestionProvider();
-    this.approvalDisposer?.();
-    this.approvalDisposer = undefined;
     const failures: unknown[] = [];
     for (const pending of this.pendingQuestions.values())
       pending.reject(new Error("companion is shutting down"));
