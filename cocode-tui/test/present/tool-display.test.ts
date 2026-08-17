@@ -24,6 +24,10 @@ describe('tool display helpers', () => {
       mark: '✓',
       label: 'done',
     })
+    expect(toolDisplayState({ status: 'cancelled' }, 'zh')).toMatchObject({
+      mark: '−',
+      label: '已取消',
+    })
   })
 
   it('summarizes arguments and errors on one line', () => {
@@ -81,6 +85,11 @@ describe('tool display helpers', () => {
     })
     expect(projectToolSummary({ ...running, status: 'success' }, 'en', 80, 3_500).elapsed)
       .toBeUndefined()
+    expect(projectToolSummary({ ...running, status: 'cancelled' }, 'en', 80, 3_500)).toMatchObject({
+      statusLabel: 'canceled',
+      elapsed: undefined,
+      tone: 'mute',
+    })
   })
 
   it('sanitizes and truncates ANSI, controls, Chinese, emoji, paths, and commands by cell width', () => {

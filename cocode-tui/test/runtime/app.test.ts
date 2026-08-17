@@ -1767,6 +1767,86 @@ describe('TuiApp', () => {
     expect(app.snapshot().exiting).toBe(true)
   })
 
+  it('stops in-flight tool clocks when cancellation is accepted', async () => {
+    const runtime = fakeRuntime()
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+    })
+    await app.start()
+    runtime.emit({
+      method: 'session.status',
+      params: { sessionId: 's1', status: 'running' },
+    })
+    runtime.emit({
+      method: 'session.event',
+      params: {
+        sessionId: 's1',
+        event: {
+          type: 'tool/call',
+          seq: 1,
+          time: Date.now() - 5_000,
+          data: {
+            turn: 1,
+            step: 0,
+            callId: 'write-1',
+            name: 'write',
+            arguments: '{"file_path":"/tmp/notes.md"}',
+          },
+        },
+      },
+    })
+    expect(app.snapshot().nodes[0]).toMatchObject({ kind: 'tool', status: 'running' })
+    app.dispatch({ type: 'interruptOrQuit' })
+    await expect.poll(() => runtime.cancels).toEqual([{ sessionId: 's1', keepInbox: false }])
+    expect(app.snapshot().nodes[0]).toMatchObject({ kind: 'tool', status: 'cancelled' })
+    expect(app.snapshot().notice?.message).toMatch(/Cancel requested/)
+    runtime.emit({
+      method: 'session.status',
+      params: { sessionId: 's1', status: 'idle' },
+    })
+    expect(app.snapshot().notice).toBeUndefined()
+  })
+
+  it('settles in-flight tools when the session becomes idle', async () => {
+    const runtime = fakeRuntime()
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+    })
+    await app.start()
+    runtime.emit({
+      method: 'session.event',
+      params: {
+        sessionId: 's1',
+        event: {
+          type: 'tool/call',
+          seq: 1,
+          time: 1,
+          data: {
+            turn: 1,
+            step: 0,
+            callId: 'write-1',
+            name: 'write',
+            arguments: '{}',
+          },
+        },
+      },
+    })
+    runtime.emit({
+      method: 'session.status',
+      params: { sessionId: 's1', status: 'idle' },
+    })
+    expect(app.snapshot().nodes[0]).toMatchObject({ kind: 'tool', status: 'cancelled' })
+    expect(app.snapshot().notice).toBeUndefined()
+  })
+
   it('requires two idle interrupts to quit', async () => {
     const runtime = fakeRuntime()
     const app = createTuiApp({

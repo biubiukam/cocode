@@ -1238,6 +1238,7 @@ class TuiAppImpl implements TuiApp {
       },
       cancel: () => this.runtime.cancel(this.sessionId),
       cancelAccepted: (wasRunning) => {
+        if (wasRunning) this.assembler.settleOpen()
         this.notice = {
           tone: 'info',
           message: wasRunning
@@ -1274,6 +1275,7 @@ class TuiAppImpl implements TuiApp {
     if (cancelRequest === undefined) return
     void cancelRequest.then(
       (wasRunning) => {
+        if (wasRunning) this.assembler.settleOpen()
         this.notice = {
           tone: 'info',
           message: wasRunning
@@ -2893,7 +2895,13 @@ class TuiAppImpl implements TuiApp {
             body: text(this.locale, 'turnComplete'),
           })
         }
-        if (agent === 'idle') this.flushQueuedPrompt()
+        if (agent === 'idle') {
+          this.assembler.settleOpen()
+          if (this.notice?.message === text(this.locale, 'cancelRequested')) {
+            this.notice = undefined
+          }
+          this.flushQueuedPrompt()
+        }
       },
       clearInterrupt: () => {
         this.interruptArmed = false
