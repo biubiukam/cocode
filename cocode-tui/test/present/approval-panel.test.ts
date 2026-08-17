@@ -140,14 +140,13 @@ class InputStream extends PassThrough {
 class CaptureStream extends Writable {
   readonly isTTY = true
   output = ''
-  constructor(readonly columns: number, readonly rows: number) {
+  constructor(
+    readonly columns: number,
+    readonly rows: number,
+  ) {
     super()
   }
-  override _write(
-    chunk: Buffer | string,
-    _encoding: BufferEncoding,
-    callback: (error?: Error | null) => void,
-  ): void {
+  override _write(chunk: Buffer | string, _encoding: BufferEncoding, callback: (error?: Error | null) => void): void {
     this.output += chunk.toString()
     callback()
   }
