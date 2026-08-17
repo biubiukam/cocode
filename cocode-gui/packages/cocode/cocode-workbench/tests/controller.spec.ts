@@ -133,4 +133,31 @@ describe("WorkbenchController", () => {
     controller.closeDockIfEmpty("right")
     expect(closed).toEqual(["right"])
   })
+
+  it("reuses an existing preview tab for the same file path", () => {
+    const { controller, opened } = harness()
+    controller.registerPanel({ id: "preview", title: "Preview", defaultDock: "right", render: () => null })
+    controller.setSession("s1")
+    const first = controller.open("preview", { title: "about-me.html", target: { path: "/ws/about-me.html" } })
+    const second = controller.open("preview", { title: "about-me.html", target: { path: "/ws/about-me.html" } })
+    expect(first).toBe(second)
+    expect(controller.snapshot().session.instances).toHaveLength(1)
+    expect(controller.snapshot().session.active.right).toBe(first)
+    expect(opened).toEqual(["right", "right"])
+  })
+
+  it("keeps separate preview tabs for the same path with different target data", () => {
+    const { controller } = harness()
+    controller.registerPanel({ id: "preview", title: "Preview", defaultDock: "right", render: () => null })
+    controller.setSession("s1")
+    const file = controller.open("preview", { target: { path: "/ws/app.ts" } })
+    const staged = controller.open("preview", {
+      target: { path: "/ws/app.ts", data: { kind: "diff", group: "index" } },
+    })
+    const worktree = controller.open("preview", {
+      target: { path: "/ws/app.ts", data: { kind: "diff", group: "worktree" } },
+    })
+    expect(new Set([file, staged, worktree]).size).toBe(3)
+    expect(controller.snapshot().session.instances).toHaveLength(3)
+  })
 })

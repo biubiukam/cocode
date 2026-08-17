@@ -1,6 +1,6 @@
 import net from 'node:net'
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync, renameSync } from 'node:fs'
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { endpointFor, descriptorPath, leaseDirectory, lockPath, scopePath } from './paths.js'
@@ -13,11 +13,21 @@ import { HostLogger } from './logging.js'
 type AcquireRequest = AcquireHostRequest & { clientPid?: number }
 type HostProcess = { child: ReturnType<typeof spawn> | null; descriptor: HostDescriptor; idleTimer?: NodeJS.Timeout }
 
+const SHUTDOWN_SIGNALS: readonly NodeJS.Signals[] = ['SIGINT', 'SIGTERM', 'SIGHUP']
+/**
+ * How long a Host may take to unwind before it is killed. Workbench shutdown
+ * disposes PTYs and browser contexts, which regularly overran the original two
+ * seconds and forced a SIGKILL on an otherwise healthy exit.
+ */
+const HOST_TERMINATE_GRACE_MS = Number(process.env.COCODE_HOST_TERMINATE_GRACE_MS ?? 8_000)
+const HOST_KILL_GRACE_MS = 2_000
+
 export async function runSupervisorService(stateDirectory: string): Promise<void> {
   mkdirSync(stateDirectory, { recursive: true, mode: 0o700 })
   const scope = JSON.parse(readFileSync(scopePath(stateDirectory), 'utf8')) as HostScope
   const logger = new HostLogger({ stateDirectory })
   const service = new SupervisorService(stateDirectory, scope, logger)
+  const signals = installShutdownSignals(service, logger)
   try {
     await service.start()
     await service.wait()
@@ -25,7 +35,28 @@ export async function runSupervisorService(stateDirectory: string): Promise<void
     logger.log('fatal', 'supervisor.failed', { error: error instanceof Error ? error.message : String(error) })
     throw error
   } finally {
+    signals.dispose()
     logger.close()
+  }
+}
+
+/**
+ * Idle shutdown lives in this process, so a Supervisor that exits without
+ * stopping its Host strands one that nothing will ever reclaim.
+ */
+function installShutdownSignals(service: SupervisorService, logger: HostLogger): { dispose: () => void } {
+  const registered = SHUTDOWN_SIGNALS.map((signal) => {
+    const handler = (): void => {
+      logger.log('info', 'supervisor.signal.received', { signal })
+      void service.stop()
+    }
+    process.on(signal, handler)
+    return { signal, handler }
+  })
+  return {
+    dispose: (): void => {
+      for (const { signal, handler } of registered) process.off(signal, handler)
+    },
   }
 }
 
@@ -158,6 +189,10 @@ class SupervisorService {
         COCODE_DSH_PROFILE: this.scope.profile,
       },
       stdio: ['ignore', 'pipe', 'pipe'],
+      // A Host owns its descendants.  On POSIX this gives us a stable process
+      // group so shutdown can terminate the whole tree instead of only the
+      // Node leader.  Windows uses taskkill /T in terminateProcessTree below.
+      detached: process.platform !== 'win32',
     })
     const startupBuffer = new RingBuffer(256 * 1024)
     const streamBuffers = { stdout: '', stderr: '' }
@@ -203,7 +238,10 @@ class SupervisorService {
       child.once('exit', (code, signal) => {
         flushPartialLines()
         clearTimeout(timer)
-        this.logger.log('error', readyObserved ? 'dsh.host.exit' : 'dsh.host.exit.before-ready', {
+        // An exit this Supervisor asked for is the normal end of a session; only
+        // one it did not ask for signals a problem worth surfacing as an error.
+        const expected = readyObserved && this.hostStopPromise !== null
+        this.logger.log(expected ? 'info' : 'error', readyObserved ? 'dsh.host.exit' : 'dsh.host.exit.before-ready', {
           exitCode: code ?? -1,
           signal: signal ?? 'none',
           hostPid: child.pid ?? -1,
@@ -272,10 +310,19 @@ class SupervisorService {
   }
   private async terminateHost(host: HostProcess): Promise<void> {
     const pid = host.child?.pid ?? host.descriptor.hostPid
-    await terminateProcess(pid, () => {
-      if (host.child !== null) host.child.kill('SIGTERM')
-      else process.kill(pid, 'SIGTERM')
-    })
+    await terminateProcessTree(
+      pid,
+      () => {
+        if (process.platform === 'win32') {
+          if (host.child !== null) host.child.kill('SIGTERM')
+          else process.kill(pid, 'SIGTERM')
+        } else {
+          signalProcessGroup(pid, 'SIGTERM')
+        }
+      },
+      () => this.logger.log('warn', 'dsh.host.stop.escalated', { hostPid: pid, graceMs: HOST_TERMINATE_GRACE_MS }),
+    )
+    this.logger.log('info', 'dsh.host.process-tree.stopped', { hostPid: pid })
   }
   private cleanupLeases(): void {
     const now = Date.now()
@@ -305,7 +352,7 @@ class SupervisorService {
   private writeDescriptor(descriptor: HostDescriptor): void { const temp = `${descriptorPath(this.directory)}.${process.pid}.tmp`; writeFileSync(temp, JSON.stringify(descriptor, null, 2) + '\n', { mode: 0o600 }); renameSync(temp, descriptorPath(this.directory)) }
   private readDescriptor(): HostDescriptor | null { try { return JSON.parse(readFileSync(descriptorPath(this.directory), 'utf8')) as HostDescriptor } catch { return null } }
   private doctor(): Record<string, unknown> { return { supervisorProtocolRevision: SUPERVISOR_PROTOCOL_REVISION, supervisorBuildRevision: SUPERVISOR_BUILD_REVISION, scope: this.scope, descriptor: this.readDescriptor(), leaseCount: this.leases.size, pid: process.pid } }
-  private stop(): Promise<void> {
+  stop(): Promise<void> {
     if (this.stopPromise !== null) return this.stopPromise
     this.stopped = true
     this.stopPromise = (async () => {
@@ -419,16 +466,60 @@ async function waitForProcessExit(pid: number, timeoutMs: number): Promise<void>
 
 async function terminateChild(child: ReturnType<typeof spawn>): Promise<void> {
   if (child.pid === undefined) return
-  await terminateProcess(child.pid, () => child.kill('SIGTERM'))
+  await terminateProcessTree(child.pid, () => {
+    if (process.platform === 'win32') child.kill('SIGTERM')
+    else signalProcessGroup(child.pid!, 'SIGTERM')
+  })
 }
 
-async function terminateProcess(pid: number, terminate: () => void): Promise<void> {
+async function terminateProcess(pid: number, terminate: () => void, onEscalate?: () => void): Promise<void> {
   if (pid <= 0 || !isProcessAlive(pid)) return
   try { terminate() } catch { /* the process may have exited between checks */ }
-  await waitForProcessExit(pid, 2_000)
+  await waitForProcessExit(pid, HOST_TERMINATE_GRACE_MS)
   if (!isProcessAlive(pid)) return
+  onEscalate?.()
   try { process.kill(pid, 'SIGKILL') } catch { /* already gone */ }
-  await waitForProcessExit(pid, 2_000)
+  await waitForProcessExit(pid, HOST_KILL_GRACE_MS)
+}
+
+/** Terminate a Host and every descendant it owns, not only the leader PID. */
+async function terminateProcessTree(pid: number, terminate: () => void, onEscalate?: () => void): Promise<void> {
+  if (pid <= 0 || !isProcessAlive(pid)) return
+  try { terminate() } catch { /* the process may have exited between checks */ }
+  await waitForProcessTreeExit(pid, HOST_TERMINATE_GRACE_MS)
+  if (!isProcessTreeAlive(pid)) return
+  onEscalate?.()
+  try {
+    if (process.platform === 'win32') {
+      spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' })
+    } else {
+      signalProcessGroup(pid, 'SIGKILL')
+    }
+  } catch { /* already gone */ }
+  await waitForProcessTreeExit(pid, HOST_KILL_GRACE_MS)
+}
+
+function signalProcessGroup(pid: number, signal: NodeJS.Signals): void {
+  // The Host is spawned detached on POSIX, so -pid addresses its process group.
+  process.kill(-pid, signal)
+}
+
+function isProcessTreeAlive(pid: number): boolean {
+  if (!isProcessAlive(pid)) return false
+  if (process.platform === 'win32') return true
+  try {
+    process.kill(-pid, 0)
+    return true
+  } catch (error) {
+    return error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'EPERM'
+  }
+}
+
+async function waitForProcessTreeExit(pid: number, timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline && isProcessTreeAlive(pid)) {
+    await new Promise((resolve) => setTimeout(resolve, 100))
+  }
 }
 
 async function hostHealth(descriptor: HostDescriptor): Promise<boolean> {

@@ -3,10 +3,12 @@ import path from "node:path"
 import { readdirSync, statSync, unlinkSync } from "node:fs"
 import { DesktopLogger } from "../logging/desktop-logger"
 import { createDiagnosticsService, type DiagnosticsService } from "./diagnostics-service"
+import { ResourceMonitor } from "./resource-monitor"
 
 export interface DesktopObservability {
 	readonly logger: DesktopLogger
 	readonly diagnostics: DiagnosticsService
+	readonly resources: ResourceMonitor
 	readonly dispose: () => void
 }
 
@@ -20,10 +22,13 @@ export function createDesktopObservability(): DesktopObservability {
 		processType: "main",
 		defaultLevel: "info",
 	})
+	const resources = new ResourceMonitor(logger)
 	const diagnostics = createDiagnosticsService({
 		logger,
 		buildId: process.env.COCODE_BUILD_ID?.trim() || undefined,
+		resources,
 	})
+	resources.start()
 	const removers: Array<() => void> = []
 
 	logger.log("info", "app.start", {
@@ -62,8 +67,10 @@ export function createDesktopObservability(): DesktopObservability {
 	return {
 		logger,
 		diagnostics,
+		resources,
 		dispose: () => {
 			for (const remove of removers.splice(0)) remove()
+			resources.dispose()
 			logger.log("info", "app.shutdown.completed")
 			logger.close()
 		},

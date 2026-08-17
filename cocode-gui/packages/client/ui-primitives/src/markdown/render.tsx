@@ -22,6 +22,8 @@ import type * as Md from 'mdast'
 import type {} from 'mdast-util-math'
 import { normalizeUri } from 'micromark-util-sanitize-uri'
 import { CodeBlock } from './CodeBlock.tsx'
+import { GitHubRefLink } from './GitHubRefLink.tsx'
+import { parseGitHubRef } from './github-ref.ts'
 import { renderTexToReact } from './katex.tsx'
 import type { PositionedBlock } from './incremental.ts'
 import css from './MarkdownText.module.css'
@@ -236,7 +238,11 @@ function renderNode(node: Md.RootContent, key: Key, context: MarkdownRenderConte
       // authored text, not a parsed destination, so no normalizeUri: port,
       // path, and query render unchanged.
       const href = inlineCodeHttpUrl(value)
-      if (href !== undefined) return <code key={key}>{renderSafeLink(href, [value], 'link')}</code>
+      if (href !== undefined) {
+        const ghRef = parseGitHubRef(href)
+        if (ghRef !== undefined) return <GitHubRefLink key={key} href={href} ref={ghRef} />
+        return <code key={key}>{renderSafeLink(href, [value], 'link')}</code>
+      }
       // A token the owner's file-mention vocabulary recognizes opens that
       // file; the resolver, not this renderer, decides what names a file.
       // Inside an anchor the token stays inert — a button cannot nest there.
@@ -436,6 +442,8 @@ function renderTableRow(
 function renderSafeLink(href: string, children: ReactNode[], key: Key): ReactNode {
   const safeHref = sanitizeUrl(href)
   if (safeHref === '') return <Fragment key={key}>{children}</Fragment>
+  const ghRef = parseGitHubRef(safeHref)
+  if (ghRef !== undefined) return <GitHubRefLink key={key} href={safeHref} ref={ghRef} />
   const external = ['http:', 'https:'].includes(new URL(safeHref).protocol)
   return (
     <a

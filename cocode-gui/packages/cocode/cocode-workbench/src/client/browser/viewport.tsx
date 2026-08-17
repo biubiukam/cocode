@@ -18,6 +18,8 @@ export interface ViewportProps {
   readonly attachedTabId?: string
   /** Changes on every attach so a same-tab re-attach still restarts the stream. */
   readonly attachSeq: number
+  /** Hide the canvas while the themed start page covers about:blank. */
+  readonly hidden?: boolean
 }
 
 function modifiersOf(event: { altKey: boolean; ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }): BrowserModifier[] {
@@ -37,7 +39,7 @@ export function BrowserViewport(props: ViewportProps) {
   const composingRef = useRef(false)
   const [preedit, setPreedit] = useState("")
   const [caret, setCaret] = useState({ x: 16, y: 16 })
-  const { send, registerFrameSink, active, attachedTabId, attachSeq } = props
+  const { send, registerFrameSink, active, attachedTabId, attachSeq, hidden } = props
   const attached = attachedTabId !== undefined
 
   // Paint and only then ack: the ack is the flow-control signal, so acking on
@@ -141,10 +143,11 @@ export function BrowserViewport(props: ViewportProps) {
     })
   }, [send])
 
-  return <div className={css.viewport}>
+  return <div className={css.viewport} data-hidden={hidden ? "" : undefined}>
     <canvas
       ref={canvasRef}
       className={css.canvas}
+      hidden={hidden}
       onPointerMove={pointer("move")}
       onPointerDown={pointer("down")}
       onPointerUp={pointer("up")}

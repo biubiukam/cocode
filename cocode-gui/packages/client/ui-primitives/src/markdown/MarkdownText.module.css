@@ -5,8 +5,19 @@
 .markdown {
   min-width: 0;
   overflow-wrap: anywhere;
-  font: var(--dsw-font-markdown-base);
+  font-family: var(--dsw-font-markdown-base-font-family);
+  font-weight: var(--dsw-font-markdown-base-font-weight);
+  font-style: var(--dsw-font-markdown-base-font-style);
+  font-size: var(--dsw-font-markdown-base-font-size);
+  line-height: var(--dsw-font-markdown-base-line-height);
   color: var(--dsw-alias-label-primary);
+}
+
+/* Conversation transcript parents set font-size; inherit keeps assistant
+   prose on the message-list scale without touching other Markdown surfaces. */
+.inheritMetrics {
+  font-size: inherit;
+  line-height: inherit;
 }
 
 .markdown strong {
@@ -76,6 +87,15 @@
 .markdown a:focus {
   outline: none;
   text-decoration: underline var(--dsw-alias-state-business-primary);
+}
+
+.markdown .githubRef,
+.markdown .githubRef:hover,
+.markdown .githubRef:focus {
+  border: none;
+  margin: 0;
+  padding: 0;
+  text-decoration: none;
 }
 
 .markdown a:focus-visible {
@@ -262,4 +282,44 @@
   outline: none;
   text-decoration: underline var(--dsw-alias-state-business-primary);
   text-underline-offset: 3px;
+}
+
+/* GitHub issue / PR chip: octocat badge + #number (figma chat ref link). */
+.githubRef {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  color: var(--dsw-alias-state-business-primary);
+  text-decoration: none;
+  vertical-align: baseline;
+}
+
+.githubRef:hover,
+.githubRef:focus {
+  outline: none;
+  text-decoration: none;
+}
+
+.githubRef:hover .githubRefNumber,
+.githubRef:focus .githubRefNumber {
+  text-decoration: underline var(--dsw-alias-state-business-primary);
+  text-underline-offset: 3px;
+}
+
+.githubRef:focus-visible {
+  box-shadow: 0 0 0 2px var(--dsw-alias-state-business-primary);
+  border-radius: 4px;
+}
+
+.githubRefIcon {
+  flex: none;
+  color: var(--dsw-alias-state-business-primary);
+}
+
+.githubRefNumber {
+  font: inherit;
+  font-variant-numeric: tabular-nums;
 }

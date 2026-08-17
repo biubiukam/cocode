@@ -2,12 +2,41 @@ export const dshRuntimeChannels = {
 	bootstrap: "dsh-runtime:bootstrap",
 	request: "dsh-runtime:request",
 	cancelRequest: "dsh-runtime:cancel-request",
+	requestRecovery: "dsh-runtime:request-recovery",
+	recoveryState: "dsh-runtime:recovery-state",
+	rebound: "dsh-runtime:rebound",
 } as const
 
 /** Theme preference transferred with the early bootstrap handshake. */
 export type DshThemePreference = "light" | "dark" | "system"
 
 export type DshRuntimeRequestMethod = "GET" | "HEAD" | "POST"
+
+export type DshRuntimeRecoveryReason =
+	| "host_unreachable"
+	| "host_exit"
+	| "bootstrap_failed"
+	| "health_failed"
+
+export interface DshRuntimeRecoveryRequestDto {
+	readonly reason: DshRuntimeRecoveryReason
+	readonly endpointGeneration: number
+}
+
+export interface DshRuntimeRecoveryStateDto {
+	readonly state: "idle" | "recovering" | "ready" | "failed"
+	readonly attempt: number
+	readonly maxAttempts: number
+	readonly reason?: DshRuntimeRecoveryReason
+	readonly recoveryId: string
+	readonly endpointGeneration: number
+	readonly error?: { readonly code: string; readonly message: string }
+}
+
+export interface DshRuntimeReboundDto {
+	readonly endpointGeneration: number
+	readonly bootstrap: DshRuntimeBootstrapDto
+}
 
 export interface DshRuntimeRequestDto {
 	readonly requestId: string
@@ -44,8 +73,14 @@ export interface DshRuntimeBootstrapDto {
 	readonly themePreference: DshThemePreference
 }
 
+export type DshRuntimeRecoveryStateListener = (state: DshRuntimeRecoveryStateDto) => void
+export type DshRuntimeReboundListener = (event: DshRuntimeReboundDto) => void
+
 export interface DshRuntimeApi {
 	getBootstrap(): Promise<DshRuntimeBootstrapDto>
 	request(request: DshRuntimeRequestDto): Promise<DshRuntimeResponseDto>
 	cancelRequest(requestId: string): void
+	requestRecovery(request: DshRuntimeRecoveryRequestDto): Promise<DshRuntimeRecoveryStateDto>
+	onRecoveryState(listener: DshRuntimeRecoveryStateListener): () => void
+	onRebound(listener: DshRuntimeReboundListener): () => void
 }

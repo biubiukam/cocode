@@ -40,6 +40,8 @@ export function DiagnosticsSection(): JSX.Element {
       <Metric label={isChinese() ? "Host 日志" : "Host logs"} value={formatBytes(status?.hostLogBytes ?? 0)} />
       <Metric label={isChinese() ? "崩溃文件" : "Crash dumps"} value={String(status?.crashCount ?? 0)} />
       <Metric label={isChinese() ? "丢弃记录" : "Dropped records"} value={String(status?.droppedRecordCount ?? 0)} />
+      <Metric label={isChinese() ? "Electron 内存" : "Electron memory"} value={formatBytes(status?.resources?.latest?.electronWorkingSetBytes ?? 0)} />
+      <Metric label={isChinese() ? "Electron 进程" : "Electron processes"} value={String(status?.resources?.latest?.processCount ?? 0)} />
     </div>
     {status?.temporaryDebugUntil !== undefined && <p style={styles.notice}>{isChinese() ? `Debug 日志开启至 ${status.temporaryDebugUntil}` : `Debug logging enabled until ${status.temporaryDebugUntil}`}</p>}
     <div style={styles.actions}>

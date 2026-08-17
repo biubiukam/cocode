@@ -31,6 +31,15 @@ import { SessionQueueMirror } from './queue-mirror.ts'
 /** Messages requested per history page. */
 export const PAGE_MESSAGES = 50
 
+/**
+ * Keep a bounded materialized transcript in the renderer.  The host remains
+ * the source of truth; older pages can be fetched again by sequence when the
+ * user scrolls back.  Hysteresis avoids rebuilding the assembler on every
+ * live event once the limit is reached.
+ */
+export const MAX_MATERIALIZED_EVENTS = 2_000
+const TARGET_MATERIALIZED_EVENTS = 1_800
+
 /** Manager-owned observers of a Session object's local state edges. */
 export interface SessionOptions {
   /** Catalog-discovered address selecting non-activating subagent transport. */
@@ -407,6 +416,7 @@ export class Session implements SessionFace {
       this.baseSeq = older[0]?.event.seq ?? this.baseSeq
       this.hasMore = result.value.hasMore
       this.conversation.prepend(older.map(conversationInput), this.hasMore)
+      this.trimMaterializedWindowIfNeeded()
     } catch (error) {
       console.error('[web-runtime] loadOlder failed:', error)
     } finally {
@@ -677,6 +687,7 @@ export class Session implements SessionFace {
     const buffered = this.liveBuffer
     this.liveBuffer = []
     for (const item of buffered) this.appendLive(item.event, item.view)
+    this.trimMaterializedWindowIfNeeded()
     this.notifier.markDirty()
   }
 
@@ -688,8 +699,31 @@ export class Session implements SessionFace {
     this.views.push(view)
     if (event.type === 'turn/start') this.firstPromptPendingTurn = false
     const queueChanged = this.queueMirror.acceptDurable(event)
-    const publication = this.conversation.append({ event, view })
+    let publication = this.conversation.append({ event, view })
+    if (this.trimMaterializedWindowIfNeeded()) publication = 'immediate'
     return queueChanged ? 'immediate' : publication
+  }
+
+  /**
+   * Drop only the oldest materialized entries once the hysteresis threshold is
+   * crossed.  Rebuilding the assembler is intentional: contexts may depend on
+   * events that are being removed, so slicing the raw arrays alone would leave
+   * stale indexes, dependencies, and view snapshots alive.
+   */
+  private trimMaterializedWindowIfNeeded(): boolean {
+    if (this.events.length <= MAX_MATERIALIZED_EVENTS) return false
+    const start = this.events.length - TARGET_MATERIALIZED_EVENTS
+    const retainedEvents = this.events.slice(start)
+    const retainedViews = this.views.slice(start)
+    this.events = retainedEvents
+    this.views = retainedViews
+    this.baseSeq = retainedEvents[0]?.seq ?? 0
+    this.hasMore = true
+    this.conversation.replaceWindow(
+      retainedEvents.map((event, index) => conversationInput({ event, view: retainedViews[index] })),
+      true,
+    )
+    return true
   }
 
   /** Land a live session/event (open/repair in flight -> buffer; overlapping seq -> drop;

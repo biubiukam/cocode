@@ -12,6 +12,9 @@ import css from './ConversationRoot.module.css'
 /** Full props composed from the slot contract. */
 export type ConversationRootProps = ConversationSlotProps
 
+/** How long the thumb stays visible after the last scroll event. */
+const SCROLLBAR_LINGER_MS = 1200
+
 /** Local optimistic state for a workspace pick. The label is retained across
  * workspace-list refreshes so a transient list gap cannot erase the choice. */
 interface WorkspaceSelection {
@@ -28,7 +31,7 @@ function workspaceSelectionError(reason: unknown): string {
 
 export function ConversationRoot({
   sessionId, useSession, useSessions, useWorkspaces, useInput, useComposerBlock,
-  renderSlot, renderSlotChain, selectWorkspace, t,
+  renderSlot, renderSlotChain, selectWorkspace, t, useStore,
 }: ConversationRootProps) {
   const openState = useSession(s => s.openState)
   const composerPhase = useSession(s => s.composerPhase)
@@ -42,15 +45,46 @@ export function ConversationRoot({
   // send; its reason is already localized by whoever raised it.
   const composerBlock = useComposerBlock(block => block)
 
+  const logoPreference = useStore(state => state.logoPreference)
+
   const [pickerOpen, setPickerOpen] = useState(false)
   const [workspaceSelection, setWorkspaceSelection] = useState<WorkspaceSelection | undefined>()
   const pickerAnchor = useRef<HTMLButtonElement>(null)
+  const scrollBodyRef = useRef<HTMLDivElement>(null)
+  const scrollbarLingerRef = useRef<number | undefined>(undefined)
+  const scrollbarVisibleRef = useRef(false)
 
   // Publishes the seat's live height as --dsh-composer-height on the scroll
   // body so floating controls (ChatView back-to-bottom) clear the composer as
   // it grows. Callback ref, not an effect; stable identity prevents observer
   // churn while the first blank session fills the resident body outlet.
   const seatObserver = useRef<ResizeObserver | null>(null)
+  // Scrollbars follow scroll input: drawn while the reader is moving the
+  // transcript and for SCROLLBAR_LINGER_MS after, then fade out via
+  // .quietBars rebinding ui-theme's thumb tokens. ClassList, not React
+  // state — scroll can fire every frame and must not re-render the column.
+  useEffect(() => {
+    const scroller = scrollBodyRef.current
+    if (scroller === null) return
+    const revealBars = (): void => {
+      if (!scrollbarVisibleRef.current) {
+        scrollbarVisibleRef.current = true
+        scroller.classList.remove(css.quietBars)
+      }
+      window.clearTimeout(scrollbarLingerRef.current)
+      scrollbarLingerRef.current = window.setTimeout(() => {
+        scrollbarLingerRef.current = undefined
+        scrollbarVisibleRef.current = false
+        scroller.classList.add(css.quietBars)
+      }, SCROLLBAR_LINGER_MS)
+    }
+    scroller.addEventListener('scroll', revealBars, { passive: true })
+    return () => {
+      scroller.removeEventListener('scroll', revealBars)
+      window.clearTimeout(scrollbarLingerRef.current)
+    }
+  }, [])
+
   const seatResizeRef = useCallback((seat: HTMLDivElement | null): void => {
     seatObserver.current?.disconnect()
     seatObserver.current = null
@@ -141,7 +175,6 @@ export function ConversationRoot({
           },
           onClose: () => { setPickerOpen(false) },
         })}
-        {renderSlot('conversation.hero.agentPreset', {})}
       </div>
       {workspaceSelection?.error !== undefined && (
         <div className={css.heroWorkspaceError} role="alert">
@@ -187,7 +220,7 @@ export function ConversationRoot({
   const composerBar = (
     <div className={clsx(css.composerStack, hero && css.composerHero)}>
       {hero && <HeroGlow className={css.heroGlow} />}
-      {hero && <HeroShell t={t} />}
+      {hero && <HeroShell t={t} logoPreference={logoPreference} />}
       {hero && heroWorkspaceRow}
       {zone !== undefined && renderSlot('conversation.input.dock', zone)}
       {inputBar}
@@ -214,7 +247,7 @@ export function ConversationRoot({
   return (
     <div className={css.root} data-phase={phase}>
       {renderSlot('conversation.session.header', {})}
-      <div className={css.scrollBody} data-conversation-scroll="">
+      <div ref={scrollBodyRef} className={clsx(css.scrollBody, css.quietBars)} data-conversation-scroll="">
         <div className={css.scrollBodyDrag}></div>
         {renderSlot('conversation.session', {})}
         {composerSeat}

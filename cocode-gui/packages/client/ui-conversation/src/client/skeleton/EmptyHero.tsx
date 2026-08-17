@@ -6,6 +6,8 @@
 
 import { useId } from 'react'
 import type { ReactNode, RefObject } from 'react'
+import clsx from 'clsx'
+import type { LogoPreference } from '@deepseek-ai/dsh-client-ui-theme/client'
 import {
   FishLogo, IconChevronDownOutline14, IconFolderClose16, IconFolderOpen16,
 } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -102,6 +104,8 @@ export function HeroGlow({ className }: { className?: string | undefined }) {
 export interface HeroShellProps {
   /** The owner's locale seat, passed down as a plain prop. */
   t: HeroTranslate
+  /** Sidebar logo preference — DeepSeek branding rides only the deepseek choice. */
+  logoPreference: LogoPreference
   /** Overlay content after the stack (modals). */
   children?: ReactNode
 }
@@ -112,17 +116,21 @@ export interface HeroShellProps {
  * @param props - see {@link HeroShellProps}.
  * @returns the centered hero element tree.
  */
-export function HeroShell({ t, children }: HeroShellProps) {
+export function HeroShell({ t, logoPreference, children }: HeroShellProps) {
+  const showDeepseekBranding = logoPreference === 'deepseek'
   return (
     <div className={css.root}>
       <div className={css.stack}>
-        <div className={css.headline}>
-          {/* figma 34:10412: fish 34×25 leading the headline, gap 10. */}
-          <span className={css.fishHitbox}>
-            <FishLogo size={34} className={css.fish} />
-          </span>
+        <div className={clsx(css.headline, !showDeepseekBranding && css.headlineCocode)}>
+          {showDeepseekBranding && (
+            <span className={css.fishHitbox}>
+              <FishLogo size={34} className={css.fish} />
+            </span>
+          )}
           <span className={css.headlineText}>{t('hero.headline')}</span>
-          <span className={css.previewBadge}>{t('hero.preview')}</span>
+          {showDeepseekBranding && (
+            <span className={css.previewBadge}>{t('hero.preview')}</span>
+          )}
         </div>
         <div className={css.body}>
           {/* The resident composer (ConversationRoot's root-owned scrollport;

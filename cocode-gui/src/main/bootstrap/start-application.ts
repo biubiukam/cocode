@@ -17,6 +17,7 @@ import {
 	registerApplicationUpdates,
 	type ApplicationUpdateRegistration,
 } from "../shell/updater/register-application-updates"
+import { applyDockIcon } from "../shell/windows/app-icon"
 import { createMainWindow } from "../shell/windows/create-main-window"
 import { createDatabaseModule, type DatabaseModule } from "./create-database-module"
 import { ShortcutService } from "../contexts/shortcuts/application/shortcut-service"
@@ -49,6 +50,7 @@ export const startApplication = (): void => {
 	let shortcuts: ShortcutService | null = null
 	let mainWindow: BrowserWindow | null = null
 	let dshUrl: string | null = null
+	let rebindDshRuntimeOrigin: ((origin: string) => void) | null = null
 	let applicationUpdates: ApplicationUpdateRegistration | null = null
 	let tuiLauncher: TuiLauncher | null = null
 
@@ -57,7 +59,11 @@ export const startApplication = (): void => {
 		createWindow: () => {
 			if (!dshUrl) throw new Error("DSH runtime URL was not available after startup.")
 			observability.logger.log("info", "window.create.started")
-			mainWindow = createMainWindow(dshUrl, observability.logger)
+			mainWindow = createMainWindow(dshUrl, observability.logger, {
+				registerRuntimeOriginRebind: (rebind) => {
+					rebindDshRuntimeOrigin = rebind
+				},
+			})
 			mainWindow.once("closed", () => {
 				observability.logger.log("info", "window.closed")
 				mainWindow = null
@@ -65,6 +71,7 @@ export const startApplication = (): void => {
 		},
 		onReady: async () => {
 			observability.logger.log("info", "app.ready.started")
+			applyDockIcon()
 			databaseModule = createDatabaseModule(app.getPath("home"), observability.logger)
 			try {
 				databaseModule.initialize()
@@ -96,8 +103,11 @@ export const startApplication = (): void => {
 				}
 			}
 			registerTuiIpc(tuiLauncher, observability.logger)
-			registerDshRuntimeIpc(dshRuntime, observability.logger)
+			registerDshRuntimeIpc(dshRuntime, observability.logger, {
+				onRebound: (origin) => rebindDshRuntimeOrigin?.(origin),
+			})
 			dshUrl = await dshRuntime.start()
+			observability.resources.setHostPid(dshRuntime.hostPid)
 			observability.diagnostics.setHostLogDirectory(dshRuntime.hostLogDirectory)
 			observability.logger.log("info", "dsh.host.ready", {
 				attributes: { endpoint: redactEndpoint(dshUrl) },
@@ -140,9 +150,10 @@ export const startApplication = (): void => {
 				databaseModule?.dispose()
 				observability.logger.log("info", "database.closed")
 				databaseModule = null
-				await dshRuntime?.stop()
+				await dshRuntime?.shutdown()
 				dshRuntime = null
 				dshUrl = null
+				rebindDshRuntimeOrigin = null
 			} finally {
 				unregisterElectronObservers()
 				observability.dispose()

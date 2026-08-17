@@ -103,6 +103,8 @@ test('createRuntimePatch registers Cocode plugins by package name', () => {
     ],
   )
 
+  assert.match(patch, /id: llm-deepseek\n  name: '@deepseek-ai\/dsh-llm-deepseek'/)
+  assert.match(patch, /maxRetries: 5/)
   assert.match(patch, /id: cocode-sidebar\n      name: "cocode-sidebar"/)
   assert.match(patch, /id: cocode-account\n      name: "cocode-account"/)
   assert.match(patch, /id: cocode-shortcuts\n      name: "cocode-shortcuts"/)

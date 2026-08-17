@@ -3,10 +3,11 @@ import type { RendererLogger } from "../../shared/logging/renderer-logger"
 const TRANSPORT_PATCH_MARKER = "__DSH_DESKTOP_TRANSPORT__"
 
 interface DesktopTransportState {
-	readonly origin: string
+	origin: string
 	readonly fetch: typeof window.fetch
 	readonly WebSocket: typeof window.WebSocket
 	readonly EventSource: typeof window.EventSource
+	rebind(origin: string): void
 }
 
 interface DesktopTransportWindow extends Window {
@@ -16,23 +17,30 @@ interface DesktopTransportWindow extends Window {
 export function installDshTransport(runtimeOrigin: string, logger?: RendererLogger): void {
 	const target = window as DesktopTransportWindow
 	const current = target[TRANSPORT_PATCH_MARKER]
-	if (current?.origin === runtimeOrigin) return
+	if (current !== undefined) {
+		current.rebind(runtimeOrigin)
+		return
+	}
 
 	const currentOrigin = window.location.origin
 	const currentHref = window.location.href
-	const previousFetch = current?.fetch ?? window.fetch.bind(window)
-	const PreviousWebSocket = current?.WebSocket ?? window.WebSocket
-	const PreviousEventSource = current?.EventSource ?? window.EventSource
-	target[TRANSPORT_PATCH_MARKER] = {
+	const previousFetch = window.fetch.bind(window)
+	const PreviousWebSocket = window.WebSocket
+	const PreviousEventSource = window.EventSource
+	const state: DesktopTransportState = {
 		origin: runtimeOrigin,
 		fetch: previousFetch,
 		WebSocket: PreviousWebSocket,
 		EventSource: PreviousEventSource,
+		rebind: (origin) => {
+			state.origin = new URL(origin).origin
+		},
 	}
+	target[TRANSPORT_PATCH_MARKER] = state
 
 	window.fetch = (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
 		const inputUrl = input instanceof Request ? input.url : String(input)
-		const rewritten = rewriteDshHttpUrl(inputUrl, currentOrigin, currentHref, runtimeOrigin)
+		const rewritten = rewriteDshHttpUrl(inputUrl, currentOrigin, currentHref, state.origin)
 		if (rewritten === undefined) return previousFetch(input, init)
 
 		const baseRequest =
@@ -74,7 +82,7 @@ export function installDshTransport(runtimeOrigin: string, logger?: RendererLogg
 
 	class DshWebSocket extends PreviousWebSocket {
 		public constructor(url: string | URL, protocols?: string | string[]) {
-			const rewritten = rewriteDshWebSocketUrl(url, currentOrigin, currentHref, runtimeOrigin)
+			const rewritten = rewriteDshWebSocketUrl(url, currentOrigin, currentHref, state.origin)
 			const started = performance.now()
 			super(rewritten, protocols)
 			const path = safePath(rewritten)
@@ -104,7 +112,7 @@ export function installDshTransport(runtimeOrigin: string, logger?: RendererLogg
 
 	class DshEventSource extends PreviousEventSource {
 		public constructor(url: string | URL, eventSourceInitDict?: EventSourceInit) {
-			const rewritten = rewriteEventSourceUrl(url, currentOrigin, runtimeOrigin)
+			const rewritten = rewriteEventSourceUrl(url, currentOrigin, state.origin)
 			super(rewritten, eventSourceInitDict)
 			const path = safePath(rewritten)
 			this.addEventListener("open", () =>
@@ -122,6 +130,12 @@ export function installDshTransport(runtimeOrigin: string, logger?: RendererLogg
 		}
 	}
 	window.EventSource = DshEventSource
+}
+
+export function rebindDshTransport(runtimeOrigin: string): void {
+	const state = (window as DesktopTransportWindow)[TRANSPORT_PATCH_MARKER]
+	if (state === undefined) throw new Error("DSH desktop transport is not installed")
+	state.rebind(runtimeOrigin)
 }
 
 export function rewriteDshHttpUrl(
@@ -154,7 +168,8 @@ export function rewriteDshWebSocketUrl(
 ): string {
 	const url = new URL(input, currentHref)
 	if (
-		(!matchesWebSocketOrigin(url, currentOrigin) && !matchesWebSocketOrigin(url, runtimeOrigin)) ||
+		(!matchesWebSocketOrigin(url, currentOrigin) &&
+			!matchesWebSocketOrigin(url, runtimeOrigin)) ||
 		!isDshDesktopWebSocketPath(url.pathname)
 	)
 		return url.href

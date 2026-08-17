@@ -255,6 +255,16 @@
      (768 against 776) — worth 2 to 5 wrapped lines on a long draft. */
 }
 
+/* Empty composer: caption-scale metrics on all three glyph layers so the
+   caret (textarea) matches the ::placeholder. Once the user types, data-empty
+   drops and the stack inherits the card's 16/24 draft size again. */
+.grow[data-empty] .input,
+.grow[data-empty] .mirror,
+.grow[data-empty] .backdrop {
+  font-size: 13px;
+  line-height: 20px;
+}
+
 /* figma 34:10434: #ADB2B8 light / #81858C dark — the caption pair exactly. */
 .input::placeholder {
   color: var(--dsw-alias-label-caption);
@@ -324,7 +334,7 @@
   gap: 6px;
 }
 
-/* Attach control (figma + control): 28px, selector fill, primary glyph. */
+/* Attach control (figma + control): 28px circular, selector fill, primary glyph. */
 .add {
   display: grid;
   place-items: center;
@@ -332,7 +342,7 @@
   width: 28px;
   height: 28px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--ds-radius-pill);
   background: var(--dsw-specific-selector);
   color: var(--dsw-alias-label-primary);
   cursor: pointer;

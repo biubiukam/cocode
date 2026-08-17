@@ -21,6 +21,27 @@ function isFlashModel(model: { id: string; name: string }): boolean {
   return /flash/i.test(model.id) || /flash/i.test(model.name)
 }
 
+function isCocodeNutGroup(group: ModelProviderGroup): boolean {
+  return group.id === COCODE_NUT_PROVIDER || group.id === LEGACY_COCODE_NUT_PROVIDER
+}
+
+/** Cocode Nut groups lead the selector; other providers keep host order. */
+function groupsForDisplay(groups: readonly ModelProviderGroup[]): readonly ModelProviderGroup[] {
+  const nut: ModelProviderGroup[] = []
+  const rest: ModelProviderGroup[] = []
+  for (const group of groups) {
+    if (isCocodeNutGroup(group)) nut.push(group)
+    else rest.push(group)
+  }
+  nut.sort((left, right) => {
+    if (left.id === right.id) return 0
+    if (left.id === COCODE_NUT_PROVIDER) return -1
+    if (right.id === COCODE_NUT_PROVIDER) return 1
+    return 0
+  })
+  return [...nut, ...rest]
+}
+
 /**
  * Recover an unroutable session onto Cocode Nut Flash when that catalog is live.
  * Prefers the current `cocode-nut` id over the legacy alias, then the exact
@@ -108,7 +129,7 @@ export class ModelDirectory {
     this.store.update((s) => {
       s.current = current
       s.routable = routable
-      s.groups = groups
+      s.groups = groupsForDisplay(groups)
       s.failures = failures
       s.status = 'ready'
       s.error = null

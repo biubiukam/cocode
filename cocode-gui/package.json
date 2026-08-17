@@ -25,11 +25,8 @@
 	],
 	"scripts": {
 		"postinstall": "node scripts/harden-electron-default-app.mjs",
-		"predev": "node scripts/harden-electron-default-app.mjs && corepack pnpm@10.34.5 run build:cocode-plugins && corepack pnpm@10.34.5 run build:supervisor",
 		"dev": "node scripts/start-with-dsh-runtime.mjs",
-		"predev:web": "corepack pnpm@10.34.5 run build:cocode-plugins && corepack pnpm@10.34.5 run build:supervisor",
 		"dev:web": "node scripts/start-web-dev.mjs",
-		"prestart": "node scripts/harden-electron-default-app.mjs && corepack pnpm@10.34.5 run build:cocode-plugins && corepack pnpm@10.34.5 run build:supervisor",
 		"start": "node scripts/start-with-dsh-runtime.mjs",
 		"build:cocode-plugins": "node scripts/cocode-plugins.mjs build",
 		"test:cocode-plugins": "node scripts/cocode-plugins.mjs test && corepack pnpm@10.34.5 --dir ../cocode-host-supervisor run test",
@@ -60,6 +57,7 @@
 		"windows-sign:configure": "node scripts/release/windows-sign-credentials.cjs configure",
 		"windows-sign:clear": "node scripts/release/windows-sign-credentials.cjs clear",
 		"windows-sign:status": "node scripts/release/windows-sign-credentials.cjs status",
+		"reconcile:processes": "node scripts/reconcile-owned-processes.mjs",
 		"typecheck": "tsc --noEmit"
 	},
 	"keywords": [],

@@ -12,6 +12,10 @@ export type SupervisorClientOptions = {
   startupTimeoutMs?: number
 }
 
+/** The stale Host is stopped first, so its Supervisor only has to unwind itself. */
+const STALE_TERMINATE_GRACE_MS = 5_000
+const STALE_KILL_GRACE_MS = 2_000
+
 type SupervisorDoctor = {
   supervisorBuildRevision?: string
   leaseCount?: number
@@ -168,13 +172,24 @@ async function stopStaleSupervisor(supervisorPid: number | undefined, hostPid: n
   if (supervisorPid !== undefined && isProcessAlive(supervisorPid)) await terminateProcess(supervisorPid, 'Host Supervisor')
 }
 
+/** A stale process that ignores SIGTERM must never block the next client from starting. */
 async function terminateProcess(pid: number, label: string): Promise<void> {
   try { process.kill(pid, 'SIGTERM') } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw new Error(`Unable to stop stale ${label} (${pid}): ${String(error)}`)
+    if ((error as NodeJS.ErrnoException).code === 'ESRCH') return
+    throw new Error(`Unable to stop stale ${label} (${pid}): ${String(error)}`)
   }
-  const deadline = Date.now() + 2_000
-  while (Date.now() < deadline && isProcessAlive(pid)) await new Promise((resolve) => setTimeout(resolve, 100))
-  if (isProcessAlive(pid)) throw new Error(`Stale ${label} (${pid}) did not exit after SIGTERM.`)
+  if (await waitForProcessExit(pid, STALE_TERMINATE_GRACE_MS)) return
+  try { process.kill(pid, 'SIGKILL') } catch { /* already gone */ }
+  if (await waitForProcessExit(pid, STALE_KILL_GRACE_MS)) return
+  throw new Error(`Stale ${label} (${pid}) did not exit after SIGKILL.`)
+}
+
+async function waitForProcessExit(pid: number, timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline && isProcessAlive(pid)) {
+    await new Promise((resolve) => setTimeout(resolve, 100))
+  }
+  return !isProcessAlive(pid)
 }
 
 function isProcessAlive(pid: number): boolean {

@@ -5,7 +5,7 @@
  * the host reports, so the toolbar cannot drift from the page the way a locally
  * maintained history array does.
  */
-import { useEffect, useState } from "react"
+import { useEffect, useState, type Ref } from "react"
 import { isWebAddress, type BrowserInputEvent, type BrowserTabView } from "../../browser/protocol.ts"
 import { ArrowRightIcon, ChevronIcon, ChevronLeftIcon, CloseIcon, ExternalIcon, ReloadIcon } from "../icons.tsx"
 import { t } from "../locales.ts"
@@ -14,6 +14,7 @@ import css from "./browser.module.css"
 export interface ToolbarProps {
   readonly tab?: BrowserTabView
   readonly send: (event: BrowserInputEvent) => void
+  readonly addressRef?: Ref<HTMLInputElement>
 }
 
 export function BrowserToolbar(props: ToolbarProps) {
@@ -64,6 +65,7 @@ export function BrowserToolbar(props: ToolbarProps) {
     >{loading ? <CloseIcon size={16} /> : <ReloadIcon size={16} />}</button>
     <form className={css.addressForm} onSubmit={event => { event.preventDefault(); go() }}>
       <input
+        ref={props.addressRef}
         className={css.address}
         aria-label={t("browser.address")}
         placeholder={t("browser.address")}

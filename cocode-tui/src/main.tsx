@@ -12,7 +12,7 @@ import { displayError } from './runtime/errors/index.ts'
 import { startErrorMessage } from './runtime/app-view.ts'
 import { P0_CAPABILITIES } from './runtime/capabilities.ts'
 import { resolveSessionRoot } from './runtime/sessions-root.ts'
-import { DEFAULT_THEME, setTheme } from './present/theme.ts'
+import { resolveInitialTheme, setTheme } from './present/theme.ts'
 import { setGlyphs, supportsUnicode } from './present/glyphs.ts'
 import {
   createAuthStore,
@@ -36,7 +36,7 @@ if (process.stdin.isTTY !== true || process.stdout.isTTY !== true) {
   process.stderr.write('Cocode TUI requires a TTY.\n')
   process.exitCode = 1
 } else {
-  void main(createTerminalOutput(process.stdout, { extraRows: 1 })).catch((error: unknown) => {
+  void main(createTerminalOutput(process.stdout)).catch((error: unknown) => {
     process.stderr.write(`Cocode TUI failed to start: ${startErrorMessage(error)}\n`)
     process.exitCode = 1
   })
@@ -46,7 +46,7 @@ async function main(output: NodeJS.WriteStream): Promise<void> {
   // Color depth and glyph coverage are fixed for the life of the session, so
   // they are resolved once here rather than probed at every render.
   setGlyphs(supportsUnicode())
-  setTheme(DEFAULT_THEME)
+  setTheme(resolveInitialTheme())
 
   const launch = parseLaunchFromEnv()
 

@@ -29,6 +29,19 @@ export interface DiagnosticsStatusDto {
 	readonly crashCount: number
 	readonly temporaryDebugUntil?: string
 	readonly droppedRecordCount: number
+	readonly resources?: ResourceSummaryDto
+}
+
+export interface ResourceSummaryDto {
+	readonly sampleCount: number
+	readonly latest?: {
+		readonly at: string
+		readonly mainRssBytes: number
+		readonly mainHeapUsedBytes: number
+		readonly electronWorkingSetBytes: number
+		readonly hostRssBytes?: number
+		readonly processCount: number
+	}
 }
 
 export interface TemporaryDebugRequestDto {

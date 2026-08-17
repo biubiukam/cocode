@@ -32,6 +32,8 @@
   /* The shell owns this row so the collapsed rail can carry the same seam. */
   height: var(--dsh-shell-header-height, 46px);
   overflow: hidden;
+  /* Match the left sidebar surface so the top chrome reads as one band. */
+  background: var(--dsw-specific-sidebar-fill);
 }
 
 /* Bottom pixel row of the header, which the frame continues leftwards across a
@@ -250,6 +252,15 @@
 
 .root[data-phase='active'] .header {
   flex: none;
+}
+
+/* Scrollbars are a scroll affordance: hidden at rest, revealed while the
+   reader is scrolling and for SCROLLBAR_LINGER_MS after. Rebidding ui-theme's
+   indirection pair to `transparent` preserves scrollbar-gutter: stable
+   without reflow — same contract as SidebarRoot.quietBars. */
+.scrollBody.quietBars {
+  --dsh-scrollbar-thumb: transparent;
+  --dsh-scrollbar-thumb-hover: transparent;
 }
 
 .scrollBody {

@@ -1,5 +1,5 @@
 /* Tool summary row (figma 122:9479): 24px single line —
-   [16 leading] gap6 [title 14/24] gap8 [2x2 dot] gap8 [summary FILL truncate]. */
+   [16 leading] gap6 [title 14/24] gap8 [summary FILL truncate]. */
 
 .root {
   display: flex;
@@ -52,10 +52,6 @@
   font-weight: 500;
 }
 
-.root[data-tool^='cordis_'] .sep {
-  background: var(--dsw-alias-state-business-primary);
-}
-
 .chevron {
   color: var(--dsw-alias-label-secondary);
 }
@@ -64,18 +60,10 @@
   font-weight: 400;
 }
 
-.sep {
-  flex: none;
-  width: 2px;
-  height: 2px;
-  border-radius: 1px;
-  margin: 0 8px;
-  background: var(--dsw-alias-label-caption);
-}
-
 .summary {
   flex: 1 1 auto;
   min-width: 0;
+  margin-left: 8px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -98,14 +86,14 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
-/* File-tool path: same geometry as .summary, with a persistent link affordance. */
+/* File-tool path: same geometry as .summary, Codex-style link blue at rest. */
 .fileLink {
   flex: 1 1 auto;
   min-width: 0;
+  margin: 0 0 0 8px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  margin: 0;
   padding: 0;
   border: none;
   background: none;
@@ -113,16 +101,13 @@
   text-align: left;
   font-size: 14px;
   line-height: 24px;
-  color: var(--dsw-alias-state-business-primary);
-  text-decoration: underline;
-  text-decoration-color: var(--dsw-alias-label-quaternary);
-  text-underline-offset: 3px;
+  color: var(--dsw-alias-label-primary-bluish);
+  text-decoration: none;
   cursor: pointer;
 }
 
 .fileLink:hover {
-  color: var(--dsw-alias-state-business-primary);
-  text-decoration-color: currentColor;
+  color: var(--dsw-alias-label-primary-bluish);
 }
 
 /* Error row's collapsed summary: the failure's first line in the error color. */

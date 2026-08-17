@@ -77,6 +77,7 @@ body {
 ::-webkit-scrollbar-thumb {
   border-radius: calc(var(--dsh-scrollbar-width) / 2);
   background: var(--dsh-scrollbar-thumb);
+  transition: background var(--ds-transition-duration-slow) var(--ds-ease-in-out);
 }
 
 ::-webkit-scrollbar-thumb:hover {

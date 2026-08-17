@@ -62,6 +62,7 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
             streaming={streaming}
             codeLabels={codeLabels}
             fileMentions={mentions}
+            inheritMetrics
           />,
         )
         break

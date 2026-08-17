@@ -151,6 +151,13 @@ export function createRuntimePatch(
   pluginEntries: readonly RuntimePluginEntry[],
 ): string {
   return [
+    '# Align transient model-request recovery with Codex (5 bounded backoff retries).',
+    '- id: llm-deepseek',
+    "  name: '@deepseek-ai/dsh-llm-deepseek'",
+    '  config:',
+    '    retryPolicy:',
+    '      mode: normal',
+    '      maxRetries: 5',
     '- insert:',
     '    - id: cocode-host-jsonrpc',
     `      name: ${JSON.stringify(jsonRpcPluginUrl)}`,

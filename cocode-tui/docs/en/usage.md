@@ -191,6 +191,8 @@ Each picker row includes a short preview generated from the first user message i
 
 When a turn changes from running to idle, the TUI sends an OSC 9 terminal notification by default. Set `COCODE_TUI_NOTIFY=off` to disable it, or `osc777` for terminals that support OSC 777. Notifications are best-effort terminal control sequences; a write failure does not affect the session.
 
+At startup, `COCODE_TUI_THEME=dark|light|system` takes precedence. With `system` or when unset, macOS reads the system appearance; other environments use the terminal's `COLORFGBG` background hint and fall back to the dark theme when the background cannot be detected.
+
 ## Errors
 
 Failures show `CODE · explanation` on the status line. Language follows `COCODE_LANG`, then `LANG` / `LC_MESSAGES`. Full catalog: [error codes](./errors.md).

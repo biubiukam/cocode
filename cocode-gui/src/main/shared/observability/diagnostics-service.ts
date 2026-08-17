@@ -18,11 +18,13 @@ import type {
 } from "../../../contracts/ipc/diagnostics.contract"
 import { DesktopLogger } from "../logging/desktop-logger"
 import { sanitizePath } from "../logging/redaction"
+import type { ResourceMonitor } from "./resource-monitor"
 
 export interface DiagnosticsServiceOptions {
 	readonly logger: DesktopLogger
 	readonly hostLogDirectory?: string
 	readonly buildId?: string
+	readonly resources?: ResourceMonitor
 }
 
 export class DiagnosticsService {
@@ -31,6 +33,7 @@ export class DiagnosticsService {
 	private readonly diagnosticsDirectory: string
 	private hostLogDirectory: string | undefined
 	private readonly buildId: string | undefined
+	private readonly resources: ResourceMonitor | undefined
 
 	public constructor(options: DiagnosticsServiceOptions) {
 		this.logger = options.logger
@@ -38,6 +41,7 @@ export class DiagnosticsService {
 		this.diagnosticsDirectory = path.join(this.logDirectory, "diagnostics")
 		this.hostLogDirectory = options.hostLogDirectory
 		this.buildId = options.buildId
+		this.resources = options.resources
 		mkdirSync(this.diagnosticsDirectory, { recursive: true, mode: 0o700 })
 	}
 
@@ -55,7 +59,10 @@ export class DiagnosticsService {
 			countCrashDumps(),
 			directoryBytes(this.hostLogDirectory),
 		)
-		return status
+		return {
+			...status,
+			...(this.resources === undefined ? {} : { resources: this.resources.getSummary() }),
+		}
 	}
 
 	public async exportBundle(): Promise<DiagnosticsBundleDto> {
@@ -84,6 +91,7 @@ export class DiagnosticsService {
 			if (this.hostLogDirectory !== undefined)
 				copyDirectory(this.hostLogDirectory, path.join(stagingDirectory, "host"))
 			if (includeCrashDumps) copyCrashDumps(path.join(stagingDirectory, "crashDumps"))
+			this.writeResourceTelemetry(stagingDirectory)
 			this.writeEnvironment(stagingDirectory)
 			this.writeHostDescriptor(stagingDirectory)
 			this.writeManifest(stagingDirectory)
@@ -202,6 +210,23 @@ export class DiagnosticsService {
 				audit: true,
 			})
 		}
+	}
+
+	private writeResourceTelemetry(stagingDirectory: string): void {
+		if (this.resources === undefined) return
+		const samples = this.resources.getRecentSamples()
+		writeFileSync(
+			path.join(stagingDirectory, "resource-summary.json"),
+			`${JSON.stringify(this.resources.getSummary(), null, 2)}\n`,
+			{ mode: 0o600 },
+		)
+		writeFileSync(
+			path.join(stagingDirectory, "resource-samples.ndjson"),
+			samples.length === 0
+				? ""
+				: `${samples.map((sample) => JSON.stringify(sample)).join("\n")}\n`,
+			{ mode: 0o600 },
+		)
 	}
 
 	private async confirmCrashDumpExport(): Promise<boolean> {

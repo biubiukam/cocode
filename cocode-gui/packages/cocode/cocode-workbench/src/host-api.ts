@@ -1,10 +1,10 @@
 import { execFile } from "node:child_process"
 import { cp, mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises"
-import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path"
+import { basename, dirname, isAbsolute, join, relative } from "node:path"
 import { promisify } from "node:util"
 import type { WorkbenchContext, WorkbenchRequest, WorkbenchResponse, WorkbenchRoute } from "./host-types.ts"
 import { applyBrowserHost } from "./browser/host.ts"
-import { resolveSessionCwd } from "./session-cwd.ts"
+import { absolutePath, assertWritable, canWrite, readablePath, sessionCwd, writablePath } from "./file-access.ts"
 import { gitDispatch } from "./git-api.ts"
 
 const exec = promisify(execFile)
@@ -40,36 +40,17 @@ function textField(payload: Record<string, unknown>, key: string): string | unde
   return typeof value === "string" && value.trim() !== "" ? value : undefined
 }
 
-function sessionCwd(ctx: WorkbenchContext, payload: Record<string, unknown>): string {
-  return resolveSessionCwd(ctx, textField(payload, "sessionId"), textField(payload, "cwd"))
-}
-
-/** Reject any path that escapes the session workspace before it reaches the filesystem. */
-function ensureInside(cwd: string, absolute: string): string {
-  const rel = relative(cwd, absolute)
-  if (rel === ".." || rel.startsWith("../") || rel.startsWith("..\\") || isAbsolute(rel)) {
-    throw new Error("path is outside the active workspace")
-  }
-  return absolute
-}
-
-function boundedPath(ctx: WorkbenchContext, payload: Record<string, unknown>, key: string): string {
-  const cwd = sessionCwd(ctx, payload)
-  const requested = textField(payload, key) ?? cwd
-  return ensureInside(cwd, isAbsolute(requested) ? resolve(requested) : resolve(cwd, requested))
-}
-
 /**
  * Resolve the `to` field of a move/copy: a bare name renames next to the
  * source, anything with a separator is resolved against the workspace root.
  */
-function destinationPath(cwd: string, source: string, payload: Record<string, unknown>): string {
+function destinationPath(ctx: WorkbenchContext, cwd: string, source: string, payload: Record<string, unknown>): string {
   const to = textField(payload, "to")
   if (to === undefined || to.includes("\0")) throw new Error("a target name is required")
   const absolute = to.includes("/") || to.includes("\\")
-    ? (isAbsolute(to) ? resolve(to) : resolve(cwd, to))
+    ? absolutePath(cwd, to)
     : join(dirname(source), to)
-  return ensureInside(cwd, absolute)
+  return assertWritable(ctx, payload, absolute)
 }
 
 async function exists(path: string): Promise<boolean> {
@@ -101,7 +82,7 @@ async function uniquePath(target: string): Promise<string> {
 }
 
 async function tree(ctx: WorkbenchContext, payload: Record<string, unknown>) {
-  const directory = boundedPath(ctx, payload, "path")
+  const directory = readablePath(ctx, payload, "path")
   const entries = await readdir(directory, { withFileTypes: true })
   const limited = entries.slice(0, MAX_DIRECTORY_ENTRIES)
   return {
@@ -134,16 +115,20 @@ async function tree(ctx: WorkbenchContext, payload: Record<string, unknown>) {
 }
 
 async function fileRead(ctx: WorkbenchContext, payload: Record<string, unknown>) {
-  const path = boundedPath(ctx, payload, "path")
+  const path = readablePath(ctx, payload, "path")
   const bytes = await readFile(path)
   const limited = bytes.byteLength > MAX_FILE_BYTES ? bytes.subarray(0, MAX_FILE_BYTES) : bytes
   const binary = limited.subarray(0, Math.min(limited.length, 4096)).includes(0)
-  if (binary) return { kind: "binary", bytes: limited.byteLength, truncated: bytes.byteLength > limited.byteLength }
-  return { kind: "text", content: new TextDecoder().decode(limited), truncated: bytes.byteLength > limited.byteLength }
+  // `writable` lets the editor open read-only up front instead of accepting
+  // edits the current sandbox mode will reject at save time.
+  const writable = canWrite(ctx, payload, path)
+  const truncated = bytes.byteLength > limited.byteLength
+  if (binary) return { kind: "binary", bytes: limited.byteLength, truncated, writable }
+  return { kind: "text", content: new TextDecoder().decode(limited), truncated, writable }
 }
 
 async function fileWrite(ctx: WorkbenchContext, payload: Record<string, unknown>) {
-  const path = boundedPath(ctx, payload, "path")
+  const path = writablePath(ctx, payload, "path")
   const content = payload.content
   if (typeof content !== "string") throw new Error("fs.write requires text content")
   if (Buffer.byteLength(content, "utf8") > MAX_FILE_BYTES) throw new Error("file is too large")
@@ -152,7 +137,7 @@ async function fileWrite(ctx: WorkbenchContext, payload: Record<string, unknown>
 }
 
 async function fileMkdir(ctx: WorkbenchContext, payload: Record<string, unknown>) {
-  const path = boundedPath(ctx, payload, "path")
+  const path = writablePath(ctx, payload, "path")
   await mkdir(path)
   return { created: true }
 }
@@ -160,9 +145,9 @@ async function fileMkdir(ctx: WorkbenchContext, payload: Record<string, unknown>
 /** Rename in place or move across directories; never overwrites an existing entry. */
 async function fileRename(ctx: WorkbenchContext, payload: Record<string, unknown>) {
   const cwd = sessionCwd(ctx, payload)
-  const source = boundedPath(ctx, payload, "path")
+  const source = writablePath(ctx, payload, "path")
   if (source === cwd) throw new Error("cannot rename the workspace root")
-  const target = destinationPath(cwd, source, payload)
+  const target = destinationPath(ctx, cwd, source, payload)
   if (target === source) return { path: source }
   if (contains(source, target)) throw new Error("cannot move a folder into itself")
   if (await exists(target)) throw new Error(`${basename(target)} already exists`)
@@ -174,8 +159,9 @@ async function fileRename(ctx: WorkbenchContext, payload: Record<string, unknown
 /** Copy a file or directory tree, sidestepping a name clash instead of failing. */
 async function fileCopy(ctx: WorkbenchContext, payload: Record<string, unknown>) {
   const cwd = sessionCwd(ctx, payload)
-  const source = boundedPath(ctx, payload, "from")
-  const requested = destinationPath(cwd, source, payload)
+  // The source is only read; solely the destination must clear the write fence.
+  const source = readablePath(ctx, payload, "from")
+  const requested = destinationPath(ctx, cwd, source, payload)
   // Deduplicate first: pasting next to the source resolves onto the source
   // itself, so only a genuinely nested target is a recursive copy.
   const target = await uniquePath(requested)
@@ -187,18 +173,19 @@ async function fileCopy(ctx: WorkbenchContext, payload: Record<string, unknown>)
 
 async function fileDelete(ctx: WorkbenchContext, payload: Record<string, unknown>) {
   const cwd = sessionCwd(ctx, payload)
-  const path = boundedPath(ctx, payload, "path")
+  const path = writablePath(ctx, payload, "path")
   if (path === cwd) throw new Error("cannot delete the workspace root")
   await rm(path, { recursive: true, force: true })
   return { deleted: true }
 }
 
 /**
- * Show the entry in the host file manager. Arguments go through execFile, so
- * the workspace-bounded path is never interpreted by a shell.
+ * Show the entry in the host file manager. Revealing observes rather than
+ * mutates, so it follows the read rule. Arguments go through execFile, so the
+ * path is never interpreted by a shell.
  */
 async function fileReveal(ctx: WorkbenchContext, payload: Record<string, unknown>) {
-  const path = boundedPath(ctx, payload, "path")
+  const path = readablePath(ctx, payload, "path")
   if (!await exists(path)) throw new Error("this entry no longer exists")
   try {
     if (process.platform === "darwin") await exec("open", ["-R", path])
@@ -245,7 +232,7 @@ export function createWorkbenchApi(ctx: WorkbenchContext): WorkbenchRoute {
           const path = url.searchParams.get("path")
           const cwd = url.searchParams.get("cwd") ?? undefined
           if (path === null) throw new Error("path is required")
-          const absolute = boundedPath(ctx, { sessionId, path, cwd }, "path")
+          const absolute = readablePath(ctx, { sessionId, path, cwd }, "path")
           const bytes = await readFile(absolute)
           response.writeHead(200, { "content-type": mimeFor(absolute), "cache-control": "no-store", "content-length": String(bytes.byteLength) })
           response.end(bytes)

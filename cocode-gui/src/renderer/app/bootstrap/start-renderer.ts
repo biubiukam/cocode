@@ -1,8 +1,12 @@
 import { AppWebEntry } from "@deepseek-ai/dsh-client-web"
-import type { DshThemePreference } from "../../../contracts/ipc/dsh-runtime.contract"
+import type {
+	DshRuntimeReboundDto,
+	DshRuntimeRecoveryStateDto,
+	DshThemePreference,
+} from "../../../contracts/ipc/dsh-runtime.contract"
 import { createDshBundleLoader } from "./dsh-bundle-loader"
 import { selectDshBootEntries } from "./dsh-boot-entries"
-import { installDshTransport } from "./dsh-transport"
+import { installDshTransport, rebindDshTransport } from "./dsh-transport"
 import {
 	isDesktopDshBridgeAvailable,
 	loadDshBootstrap,
@@ -10,6 +14,7 @@ import {
 } from "./load-dsh-bootstrap"
 import { resolveLocalDshClientBundleUrl } from "./local-dsh-client-bundles"
 import { RendererLogger } from "../../shared/logging/renderer-logger"
+import { prepareDshBootManifest } from "./prepare-dsh-boot"
 
 const logger = new RendererLogger()
 
@@ -25,8 +30,10 @@ export async function startRenderer(element: HTMLElement): Promise<void> {
 		markThemeReady()
 		const runtimeOrigin = resolveRendererRuntimeOrigin(bootstrap)
 		window.__DSH_DESKTOP_RUNTIME_ORIGIN__ = runtimeOrigin
+		window.__DSH_DESKTOP_ENDPOINT_GENERATION__ = 0
 		if (isDesktopDshBridgeAvailable()) {
 			installDshTransport(runtimeOrigin, logger)
+			installRuntimeRecoveryListeners()
 		}
 		const bootEntries = selectDshBootEntries(
 			bootstrap.boot.entries,
@@ -51,6 +58,39 @@ export async function startRenderer(element: HTMLElement): Promise<void> {
 		logger.error("renderer.start.failed", error, { component: "renderer" })
 		element.replaceChildren(createFailureView(error))
 	}
+}
+
+function installRuntimeRecoveryListeners(): void {
+	window.desktopApi.dsh.onRecoveryState((state: DshRuntimeRecoveryStateDto) => {
+		// Main's ready means the new Runtime passed bootstrap/health checks. The
+		// renderer stays degraded until the fresh connection handshake and
+		// snapshot resync complete (runtime/index.ts publishes the final ready).
+		if (state.state === "ready") return
+		document.documentElement.dataset.dshRuntimeState = state.state
+		window.dispatchEvent(
+			new CustomEvent("cocode:dsh-runtime-recovery-state", { detail: state }),
+		)
+	})
+	window.desktopApi.dsh.onRebound((event: DshRuntimeReboundDto) => {
+		const runtimeOrigin = new URL(event.bootstrap.origin).origin
+		rebindDshTransport(runtimeOrigin)
+		window.__DSH_DESKTOP_RUNTIME_ORIGIN__ = runtimeOrigin
+		window.__DSH_DESKTOP_ENDPOINT_GENERATION__ = event.endpointGeneration
+		document.documentElement.dataset.dshRuntimeState = "degraded"
+		prepareDshBootManifest(event.bootstrap, runtimeOrigin)
+		window.dispatchEvent(
+			new CustomEvent("cocode:dsh-runtime-recovery-state", {
+				detail: {
+					state: "degraded",
+					attempt: 0,
+					maxAttempts: 3,
+					recoveryId: "renderer-resync",
+					endpointGeneration: event.endpointGeneration,
+				},
+			}),
+		)
+		window.dispatchEvent(new CustomEvent("cocode:dsh-runtime-rebound", { detail: event }))
+	})
 }
 
 function markThemeReady(): void {

@@ -96,6 +96,7 @@ describe('AuthStore', () => {
     expect((await readSettings(dshHome)).hasCloudRoute).toBe(false)
     const providerConfig = JSON.parse(store.resolved().env.COCODE_LLM_PROVIDERS ?? '{}')
     expect(providerConfig['cocode-nut'].api).toBe('openai-responses')
+    expect(providerConfig['cocode-nut'].retryPolicy).toEqual({ mode: 'normal', maxRetries: 5 })
     expect(providerConfig['cocode-nut'].models).toHaveLength(2)
   })
 
@@ -199,6 +200,7 @@ describe('AuthStore', () => {
     expect(await readAccount(home)).toMatchObject({ personalKeyId: 'key-1' })
     const providerConfig = JSON.parse(store.resolved().env.COCODE_LLM_PROVIDERS ?? '{}')
     expect(providerConfig['cocode-nut'].api).toBe('openai-responses')
+    expect(providerConfig['cocode-nut'].retryPolicy).toEqual({ mode: 'normal', maxRetries: 5 })
     expect(providerConfig['cocode-nut'].models).toEqual([
       { id: 'cloud-1', name: 'Cloud 1' },
       { id: 'cloud-2', name: 'Cloud 2' },
