@@ -17,19 +17,26 @@ export function ApprovalPanel(props: {
   mousePointer?: TuiMousePointer
   dispatch: (action: TuiAction) => void
 }) {
-  const [hoveredAction, setHoveredAction] = useState<ReturnType<typeof approvalActionAtRow>>()
+  const [hoveredAction, setHoveredAction] =
+    useState<ReturnType<typeof approvalActionAtRow>>()
   const [inputReady, setInputReady] = useState(false)
-  const lastPointerId = useRef<number | undefined>(undefined)
+  const lastPointerId = useRef(props.mousePointer?.id)
 
   useEffect(() => {
     setInputReady(false)
+    lastPointerId.current = props.mousePointer?.id
     const timer = setTimeout(() => setInputReady(true), 700)
     return () => clearTimeout(timer)
   }, [props.state.request.callId, props.state.request.toolName])
 
   useEffect(() => {
     const pointer = props.mousePointer
-    if (!inputReady || pointer === undefined || pointer.id === lastPointerId.current) return
+    if (
+      !inputReady ||
+      pointer === undefined ||
+      pointer.id === lastPointerId.current
+    )
+      return
     lastPointerId.current = pointer.id
     const action = approvalActionAtRow(pointer.row, props.panelStartRow)
     setHoveredAction(action)
@@ -71,48 +78,55 @@ export function ApprovalPanel(props: {
       }
       borderColor={theme.warning}
     >
-      <Text color={theme.text} wrap="truncate-end">
+      <Text color={theme.text} wrap='truncate-end'>
         {sanitizeSingleLine(request.toolName)}
       </Text>
-      <Text color={theme.dim} wrap="truncate-end">
+      <Text color={theme.dim} wrap='truncate-end'>
         {text(props.locale, 'approvalTarget')}:{' '}
-        {sanitizeSingleLine(request.target ?? text(props.locale, 'approvalUnavailableValue'))}
-      </Text>
-      <Text color={theme.dim} wrap="truncate-end">
-        {text(props.locale, 'approvalRisk')}:{' '}
         {sanitizeSingleLine(
-          request.risk ?? request.reason ?? text(props.locale, 'approvalUnavailableValue'),
+          request.target ?? text(props.locale, 'approvalUnavailableValue'),
         )}
       </Text>
-      <Text color={theme.dim} wrap="truncate-end">
-        {text(props.locale, 'approvalSource')}: {sanitizeSingleLine(request.source ?? 'runtime')}
+      <Text color={theme.dim} wrap='truncate-end'>
+        {text(props.locale, 'approvalRisk')}:{' '}
+        {sanitizeSingleLine(
+          request.risk ??
+            request.reason ??
+            text(props.locale, 'approvalUnavailableValue'),
+        )}
+      </Text>
+      <Text color={theme.dim} wrap='truncate-end'>
+        {text(props.locale, 'approvalSource')}:{' '}
+        {sanitizeSingleLine(request.source ?? 'runtime')}
       </Text>
       <ApprovalAction
         active={hoveredAction === 'allowed-once'}
         label={props.locale === 'zh' ? '允许一次' : 'Allow once'}
-        shortcut="a / enter"
+        shortcut='a / enter'
       />
       <ApprovalAction
         active={hoveredAction === 'allowed-for-turn'}
         label={props.locale === 'zh' ? '本轮允许' : 'Allow for turn'}
-        shortcut="t"
+        shortcut='t'
       />
       <ApprovalAction
         active={hoveredAction === 'rejected'}
         label={props.locale === 'zh' ? '拒绝' : 'Deny'}
-        shortcut="d / n"
+        shortcut='d / n'
       />
     </PanelFrame>
   )
 }
 
-function ApprovalAction(props: { active: boolean; label: string; shortcut: string }) {
+function ApprovalAction(props: {
+  active: boolean
+  label: string
+  shortcut: string
+}) {
   return (
-    <Text
-      {...selectionStyle(props.active)}
-      wrap="truncate-end"
-    >
-      {props.active ? glyphs.optionActive : glyphs.optionInactive} {props.label} <Text color={theme.dim}>{props.shortcut}</Text>
+    <Text {...selectionStyle(props.active)} wrap='truncate-end'>
+      {props.active ? glyphs.optionActive : glyphs.optionInactive} {props.label}{' '}
+      <Text color={theme.dim}>{props.shortcut}</Text>
     </Text>
   )
 }
