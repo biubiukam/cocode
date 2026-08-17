@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { probeRuntimeCapabilities } from '../../packages/connection/src/capability.ts'
 import {
@@ -7,6 +9,7 @@ import {
   resolveHostRuntimeEnv,
   resolveHostScope,
 } from '../../packages/connection/src/client.ts'
+import { fingerprintRuntimePlugins } from '../../packages/connection/src/runtime-plugins.ts'
 
 type ProbeCall = { method: string; params: object; timeoutMs?: number }
 
@@ -57,6 +60,34 @@ describe('runtime capability negotiation', () => {
 
     expect(first.dshHome).toBe(second.dshHome)
     expect(first.hostConfigFingerprint).not.toBe(second.hostConfigFingerprint)
+  })
+
+  it('versions the Host scope with the bundled runtime plugins', () => {
+    const scope = resolveHostScope({
+      cwd: '/tmp',
+      env: { DSH_HOME: '/tmp/cocode-home' },
+    })
+
+    expect(scope.hostConfigFingerprint).toMatch(/:plugins-[0-9a-f]{32}$/)
+  })
+
+  it('changes the plugin fingerprint when a bundled plugin changes', () => {
+    const runtimeRoot = mkdtempSync(join(tmpdir(), 'cocode-runtime-'))
+    const pluginRoot = join(runtimeRoot, 'plugins', 'cocode-dsml')
+    mkdirSync(join(pluginRoot, 'lib'), { recursive: true })
+    writeFileSync(join(runtimeRoot, 'plugins.json'), '{"plugins":["cocode-dsml"]}\n')
+    writeFileSync(join(pluginRoot, 'package.json'), '{"name":"cocode-dsml"}\n')
+    writeFileSync(join(pluginRoot, 'lib', 'index.js'), 'export const version = 1\n')
+
+    try {
+      const first = fingerprintRuntimePlugins(runtimeRoot)
+      writeFileSync(join(pluginRoot, 'lib', 'index.js'), 'export const version = 2\n')
+      const second = fingerprintRuntimePlugins(runtimeRoot)
+
+      expect(second).not.toBe(first)
+    } finally {
+      rmSync(runtimeRoot, { recursive: true, force: true })
+    }
   })
 
   it('does not enable steer when the runtime advertises queue only', async () => {

@@ -58,7 +58,7 @@ export function StatusLine(props: {
         }),
   ].filter((value): value is string => value !== undefined)
   return (
-    <Box flexDirection="column" marginBottom={1}>
+    <Box flexDirection="column" flexShrink={0} marginBottom={1}>
       <Box width="100%" justifyContent="space-between">
         <Text color={theme.dim} wrap="truncate-end">
           <AgentStatusIndicator agent={props.agent} /> {props.status.line}

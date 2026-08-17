@@ -38,6 +38,7 @@ import type {
   TuiImageInput,
 } from './types.ts'
 import { fallbackCapabilitySnapshot, probeRuntimeCapabilities } from './capability.ts'
+import { runtimePluginFingerprint } from './runtime-plugins.ts'
 
 type HarnessClient = JsonRpcPeer
 
@@ -566,7 +567,11 @@ export function resolveHostRuntimeEnv(env: NodeJS.ProcessEnv): HostRuntimeEnv {
 }
 
 export function resolveHostScope(launch: TuiLaunch): HostScope {
-  return resolveSharedHostScope(launch.env ?? process.env)
+  const scope = resolveSharedHostScope(launch.env ?? process.env)
+  return {
+    ...scope,
+    hostConfigFingerprint: `${scope.hostConfigFingerprint}:plugins-${runtimePluginFingerprint()}`,
+  }
 }
 
 type CompanionCapabilities = {
