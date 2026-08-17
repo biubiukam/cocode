@@ -41,6 +41,7 @@ const RELEASE_KEYS = new Set([
 	"RELEASE_DESCRIPTION",
 	"RELEASE_HOMEPAGE",
 	"ELECTRON_UPDATE_REPOSITORY",
+	"ELECTRON_UPDATE_REPOSITORY_WIN32_ARM64",
 	"ELECTRON_AUTO_UPDATE",
 	"ELECTRON_UPDATE_INTERVAL",
 	"MACOS_ICON_PATH",
@@ -134,11 +135,32 @@ export function resolveReleaseTarget(environment = process.env): ReleaseTarget {
 	return { platform, arch }
 }
 
-export function resolveGitHubReleaseRepository(environment = process.env): GitHubReleaseRepository {
-	const repository = environment.GITHUB_REPOSITORY?.trim() || "cocode-agency/cocode"
+export function resolveGitHubReleaseRepository(
+	environment = process.env,
+	target?: ReleaseTarget,
+): GitHubReleaseRepository {
+	const repository =
+		target?.platform === "win32" && target.arch === "arm64"
+			? resolveWindowsArm64UpdateRepository(environment)
+			: environment.GITHUB_REPOSITORY?.trim() || "cocode-agency/cocode"
+	return parseGitHubReleaseRepository(repository, "GitHub release repository")
+}
+
+export function resolveWindowsArm64UpdateRepository(environment = process.env): string {
+	const repository = environment.ELECTRON_UPDATE_REPOSITORY_WIN32_ARM64?.trim()
+	if (!repository) {
+		throw new Error(
+			"ELECTRON_UPDATE_REPOSITORY_WIN32_ARM64 is required for Windows ARM64 releases.",
+		)
+	}
+	parseGitHubReleaseRepository(repository, "ELECTRON_UPDATE_REPOSITORY_WIN32_ARM64")
+	return repository
+}
+
+function parseGitHubReleaseRepository(repository: string, label: string): GitHubReleaseRepository {
 	const [owner, name, ...rest] = repository.split("/")
 	if (!owner || !name || rest.length > 0 || /\s/.test(repository)) {
-		throw new Error(`GITHUB_REPOSITORY must use the owner/name format: ${repository}`)
+		throw new Error(`${label} must use the owner/name format: ${repository}`)
 	}
 	return { owner, name }
 }
@@ -371,6 +393,15 @@ export function requireReleaseCredentials(target: ReleaseTarget, environment = p
 		throw new Error("Windows signing credentials are required for a signed Windows release.")
 }
 
+export function requireReleaseUpdateRepository(
+	target: ReleaseTarget,
+	environment = process.env,
+): void {
+	if (target.platform === "win32" && target.arch === "arm64") {
+		resolveWindowsArm64UpdateRepository(environment)
+	}
+}
+
 export function createDmgConfig(environment = process.env): MakerDMGConfig {
 	return {
 		format: (environment.DMG_FORMAT?.trim() as MakerDMGConfig["format"]) || "UDZO",
@@ -391,7 +422,7 @@ export function createSquirrelConfig(
 	const arch = environment.RELEASE_ARCH ?? process.arch
 	if (arch !== "x64" && arch !== "arm64")
 		throw new Error(`Unsupported Squirrel architecture: ${arch}.`)
-	const segment = arch === "x64" ? "win32-x64" : "arm64"
+	const segment = arch === "x64" ? "win32-x64" : "win32-arm64"
 	const artifactRoot = `Cocode-Desktop-${packageVersion}-${segment}`
 	return {
 		noMsi: false,

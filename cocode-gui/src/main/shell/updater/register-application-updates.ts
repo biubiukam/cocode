@@ -1,6 +1,7 @@
 import { app, autoUpdater, dialog } from "electron"
 import { UpdateSourceType, updateElectronApp, type IUpdateElectronApp } from "update-electron-app"
 import packageMetadata from "../../../../package.json"
+import { embeddedWindowsArm64UpdateRepository } from "./application-update-build-config"
 import {
 	resolveApplicationUpdateConfig,
 	resolveGitHubRepositoryFromUrl,
@@ -25,6 +26,7 @@ export function registerApplicationUpdates(
 			platform: process.platform,
 			architecture: process.arch,
 			defaultRepository: resolveGitHubRepositoryFromUrl(packageMetadata.repository.url),
+			embeddedWindowsArm64Repository: embeddedWindowsArm64UpdateRepository,
 		})
 	} catch (error) {
 		console.error("Automatic updates are disabled because configuration is invalid:", error)

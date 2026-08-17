@@ -5,10 +5,13 @@ import {
 	createSquirrelConfig,
 	createWindowsSignOptions,
 	requireReleaseCredentials,
+	requireReleaseUpdateRepository,
+	resolveGitHubReleaseRepository,
 	resolveMacCliInstallPath,
 	resolveMacInstallerSigningIdentity,
 	resolveReleaseTarget,
 	resolveWindowsSignMode,
+	resolveWindowsArm64UpdateRepository,
 	resolveWindowsSignServiceOptions,
 } from "../../scripts/release/release-config"
 
@@ -57,8 +60,37 @@ test("generates architecture-safe Squirrel names", () => {
 		"Cocode-Desktop-1.2.3-win32-x64-Setup.exe",
 	)
 	assert.equal(
+		createSquirrelConfig("1.2.3", { RELEASE_ARCH: "arm64" }).setupExe,
+		"Cocode-Desktop-1.2.3-win32-arm64-Setup.exe",
+	)
+	assert.equal(
 		createSquirrelConfig("1.2.3", { RELEASE_ARCH: "arm64" }).setupMsi,
-		"Cocode-Desktop-1.2.3-arm64-Setup.msi",
+		"Cocode-Desktop-1.2.3-win32-arm64-Setup.msi",
+	)
+})
+
+test("requires and selects an isolated Windows arm64 update repository", () => {
+	const environment = {
+		GITHUB_REPOSITORY: "acme/cocode",
+		ELECTRON_UPDATE_REPOSITORY_WIN32_ARM64: "acme/cocode-win32-arm64",
+	}
+	assert.equal(resolveWindowsArm64UpdateRepository(environment), "acme/cocode-win32-arm64")
+	assert.deepEqual(
+		resolveGitHubReleaseRepository(environment, { platform: "win32", arch: "arm64" }),
+		{ owner: "acme", name: "cocode-win32-arm64" },
+	)
+	assert.deepEqual(
+		resolveGitHubReleaseRepository(environment, { platform: "win32", arch: "x64" }),
+		{ owner: "acme", name: "cocode" },
+	)
+	assert.doesNotThrow(() =>
+		requireReleaseUpdateRepository({ platform: "win32", arch: "arm64" }, environment),
+	)
+	assert.throws(() => requireReleaseUpdateRepository({ platform: "win32", arch: "arm64" }, {}))
+	assert.throws(() =>
+		resolveWindowsArm64UpdateRepository({
+			ELECTRON_UPDATE_REPOSITORY_WIN32_ARM64: "invalid",
+		}),
 	)
 })
 

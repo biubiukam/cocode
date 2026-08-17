@@ -36,7 +36,7 @@ test("normalizes macOS DMG, ZIP and PKG artifact names with platform and archite
 	}
 })
 
-test("does not publish Windows arm64 Squirrel feed metadata to the shared feed", () => {
+test("preserves the complete Windows arm64 Squirrel feed for isolated publication", () => {
 	const result: ForgeMakeResult = {
 		platform: "win32",
 		arch: "arm64",
@@ -44,7 +44,11 @@ test("does not publish Windows arm64 Squirrel feed metadata to the shared feed",
 		artifacts: ["/tmp/arm64-Setup.exe", "/tmp/RELEASES", "/tmp/arm64.nupkg"],
 	}
 	const [selected] = selectGitHubReleaseArtifacts([result])
-	assert.deepEqual(selected?.artifacts, ["/tmp/arm64-Setup.exe"])
+	assert.deepEqual(selected?.artifacts, [
+		"/tmp/arm64-Setup.exe",
+		"/tmp/RELEASES",
+		"/tmp/arm64.nupkg",
+	])
 })
 
 test("skips files while searching for the packaged macOS app", () => {

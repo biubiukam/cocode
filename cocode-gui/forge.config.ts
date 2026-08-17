@@ -162,7 +162,7 @@ const config: ForgeConfig = {
 		{
 			name: "@electron-forge/publisher-github",
 			config: {
-				repository: resolveGitHubReleaseRepository(),
+				repository: resolveGitHubReleaseRepository(process.env, releaseTarget),
 				tagPrefix: "v",
 				draft: true,
 				prerelease: false,
