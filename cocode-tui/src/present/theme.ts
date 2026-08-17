@@ -140,7 +140,7 @@ export function resolveInitialTheme(
 
   const background = env.COLORFGBG?.split(';').at(-1)
   const backgroundId = background === undefined ? undefined : Number(background)
-  if (Number.isInteger(backgroundId)) {
+  if (typeof backgroundId === 'number' && Number.isInteger(backgroundId)) {
     if ([3, 6, 7, 10, 11, 14, 15].includes(backgroundId)) return 'light'
     if ([0, 1, 2, 4, 5, 8, 9, 12, 13].includes(backgroundId)) return 'dark'
   }
