@@ -54,6 +54,9 @@
 		"commitlint": "commitlint",
 		"prepare": "husky",
 		"check:env": "node scripts/check-env.mjs",
+		"windows-sign:configure": "node scripts/release/windows-sign-credentials.cjs configure",
+		"windows-sign:clear": "node scripts/release/windows-sign-credentials.cjs clear",
+		"windows-sign:status": "node scripts/release/windows-sign-credentials.cjs status",
 		"reconcile:processes": "node scripts/reconcile-owned-processes.mjs",
 		"typecheck": "tsc --noEmit"
 	},
@@ -88,6 +91,7 @@
 		"eslint-import-resolver-typescript": "^4.4.5",
 		"eslint-plugin-import": "^2.32.0",
 		"husky": "9.1.7",
+		"keytar": "7.9.0",
 		"lightningcss": "1.32.0",
 		"lint-staged": "15.5.2",
 		"postcss": "^8.5.26",
