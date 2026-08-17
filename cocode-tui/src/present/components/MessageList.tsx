@@ -4,13 +4,13 @@ import type { ConversationNode } from '../../runtime/nodes/types.ts'
 import { nodeKey } from '../../runtime/nodes/types.ts'
 import {
   maxMessageScrollOffset,
-  resolveMessageWindow,
   transcriptPaintColumns,
 } from '../message-scroll.ts'
+import { cachedNodeRows, measureTranscript } from '../transcript-layout.ts'
 import { glyphs } from '../glyphs.ts'
 import { renderNode } from '../nodes.tsx'
 import { scrollbarThumb } from '../scrollbar.ts'
-import { estimateNodeRows, nodeAttached } from '../visible-tail.ts'
+import { nodeAttached } from '../visible-tail.ts'
 import { theme } from '../theme.ts'
 import { EmptyState } from './EmptyState.tsx'
 import { Scrollbar } from './Scrollbar.tsx'
@@ -38,7 +38,7 @@ function slotHeights(
   let used = 0
   return nodes.map((node, index) => {
     const railed = hasRail(node.kind)
-    const estimated = estimateNodeRows(
+    const estimated = cachedNodeRows(
       node,
       verbose,
       expandedNodeIds?.has(nodeKey(node.kind, node.id)) === true,
@@ -125,18 +125,17 @@ export function MessageList(props: {
         )
   const window =
     props.maxRows === undefined
-      ? { nodes: visibleNodes, hiddenRowsBefore: 0 }
-      : resolveMessageWindow(
-          visibleNodes,
-          props.maxRows,
-          props.verbose,
-          props.expandedNodeIds,
-          props.scrollOffset,
-          contentColumns,
-        )
+      ? { nodes: visibleNodes, startIndex: 0, hiddenRowsBefore: 0 }
+      : measureTranscript({
+          nodes: visibleNodes,
+          maxRows: props.maxRows,
+          verbose: props.verbose,
+          expandedNodeIds: props.expandedNodeIds,
+          maxColumns: contentColumns,
+          scrollOffset: props.scrollOffset,
+        }).window
   const nodes = window.nodes
-  const windowStartIndex =
-    nodes[0] === undefined ? 0 : visibleNodes.indexOf(nodes[0])
+  const windowStartIndex = window.startIndex
   const nodeSlots = slotHeights(
     nodes,
     visibleNodes,

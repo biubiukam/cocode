@@ -207,6 +207,7 @@ export function Chat(props: {
   const [inspectorMouseInput, setInspectorMouseInput] =
     useState<InspectorMouseInput>()
   const mouseClickId = useRef(0)
+  const planReviewWheelTicks = useRef(0)
   // Mouse press/move packets can share one stdin chunk; this ref keeps the
   // drag session available before React commits the reducer update.
   const messageSelectionDragging = useRef(false)
@@ -627,14 +628,23 @@ export function Chat(props: {
     mainChecklistRows +
     statusRows +
     editorRows
-  const messageContentColumns =
-    transcriptPaintColumns(
+  const messageContentColumns = useMemo(
+    () =>
+      transcriptPaintColumns(
+        displayNodes,
+        messageMaxRows,
+        snap.verbose,
+        expandedMessageIds,
+        mainColumns,
+      ) ?? Math.max(1, mainColumns),
+    [
       displayNodes,
-      messageMaxRows,
-      snap.verbose,
       expandedMessageIds,
       mainColumns,
-    ) ?? Math.max(1, mainColumns)
+      messageMaxRows,
+      snap.verbose,
+    ],
+  )
   const composerHeader = composerHeaderLayout({
     composer: snap.composer,
     agent: snap.agent,
@@ -733,6 +743,10 @@ export function Chat(props: {
   }, [mainColumns, snap.notice?.message])
 
   useEffect(() => {
+    if (!questionOpen) planReviewWheelTicks.current = 0
+  }, [questionOpen])
+
+  useEffect(() => {
     if (followTranscript) setMessageScrollOffset(0)
   }, [
     followTranscript,
@@ -819,6 +833,20 @@ export function Chat(props: {
       }
       const wheelDelta = mouseWheelDelta(event)
       if (wheelDelta !== undefined) {
+        if (
+          questionOpen &&
+          snap.question !== undefined &&
+          isPlanReviewQuestion(snap.question.question)
+        ) {
+          planReviewWheelTicks.current += wheelDelta
+          setQuestionMousePointer({
+            id: mouseClickId.current++,
+            row: layoutRowFromMouseY(event.y),
+            action: 'move',
+            wheelDelta: planReviewWheelTicks.current,
+          })
+          return
+        }
         if (
           layout.tooSmall ||
           commandPaletteOpen ||
@@ -2607,7 +2635,7 @@ function questionPanelRows(
     (rows, option) => rows + 1 + Number(option.description !== undefined),
     0,
   )
-  return 11 + Number(state.question.detail !== undefined) + optionRows
+  return 7 + Number(state.total > 1) + Number(state.question.customInput !== false ? 3 : 0) + Number(state.question.detail !== undefined) + optionRows
 }
 
 function overlayWindowSize(

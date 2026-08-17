@@ -24,6 +24,7 @@ export type {
   TuiRuntimeAdvertisement,
   TuiSessionSummary,
   TuiSessionOpenResult,
+  TuiWorkspaceEnsureResult,
   TuiModel,
   TuiModelProviderGroup,
   TuiModelCatalogFailure,

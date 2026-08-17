@@ -1,7 +1,7 @@
 import { describe, it } from "node:test"
 import assert from "node:assert/strict"
 import os from "node:os"
-import path from "node:path"
+import * as path from "pathe"
 import { resolveDshHome } from "../../../src/main/contexts/dsh-runtime/infrastructure/dsh-home"
 
 describe("resolveDshHome", () => {

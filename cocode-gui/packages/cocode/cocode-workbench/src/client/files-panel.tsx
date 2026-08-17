@@ -2,9 +2,10 @@ import { useCallback, useEffect, useState, type MouseEvent as ReactMouseEvent, t
 import { Button, Menu, Modal, writeClipboard } from "@deepseek-ai/dsh-client-ui-primitives"
 import type { WorkbenchPanelProps } from "./model.ts"
 import { workbenchRequest } from "./runtime-api.ts"
+import { baseName, isAbsolutePath, isValidName, joinPath, parentOf, relativeTo } from "../paths.ts"
 import {
-  baseName, copyEntry, createEntry, deleteEntry, isValidName, joinPath,
-  moveEntry, parentOf, relativeTo, renameEntry, revealEntry, type TreeEntry,
+  copyEntry, createEntry, deleteEntry,
+  moveEntry, renameEntry, revealEntry, type TreeEntry,
 } from "./files-actions.ts"
 import { fileMenuEntries, isFileCommand, type FileCommand } from "./files-menu.ts"
 import { ChevronIcon, FileGlyph, FolderGlyph, SearchIcon } from "./icons.tsx"
@@ -58,7 +59,7 @@ const BADGE_RANK: Readonly<Record<GitEntry["group"], number>> = { merge: 3, work
 function gitMap(root: string, entries: readonly GitEntry[]): Readonly<Record<string, string>> {
   const best: Record<string, { readonly rank: number; readonly badge: string }> = {}
   for (const entry of entries) {
-    const path = entry.path.startsWith("/") ? entry.path : joinPath(root, entry.path)
+    const path = isAbsolutePath(entry.path) ? entry.path : joinPath(root, entry.path)
     const badge = entry.group === "untracked" ? "U" : entry.status.toUpperCase()
     const rank = BADGE_RANK[entry.group]
     const current = best[path]

@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs"
 import { randomUUID } from "node:crypto"
-import path from "node:path"
+import * as path from "pathe"
 import { app } from "electron"
 import type {
 	DshRuntimeBootstrapDto,

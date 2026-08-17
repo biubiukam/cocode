@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process"
 import { mkdirSync, rmSync } from "node:fs"
-import path from "node:path"
+import * as path from "pathe"
 import {
 	loadReleaseEnvironment,
 	requireReleaseCredentials,
@@ -14,6 +14,11 @@ const platform = readOption("--platform")
 const arch = readOption("--arch")
 if (!platform || !arch) throw new Error("Usage: pnpm release:{mac|win}:{x64|arm64}")
 
+const runtimeArtifactRoot =
+	process.env.COCODE_RUNTIME_ARTIFACT_ROOT ?? path.resolve(`release/${platform}/${arch}/runtime`)
+const tuiArtifactRoot =
+	process.env.COCODE_TUI_ARTIFACT_ROOT ?? path.resolve(`release/${platform}/${arch}/tui`)
+
 const environment: NodeJS.ProcessEnv = {
 	...process.env,
 	RELEASE_PLATFORM: platform,
@@ -21,9 +26,8 @@ const environment: NodeJS.ProcessEnv = {
 	RELEASE_REQUIRE_SIGNING: "1",
 	RELEASE_REQUIRE_NATIVE_ARCH_MATCH: "1",
 	FORGE_OUT_DIR: process.env.FORGE_OUT_DIR ?? `release/${platform}/${arch}`,
-	COCODE_RUNTIME_ARTIFACT_ROOT:
-		process.env.COCODE_RUNTIME_ARTIFACT_ROOT ??
-		path.resolve(`release/${platform}/${arch}/runtime`),
+	COCODE_RUNTIME_ARTIFACT_ROOT: runtimeArtifactRoot,
+	COCODE_TUI_ARTIFACT_ROOT: tuiArtifactRoot,
 }
 environment.WINDOWS_SIGN_LEDGER_DIR = path.resolve(environment.FORGE_OUT_DIR, "windows-sign-ledger")
 delete environment.COREPACK_ROOT
@@ -51,40 +55,43 @@ if (target.platform === "win32" && resolveWindowsSignMode(environment) === "serv
 		throw new Error("Windows signing service credential preflight failed.")
 }
 
-const command = process.platform === "win32" ? "corepack.cmd" : "corepack"
-const runtime = spawnSync(
-	command,
-	[
-		"pnpm@10.34.5",
-		"run",
-		"build:runtime",
-		"--",
-		"--clean",
-		"--output",
-		environment.COCODE_RUNTIME_ARTIFACT_ROOT,
-	],
-	{ cwd: process.cwd(), env: environment, stdio: "inherit" },
-)
-if (runtime.error) throw runtime.error
-if (runtime.status !== 0)
-	throw new Error(`Runtime build exited with code ${String(runtime.status)}.`)
+const runtimeStatus = runPnpm([
+	"run",
+	"build:runtime",
+	"--",
+	"--clean",
+	"--output",
+	runtimeArtifactRoot,
+])
+if (runtimeStatus !== 0) throw new Error(`Runtime build exited with code ${String(runtimeStatus)}.`)
 
-const forge = spawnSync(
-	command,
-	[
-		"pnpm@10.34.5",
-		"exec",
-		"electron-forge",
-		"make",
-		"--platform",
-		target.platform,
-		"--arch",
-		target.arch,
-	],
-	{ cwd: process.cwd(), env: environment, stdio: "inherit" },
-)
-if (forge.error) throw forge.error
-process.exitCode = forge.status ?? 1
+// Forge verifies the staged TUI while packaging, and `pnpm exec` bypasses the
+// premake lifecycle script that would otherwise build it.
+const tuiStatus = runPnpm(["run", "build:tui", "--", "--output", tuiArtifactRoot])
+if (tuiStatus !== 0) throw new Error(`TUI build exited with code ${String(tuiStatus)}.`)
+
+process.exitCode = runPnpm([
+	"exec",
+	"electron-forge",
+	"make",
+	"--platform",
+	target.platform,
+	"--arch",
+	target.arch,
+])
+
+function runPnpm(args: readonly string[]): number {
+	const command = process.platform === "win32" ? "corepack.cmd" : "corepack"
+	const commandOptions = process.platform === "win32" ? { shell: true } : {}
+	const result = spawnSync(command, ["pnpm@10.34.5", ...args], {
+		cwd: process.cwd(),
+		env: environment,
+		stdio: "inherit",
+		...commandOptions,
+	})
+	if (result.error) throw result.error
+	return result.status ?? 1
+}
 
 function readOption(name: string): string | undefined {
 	const index = process.argv.indexOf(name)

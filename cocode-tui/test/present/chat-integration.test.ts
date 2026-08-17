@@ -25,19 +25,83 @@ describe('Chat', () => {
       startBeforeRender: true,
       mouseSupported: true,
       columns: 100,
+      rows: 24,
     })
 
     try {
       emitUserMessages(runtime, 18)
       await expect.poll(() => chat.app.snapshot().nodes.length).toBe(18)
-      await renderFlush()
+      await expect
+        .poll(() => latestPlainLines(chat.stdout.output).join('\n'))
+        .toContain('message-17')
+      expect(latestPlainLines(chat.stdout.output).join('\n')).not.toContain(
+        'message-0',
+      )
+
       chat.stdout.output = ''
+      for (let tick = 0; tick < 12; tick += 1) {
+        chat.stdin.write('\u001b[<64;10;10M')
+        await renderFlush()
+        if (
+          latestPlainLines(chat.stdout.output).join('\n').includes('message-0')
+        ) {
+          break
+        }
+      }
+      expect(latestPlainLines(chat.stdout.output).join('\n')).toContain(
+        'message-0',
+      )
+    } finally {
+      await closeChat(chat)
+    }
+  })
 
-      chat.stdin.write('\u001b[<64;10;10M'.repeat(8))
+  it('scrolls a plan review preview with the mouse wheel', async () => {
+    const runtime = createTestRuntime()
+    const chat = await renderChat(runtime.value, {
+      startBeforeRender: true,
+      mouseSupported: true,
+      columns: 100,
+      rows: 40,
+    })
+
+    try {
+      const detail = `# Plan\n\n${Array.from(
+        { length: 40 },
+        (_, index) => `- LINE-${String(index + 1).padStart(3, '0')}`,
+      ).join('\n')}`
+      const questionAnswer = runtime.askQuestion({
+        sessionId: 'session-1',
+        questions: [
+          {
+            id: 'review',
+            question: 'Approve this plan and leave plan mode?',
+            detail,
+            options: [{ label: 'Approve' }, { label: 'Keep planning' }],
+            intent: { kind: 'plan-review', approve: 'Approve' },
+          },
+        ],
+      })
+      questionAnswer.catch(() => undefined)
+      await expect.poll(() => chat.app.snapshot().question).toBeDefined()
       await renderFlush()
 
-      expect(plainOutput(chat.stdout.output)).toContain('message-0')
+      const before = plainOutput(chat.stdout.output)
+      expect(before).toContain('LINE-001')
+      expect(before).toContain('more')
+
+      chat.stdout.output = ''
+      chat.stdin.write('\u001b[<65;10;12M'.repeat(4))
+      await renderFlush()
+
+      const after = lastPaint(plainOutput(chat.stdout.output))
+      expect(after).toContain('↑')
+      expect(after).toContain('LINE-030')
+      expect(after).not.toContain('LINE-001')
     } finally {
+      if (chat.app.snapshot().question !== undefined) {
+        chat.app.dispatch({ type: 'question.cancel' })
+      }
       await closeChat(chat)
     }
   })
@@ -366,6 +430,8 @@ describe('Chat', () => {
           patchConsole: false,
           exitOnCtrlC: false,
           kittyKeyboard: { mode: 'enabled' },
+          // CI/GITHUB_ACTIONS makes Ink defer frames until unmount.
+          interactive: true,
         },
       )
 
@@ -395,7 +461,13 @@ describe('Chat', () => {
           .poll(() => app.snapshot().status.telemetry.reasoningEffort)
           .toBe('high')
         app.dispatch({ type: 'setDraft', text: 'csn' })
-        await renderFlush()
+        await expect
+          .poll(() =>
+            latestPlainLines(target.output).findIndex((line) =>
+              line.includes('> csn'),
+            ),
+          )
+          .toBeGreaterThanOrEqual(0)
 
         const lines = latestPlainLines(target.output)
         const draftRow = lines.findIndex((line) => line.includes('> csn'))
@@ -1460,6 +1532,12 @@ function renderFlush(): Promise<void> {
 
 function plainOutput(output: string): string {
   return output.replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, '')
+}
+
+function lastPaint(output: string): string {
+  const marker = 'Plan preview'
+  const start = output.lastIndexOf(marker)
+  return start === -1 ? output : output.slice(start)
 }
 
 class InputStream extends PassThrough {

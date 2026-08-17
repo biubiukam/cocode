@@ -3,6 +3,7 @@ import test from "node:test"
 import {
 	resolveApplicationUpdateConfig,
 	resolveGitHubRepositoryFromUrl,
+	resolvePublicMsixFeedUrl,
 } from "../../../src/main/shell/updater/application-update-config"
 
 const base = {
@@ -17,6 +18,7 @@ test("enables packaged macOS updates with a ten-minute default interval", () => 
 		enabled: true,
 		repository: "cocode-agency/cocode",
 		updateInterval: "10 minutes",
+		channel: "macos",
 	})
 })
 
@@ -29,11 +31,86 @@ test("honors the repository and interval environment overrides", () => {
 				ELECTRON_UPDATE_INTERVAL: "1 hour",
 			},
 		}),
-		{ enabled: true, repository: "acme/desktop", updateInterval: "1 hour" },
+		{ enabled: true, repository: "acme/desktop", updateInterval: "1 hour", channel: "macos" },
 	)
 })
 
-test("disables development, unsupported platforms, and Windows arm64", () => {
+test("enables packaged Windows Squirrel x64 and MSIX x64/arm64 updates", () => {
+	assert.deepEqual(
+		resolveApplicationUpdateConfig({
+			...base,
+			platform: "win32",
+			architecture: "x64",
+			windowsStore: false,
+		}),
+		{
+			enabled: true,
+			repository: "cocode-agency/cocode",
+			updateInterval: "10 minutes",
+			channel: "squirrel",
+		},
+	)
+	assert.deepEqual(
+		resolveApplicationUpdateConfig({
+			...base,
+			platform: "win32",
+			architecture: "x64",
+			windowsStore: true,
+		}),
+		{
+			enabled: true,
+			repository: "cocode-agency/cocode",
+			updateInterval: "10 minutes",
+			channel: "msix",
+		},
+	)
+	assert.deepEqual(
+		resolveApplicationUpdateConfig({
+			...base,
+			platform: "win32",
+			architecture: "arm64",
+			windowsStore: true,
+		}),
+		{
+			enabled: true,
+			repository: "cocode-agency/cocode",
+			updateInterval: "10 minutes",
+			channel: "msix",
+		},
+	)
+})
+
+test("disables legacy Windows arm64 Squirrel updates", () => {
+	assert.deepEqual(
+		resolveApplicationUpdateConfig({
+			...base,
+			platform: "win32",
+			architecture: "arm64",
+			windowsStore: false,
+		}),
+		{ enabled: false, reason: "legacy-squirrel-package" },
+	)
+})
+
+test("uses the shared repository override for MSIX updates", () => {
+	assert.deepEqual(
+		resolveApplicationUpdateConfig({
+			...base,
+			platform: "win32",
+			architecture: "arm64",
+			windowsStore: true,
+			environment: { ELECTRON_UPDATE_REPOSITORY: "acme/desktop" },
+		}),
+		{
+			enabled: true,
+			repository: "acme/desktop",
+			updateInterval: "10 minutes",
+			channel: "msix",
+		},
+	)
+})
+
+test("disables development, unsupported platforms, and unsupported architectures", () => {
 	assert.deepEqual(resolveApplicationUpdateConfig({ ...base, packaged: false }), {
 		enabled: false,
 		reason: "development",
@@ -43,7 +120,7 @@ test("disables development, unsupported platforms, and Windows arm64", () => {
 		reason: "unsupported-platform",
 	})
 	assert.deepEqual(
-		resolveApplicationUpdateConfig({ ...base, platform: "win32", architecture: "arm64" }),
+		resolveApplicationUpdateConfig({ ...base, platform: "win32", architecture: "ia32" }),
 		{ enabled: false, reason: "unsupported-architecture" },
 	)
 })
@@ -65,8 +142,18 @@ test("allows explicit opt-out and rejects unsafe intervals or repository values"
 	assert.throws(() =>
 		resolveApplicationUpdateConfig({
 			...base,
+			environment: { ELECTRON_UPDATE_INTERVAL: "0 hours" },
+		}),
+	)
+	assert.throws(() =>
+		resolveApplicationUpdateConfig({
+			...base,
 			environment: { ELECTRON_UPDATE_REPOSITORY: "acme" },
 		}),
+	)
+	assert.equal(
+		resolvePublicMsixFeedUrl("acme/desktop", "arm64", "1.2.3"),
+		"https://update.electronjs.org/acme/desktop/win32-arm64/msix/1.2.3",
 	)
 })
 

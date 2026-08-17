@@ -36,15 +36,10 @@ describe('terminal output', () => {
         React.createElement(Box, { flexGrow: 1 }),
         React.createElement(Text, null, 'FRAME-BOTTOM'),
       ),
-      {
-        stdin: stdin as unknown as NodeJS.ReadStream,
-        stdout: output,
-        patchConsole: false,
-        exitOnCtrlC: false,
-      },
+      inkLive(stdin, output),
     )
 
-    await new Promise<void>((resolve) => setTimeout(resolve, 50))
+    await screen.waitUntilRenderFlush()
     const visible = target.value.replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, '')
     expect(visible).toContain('FRAME-TOP')
     expect(visible.endsWith('\n')).toBe(false)
@@ -59,14 +54,12 @@ describe('terminal output', () => {
     const target = new CaptureStream()
     Object.assign(target, { rows: 4 })
     const output = createTerminalOutput(target as unknown as NodeJS.WriteStream)
-    const screen = render(React.createElement(CursorFrame, { rows: target.rows, cursorRow: 2 }), {
-      stdin: stdin as unknown as NodeJS.ReadStream,
-      stdout: output,
-      patchConsole: false,
-      exitOnCtrlC: false,
-    })
+    const screen = render(
+      React.createElement(CursorFrame, { rows: target.rows, cursorRow: 2 }),
+      inkLive(stdin, output),
+    )
 
-    await new Promise<void>((resolve) => setTimeout(resolve, 50))
+    await screen.waitUntilRenderFlush()
     expect(terminalCursorPosition(target.value)).toEqual({ row: 2, column: 2 })
 
     screen.unmount()
@@ -79,16 +72,14 @@ describe('terminal output', () => {
     const target = new CaptureStream()
     Object.assign(target, { rows: 4 })
     const output = createTerminalOutput(target as unknown as NodeJS.WriteStream)
-    const screen = render(React.createElement(CursorFrame, { rows: target.rows, cursorRow: 2 }), {
-      stdin: stdin as unknown as NodeJS.ReadStream,
-      stdout: output,
-      patchConsole: false,
-      exitOnCtrlC: false,
-    })
+    const screen = render(
+      React.createElement(CursorFrame, { rows: target.rows, cursorRow: 2 }),
+      inkLive(stdin, output),
+    )
 
-    await new Promise<void>((resolve) => setTimeout(resolve, 50))
+    await screen.waitUntilRenderFlush()
     screen.rerender(React.createElement(CursorFrame, { rows: target.rows, cursorRow: 1 }))
-    await new Promise<void>((resolve) => setTimeout(resolve, 50))
+    await screen.waitUntilRenderFlush()
 
     expect(terminalCursorPosition(target.value)).toEqual({ row: 1, column: 2 })
 
@@ -102,16 +93,14 @@ describe('terminal output', () => {
     const target = new CaptureStream()
     Object.assign(target, { rows: 4 })
     const output = createTerminalOutput(target as unknown as NodeJS.WriteStream)
-    const screen = render(React.createElement(CursorFrame, { rows: 3, cursorRow: 1 }), {
-      stdin: stdin as unknown as NodeJS.ReadStream,
-      stdout: output,
-      patchConsole: false,
-      exitOnCtrlC: false,
-    })
+    const screen = render(
+      React.createElement(CursorFrame, { rows: 3, cursorRow: 1 }),
+      inkLive(stdin, output),
+    )
 
-    await new Promise<void>((resolve) => setTimeout(resolve, 50))
+    await screen.waitUntilRenderFlush()
     screen.rerender(React.createElement(CursorFrame, { rows: 3, cursorRow: 0 }))
-    await new Promise<void>((resolve) => setTimeout(resolve, 50))
+    await screen.waitUntilRenderFlush()
 
     expect(terminalCursorPosition(target.value)).toEqual({ row: 0, column: 2 })
 
@@ -127,18 +116,13 @@ describe('terminal output', () => {
     const output = createTerminalOutput(target as unknown as NodeJS.WriteStream)
     const screen = render(
       React.createElement(CursorFrame, { rows: target.rows, cursorRow: 2, bottom: 'DRAFT' }),
-      {
-        stdin: stdin as unknown as NodeJS.ReadStream,
-        stdout: output,
-        patchConsole: false,
-        exitOnCtrlC: false,
-      },
+      inkLive(stdin, output),
     )
 
-    await new Promise<void>((resolve) => setTimeout(resolve, 50))
+    await screen.waitUntilRenderFlush()
     const beforeSend = target.value.length
     screen.rerender(React.createElement(CursorFrame, { rows: target.rows, bottom: 'RUNNING' }))
-    await new Promise<void>((resolve) => setTimeout(resolve, 50))
+    await screen.waitUntilRenderFlush()
 
     const redraw = target.value.slice(beforeSend)
     expect(redraw).toContain('\u001b[H\u001b[J')
@@ -186,6 +170,17 @@ describe('terminal output', () => {
     expect(output.cocodeTerminalColumns).toBe(120)
   })
 })
+
+function inkLive(stdin: InputStream, stdout: NodeJS.WriteStream) {
+  return {
+    stdin: stdin as unknown as NodeJS.ReadStream,
+    stdout,
+    patchConsole: false,
+    exitOnCtrlC: false,
+    // CI/GITHUB_ACTIONS makes Ink defer frames until unmount.
+    interactive: true,
+  }
+}
 
 class CaptureStream extends Writable {
   readonly isTTY = true

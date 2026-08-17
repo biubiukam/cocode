@@ -98,11 +98,15 @@ export function createQuestionCoordinator(options: {
         key: `${pending.id}-${pending.index}`,
         sessionId: pending.request.sessionId,
         question,
-        tabs: pending.request.questions.map((item, index) => ({
-          position: index + 1,
-          label: questionTabLabel(item),
-          answered: hasAnswer(pending.answers[index]),
-        })),
+        ...(pending.request.questions.length <= 1
+          ? {}
+          : {
+              tabs: pending.request.questions.map((item, index) => ({
+                position: index + 1,
+                label: questionTabLabel(item),
+                answered: hasAnswer(pending.answers[index]),
+              })),
+            }),
         position: pending.index + 1,
         total: pending.request.questions.length,
         answered: pending.answers.filter(hasAnswer).length,

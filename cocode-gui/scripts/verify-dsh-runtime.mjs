@@ -1,5 +1,5 @@
 import { existsSync, lstatSync, readFileSync, readdirSync, statSync } from "node:fs"
-import path from "node:path"
+import * as path from "pathe"
 import { fileURLToPath } from "node:url"
 import { hashDirectory, hashJson } from "./runtime-build-helpers.mjs"
 
@@ -68,7 +68,7 @@ export function verifyRuntime(
 	if (hashDirectory(path.join(root, "node_modules")) !== manifest.dependencyClosureHash)
 		throw new Error("Dependency closure hash mismatch.")
 	verifyNoSymlinks(root)
-	verifyNodePtyHelper(root)
+	verifyNodePtyNatives(root, platform, arch)
 	return manifest
 }
 
@@ -78,20 +78,33 @@ function verifyNoSymlinks(root) {
 			throw new Error(`Staged runtime contains a symlink: ${relative}`)
 }
 
-function verifyNodePtyHelper(root) {
-	const candidates = [
-		path.join(
-			root,
-			"node_modules",
-			"node-pty",
-			"prebuilds",
-			`${process.platform}-${process.arch}`,
-			"spawn-helper",
-		),
-		path.join(root, "node_modules", "node-pty", "build", "Release", "spawn-helper"),
-	]
-	if (!candidates.some(existsSync))
-		throw new Error("node-pty spawn-helper is missing for the current architecture.")
+/**
+ * node-pty loads each native module from the first of build/Release,
+ * build/Debug or prebuilds/<platform>-<arch> that contains it, and resolves the
+ * companion binaries next to it. Windows has no spawn-helper: it drives conpty
+ * and winpty instead.
+ */
+function verifyNodePtyNatives(root, platform, arch) {
+	const moduleRoot = path.join(root, "node_modules", "node-pty")
+	const searchDirectories = ["build/Release", "build/Debug", `prebuilds/${platform}-${arch}`].map(
+		(relative) => path.join(moduleRoot, relative),
+	)
+	const resolveNativeDirectory = (name) => {
+		const directory = searchDirectories.find((candidate) =>
+			existsSync(path.join(candidate, name)),
+		)
+		if (!directory) throw new Error(`node-pty ${name} is missing for ${platform}/${arch}.`)
+		return directory
+	}
+	const ptyDirectory = resolveNativeDirectory("pty.node")
+	if (platform !== "win32") {
+		assertFile(path.join(ptyDirectory, "spawn-helper"), "node-pty spawn-helper")
+		return
+	}
+	assertFile(path.join(ptyDirectory, "winpty-agent.exe"), "node-pty winpty agent")
+	const conptyDirectory = resolveNativeDirectory("conpty.node")
+	assertFile(path.join(conptyDirectory, "conpty", "conpty.dll"), "node-pty conpty library")
+	assertFile(path.join(conptyDirectory, "conpty", "OpenConsole.exe"), "node-pty conpty console")
 }
 
 function listPaths(root, prefix = "") {

@@ -1,5 +1,5 @@
 import { app, crashReporter } from "electron"
-import path from "node:path"
+import * as path from "pathe"
 import { readdirSync, statSync, unlinkSync } from "node:fs"
 import { DesktopLogger } from "../logging/desktop-logger"
 import { createDiagnosticsService, type DiagnosticsService } from "./diagnostics-service"

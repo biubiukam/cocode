@@ -102,6 +102,39 @@ describe('Assembler', () => {
     ])
   })
 
+  it('republishes a changed node as a new object and keeps settled ones stable', () => {
+    const a = assembler()
+    a.ingest(
+      ev('user/message', 1, {
+        id: 'm1',
+        role: 'user',
+        content: [{ type: 'text', text: 'hello' }],
+        source: { kind: 'user' },
+      }),
+    )
+    a.ingest(
+      ev('assistant/chunk', 2, {
+        turn: 1,
+        step: 0,
+        chunk: { type: 'text-delta', index: 0, text: 'Hel' },
+      }),
+    )
+    const first = a.snapshot()
+    a.ingest(
+      ev('assistant/chunk', 3, {
+        turn: 1,
+        step: 0,
+        chunk: { type: 'text-delta', index: 0, text: 'lo' },
+      }),
+    )
+    const second = a.snapshot()
+
+    expect(second[0]).toBe(first[0])
+    expect(second[1]).not.toBe(first[1])
+    expect(first[1]).toMatchObject({ text: 'Hel' })
+    expect(second[1]).toMatchObject({ text: 'Hello' })
+  })
+
   it('merges assistant chunks then seals on message', () => {
     const a = assembler()
     a.ingest(
@@ -198,6 +231,74 @@ describe('Assembler', () => {
       status: 'success',
       result: 'ok',
     })
+  })
+
+  it('marks in-flight tools cancelled when the turn ends', () => {
+    const a = assembler()
+    a.ingest(
+      ev('tool/call', 1, {
+        turn: 1,
+        step: 0,
+        callId: 'write-1',
+        name: 'write',
+        arguments: '{}',
+      }),
+    )
+    a.ingest(ev('turn/end', 2, { turn: 1, reason: { kind: 'cancelled' } }))
+    expect(a.snapshot()[0]).toMatchObject({
+      kind: 'tool',
+      id: 'write-1',
+      status: 'cancelled',
+      streaming: false,
+    })
+  })
+
+  it('settles in-flight tools immediately when the user interrupts', () => {
+    const a = assembler()
+    a.ingest(
+      ev('tool/call', 1, {
+        turn: 1,
+        step: 0,
+        callId: 'write-2',
+        name: 'write',
+        arguments: '{}',
+      }),
+    )
+    a.settleOpen()
+    expect(a.snapshot()[0]).toMatchObject({ status: 'cancelled', streaming: false })
+  })
+
+  it('does not reopen a completed tool when the turn later ends', () => {
+    const a = assembler()
+    a.ingest(
+      ev('tool/call', 1, {
+        turn: 1,
+        step: 0,
+        callId: 'c1',
+        name: 'bash',
+        arguments: '{}',
+      }),
+    )
+    a.ingest(
+      ev('tool/result', 2, {
+        turn: 1,
+        step: 0,
+        message: {
+          id: 'r1',
+          role: 'user',
+          content: [
+            {
+              type: 'tool-result',
+              toolCallId: 'c1',
+              content: [{ type: 'text', text: 'ok' }],
+            },
+          ],
+          source: { kind: 'tool', callId: 'c1' },
+        },
+      }),
+    )
+    a.ingest(ev('turn/end', 3, { turn: 1 }))
+    expect(a.snapshot()[0]).toMatchObject({ status: 'success', result: 'ok' })
   })
 
   it('projects exit_plan_mode arguments while the tool call is streaming', () => {

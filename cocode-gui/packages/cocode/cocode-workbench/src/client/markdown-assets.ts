@@ -1,3 +1,4 @@
+import { isAbsolutePath, parentOf } from "../paths.ts"
 import { fileUrl } from "./runtime-api.ts"
 
 /**
@@ -9,12 +10,6 @@ const IMAGE_OR_CODE = /(`+)[\s\S]*?\1|!\[([^\]]*)\]\(\s*<?([^)\s>]+)>?((?:\s+"[^
 
 /** Anything already carrying a scheme (http:, data:, //host) is left alone. */
 const ABSOLUTE_TARGET = /^(?:[a-z][a-z0-9+.\-]*:|\/\/)/i
-
-/** Containing directory of a file path, tolerating either path separator. */
-function directoryOf(path: string): string {
-  const boundary = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"))
-  return boundary <= 0 ? path : path.slice(0, boundary)
-}
 
 /** Markdown targets may be percent-encoded; the host route wants the raw path. */
 function decodeTarget(target: string): string {
@@ -32,7 +27,7 @@ function decodeTarget(target: string): string {
  * @param sessionId - session whose workspace serves the files.
  */
 export function resolveMarkdownImages(source: string, path: string, sessionId: string | undefined): string {
-  const directory = directoryOf(path)
+  const directory = parentOf(path)
   return source.replace(IMAGE_OR_CODE, (
     match: string,
     fence: string | undefined,
@@ -43,7 +38,7 @@ export function resolveMarkdownImages(source: string, path: string, sessionId: s
     if (fence !== undefined || target === undefined) return match
     if (ABSOLUTE_TARGET.test(target)) return match
     const decoded = decodeTarget(target)
-    const absolute = decoded.startsWith("/") ? decoded : `${directory}/${decoded}`
+    const absolute = isAbsolutePath(decoded) ? decoded : `${directory}/${decoded}`
     // Angle brackets keep the encoded URL parseable when the path contains
     // characters encodeURIComponent leaves intact, such as parentheses.
     return `![${alt ?? ""}](<${fileUrl(sessionId, absolute)}>${title ?? ""})`

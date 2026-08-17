@@ -15,6 +15,7 @@ import type {
   TuiRuntime,
   TuiImageInput,
   TuiPluginEntry,
+  TuiWorkspaceEnsureResult,
 } from '@cocode/tui-connection'
 import type { SelectModeResult } from './auth/store.ts'
 import type { AuthSnapshot, ResolvedAuth } from './auth/types.ts'
@@ -508,6 +509,7 @@ class TuiAppImpl implements TuiApp {
   private remoteCommands: TuiCommandDescriptor[] = []
   private pendingSkillInvocation: string | undefined
   private readonly questions: QuestionCoordinator
+  private workspaceAuthorizationPending = false
   private readonly approvalQueue: PendingApproval[] = []
   private activeApproval: PendingApproval | undefined
   private permissionMode = 'manual'
@@ -1238,6 +1240,7 @@ class TuiAppImpl implements TuiApp {
       },
       cancel: () => this.runtime.cancel(this.sessionId),
       cancelAccepted: (wasRunning) => {
+        if (wasRunning) this.assembler.settleOpen()
         this.notice = {
           tone: 'info',
           message: wasRunning
@@ -1264,6 +1267,10 @@ class TuiAppImpl implements TuiApp {
   }
 
   private cancelQuestion(): void {
+    if (this.workspaceAuthorizationPending) {
+      this.questions.cancel()
+      return
+    }
     // Start cancelling the agent turn before rejecting the question promise.
     // Otherwise the model can receive a normal tool error and immediately
     // issue the same question again.
@@ -1274,6 +1281,7 @@ class TuiAppImpl implements TuiApp {
     if (cancelRequest === undefined) return
     void cancelRequest.then(
       (wasRunning) => {
+        if (wasRunning) this.assembler.settleOpen()
         this.notice = {
           tone: 'info',
           message: wasRunning
@@ -2508,6 +2516,28 @@ class TuiAppImpl implements TuiApp {
     mode: 'normal' | 'queue' | 'steer' = 'normal',
     images: readonly DraftImage[] = [],
   ): Promise<string> {
+    if (this.runtime.ensureWorkspace === undefined) {
+      return this.sendPromptBlocks(promptText, attachments, mode, images)
+    }
+    return this.sendPromptWithAttachments(promptText, attachments, mode, images)
+  }
+
+  private async sendPromptWithAttachments(
+    promptText: string,
+    attachments: readonly { path: string; token: string }[],
+    mode: 'normal' | 'queue' | 'steer',
+    images: readonly DraftImage[],
+  ): Promise<string> {
+    await this.ensureWorkspaceAuthorization()
+    return this.sendPromptBlocks(promptText, attachments, mode, images)
+  }
+
+  private sendPromptBlocks(
+    promptText: string,
+    attachments: readonly { path: string; token: string }[],
+    mode: 'normal' | 'queue' | 'steer',
+    images: readonly DraftImage[],
+  ): Promise<string> {
     const visiblePromptText = images.reduce(
       (value, image) => value.split(image.token).join(''),
       promptText,
@@ -2536,6 +2566,52 @@ class TuiAppImpl implements TuiApp {
         mode,
       ),
     )
+  }
+
+  private async ensureWorkspaceAuthorization(): Promise<void> {
+    if (this.runtime.ensureWorkspace === undefined) return
+
+    const initial = await this.runtime.ensureWorkspace(this.sessionId, false)
+    if (initial.status === 'unsupported' || initial.status === 'ready') return
+
+    const allowLabel = text(this.locale, 'workspaceAuthorizationAllow')
+    this.workspaceAuthorizationPending = true
+    try {
+      const answer = await this.questions.ask({
+        sessionId: this.sessionId,
+        questions: [{
+          id: 'workspace-authorization',
+          header: text(this.locale, 'workspaceAuthorizationTitle'),
+          question: text(this.locale, 'workspaceAuthorizationQuestion'),
+          detail: initial.path,
+          customInput: false,
+          options: [
+            {
+              label: allowLabel,
+              description: text(this.locale, 'workspaceAuthorizationAllowDescription'),
+            },
+            {
+              label: text(this.locale, 'workspaceAuthorizationCancel'),
+              description: text(this.locale, 'workspaceAuthorizationCancelDescription'),
+            },
+          ],
+        }],
+      })
+      if (!answer.answers[0]?.selected.includes(allowLabel)) {
+        throw new Error(text(this.locale, 'workspaceAuthorizationCancelled'))
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('interrupted')) {
+        throw new Error(text(this.locale, 'workspaceAuthorizationCancelled'))
+      }
+      throw error
+    } finally {
+      this.workspaceAuthorizationPending = false
+    }
+
+    const result: TuiWorkspaceEnsureResult = await this.runtime.ensureWorkspace(this.sessionId, true)
+    if (result.status === 'unsupported' || result.status === 'ready') return
+    throw new Error(text(this.locale, 'workspaceAuthorizationUnavailable'))
   }
 
   private restoreFailedPrompt(
@@ -2893,7 +2969,13 @@ class TuiAppImpl implements TuiApp {
             body: text(this.locale, 'turnComplete'),
           })
         }
-        if (agent === 'idle') this.flushQueuedPrompt()
+        if (agent === 'idle') {
+          this.assembler.settleOpen()
+          if (this.notice?.message === text(this.locale, 'cancelRequested')) {
+            this.notice = undefined
+          }
+          this.flushQueuedPrompt()
+        }
       },
       clearInterrupt: () => {
         this.interruptArmed = false

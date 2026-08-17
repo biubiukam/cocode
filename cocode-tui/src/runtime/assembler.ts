@@ -36,6 +36,7 @@ export type Assembler = {
   replaceWindow(events: readonly SessionEvent[]): void
   snapshot(): readonly ConversationNode[]
   stats(): AssemblerStats
+  settleOpen(): void
   reset(): void
 }
 
@@ -90,6 +91,8 @@ class ConversationAssembler implements Assembler {
     } else {
       this.updateContext(matched.definition, matched.id, event)
     }
+    // Cancelled turns often omit tool/result; close in-flight tools here.
+    if (event.type === 'turn/end') this.settleOpen()
     this.pruneCompletedContexts()
   }
 
@@ -98,12 +101,15 @@ class ConversationAssembler implements Assembler {
     const next: ConversationNode[] = []
     for (const context of this.order) {
       if (context.dirty) {
-        context.node = context.definition.buildViewNode({
+        const built = context.definition.buildViewNode({
           kind: context.kind,
           id: context.id,
           startSeq: context.startSeq,
           state: context.state,
         })
+        // Definitions mutate their state in place, so copy on publish: the
+        // presentation layer keys render caches on node identity.
+        context.node = built === null ? null : ({ ...built } as ConversationNode)
         context.dirty = false
       }
       if (context.node !== null) next.push(context.node)
@@ -119,6 +125,23 @@ class ConversationAssembler implements Assembler {
       evictedNodes: this.evictedNodes,
       retainedStateBytes: this.retainedStateBytes,
     }
+  }
+
+  settleOpen(): void {
+    let changed = false
+    for (const context of this.order) {
+      const settle = context.definition.settle
+      if (settle === undefined) continue
+      const next = settle(context.state)
+      if (next === context.state) continue
+      this.retainedStateBytes -= context.stateBytes
+      context.state = next
+      context.stateBytes = estimateStateBytes(context.state)
+      this.retainedStateBytes += context.stateBytes
+      context.dirty = true
+      changed = true
+    }
+    if (changed) this.cacheValid = false
   }
 
   private matchEvent(event: SessionEvent):

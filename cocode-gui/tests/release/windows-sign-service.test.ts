@@ -4,7 +4,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import os from "node:os"
-import path from "node:path"
+import * as path from "pathe"
 import test from "node:test"
 
 interface SigningServiceConfig {

@@ -82,10 +82,28 @@ export const registerApplicationLifecycle = ({
 		}
 	})
 
-	app.on("activate", () => {
-		if (applicationReady && BrowserWindow.getAllWindows().length === 0) {
+	const revealMainWindow = (): void => {
+		if (!applicationReady) return
+		const [window] = BrowserWindow.getAllWindows()
+		if (!window) {
 			createWindow()
+			return
 		}
+		if (window.isMinimized()) window.restore()
+		window.show()
+		window.focus()
+	}
+
+	app.on("activate", revealMainWindow)
+
+	// A second launch quits itself through the single-instance lock, so this
+	// instance owns the user's intent to open the app and has to surface.
+	app.on("second-instance", () => {
+		logger?.log("info", "app.second-instance.rejected")
+		// The newly launched process is the foreground app on macOS until the
+		// running one takes activation back.
+		if (process.platform === "darwin") app.focus({ steal: true })
+		revealMainWindow()
 	})
 
 	return {

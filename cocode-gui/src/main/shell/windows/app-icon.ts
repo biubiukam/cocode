@@ -1,5 +1,5 @@
 import { app, nativeImage, type NativeImage } from "electron"
-import path from "node:path"
+import * as path from "pathe"
 
 /**
  * Packaged builds carry the Cocode icon inside the bundle (Forge writes it from

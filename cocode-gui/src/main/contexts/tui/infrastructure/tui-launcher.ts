@@ -2,6 +2,8 @@ import { createHash } from "node:crypto"
 import { readFile } from "node:fs/promises"
 import { existsSync } from "node:fs"
 import { spawn } from "node:child_process"
+// Paths here end up in shell command strings and escaping, so keep OS separators.
+// eslint-disable-next-line no-restricted-imports
 import path from "node:path"
 import { app } from "electron"
 import { resolveDshHome } from "../../dsh-runtime/infrastructure/dsh-home"
@@ -38,7 +40,7 @@ export class TuiLauncher {
 		const resourcesRoot = resolveResourcesRoot()
 		const executable =
 			process.env.COCODE_NODE_EXECUTABLE?.trim() || path.join(resourcesRoot, "cocode-node")
-		const entry = path.join(resourcesRoot, "tui", "cocode-tui.mjs")
+		const entry = path.join(resourcesRoot, "tui", "cocode-cli.mjs")
 		const supervisorEntry = path.join(
 			resourcesRoot,
 			"dsh-runtime",
@@ -133,14 +135,19 @@ export class TuiLauncher {
 		let runtimeValid = true
 		if (manifest !== null) {
 			const resourcesRoot = resolveResourcesRoot()
-			const entry = path.join(resourcesRoot, "tui", "cocode-tui.mjs")
-			const entryHash = createHash("sha256")
-				.update(await readFile(entry))
+			const cliEntry = path.join(resourcesRoot, "tui", "cocode-cli.mjs")
+			const runtimeEntry = path.join(resourcesRoot, "tui", "cocode-tui.mjs")
+			const cliHash = createHash("sha256")
+				.update(await readFile(cliEntry))
+				.digest("hex")
+			const runtimeHash = createHash("sha256")
+				.update(await readFile(runtimeEntry))
 				.digest("hex")
 			runtimeValid =
 				manifest.schemaVersion === 1 &&
-				manifest.entry === "tui/cocode-tui.mjs" &&
-				manifest.sha256 === entryHash
+				manifest.entry === "tui/cocode-cli.mjs" &&
+				manifest.sha256 === cliHash &&
+				manifest.runtimeSha256 === runtimeHash
 		}
 		return {
 			runtimeValid,

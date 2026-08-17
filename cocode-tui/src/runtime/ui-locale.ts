@@ -137,12 +137,22 @@ export type UiTextKey =
   | 'pluginsToggling'
   | 'questionTitle'
   | 'questionHint'
+  | 'questionSingleHint'
   | 'questionCustom'
   | 'questionMultiHint'
   | 'questionSelectHint'
+  | 'questionOptionHint'
   | 'questionStreaming'
   | 'questionReady'
   | 'questionUnavailable'
+  | 'workspaceAuthorizationTitle'
+  | 'workspaceAuthorizationQuestion'
+  | 'workspaceAuthorizationAllow'
+  | 'workspaceAuthorizationAllowDescription'
+  | 'workspaceAuthorizationCancel'
+  | 'workspaceAuthorizationCancelDescription'
+  | 'workspaceAuthorizationCancelled'
+  | 'workspaceAuthorizationUnavailable'
   | 'rewindTitle'
   | 'rewindHint'
   | 'rewindArm'
@@ -433,12 +443,22 @@ const TEXT: Record<UiLocale, Record<UiTextKey, string>> = {
     pluginsToggling: 'updating…',
     questionTitle: 'Question',
     questionHint: '↑↓ move · ←→ switch',
+    questionSingleHint: '↑↓ choose',
     questionCustom: 'Type another answer',
     questionMultiHint: 'space toggles · tab custom',
     questionSelectHint: 'tab custom',
+    questionOptionHint: '↑↓ choose',
     questionStreaming: 'question is streaming…',
     questionReady: 'question ready for interaction',
     questionUnavailable: 'Question text unavailable',
+    workspaceAuthorizationTitle: 'Workspace access',
+    workspaceAuthorizationQuestion: 'Allow Cocode to register the current directory as a workspace?',
+    workspaceAuthorizationAllow: 'Allow',
+    workspaceAuthorizationAllowDescription: 'Create the workspace and attach this session.',
+    workspaceAuthorizationCancel: 'Cancel',
+    workspaceAuthorizationCancelDescription: 'Cancel without creating a workspace or session.',
+    workspaceAuthorizationCancelled: 'Workspace authorization was cancelled.',
+    workspaceAuthorizationUnavailable: 'Workspace authorization could not be completed.',
     rewindTitle: 'Rewind conversation',
     rewindHint: '↑↓ select · enter review · esc close',
     rewindArm: 'Press Esc again to choose a rewind point.',
@@ -551,7 +571,7 @@ const TEXT: Record<UiLocale, Record<UiTextKey, string>> = {
     reviewSummary: '{files} files · +{additions}/-{deletions}{binary}{truncated}',
     reviewOmittedFiles: '… {count} untracked files omitted',
     approvalTitle: 'Approval required',
-    approvalHint: 'enter/a allow once · t allow for turn · d/n reject · esc cancel',
+    approvalHint: '↑↓ choose · enter confirm · a once · t turn · d/n reject · esc',
     approvalAllowed: 'Tool allowed once.',
     approvalAllowedForTurn: 'Tool allowed for this turn.',
     approvalRejected: 'Tool request rejected.',
@@ -572,10 +592,10 @@ const TEXT: Record<UiLocale, Record<UiTextKey, string>> = {
     planEnabled: 'Plan mode enabled.',
     planDisabled: 'Plan mode disabled.',
     planReviewTitle: 'Plan review',
-    planReviewHint: '↑↓ choose · pgup/pgdn scroll · enter confirm · esc cancel',
+    planReviewHint: '↑↓ choose · wheel/pgup/pgdn scroll · enter confirm · esc cancel',
     planReviewPreview: 'Plan preview',
     planReviewEmpty: 'The plan preview is empty.',
-    planReviewFooter: '↑↓ choose an action · PgUp/PgDn scroll · Enter confirm · Esc cancel',
+    planReviewFooter: '↑↓ choose an action · wheel/PgUp/PgDn scroll · Enter confirm · Esc cancel',
     planStreaming: 'plan is streaming…',
     planReady: 'plan ready for review',
     steerSending: 'Sending follow-up at the next tool boundary…',
@@ -728,12 +748,22 @@ const TEXT: Record<UiLocale, Record<UiTextKey, string>> = {
     pluginsToggling: '正在更新…',
     questionTitle: '需要确认',
     questionHint: '↑↓ 移动 · ←→ 切换问题',
+    questionSingleHint: '↑↓ 选择',
     questionCustom: '输入其他答案',
     questionMultiHint: '空格勾选 · Tab 输入其他答案',
     questionSelectHint: 'Tab 输入其他答案',
+    questionOptionHint: '↑↓ 选择',
     questionStreaming: '问题生成中…',
     questionReady: '问题已生成，等待交互',
     questionUnavailable: '问题内容暂不可用',
+    workspaceAuthorizationTitle: '工作区授权',
+    workspaceAuthorizationQuestion: '是否允许 Cocode 将当前目录注册为工作区？',
+    workspaceAuthorizationAllow: '允许',
+    workspaceAuthorizationAllowDescription: '创建工作区并绑定当前会话。',
+    workspaceAuthorizationCancel: '取消',
+    workspaceAuthorizationCancelDescription: '取消操作，不创建工作区或会话。',
+    workspaceAuthorizationCancelled: '已取消工作区授权。',
+    workspaceAuthorizationUnavailable: '工作区授权未完成。',
     rewindTitle: '回滚会话',
     rewindHint: '↑↓ 选择 · 回车预览 · Esc 关闭',
     rewindArm: '再次按 Esc 选择回滚位置。',
@@ -846,7 +876,7 @@ const TEXT: Record<UiLocale, Record<UiTextKey, string>> = {
     reviewSummary: '{files} 个文件 · +{additions}/-{deletions}{binary}{truncated}',
     reviewOmittedFiles: '… {count} 个未跟踪文件未展示',
     approvalTitle: '需要审批',
-    approvalHint: '回车/a 允许一次 · t 允许本轮 · d/n 拒绝 · Esc 取消',
+    approvalHint: '↑↓ 选择 · 回车确认 · a 一次 · t 本轮 · d/n 拒绝 · Esc',
     approvalAllowed: '已允许本次工具调用。',
     approvalAllowedForTurn: '已允许本轮中的工具调用。',
     approvalRejected: '已拒绝工具调用。',
@@ -867,10 +897,10 @@ const TEXT: Record<UiLocale, Record<UiTextKey, string>> = {
     planEnabled: '已启用计划模式。',
     planDisabled: '已关闭计划模式。',
     planReviewTitle: '计划审阅',
-    planReviewHint: '↑↓ 选择 · PgUp/PgDn 滚动 · 回车确认 · Esc 取消',
+    planReviewHint: '↑↓ 选择 · 滚轮/PgUp/PgDn 滚动 · 回车确认 · Esc 取消',
     planReviewPreview: '计划预览',
     planReviewEmpty: '计划内容为空。',
-    planReviewFooter: '↑↓ 选择操作 · PgUp/PgDn 滚动 · 回车确认 · Esc 取消',
+    planReviewFooter: '↑↓ 选择操作 · 滚轮/PgUp/PgDn 滚动 · 回车确认 · Esc 取消',
     planStreaming: '计划生成中…',
     planReady: '计划已生成，等待审阅',
     steerSending: '将在下一个工具步骤完成后发送后续输入……',

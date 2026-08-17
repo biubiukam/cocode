@@ -132,6 +132,101 @@ describe('QuestionPanel input', () => {
     app.cleanup()
   })
 
+  it('hides single-question chrome and disables custom input when configured', async () => {
+    const stdin = new InputStream()
+    const stdout = new CaptureStream(80, 20)
+    const dispatch = vi.fn()
+    const app = render(
+      React.createElement(QuestionPanel, {
+        state: {
+          key: 'workspace-authorization',
+          sessionId: 'session-1',
+          position: 1,
+          total: 1,
+          answered: 0,
+          question: {
+            id: 'workspace-authorization',
+            question: 'Allow access?',
+            customInput: false,
+            options: [{ label: 'Allow' }, { label: 'Cancel' }],
+          },
+        },
+        locale: 'en',
+        panelStartRow: 1,
+        dispatch,
+      }),
+      {
+        stdin: stdin as unknown as NodeJS.ReadStream,
+        stdout: stdout as unknown as NodeJS.WriteStream,
+        debug: true,
+        patchConsole: false,
+        exitOnCtrlC: false,
+      },
+    )
+
+    await flush()
+    const output = stdout.output.replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, '')
+    expect(output).not.toContain('1/1')
+    expect(output).not.toContain('Type another answer')
+    stdin.write('\u001B[B')
+    await flush()
+    stdin.write('\r')
+    await flush()
+
+    expect(dispatch).toHaveBeenCalledWith({ type: 'question.answer', selected: ['Cancel'] })
+    app.unmount()
+    await flush()
+    app.cleanup()
+  })
+
+  it('submits the last focused option when Enter is pressed on empty custom input', async () => {
+    const stdin = new InputStream()
+    const stdout = new CaptureStream(80, 20)
+    const dispatch = vi.fn()
+    const app = render(
+      React.createElement(QuestionPanel, {
+        state: {
+          key: 'question-2',
+          sessionId: 'session-1',
+          position: 2,
+          total: 2,
+          answered: 1,
+          tabs: [
+            { position: 1, label: 'First', answered: true },
+            { position: 2, label: 'Second', answered: false },
+          ],
+          question: {
+            id: 'second',
+            question: 'Choose the next step',
+            options: [{ label: 'Continue' }, { label: 'Ship it' }],
+          },
+        },
+        locale: 'en',
+        panelStartRow: 1,
+        dispatch,
+      }),
+      {
+        stdin: stdin as unknown as NodeJS.ReadStream,
+        stdout: stdout as unknown as NodeJS.WriteStream,
+        patchConsole: false,
+        exitOnCtrlC: false,
+      },
+    )
+
+    await flush()
+    stdin.write('\u001B[B')
+    await flush()
+    stdin.write('\u001B[B')
+    await flush()
+    stdin.write('\r')
+    await flush()
+
+    expect(dispatch).toHaveBeenCalledWith({ type: 'question.answer', selected: ['Ship it'] })
+    app.unmount()
+    await flush()
+    app.cleanup()
+  })
+
   it('dispatches navigation with the saved selection', async () => {
     const stdin = new InputStream()
     const stdout = new CaptureStream(80, 20)

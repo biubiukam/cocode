@@ -64,11 +64,12 @@ export interface HostLease {
 export interface HostSupervisorClient {
   acquire(request: AcquireHostRequest): Promise<HostLease>
   status(scope: HostScope): Promise<HostDescriptor | null>
+  stop(scope: HostScope, options?: { force?: boolean }): Promise<{ stopped: boolean; descriptor: HostDescriptor | null }>
   release(leaseId: string): Promise<void>
 }
 
 export const SUPERVISOR_PROTOCOL_REVISION = '1.0'
-export const SUPERVISOR_BUILD_REVISION = 'runtime-lifecycle-v4'
+export const SUPERVISOR_BUILD_REVISION = 'runtime-lifecycle-v5'
 export const HOST_PROTOCOL_REVISION = '1.0'
 export const LEASE_TTL_MS = 30_000
 

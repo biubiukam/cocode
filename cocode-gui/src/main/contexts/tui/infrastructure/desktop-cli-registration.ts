@@ -1,6 +1,9 @@
 import { execFile } from "node:child_process"
 import { chmod, mkdir, readFile, stat, unlink, writeFile } from "node:fs/promises"
 import { promisify } from "node:util"
+// Registers CLI shims into the OS PATH (path.delimiter, native separators), so
+// keep node:path semantics.
+// eslint-disable-next-line no-restricted-imports
 import path from "node:path"
 import type {
 	TuiCommandLineToolResult,
@@ -357,7 +360,7 @@ export function isManagedShim(contents: string | undefined): boolean {
 		(contents.includes("COCODE_TUI_CLIENT_KIND") &&
 			contents.includes("desktop-tui") &&
 			contents.includes("COCODE_NODE_EXECUTABLE") &&
-			contents.includes("cocode-tui.mjs"))
+			(contents.includes("cocode-cli.mjs") || contents.includes("cocode-tui.mjs")))
 	)
 }
 

@@ -12,6 +12,7 @@ import {
 	unregisterDshRuntimeIpc,
 } from "../contexts/dsh-runtime/presentation/ipc/register-dsh-runtime-ipc"
 import { registerApplicationLifecycle } from "../shell/lifecycle/register-application-lifecycle"
+import { acquireSingleInstanceLock } from "../shell/lifecycle/single-instance-guard"
 import {
 	registerApplicationUpdates,
 	type ApplicationUpdateRegistration,
@@ -40,6 +41,10 @@ export const startApplication = (): void => {
 		void handleSquirrelEvent(squirrelEvent)
 		return
 	}
+
+	// Claimed before observability, the database and the DSH runtime start, so a
+	// duplicate launch never touches state the running instance owns.
+	if (!acquireSingleInstanceLock()) return
 
 	const observability = createDesktopObservability()
 	const unregisterElectronObservers = registerElectronObservers(observability.logger)

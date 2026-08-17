@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs"
-import path from "node:path"
+import * as path from "pathe"
 
 const root = process.cwd()
 const example = path.join(root, ".env.release.example")
@@ -11,6 +11,10 @@ const allowed = new Set([
 	"ELECTRON_UPDATE_REPOSITORY",
 	"ELECTRON_AUTO_UPDATE",
 	"ELECTRON_UPDATE_INTERVAL",
+	"WINDOWS_MSIX_PACKAGE_ID",
+	"WINDOWS_MSIX_PUBLISHER",
+	"WINDOWS_MSIX_PUBLISHER_DISPLAY_NAME",
+	"WINDOWS_MSIX_PACKAGE_DISPLAY_NAME",
 	"MACOS_ICON_PATH",
 	"WINDOWS_ICON_PATH",
 	"DMG_ICON_PATH",

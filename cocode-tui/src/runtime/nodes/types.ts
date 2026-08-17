@@ -14,6 +14,7 @@ export type NodeDefinition<State = unknown> = {
   start(event: SessionEvent): State
   update(state: State, event: SessionEvent): State
   isComplete?(state: State): boolean
+  settle?(state: State): State
   buildViewNode(ctx: {
     kind: string
     id: string
@@ -80,7 +81,7 @@ export type ToolNode = {
   callId: string
   name: string
   args: string
-  status: 'running' | 'success' | 'error'
+  status: 'running' | 'success' | 'error' | 'cancelled'
   streaming?: boolean
   view?: ToolView
   result?: string

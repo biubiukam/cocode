@@ -5,7 +5,7 @@
  * teardown first: a Ctrl-C during the initial build must still stop the watcher.
  */
 import { fork } from "node:child_process"
-import path from "node:path"
+import * as path from "pathe"
 
 const DEFAULT_READY_TIMEOUT_MS = 300_000
 

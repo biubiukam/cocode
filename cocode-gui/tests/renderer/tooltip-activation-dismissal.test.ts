@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
-import { resolve } from "node:path"
+import { resolve } from "pathe"
 import test from "node:test"
 
 const source = readFileSync(

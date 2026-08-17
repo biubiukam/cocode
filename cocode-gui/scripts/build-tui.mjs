@@ -1,32 +1,37 @@
 import { createHash } from "node:crypto"
 import { execFileSync } from "node:child_process"
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
-import path from "node:path"
+import * as path from "pathe"
 import { fileURLToPath, pathToFileURL } from "node:url"
+import { shellCommandOptions } from "./lib/child-process-options.mjs"
 
 const guiRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const tuiRoot = path.resolve(guiRoot, "../cocode-tui")
 const supervisorRoot = path.resolve(guiRoot, "../cocode-host-supervisor")
-const outputRoot = path.join(guiRoot, ".cache", "cocode", "tui")
-
-export function buildTui({ output = outputRoot } = {}) {
+export function buildTui({ output = defaultOutput() } = {}) {
 	if (!existsSync(tuiRoot)) throw new Error(`TUI checkout not found: ${tuiRoot}`)
 
 	const corepack = process.platform === "win32" ? "corepack.cmd" : "corepack"
 	execFileSync(corepack, ["pnpm@10.34.5", "run", "build"], {
-		cwd: tuiRoot,
-		stdio: "inherit",
+		...shellCommandOptions({ cwd: tuiRoot, stdio: "inherit" }),
 	})
 
 	const sourceEntry = path.join(tuiRoot, "dist", "cocode-tui.mjs")
 	const sourceMeta = path.join(tuiRoot, "dist", "cocode-tui.meta.json")
+	const sourceCli = path.join(tuiRoot, "bin", "cocode-tui.mjs")
+	const sourceCliModule = path.join(tuiRoot, "bin", "cli.mjs")
 	if (!existsSync(sourceEntry)) throw new Error(`TUI build did not emit ${sourceEntry}`)
 	if (!existsSync(sourceMeta)) throw new Error(`TUI build did not emit ${sourceMeta}`)
+	if (!existsSync(sourceCli)) throw new Error(`TUI CLI entry is missing: ${sourceCli}`)
+	if (!existsSync(sourceCliModule))
+		throw new Error(`TUI CLI module is missing: ${sourceCliModule}`)
 
 	rmSync(output, { recursive: true, force: true })
 	mkdirSync(output, { recursive: true })
 	copyFileSync(sourceEntry, path.join(output, "cocode-tui.mjs"))
 	copyFileSync(sourceMeta, path.join(output, "cocode-tui.meta.json"))
+	copyFileSync(sourceCli, path.join(output, "cocode-cli.mjs"))
+	copyFileSync(sourceCliModule, path.join(output, "cli.mjs"))
 
 	const guiPackage = readJson(path.join(guiRoot, "package.json"))
 	const tuiPackage = readJson(path.join(tuiRoot, "package.json"))
@@ -39,8 +44,9 @@ export function buildTui({ output = outputRoot } = {}) {
 	const runtimeManifest = existsSync(runtimeManifestPath)
 		? readJson(runtimeManifestPath)
 		: undefined
-	const entryHash = sha256File(path.join(output, "cocode-tui.mjs"))
-	const buildId = process.env.GITHUB_SHA?.trim() || `local-${entryHash.slice(0, 12)}`
+	const runtimeHash = sha256File(path.join(output, "cocode-tui.mjs"))
+	const cliHash = sha256File(path.join(output, "cocode-cli.mjs"))
+	const buildId = process.env.GITHUB_SHA?.trim() || `local-${runtimeHash.slice(0, 12)}`
 
 	const manifest = {
 		schemaVersion: 1,
@@ -49,13 +55,21 @@ export function buildTui({ output = outputRoot } = {}) {
 		supervisorVersion: String(supervisorPackage.version),
 		dshRuntimeVersion: String(runtimeManifest?.dsh?.version ?? "unknown"),
 		protocolRevision: "1.0",
-		entry: "tui/cocode-tui.mjs",
-		sha256: entryHash,
+		entry: "tui/cocode-cli.mjs",
+		sha256: cliHash,
+		runtimeSha256: runtimeHash,
 		buildId,
 	}
 	writeFileSync(path.join(output, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`)
 	console.log(`[tui-build] staged ${output}`)
 	return { output, manifest }
+}
+
+function defaultOutput() {
+	return path.resolve(
+		process.env.COCODE_TUI_ARTIFACT_ROOT?.trim() ||
+			path.join(guiRoot, ".cache", "cocode", "tui"),
+	)
 }
 
 function readJson(file) {
@@ -68,5 +82,6 @@ function sha256File(file) {
 
 const invokedPath = process.argv[1]
 if (invokedPath && import.meta.url === pathToFileURL(path.resolve(invokedPath)).href) {
-	buildTui()
+	const outputIndex = process.argv.indexOf("--output")
+	buildTui(outputIndex >= 0 ? { output: path.resolve(process.argv[outputIndex + 1]) } : {})
 }

@@ -138,6 +138,11 @@ class SupervisorService {
       case 'renew': return this.renew(String(params.leaseId))
       case 'release': return this.release(String(params.leaseId))
       case 'status': return this.status()
+      case 'stop': {
+        const descriptor = await this.status()
+        await this.stop(params.force === true)
+        return { stopped: true, descriptor }
+      }
       case 'doctor': return this.doctor()
       default: throw new Error(`unknown supervisor method: ${method}`)
     }
@@ -193,6 +198,11 @@ class SupervisorService {
       // group so shutdown can terminate the whole tree instead of only the
       // Node leader.  Windows uses taskkill /T in terminateProcessTree below.
       detached: process.platform !== 'win32',
+      // The Supervisor that spawns this Host has no console of its own, so
+      // Windows would give the Host a fresh console window whose close button
+      // terminates the runtime under the client.  Both output streams are piped
+      // into the Supervisor log, so the Host never needs a console.
+      windowsHide: true,
     })
     const startupBuffer = new RingBuffer(256 * 1024)
     const streamBuffers = { stdout: '', stderr: '' }
@@ -352,8 +362,16 @@ class SupervisorService {
   private writeDescriptor(descriptor: HostDescriptor): void { const temp = `${descriptorPath(this.directory)}.${process.pid}.tmp`; writeFileSync(temp, JSON.stringify(descriptor, null, 2) + '\n', { mode: 0o600 }); renameSync(temp, descriptorPath(this.directory)) }
   private readDescriptor(): HostDescriptor | null { try { return JSON.parse(readFileSync(descriptorPath(this.directory), 'utf8')) as HostDescriptor } catch { return null } }
   private doctor(): Record<string, unknown> { return { supervisorProtocolRevision: SUPERVISOR_PROTOCOL_REVISION, supervisorBuildRevision: SUPERVISOR_BUILD_REVISION, scope: this.scope, descriptor: this.readDescriptor(), leaseCount: this.leases.size, pid: process.pid } }
-  stop(): Promise<void> {
+  stop(force = true): Promise<void> {
     if (this.stopPromise !== null) return this.stopPromise
+    this.cleanupLeases()
+    if (!force && this.leases.size > 0) {
+      throw new Error(`Cannot stop Host while ${this.leases.size} client lease(s) are active. Re-run with --force after closing GUI/TUI clients.`)
+    }
+    if (force) {
+      for (const record of this.leases.values()) rmSync(join(leaseDirectory(this.directory), `${record.leaseId}.json`), { force: true })
+      this.leases.clear()
+    }
     this.stopped = true
     this.stopPromise = (async () => {
       await this.stopHost()

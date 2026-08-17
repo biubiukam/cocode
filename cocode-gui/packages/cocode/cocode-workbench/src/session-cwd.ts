@@ -1,4 +1,4 @@
-import { isAbsolute, resolve } from "node:path"
+import { isAbsolute, resolve } from "pathe"
 import type { WorkbenchContext } from "./host-types.ts"
 
 /**

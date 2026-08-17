@@ -1,7 +1,8 @@
 import { existsSync, readFileSync } from "node:fs"
-import path from "node:path"
+import * as path from "pathe"
 import { loadEnvFile } from "node:process"
 import type { MakerDMGConfig } from "@electron-forge/maker-dmg"
+import type { MakerMSIXConfig } from "@electron-forge/maker-msix"
 import type { MakerSquirrelConfig } from "@electron-forge/maker-squirrel"
 import type { OsxSignOptions } from "@electron/packager"
 import type { NotaryToolCredentials } from "@electron/notarize/lib/types"
@@ -43,6 +44,10 @@ const RELEASE_KEYS = new Set([
 	"ELECTRON_UPDATE_REPOSITORY",
 	"ELECTRON_AUTO_UPDATE",
 	"ELECTRON_UPDATE_INTERVAL",
+	"WINDOWS_MSIX_PACKAGE_ID",
+	"WINDOWS_MSIX_PUBLISHER",
+	"WINDOWS_MSIX_PUBLISHER_DISPLAY_NAME",
+	"WINDOWS_MSIX_PACKAGE_DISPLAY_NAME",
 	"MACOS_ICON_PATH",
 	"WINDOWS_ICON_PATH",
 	"DMG_ICON_PATH",
@@ -88,6 +93,7 @@ const RELEASE_KEYS = new Set([
 	"RELEASE_PUBLISH",
 	"FORGE_OUT_DIR",
 	"COCODE_RUNTIME_ARTIFACT_ROOT",
+	"COCODE_TUI_ARTIFACT_ROOT",
 	"GITHUB_REPOSITORY",
 	"GITHUB_TOKEN",
 	"GITHUB_REF_TYPE",
@@ -136,9 +142,13 @@ export function resolveReleaseTarget(environment = process.env): ReleaseTarget {
 
 export function resolveGitHubReleaseRepository(environment = process.env): GitHubReleaseRepository {
 	const repository = environment.GITHUB_REPOSITORY?.trim() || "cocode-agency/cocode"
+	return parseGitHubReleaseRepository(repository, "GitHub release repository")
+}
+
+function parseGitHubReleaseRepository(repository: string, label: string): GitHubReleaseRepository {
 	const [owner, name, ...rest] = repository.split("/")
 	if (!owner || !name || rest.length > 0 || /\s/.test(repository)) {
-		throw new Error(`GITHUB_REPOSITORY must use the owner/name format: ${repository}`)
+		throw new Error(`${label} must use the owner/name format: ${repository}`)
 	}
 	return { owner, name }
 }
@@ -186,11 +196,7 @@ export function createMacSignOptions(environment = process.env): MacSignOptions 
 }
 
 export function resolveMacInstallerSigningIdentity(environment = process.env): string | undefined {
-	return (
-		environment.MAC_INSTALLER_SIGNING_IDENTITY?.trim() ||
-		environment.MAC_SIGNING_IDENTITY?.trim() ||
-		undefined
-	)
+	return environment.MAC_INSTALLER_SIGNING_IDENTITY?.trim() || undefined
 }
 
 export function resolveMacCliInstallPath(environment = process.env): string {
@@ -359,7 +365,7 @@ export function requireReleaseCredentials(target: ReleaseTarget, environment = p
 			throw new Error("MAC_SIGNING_IDENTITY is required for a signed macOS release.")
 		if (!resolveMacInstallerSigningIdentity(environment))
 			throw new Error(
-				"MAC_INSTALLER_SIGNING_IDENTITY or MAC_SIGNING_IDENTITY is required for a signed macOS PKG release.",
+				"MAC_INSTALLER_SIGNING_IDENTITY (Developer ID Installer) is required for a signed macOS PKG release.",
 			)
 		if (!createMacNotarizeOptions(environment))
 			throw new Error(
@@ -373,6 +379,15 @@ export function requireReleaseCredentials(target: ReleaseTarget, environment = p
 		)
 	if (!createWindowsSignOptions(environment))
 		throw new Error("Windows signing credentials are required for a signed Windows release.")
+	requireWindowsMsixIdentity(environment)
+}
+
+export function requireWindowsMsixIdentity(environment = process.env): void {
+	if (!environment.WINDOWS_MSIX_PACKAGE_ID?.trim())
+		throw new Error("WINDOWS_MSIX_PACKAGE_ID is required for signed Windows releases.")
+	if (!environment.WINDOWS_MSIX_PUBLISHER?.trim())
+		throw new Error("WINDOWS_MSIX_PUBLISHER is required for signed Windows releases.")
+	validateMsixPackageIdentity(environment.WINDOWS_MSIX_PACKAGE_ID)
 }
 
 export function createDmgConfig(environment = process.env): MakerDMGConfig {
@@ -395,7 +410,7 @@ export function createSquirrelConfig(
 	const arch = environment.RELEASE_ARCH ?? process.arch
 	if (arch !== "x64" && arch !== "arm64")
 		throw new Error(`Unsupported Squirrel architecture: ${arch}.`)
-	const segment = arch === "x64" ? "win32-x64" : "arm64"
+	const segment = arch === "x64" ? "win32-x64" : "win32-arm64"
 	const artifactRoot = `Cocode-Desktop-${packageVersion}-${segment}`
 	return {
 		noMsi: false,
@@ -408,6 +423,64 @@ export function createSquirrelConfig(
 		setupMsi: `${artifactRoot}-Setup.msi`,
 		windowsSign: windowsSignOptions as unknown as CjsSignToolOptions | undefined,
 	}
+}
+
+export function createMsixConfig(
+	packageVersion: string,
+	environment = process.env,
+	windowsSignOptions?: ReturnType<typeof createWindowsSignOptions>,
+): MakerMSIXConfig {
+	const arch = environment.RELEASE_ARCH ?? process.arch
+	if (arch !== "x64" && arch !== "arm64")
+		throw new Error(`Unsupported MSIX architecture: ${arch}.`)
+	const packageIdentity = environment.WINDOWS_MSIX_PACKAGE_ID?.trim() || "CocodeDesktop"
+	validateMsixPackageIdentity(packageIdentity)
+	const publisher = normalizeMsixPublisher(
+		environment.WINDOWS_MSIX_PUBLISHER?.trim() || "CN=Cocode Development",
+	)
+	const packageDisplayName =
+		environment.WINDOWS_MSIX_PACKAGE_DISPLAY_NAME?.trim() ||
+		environment.RELEASE_DESCRIPTION?.trim() ||
+		"Cocode Desktop"
+	return {
+		packageName: `Cocode-Desktop-${packageVersion}-win32-${arch}`,
+		manifestVariables: {
+			packageIdentity,
+			publisher,
+			publisherDisplayName:
+				environment.WINDOWS_MSIX_PUBLISHER_DISPLAY_NAME?.trim() ||
+				publisher.replace(/^CN=/, ""),
+			packageDisplayName,
+			packageDescription: environment.RELEASE_DESCRIPTION?.trim() || packageDisplayName,
+			packageVersion: resolveMsixPackageVersion(packageVersion),
+			targetArch: arch,
+		},
+		windowsSignOptions: windowsSignOptions as unknown as MakerMSIXConfig["windowsSignOptions"],
+	}
+}
+
+export function resolveMsixPackageVersion(packageVersion: string): string {
+	const match = packageVersion.trim().match(/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/)
+	if (!match) throw new Error(`Invalid MSIX package version: ${packageVersion}`)
+	const segments = match.slice(1).map(Number)
+	if (segments.some((segment) => segment > 65535))
+		throw new Error(`MSIX package version segment exceeds 65535: ${packageVersion}`)
+	return `${segments[0]}.${segments[1]}.${segments[2]}.0`
+}
+
+function normalizeMsixPublisher(value: string): string {
+	return value.startsWith("CN=") ? value : `CN=${value}`
+}
+
+function validateMsixPackageIdentity(value: string | undefined): void {
+	const identity = value?.trim()
+	if (
+		!identity ||
+		identity.length < 3 ||
+		identity.length > 50 ||
+		!/^[A-Za-z0-9.-]+$/.test(identity)
+	)
+		throw new Error(`WINDOWS_MSIX_PACKAGE_ID is invalid: ${value ?? ""}`)
 }
 
 function parsePositiveInteger(value: string | undefined, fallback: number): number {

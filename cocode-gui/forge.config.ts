@@ -4,7 +4,7 @@ import { createHash } from "node:crypto"
 import { existsSync, readdirSync } from "node:fs"
 import fs from "node:fs/promises"
 import path from "node:path"
-import { MakerDMG } from "@electron-forge/maker-dmg"
+import { MakerMSIX } from "@electron-forge/maker-msix"
 import { MakerSquirrel } from "@electron-forge/maker-squirrel"
 import { MakerZIP } from "@electron-forge/maker-zip"
 import { MakerDeb } from "@electron-forge/maker-deb"
@@ -14,9 +14,9 @@ import { FusesPlugin } from "@electron-forge/plugin-fuses"
 import { FuseV1Options, FuseVersion } from "@electron/fuses"
 import packageMetadata from "./package.json"
 import {
-	createDmgConfig,
 	createMacNotarizeOptions,
 	createMacSignOptions,
+	createMsixConfig,
 	createSquirrelConfig,
 	createWindowsSignOptions,
 	loadReleaseEnvironment,
@@ -54,6 +54,7 @@ const windowsSignOptions =
 	releaseTarget?.platform === "darwin" ? undefined : createWindowsSignOptions()
 
 const config: ForgeConfig = {
+	...(process.env.FORGE_OUT_DIR ? { outDir: path.resolve(process.env.FORGE_OUT_DIR) } : {}),
 	packagerConfig: {
 		asar: false,
 		appBundleId: process.env.ELECTRON_APP_ID ?? "com.cocode.desktop",
@@ -65,7 +66,6 @@ const config: ForgeConfig = {
 		osxSign: macSignOptions,
 		osxNotarize: macNotarizeOptions,
 		windowsSign: windowsSignOptions,
-		...(process.env.FORGE_OUT_DIR ? { outDir: process.env.FORGE_OUT_DIR } : {}),
 		afterExtract: [
 			(buildPath, _electronVersion, platform, _arch, callback) => {
 				const resourcesRoot =
@@ -150,14 +150,21 @@ const config: ForgeConfig = {
 	// proxy resets the connection.
 	rebuildConfig: {
 		headerURL: "https://artifacts.electronjs.org/headers/dist",
+		// The linked Supervisor checkout drags node-pty into the module walk, but
+		// only the Supervisor's own Node process loads it, and its prebuilt binary
+		// is Node-API so no Electron ABI build applies. Compiling it here would
+		// additionally require the MSVC Spectre-mitigated libraries on Windows.
+		ignoreModules: ["node-pty"],
 	},
 	makers: [
 		new MakerSquirrel(
 			createSquirrelConfig(packageMetadata.version, process.env, windowsSignOptions),
 			["win32"],
 		),
+		new MakerMSIX(createMsixConfig(packageMetadata.version, process.env, windowsSignOptions), [
+			"win32",
+		]),
 		new MakerZIP({}, ["darwin"]),
-		new MakerDMG(createDmgConfig(), ["darwin"]),
 		new MakerRpm({}),
 		new MakerDeb({}),
 	],
@@ -165,7 +172,7 @@ const config: ForgeConfig = {
 		{
 			name: "@electron-forge/publisher-github",
 			config: {
-				repository: resolveGitHubReleaseRepository(),
+				repository: resolveGitHubReleaseRepository(process.env),
 				tagPrefix: "v",
 				draft: true,
 				prerelease: false,
@@ -237,9 +244,11 @@ function runNodeScript(script: string, args: string[]): Promise<void> {
 
 async function verifyTuiArtifact(root: string): Promise<void> {
 	const entry = path.join(root, "cocode-tui.mjs")
+	const cliEntry = path.join(root, "cocode-cli.mjs")
+	const cliModule = path.join(root, "cli.mjs")
 	const meta = path.join(root, "cocode-tui.meta.json")
 	const manifestPath = path.join(root, "manifest.json")
-	for (const file of [entry, meta, manifestPath]) {
+	for (const file of [entry, cliEntry, cliModule, meta, manifestPath]) {
 		try {
 			await fs.access(file)
 		} catch {
@@ -249,15 +258,20 @@ async function verifyTuiArtifact(root: string): Promise<void> {
 	const manifest = JSON.parse(await fs.readFile(manifestPath, "utf8")) as {
 		entry?: string
 		sha256?: string
+		runtimeSha256?: string
 		schemaVersion?: number
 	}
-	if (manifest.schemaVersion !== 1 || manifest.entry !== "tui/cocode-tui.mjs") {
+	if (manifest.schemaVersion !== 1 || manifest.entry !== "tui/cocode-cli.mjs") {
 		throw new Error("TUI artifact manifest is invalid.")
 	}
-	const hash = createHash("sha256")
+	const cliHash = createHash("sha256")
+		.update(await fs.readFile(cliEntry))
+		.digest("hex")
+	const runtimeHash = createHash("sha256")
 		.update(await fs.readFile(entry))
 		.digest("hex")
-	if (hash !== manifest.sha256) throw new Error("TUI artifact hash does not match its manifest.")
+	if (cliHash !== manifest.sha256 || runtimeHash !== manifest.runtimeSha256)
+		throw new Error("TUI artifact hash does not match its manifest.")
 }
 
 type ForgePackageResultLike = {

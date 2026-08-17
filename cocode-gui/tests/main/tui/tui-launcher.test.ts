@@ -1,6 +1,9 @@
 import assert from "node:assert/strict"
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import os from "node:os"
+// Exercises the native CLI registration (PATH entries, path.delimiter), so it
+// must match the OS semantics used by the implementation under test.
+// eslint-disable-next-line no-restricted-imports
 import path from "node:path"
 import test from "node:test"
 import { TuiLauncher } from "../../../src/main/contexts/tui/infrastructure/tui-launcher"
@@ -106,7 +109,8 @@ function createFixture(): {
 	const root = mkdtempSync(path.join(os.tmpdir(), "cocode-tui-launcher-"))
 	const resources = path.join(root, "resources")
 	const bin = path.join(root, "bin")
-	const entry = path.join(resources, "tui", "cocode-tui.mjs")
+	const entry = path.join(resources, "tui", "cocode-cli.mjs")
+	const runtimeEntry = path.join(resources, "tui", "cocode-tui.mjs")
 	const node = path.join(resources, "cocode-node")
 	const supervisor = path.join(
 		resources,
@@ -120,6 +124,7 @@ function createFixture(): {
 	mkdirSync(path.dirname(supervisor), { recursive: true })
 	mkdirSync(bin, { recursive: true })
 	writeFileSync(entry, "export {}\n")
+	writeFileSync(runtimeEntry, "export {}\n")
 	writeFileSync(node, "")
 	writeFileSync(supervisor, "export {}\n")
 	chmodSync(node, 0o755)

@@ -31,6 +31,7 @@ import type {
   TuiNotification,
   TuiRuntime,
   TuiSessionOpenResult,
+  TuiWorkspaceEnsureResult,
   TuiModelCatalog,
   TuiModelCatalogFailure,
   TuiModelProviderGroup,
@@ -59,6 +60,7 @@ class SdkTuiRuntime implements TuiRuntime {
   private questionHandler: ((request: TuiQuestionRequest) => Promise<TuiQuestionAnswer>) | undefined
   private approvalHandler: ((request: TuiApprovalRequest) => Promise<TuiApprovalAnswer>) | undefined
   private capabilitySnapshot: TuiCapabilitySnapshot = fallbackCapabilitySnapshot()
+  private cwd = process.cwd()
 
   constructor(launch: TuiLaunch) {
     this.launch = launch
@@ -71,6 +73,7 @@ class SdkTuiRuntime implements TuiRuntime {
   }> {
     this.closing = false
     this.wire = 'unknown'
+    this.cwd = init.cwd
     this.capabilitySnapshot = fallbackCapabilitySnapshot()
     try {
       const lease = await createHostSupervisorClient().acquire({
@@ -320,6 +323,25 @@ class SdkTuiRuntime implements TuiRuntime {
     if (rows === undefined)
       throw new Error(`session/list returned no session list: ${JSON.stringify(result)}`)
     return rows.map(parseSessionSummary)
+  }
+
+  async ensureWorkspace(
+    sessionId: string,
+    approved = false,
+  ): Promise<TuiWorkspaceEnsureResult> {
+    const path = this.cwd
+    if (this.wire !== 'companion') {
+      return {
+        status: 'unsupported',
+        path,
+        reason: 'workspace authorization requires the Cocode companion runtime',
+      }
+    }
+    const result = await this.requireClient().request('cocode/workspace/ensure', {
+      sessionId,
+      approved,
+    })
+    return parseWorkspaceEnsureResult(result)
   }
 
   async listModels(): Promise<TuiModelCatalog> {
@@ -885,6 +907,39 @@ function parseSessionSummary(value: unknown): TuiSessionSummary {
     ...(typeof value.seedLength === 'number' ? { seedLength: value.seedLength } : {}),
     ...(typeof value.title === 'string' ? { title: value.title } : {}),
     ...(typeof value.eventCount === 'number' ? { eventCount: value.eventCount } : {}),
+  }
+}
+
+function parseWorkspaceEnsureResult(value: unknown): TuiWorkspaceEnsureResult {
+  if (!isRecord(value) || typeof value.status !== 'string' || typeof value.path !== 'string') {
+    throw new Error(`workspace/ensure returned an invalid result: ${JSON.stringify(value)}`)
+  }
+  if (value.status === 'authorization-required') {
+    if (typeof value.title !== 'string') {
+      throw new Error(`workspace/ensure returned an invalid authorization request: ${JSON.stringify(value)}`)
+    }
+    return { status: value.status, path: value.path, title: value.title }
+  }
+  if (value.status === 'unsupported') {
+    if (typeof value.reason !== 'string') {
+      throw new Error(`workspace/ensure returned an invalid unsupported result: ${JSON.stringify(value)}`)
+    }
+    return { status: value.status, path: value.path, reason: value.reason }
+  }
+  if (
+    value.status !== 'ready' ||
+    typeof value.workspaceId !== 'string' ||
+    typeof value.title !== 'string' ||
+    typeof value.created !== 'boolean'
+  ) {
+    throw new Error(`workspace/ensure returned an invalid ready result: ${JSON.stringify(value)}`)
+  }
+  return {
+    status: value.status,
+    workspaceId: value.workspaceId,
+    path: value.path,
+    title: value.title,
+    created: value.created,
   }
 }
 

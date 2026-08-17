@@ -5,7 +5,7 @@
  * timeout rather than an agent that hangs forever. Refs resolve through the
  * in-page store, so a stale ref fails loudly instead of hitting the wrong node.
  */
-import { isAbsolute, relative, resolve as resolvePath } from "node:path"
+import { isAbsolute, relative, resolve as resolvePath } from "pathe"
 import type { ElementHandle } from "playwright-core"
 import type { BrowserTab } from "./tabs.ts"
 import { BrowserError, type BrowserAction, type BrowserModifier } from "./protocol.ts"
@@ -68,8 +68,9 @@ export interface ActionOptions {
 function assertInsideWorkspace(workspace: string | undefined, path: string): string {
   const absolute = isAbsolute(path) ? resolvePath(path) : resolvePath(workspace ?? process.cwd(), path)
   if (workspace === undefined) throw new BrowserError("BROWSER_NAVIGATION_BLOCKED", "Uploads require an active workspace.")
+  // pathe emits forward-slash output, so a single posix check suffices.
   const rel = relative(workspace, absolute)
-  if (rel === ".." || rel.startsWith("../") || rel.startsWith("..\\") || isAbsolute(rel)) {
+  if (rel === ".." || rel.startsWith("../") || isAbsolute(rel)) {
     throw new BrowserError("BROWSER_NAVIGATION_BLOCKED", `${path} is outside the active workspace.`)
   }
   return absolute

@@ -5,7 +5,7 @@ import { posixShim } from "../../src/main/contexts/tui/infrastructure/desktop-cl
 
 test("macOS PKG wrapper matches the runtime-generated POSIX shim", () => {
 	const executable = "/Applications/Cocode.app/Contents/Resources/cocode-node"
-	const entry = "/Applications/Cocode.app/Contents/Resources/tui/cocode-tui.mjs"
+	const entry = "/Applications/Cocode.app/Contents/Resources/tui/cocode-cli.mjs"
 	const supervisorEntry =
 		"/Applications/Cocode.app/Contents/Resources/dsh-runtime/packages/host-supervisor/lib/bin.js"
 	const invocation = {

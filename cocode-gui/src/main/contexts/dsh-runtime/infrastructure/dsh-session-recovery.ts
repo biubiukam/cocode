@@ -1,6 +1,6 @@
 import { readdirSync, renameSync, mkdirSync, readFileSync, statSync } from "node:fs"
 import { zstdDecompressSync } from "node:zlib"
-import path from "node:path"
+import * as path from "pathe"
 
 const SESSION_FILE = /^session\.jsonl(?:\.zstd)?$/
 

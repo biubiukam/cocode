@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { mkdtempSync, rmSync } from "node:fs"
 import os from "node:os"
-import path from "node:path"
+import * as path from "pathe"
 import { afterEach, describe, it } from "node:test"
 import { BetterSqliteRecordRepository } from "../../../src/main/contexts/database/infrastructure/repositories/better-sqlite-record-repository"
 

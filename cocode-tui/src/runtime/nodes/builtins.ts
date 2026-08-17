@@ -313,6 +313,10 @@ const toolDefinition: NodeDefinition<ToolNode> = {
   isComplete(state) {
     return state.status !== 'running' && state.streaming !== true
   },
+  settle(state) {
+    if (state.status !== 'running' && state.streaming !== true) return state
+    return { ...state, status: 'cancelled', streaming: false }
+  },
   buildViewNode(ctx) {
     return ctx.state
   },

@@ -1,7 +1,9 @@
 import { execFileSync } from "node:child_process"
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
-import path from "node:path"
+import * as path from "pathe"
 import { fileURLToPath, pathToFileURL } from "node:url"
+import { shellCommandOptions } from "./lib/child-process-options.mjs"
+import { ensureWorkspaceDependencies } from "./lib/workspace-dependencies.mjs"
 import { hashFiles, listFiles, sha256File } from "./runtime-build-helpers.mjs"
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
@@ -79,11 +81,12 @@ export function buildSupervisor({ clean = false, manifestPath = defaultManifestP
 			(file) => previous.artifacts?.[file] === sha256File(path.join(supervisorRoot, file)),
 		)
 	if (!valid) {
+		ensureSupervisorDependencies()
 		console.log("[supervisor-build] building @cocode/host-supervisor")
 		execFileSync(
 			process.platform === "win32" ? "corepack.cmd" : "corepack",
 			["pnpm@10.34.5", "run", "build:with-gui-plugins"],
-			{ cwd: supervisorRoot, stdio: "inherit" },
+			shellCommandOptions({ cwd: supervisorRoot, stdio: "inherit" }),
 		)
 	}
 	const artifacts = Object.fromEntries(
@@ -125,6 +128,17 @@ export function buildSupervisor({ clean = false, manifestPath = defaultManifestP
 		`${JSON.stringify({ schemaVersion: 1, inputHash, artifacts }, null, 2)}\n`,
 	)
 	return { manifestPath, manifest: { schemaVersion: 1, inputHash, artifacts }, supervisorRoot }
+}
+
+function ensureSupervisorDependencies() {
+	ensureWorkspaceDependencies({
+		root: supervisorRoot,
+		label: "@cocode/host-supervisor",
+		requiredPaths: [
+			path.join(supervisorRoot, "node_modules", "esbuild", "package.json"),
+			path.join(supervisorRoot, "node_modules", "typescript", "package.json"),
+		],
+	})
 }
 
 function discoverGuiPlugins() {

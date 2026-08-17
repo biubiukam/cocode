@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process"
 import { createHash } from "node:crypto"
 import {
+	copyFileSync,
 	existsSync,
 	readdirSync,
 	readFileSync,
@@ -11,12 +12,13 @@ import {
 	mkdtempSync,
 } from "node:fs"
 import os from "node:os"
-import path from "node:path"
+import * as path from "pathe"
 import type { ForgeMakeResult } from "@electron-forge/shared-types"
 import { notarize } from "@electron/notarize"
 import {
 	createMacNotarizeOptions,
 	isReleaseSigningRequired,
+	resolveMsixPackageVersion,
 	resolveReleaseTarget,
 	resolveWindowsSignLedgerDir,
 	resolveWindowsSignMode,
@@ -26,6 +28,21 @@ const WINDOWS_SIGNABLE_FILE = /\.(exe|dll|node|sys|efi|scr)$/i
 
 export function normalizeArtifactNames(makeResults: readonly ForgeMakeResult[]): ForgeMakeResult[] {
 	return makeResults.map((result) => {
+		if (result.platform === "win32") {
+			const version = String(result.packageJSON.version ?? "0.0.0")
+			const artifacts = result.artifacts.map((artifact) => {
+				if (!artifact.toLowerCase().endsWith(".msix")) return artifact
+				const target = path.join(
+					path.dirname(artifact),
+					`Cocode-Desktop-${version}-win32-${result.arch}.msix`,
+				)
+				if (artifact === target) return artifact
+				if (existsSync(target)) rmSync(target, { force: true })
+				renameSync(artifact, target)
+				return target
+			})
+			return { ...result, artifacts }
+		}
 		if (result.platform !== "darwin") return { ...result, artifacts: [...result.artifacts] }
 		const version = String(result.packageJSON.version ?? "0.0.0")
 		const artifacts = result.artifacts.map((artifact) => {
@@ -172,8 +189,14 @@ export function verifyMadeArtifacts(makeResults: readonly ForgeMakeResult[]): vo
 			)
 				verifyWindowsNupkg(artifact)
 		}
-		if (target.platform === "win32" && process.platform === "win32")
-			verifyWindowsReleaseMetadata(result.artifacts)
+		if (target.platform === "win32" && process.platform === "win32") {
+			if (result.artifacts.some((artifact) => path.basename(artifact) === "RELEASES"))
+				verifyWindowsReleaseMetadata(result.artifacts)
+			for (const artifact of result.artifacts) {
+				if (artifact.toLowerCase().endsWith(".msix"))
+					verifyWindowsMsix(artifact, target.arch, result.packageJSON.version)
+			}
+		}
 	}
 }
 
@@ -205,29 +228,24 @@ export function appendChecksumManifest(makeResults: readonly ForgeMakeResult[]):
 	]
 }
 
-/**
- * The public Electron update service cannot use Windows ARM64 Squirrel feed
- * metadata as an x64 feed. Keep those files available as CI artifacts, but do
- * not publish them into the shared GitHub release feed.
- */
+/** Keep the x64 Squirrel legacy feed, but publish ARM64 through the shared MSIX channel. */
 export function selectGitHubReleaseArtifacts(
 	makeResults: readonly ForgeMakeResult[],
 ): ForgeMakeResult[] {
 	return makeResults.map((result) => {
-		if (result.platform !== "win32" || result.arch !== "arm64") {
+		if (result.platform !== "win32" || result.arch !== "arm64")
 			return { ...result, artifacts: [...result.artifacts] }
-		}
 		return {
 			...result,
 			artifacts: result.artifacts.filter((artifact) => {
-				const name = path.basename(artifact)
-				return name !== "RELEASES" && !name.toLowerCase().endsWith(".nupkg")
+				const name = path.basename(artifact).toLowerCase()
+				return name !== "releases" && !name.endsWith(".nupkg")
 			}),
 		}
 	})
 }
 
-function verifyWindowsFile(file: string): void {
+function verifyWindowsFile(file: string): { Subject?: string; Thumbprint?: string } {
 	const script = [
 		"$signature = Get-AuthenticodeSignature -LiteralPath $env:VERIFY_FILE",
 		"if ($signature.Status -ne 'Valid') { throw \"Invalid Authenticode signature: $env:VERIFY_FILE\" }",
@@ -250,6 +268,7 @@ function verifyWindowsFile(file: string): void {
 		throw new Error(`Unexpected Windows signer subject: ${file}`)
 	if (expectedThumbprint && normalizeThumbprint(signature.Thumbprint) !== expectedThumbprint)
 		throw new Error(`Unexpected Windows signer certificate: ${file}`)
+	return signature
 }
 
 function verifyWindowsSigningLedger(files: readonly string[]): void {
@@ -302,6 +321,63 @@ function verifyWindowsReleaseMetadata(artifacts: readonly string[]): void {
 	}
 }
 
+function verifyWindowsMsix(file: string, arch: string, version: unknown): void {
+	verifyWindowsSigningLedger([file])
+	const signature = verifyWindowsFile(file)
+	const directory = mkdtempSync(path.join(os.tmpdir(), "cocode-msix-"))
+	try {
+		const archive = path.join(directory, "package.zip")
+		const expanded = path.join(directory, "expanded")
+		copyFileSync(file, archive)
+		execFileSync(
+			"powershell.exe",
+			[
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"$ErrorActionPreference='Stop'; Expand-Archive -LiteralPath $env:MSIX_ARCHIVE -DestinationPath $env:MSIX_DIR -Force",
+			],
+			{
+				env: { ...process.env, MSIX_ARCHIVE: archive, MSIX_DIR: expanded },
+				stdio: "inherit",
+			},
+		)
+		const manifest = readFileSync(path.join(expanded, "AppxManifest.xml"), "utf8")
+		const identity = manifest.match(/<Identity\b[^>]*\/?>/i)?.[0]
+		const packageIdentity = decodeXmlAttribute(identity?.match(/\bName="([^"]+)"/i)?.[1])
+		const publisher = decodeXmlAttribute(identity?.match(/\bPublisher="([^"]+)"/i)?.[1])
+		const packageVersion = identity?.match(/\bVersion="([^"]+)"/i)?.[1]
+		const processorArchitecture = identity?.match(/\bProcessorArchitecture="([^"]+)"/i)?.[1]
+		const executable = manifest.match(/\bExecutable="([^"]+\.exe)"/i)?.[1]
+		if (
+			!identity ||
+			!packageIdentity ||
+			!publisher ||
+			!packageVersion ||
+			!processorArchitecture ||
+			!executable
+		)
+			throw new Error(`MSIX manifest is missing required identity fields: ${file}`)
+		const expectedIdentity = process.env.WINDOWS_MSIX_PACKAGE_ID?.trim()
+		if (expectedIdentity && packageIdentity !== expectedIdentity)
+			throw new Error(`MSIX package identity mismatch: ${file}`)
+		if (processorArchitecture.toLowerCase() !== arch.toLowerCase())
+			throw new Error(`MSIX architecture mismatch: ${file}`)
+		if (packageVersion !== resolveMsixPackageVersion(String(version)))
+			throw new Error(`MSIX version mismatch: ${file}`)
+		const executablePath = path.join(expanded, executable.replaceAll("\\", path.sep))
+		if (!existsSync(executablePath))
+			throw new Error(`MSIX executable entry is missing: ${executable}`)
+		const expectedPublisher = process.env.WINDOWS_MSIX_PUBLISHER?.trim()
+		if (expectedPublisher && normalizeMsixPublisher(expectedPublisher) !== publisher)
+			throw new Error(`MSIX publisher mismatch: ${file}`)
+		if (signature.Subject && signature.Subject !== publisher)
+			throw new Error(`MSIX signer publisher does not match manifest: ${file}`)
+	} finally {
+		rmSync(directory, { recursive: true, force: true })
+	}
+}
+
 function isSha256(value: string | undefined): value is string {
 	return Boolean(value && /^[a-f0-9]{64}$/i.test(value))
 }
@@ -331,6 +407,19 @@ function verifyWindowsNupkg(file: string): void {
 
 function normalizeThumbprint(value: string | undefined): string {
 	return value?.replace(/\s+/g, "").toUpperCase() || ""
+}
+
+function normalizeMsixPublisher(value: string): string {
+	return value.startsWith("CN=") ? value : `CN=${value}`
+}
+
+function decodeXmlAttribute(value: string | undefined): string | undefined {
+	return value
+		?.replaceAll("&quot;", '"')
+		.replaceAll("&apos;", "'")
+		.replaceAll("&lt;", "<")
+		.replaceAll("&gt;", ">")
+		.replaceAll("&amp;", "&")
 }
 
 function collectFiles(root: string): string[] {
