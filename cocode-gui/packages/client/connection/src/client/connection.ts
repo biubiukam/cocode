@@ -49,6 +49,8 @@ export interface ConnectionSinks {
   /** Coarse state transitions (deduplicated: fires only on change). The initial pre-connect
    *  span reports nothing — the UI treats "no state yet" as connecting, not as an outage. */
   onStateChange?: (state: ConnectionState) => void
+  /** Host handshake failed before a generation became connected. */
+  onTransportFailure?: (reason: 'host_unreachable') => void
 }
 
 /**
@@ -62,6 +64,7 @@ export class ConnectionController {
   private generation = 0
   private attempt = 0
   private current: AbortController | null = null
+  private retryWake: AbortController | null = null
   private running = false
   private lastState: ConnectionState | null = null
   private readonly config: Required<ConnectionConfig>
@@ -85,7 +88,18 @@ export class ConnectionController {
   stop(): void {
     this.running = false
     this.current?.abort()
+    this.retryWake?.abort()
     this.current = null
+    this.retryWake = null
+  }
+
+  /** Abort the current generation and wake the backoff so the next generation
+   * reconnects immediately against the newly rebound transport origin. */
+  rebind(): void {
+    if (!this.running) return
+    this.attempt = 0
+    this.current?.abort()
+    this.retryWake?.abort()
   }
 
   private backoffDelay(attempt: number): number {
@@ -153,8 +167,11 @@ export class ConnectionController {
         if (this.isGenerationActive(ac)) {
           this.callSink(() => { this.sinks.onConnected?.(descriptionResult.value) })
         }
-      } catch {
+      } catch (error) {
         // Transport failure: treat as generation failure, fall through to the shared backoff.
+        if (!ac.signal.aborted && isRuntimeTransportError(error)) {
+          this.callSink(() => this.sinks.onTransportFailure?.('host_unreachable'))
+        }
         if (!ac.signal.aborted) ac.abort()
       }
 
@@ -164,7 +181,9 @@ export class ConnectionController {
       this.attempt += 1
       console.warn(`[web-runtime] connection lost, retry #${this.attempt}`)
       const idle = new AbortController()
+      this.retryWake = idle
       await sleep(this.backoffDelay(this.attempt), idle.signal)
+      if (this.retryWake === idle) this.retryWake = null
     }
   }
 
@@ -199,4 +218,10 @@ export class ConnectionController {
       console.error('[web-runtime] connection sink threw:', error)
     }
   }
+}
+
+function isRuntimeTransportError(error: unknown): boolean {
+  if (!(error instanceof Error)) return true
+  if (error.message.startsWith("host.describe failed:")) return false
+  return error.name === "TypeError" || /fetch failed|network|socket|ECONN/i.test(error.message)
 }

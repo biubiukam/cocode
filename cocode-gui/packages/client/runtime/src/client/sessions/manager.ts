@@ -911,13 +911,14 @@ export class SessionManager {
   }
 
   /** After each connection generation: refresh the session baseline and rebuild opened windows. */
-  handleConnected(): void {
-    void this.refreshList()
+  handleConnected(): Promise<void> {
+    const tasks: Promise<unknown>[] = [this.refreshList()]
     const selectedAddress = this.selected === undefined ? undefined : this.addresses.get(this.selected)
-    if (selectedAddress !== undefined) void this.refreshSubagents(selectedAddress.parentSessionId)
-    if (this.selected !== undefined) void this.refreshSubagents(this.selected)
-    for (const parentSessionId of this.openCatalogs) void this.refreshSubagents(parentSessionId)
-    for (const session of this.sessions.values()) void session.resync()
+    if (selectedAddress !== undefined) tasks.push(this.refreshSubagents(selectedAddress.parentSessionId))
+    if (this.selected !== undefined) tasks.push(this.refreshSubagents(this.selected))
+    for (const parentSessionId of this.openCatalogs) tasks.push(this.refreshSubagents(parentSessionId))
+    for (const session of this.sessions.values()) tasks.push(session.resync())
+    return Promise.allSettled(tasks).then(() => undefined)
   }
 
   /** Debounce membership refetches while one parent catalog is selected or open. */

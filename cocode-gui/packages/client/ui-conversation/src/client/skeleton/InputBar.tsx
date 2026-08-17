@@ -97,6 +97,10 @@ export function InputBar({
   // developer-facing and keep the raw message plus code.
   useEffect(() => {
     if (promptError === null) return
+    if (promptError.error.message.startsWith('OUTCOME_UNKNOWN:')) {
+      showToast('运行状态未知：请先刷新会话状态，确认后再重试。')
+      return
+    }
     showToast(promptError.error.code === 'attachment-error'
       ? attachmentErrorText(t, promptError.error.details.reason, imageLimits)
       : `${promptError.error.message} (${promptError.error.code})`)
@@ -130,7 +134,16 @@ export function InputBar({
   // inert no-workspace state, the machine faces absent (no session), or a
   // parent-offline continuable child. An owner block also disables input;
   // adjudicating and submitting render read-only so the draft stays visible.
-  const disabled = removed || inert || !live || blocked !== undefined || parentOffline
+  const [runtimeState, setRuntimeState] = useState<string | undefined>(() =>
+    typeof document === 'undefined' ? undefined : document.documentElement.dataset.dshRuntimeState)
+  useEffect(() => {
+    const root = document.documentElement
+    const onRecoveryState = (): void => { setRuntimeState(root.dataset.dshRuntimeState) }
+    window.addEventListener('cocode:dsh-runtime-recovery-state', onRecoveryState)
+    return () => window.removeEventListener('cocode:dsh-runtime-recovery-state', onRecoveryState)
+  }, [])
+  const runtimeBlocked = runtimeState === 'recovering' || runtimeState === 'degraded' || runtimeState === 'failed'
+  const disabled = removed || inert || !live || blocked !== undefined || parentOffline || runtimeBlocked
   const locked = disabled
   // The model seat is the ONE control a block leaves live: every block this
   // contract has is cleared by choosing a model, so locking it too would leave
@@ -321,7 +334,7 @@ export function InputBar({
     }
     e.preventDefault()
     if (e.repeat) return // held-down Enter must not machine-gun sends
-    if (locked || machineBusy) return
+    if (locked || machineBusy || runtimeBlocked) return
     const accelerated = e.ctrlKey || e.metaKey
     // Empty-draft accelerated Enter acts on the queue instead of the (empty)
     // draft: the machine rejects empty drafts, so the gesture steers every

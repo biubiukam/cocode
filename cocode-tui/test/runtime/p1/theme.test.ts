@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  getTheme,
-  resolveInitialTheme,
-  resolveTheme,
-  themes,
-} from '../../../src/present/theme.ts'
+import { getTheme, resolveStartupTheme, themes } from '../../../src/present/theme.ts'
 
 describe('theme tokens', () => {
   it('keeps matching token keys for dark and light themes', () => {
@@ -12,42 +7,15 @@ describe('theme tokens', () => {
     expect(getTheme('dark')).toBe(themes.dark)
   })
 
-  it('keeps the original ANSI fallback for terminals without truecolor', () => {
-    expect(resolveTheme('light', false)).toMatchObject({
-      text: 'white',
-      dim: 'gray',
-      accent: 'cyan',
-    })
+  it('uses explicit theme configuration before terminal hints', () => {
+    expect(resolveStartupTheme({ COCODE_TUI_THEME: 'dark', TERM_PROGRAM: 'Apple_Terminal' })).toBe('dark')
+    expect(resolveStartupTheme({ COCODE_TUI_THEME: 'light', COLORFGBG: '15;0' })).toBe('light')
   })
 
-  it('detects a light terminal background from COLORFGBG', () => {
-    expect(resolveInitialTheme({ COLORFGBG: '0;15' }, { platform: 'linux' })).toBe('light')
-    expect(resolveInitialTheme({ COLORFGBG: '15;0' }, { platform: 'linux' })).toBe('dark')
-  })
-
-  it('follows the macOS system appearance before COLORFGBG', () => {
-    expect(
-      resolveInitialTheme(
-        { COLORFGBG: '15;0' },
-        { platform: 'darwin', readSystemTheme: () => 'light' },
-      ),
-    ).toBe('light')
-    expect(
-      resolveInitialTheme(
-        { COLORFGBG: '0;15' },
-        { platform: 'darwin', readSystemTheme: () => 'dark' },
-      ),
-    ).toBe('dark')
-  })
-
-  it('lets explicit theme configuration override terminal detection', () => {
-    expect(resolveInitialTheme({ COCODE_TUI_THEME: 'light', COLORFGBG: '15;0' })).toBe('light')
-    expect(resolveInitialTheme({ COCODE_TUI_THEME: 'dark', COLORFGBG: '0;15' })).toBe('dark')
-    expect(
-      resolveInitialTheme(
-        { COCODE_TUI_THEME: 'system', COLORFGBG: '15;0' },
-        { platform: 'darwin', readSystemTheme: () => 'light' },
-      ),
-    ).toBe('light')
+  it('follows COLORFGBG and Apple Terminal defaults for readable text', () => {
+    expect(resolveStartupTheme({ COLORFGBG: '15;15' })).toBe('light')
+    expect(resolveStartupTheme({ COLORFGBG: '15;0' })).toBe('dark')
+    expect(resolveStartupTheme({ TERM_PROGRAM: 'Apple_Terminal' })).toBe('light')
+    expect(resolveStartupTheme({ TERM_PROGRAM: 'xterm-256color' })).toBe('dark')
   })
 })

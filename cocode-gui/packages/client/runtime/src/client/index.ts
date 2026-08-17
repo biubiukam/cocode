@@ -216,9 +216,20 @@ export function apply(ctx: Context): void {
       if (frame.type === 'host/remote-event') ctx.remote.$dispatch(frame.event, frame.args)
     },
     onConnected: () => {
-      sessions.handleConnected()
-      workspaces.handleConnected()
       ctx.emit('connection/reset')
+      void Promise.all([sessions.handleConnected(), workspaces.handleConnected()]).then(() => {
+        if (typeof document === 'undefined') return
+        document.documentElement.dataset.dshRuntimeState = 'ready'
+        window.dispatchEvent(new CustomEvent('cocode:dsh-runtime-recovery-state', {
+          detail: {
+            state: 'ready',
+            attempt: 0,
+            maxAttempts: 3,
+            recoveryId: 'connection-ready',
+            endpointGeneration: getDesktopEndpointGeneration(),
+          },
+        }))
+      })
     },
     onStateChange: (state) => {
       // Generation death fires before any next-generation frame can arrive
@@ -228,6 +239,37 @@ export function apply(ctx: Context): void {
         sessions.handleDisconnected()
       }
     },
+    onTransportFailure: (reason) => {
+      const desktop = getDesktopRuntimeBridge()
+      if (desktop === undefined) return
+      void desktop.requestRecovery({
+        reason,
+        endpointGeneration: getDesktopEndpointGeneration(),
+      }).catch((error) => {
+        console.warn('[web-runtime] runtime recovery request failed:', error)
+      })
+    },
   })
   ctx.effect(() => () => { loop.stop() }, 'runtime: connection stream loop')
+}
+
+interface DesktopRuntimeBridge {
+  requestRecovery(request: {
+    reason: 'host_unreachable'
+    endpointGeneration: number
+  }): Promise<unknown>
+}
+
+function getDesktopRuntimeBridge(): DesktopRuntimeBridge | undefined {
+  if (typeof window === 'undefined') return undefined
+  const candidate = (window as Window & {
+    desktopApi?: { dsh?: DesktopRuntimeBridge }
+  }).desktopApi?.dsh
+  return candidate
+}
+
+function getDesktopEndpointGeneration(): number {
+  if (typeof window === 'undefined') return 0
+  return (window as Window & { __DSH_DESKTOP_ENDPOINT_GENERATION__?: number })
+    .__DSH_DESKTOP_ENDPOINT_GENERATION__ ?? 0
 }

@@ -88,6 +88,7 @@ export function apply(ctx: Context): void {
   const api: IApiClient = fixtureClient ?? new WebApiClient()
   const rpc = fixtureClient?.rpc ?? createWebConnectionRpc()
   let started = false
+  let controller: ConnectionController | undefined
   let description: HostDescription | undefined
   const descriptionListeners = new Set<() => void>()
   const publishDescription = (next: HostDescription | undefined): void => {
@@ -115,7 +116,7 @@ export function apply(ctx: Context): void {
     start(sinks, config) {
       if (started) throw new Error('connection: the stream loop is already owned by another consumer')
       started = true
-      const controller = new ConnectionController(api, {
+      controller = new ConnectionController(api, {
         ...sinks,
         onConnected: (next) => {
           publishDescription(next)
@@ -134,11 +135,17 @@ export function apply(ctx: Context): void {
       controller.start()
       return {
         stop: () => {
-          controller.stop()
+          controller?.stop()
+          controller = undefined
           publishDescription(undefined)
         },
       }
     },
+  }
+  if (typeof window !== 'undefined') {
+    const onRebound = (): void => controller?.rebind()
+    window.addEventListener('cocode:dsh-runtime-rebound', onRebound)
+    ctx.effect(() => () => window.removeEventListener('cocode:dsh-runtime-rebound', onRebound), 'connection: runtime rebound listener')
   }
   ctx.provide('connection', handle)
 }

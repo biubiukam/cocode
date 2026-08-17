@@ -20,6 +20,63 @@ import {
 import type { createLayoutStore } from './stores.ts'
 import css from './AppFrame.module.css'
 
+type RuntimeRecoveryState = 'idle' | 'recovering' | 'ready' | 'failed'
+type RuntimeRecoveryDetail = {
+  state: RuntimeRecoveryState
+  attempt: number
+  maxAttempts: number
+  error?: { code: string; message: string }
+}
+
+function RuntimeRecoveryBanner() {
+  const [detail, setDetail] = useState<RuntimeRecoveryDetail | null>(null)
+
+  useEffect(() => {
+    const root = document.documentElement
+    const onState = (event: Event): void => {
+      const next = (event as CustomEvent<RuntimeRecoveryDetail>).detail
+      setDetail(next)
+    }
+    window.addEventListener('cocode:dsh-runtime-recovery-state', onState)
+    const initial = root.dataset.dshRuntimeState as RuntimeRecoveryState | undefined
+    if (initial !== undefined && initial !== 'idle' && initial !== 'ready') {
+      setDetail({ state: initial, attempt: 0, maxAttempts: 3 })
+    }
+    return () => window.removeEventListener('cocode:dsh-runtime-recovery-state', onState)
+  }, [])
+
+  if (detail === null || detail.state === 'idle' || detail.state === 'ready') return null
+  const failed = detail.state === 'failed'
+  const retry = (): void => {
+    const desktop = (window as Window & {
+      desktopApi?: { dsh?: { requestRecovery(request: { reason: 'host_unreachable'; endpointGeneration: number }): Promise<unknown> } }
+    }).desktopApi?.dsh
+    if (desktop === undefined) return
+    void desktop.requestRecovery({
+      reason: 'host_unreachable',
+      endpointGeneration: (window as Window & { __DSH_DESKTOP_ENDPOINT_GENERATION__?: number }).__DSH_DESKTOP_ENDPOINT_GENERATION__ ?? 0,
+    })
+  }
+  const diagnostics = (): void => {
+    const api = (window as Window & {
+      desktopApi?: { diagnostics?: { openLogFolder(): Promise<unknown> } }
+    }).desktopApi?.diagnostics
+    if (api !== undefined) void api.openLogFolder()
+  }
+  return (
+    <div className={css.recoveryBanner} role={failed ? 'alert' : 'status'} aria-live="polite">
+      <span>
+        {failed
+          ? `本地运行时恢复失败（${String(detail.attempt)}/${String(detail.maxAttempts)}）`
+          : '正在恢复本地运行时，暂时禁止发送新操作…'}
+        {failed && detail.error?.message !== undefined ? `：${detail.error.message}` : ''}
+      </span>
+      {failed && <button type="button" onClick={retry}>重试恢复</button>}
+      {failed && <button type="button" onClick={diagnostics}>打开诊断</button>}
+    </div>
+  )
+}
+
 /** Full composed props: runtime share + child-slot render share + store share. */
 export type AppFrameProps =
   & PropsRuntime<'root'>
@@ -210,6 +267,7 @@ export function AppFrame({
       data-workbench-bottom-collapsed={bottom === 0 || undefined}
       data-dragging={dragging || undefined}
     >
+      <RuntimeRecoveryBanner />
       <div className={css.sidebarCol}>
         {/* Render-site slot call with live concession output: a closed
             sidebar keeps the mounted slot at the compact-rail width, and the
