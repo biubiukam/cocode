@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto"
-import { chmod, mkdir, readFile, stat, writeFile } from "node:fs/promises"
+import { readFile } from "node:fs/promises"
 import { existsSync } from "node:fs"
 import { spawn } from "node:child_process"
 import path from "node:path"
@@ -7,21 +7,33 @@ import { app } from "electron"
 import { resolveDshHome } from "../../dsh-runtime/infrastructure/dsh-home"
 import type {
 	TuiCommandLineToolResult,
-	TuiCommandLineToolState,
+	TuiCommandLineToolRegistrationSource,
 	TuiCommandLineToolStatus,
 } from "../../../../contracts/ipc/tui.contract"
+import {
+	createWindowsPersistentPathStore,
+	DesktopCliRegistrationService,
+	type DesktopCliRuntimeMetadata,
+	type TuiInvocation,
+} from "./desktop-cli-registration"
 
-const DESKTOP_SHIM_MARKER = "# cocode-desktop-cli-shim:v1"
-const WINDOWS_DESKTOP_SHIM_MARKER = "REM cocode-desktop-cli-shim:v1"
-
-export type TuiInvocation = {
-	readonly executable: string
-	readonly args: readonly string[]
-	readonly env: NodeJS.ProcessEnv
-	readonly cwd: string
-}
+export { type TuiInvocation } from "./desktop-cli-registration"
 
 export class TuiLauncher {
+	private readonly registration: DesktopCliRegistrationService
+
+	public constructor() {
+		const persistentPathStore = createWindowsPersistentPathStore()
+		this.registration = new DesktopCliRegistrationService({
+			resolveCandidates: () => resolveShimCandidates(),
+			buildInvocation: () => this.buildInvocation(),
+			getRuntimeMetadata: () => this.getRuntimeMetadata(),
+			getPersistentPath: persistentPathStore.get,
+			updatePersistentPath: persistentPathStore.update,
+			currentPath: () => process.env.PATH ?? process.env.Path ?? "",
+		})
+	}
+
 	public buildInvocation(args: readonly string[] = []): TuiInvocation {
 		const resourcesRoot = resolveResourcesRoot()
 		const executable =
@@ -53,120 +65,25 @@ export class TuiLauncher {
 				process.env.COCODE_HOST_CONFIG_FINGERPRINT?.trim() || "cocode-web-jsonrpc-v1",
 			COCODE_RUNTIME_CHANNEL: resolveRuntimeChannel(process.env.COCODE_RUNTIME_CHANNEL),
 		}
-		return {
-			executable,
-			args: [entry, ...args],
-			env,
-			cwd: process.cwd(),
-		}
+		return { executable, args: [entry, ...args], env, cwd: process.cwd() }
 	}
 
-	public async getCommandLineToolStatus(): Promise<TuiCommandLineToolStatus> {
-		const shimPath = resolveShimPath()
-		const directory = path.dirname(shimPath)
-		const directoryOnPath = isDirectoryOnPath(directory)
-		let existing: ExistingShim | undefined
-
-		try {
-			const file = await stat(shimPath)
-			existing = {
-				contents: await readFile(shimPath, "utf8"),
-				executable: process.platform === "win32" || (file.mode & 0o111) !== 0,
-			}
-		} catch (error) {
-			if (!isMissingFileError(error)) {
-				return createStatus(
-					shimPath,
-					directory,
-					directoryOnPath,
-					"unavailable",
-					false,
-					false,
-					`Unable to inspect the Desktop CLI shim: ${errorMessage(error)}`,
-				)
-			}
-		}
-
-		let expected: string
-		try {
-			const invocation = this.buildInvocation()
-			expected =
-				process.platform === "win32" ? windowsShim(invocation) : posixShim(invocation)
-		} catch (error) {
-			return createStatus(
-				shimPath,
-				directory,
-				directoryOnPath,
-				"unavailable",
-				isManagedShim(existing?.contents),
-				false,
-				errorMessage(error),
-			)
-		}
-
-		if (existing === undefined) {
-			return createStatus(shimPath, directory, directoryOnPath, "missing", false, true)
-		}
-
-		if (!isManagedShim(existing.contents)) {
-			return createStatus(
-				shimPath,
-				directory,
-				directoryOnPath,
-				"conflict",
-				false,
-				false,
-				"An unmanaged executable already exists at the Cocode CLI path.",
-			)
-		}
-
-		const installed = existing.contents === expected && existing.executable
-		return createStatus(
-			shimPath,
-			directory,
-			directoryOnPath,
-			installed ? "installed" : "stale",
-			true,
-			true,
-			installed ? undefined : "The Desktop CLI shim points to an older runtime.",
-		)
+	public getCommandLineToolStatus(): Promise<TuiCommandLineToolStatus> {
+		return this.registration.getStatus()
 	}
 
-	public async ensureCommandLineTool(): Promise<TuiCommandLineToolResult> {
-		const before = await this.getCommandLineToolStatus()
-		if (before.state !== "missing" && before.state !== "stale") {
-			return { changed: false, status: before }
-		}
-
-		await this.writeCommandLineTool()
-		return {
-			changed: true,
-			status: await this.getCommandLineToolStatus(),
-		}
+	public ensureCommandLineTool(
+		source: TuiCommandLineToolRegistrationSource = "desktop-startup",
+	): Promise<TuiCommandLineToolResult> {
+		return this.registration.ensure(source)
 	}
 
-	public async repairCommandLineTool(): Promise<TuiCommandLineToolResult> {
-		const before = await this.getCommandLineToolStatus()
-		if (before.state === "conflict" || before.state === "unavailable") {
-			return { changed: false, status: before }
-		}
-
-		await this.writeCommandLineTool()
-		return {
-			changed: true,
-			status: await this.getCommandLineToolStatus(),
-		}
+	public repairCommandLineTool(): Promise<TuiCommandLineToolResult> {
+		return this.registration.repair("manual")
 	}
 
-	private async writeCommandLineTool(): Promise<void> {
-		const directory = resolveShimDirectory()
-		await mkdir(directory, { recursive: true, mode: 0o755 })
-		const invocation = this.buildInvocation()
-		const contents =
-			process.platform === "win32" ? windowsShim(invocation) : posixShim(invocation)
-		const shimPath = resolveShimPath()
-		await writeFile(shimPath, contents, { mode: 0o755 })
-		if (process.platform !== "win32") await chmod(shimPath, 0o755)
+	public uninstallCommandLineTool(): Promise<TuiCommandLineToolResult> {
+		return this.registration.uninstall()
 	}
 
 	public async openInTerminal(): Promise<void> {
@@ -209,6 +126,36 @@ export class TuiLauncher {
 			return null
 		}
 	}
+
+	private async getRuntimeMetadata(): Promise<DesktopCliRuntimeMetadata> {
+		this.buildInvocation()
+		const manifest = await this.readManifest()
+		let runtimeValid = true
+		if (manifest !== null) {
+			const resourcesRoot = resolveResourcesRoot()
+			const entry = path.join(resourcesRoot, "tui", "cocode-tui.mjs")
+			const entryHash = createHash("sha256")
+				.update(await readFile(entry))
+				.digest("hex")
+			runtimeValid =
+				manifest.schemaVersion === 1 &&
+				manifest.entry === "tui/cocode-tui.mjs" &&
+				manifest.sha256 === entryHash
+		}
+		return {
+			runtimeValid,
+			...(typeof manifest?.dshRuntimeVersion === "string"
+				? { runtimeVersion: manifest.dshRuntimeVersion }
+				: {}),
+			...(typeof manifest?.tuiVersion === "string"
+				? { tuiVersion: manifest.tuiVersion }
+				: {}),
+			...(typeof manifest?.supervisorVersion === "string"
+				? { supervisorVersion: manifest.supervisorVersion }
+				: {}),
+			...(manifest === null ? {} : { manifestFingerprint: tuiManifestFingerprint(manifest) }),
+		}
+	}
 }
 
 function resolveResourcesRoot(): string {
@@ -218,123 +165,38 @@ function resolveResourcesRoot(): string {
 	return path.resolve(app.getAppPath(), ".cache", "cocode")
 }
 
-function resolveShimDirectory(): string {
-	if (process.env.COCODE_CLI_BIN_DIR?.trim())
-		return path.resolve(process.env.COCODE_CLI_BIN_DIR.trim())
-	return process.platform === "win32"
-		? path.join(app.getPath("appData"), "Cocode", "bin")
-		: path.join(app.getPath("home"), ".local", "bin")
-}
-
-function resolveShimPath(): string {
-	return path.join(resolveShimDirectory(), process.platform === "win32" ? "cocode.cmd" : "cocode")
-}
-
-type ExistingShim = {
-	readonly contents: string
-	readonly executable: boolean
-}
-
-function createStatus(
-	shimPath: string,
-	directory: string,
-	directoryOnPath: boolean,
-	state: TuiCommandLineToolState,
-	managedByDesktop: boolean,
-	canRepair: boolean,
-	detail?: string,
-): TuiCommandLineToolStatus {
-	return {
-		state,
-		path: shimPath,
-		directory,
-		managedByDesktop,
-		directoryOnPath,
-		canRepair,
-		...(detail === undefined ? {} : { detail }),
+function resolveShimCandidates(): readonly {
+	shimPath: string
+	directory: string
+	preferred?: boolean
+}[] {
+	const configured = process.env.COCODE_CLI_BIN_DIR?.trim()
+	if (configured) {
+		const directory = path.resolve(configured)
+		return [{ directory, shimPath: path.join(directory, shimName()) }]
 	}
+	if (process.platform === "win32") {
+		const localAppData = process.env.LOCALAPPDATA?.trim() || app.getPath("appData")
+		const directory = path.join(localAppData, "Cocode", "bin")
+		return [{ directory, shimPath: path.join(directory, shimName()), preferred: true }]
+	}
+	if (process.platform === "darwin" && app.isPackaged) {
+		const fallback = path.join(app.getPath("home"), ".local", "bin")
+		return [
+			{ directory: "/usr/local/bin", shimPath: "/usr/local/bin/cocode", preferred: true },
+			{ directory: fallback, shimPath: path.join(fallback, "cocode") },
+		]
+	}
+	const directory = path.join(app.getPath("home"), ".local", "bin")
+	return [{ directory, shimPath: path.join(directory, shimName()), preferred: true }]
 }
 
-function isManagedShim(contents: string | undefined): boolean {
-	if (contents === undefined) return false
-	if (contents.includes(DESKTOP_SHIM_MARKER) || contents.includes(WINDOWS_DESKTOP_SHIM_MARKER))
-		return true
-
-	return (
-		contents.includes("COCODE_TUI_CLIENT_KIND") &&
-		contents.includes("desktop-tui") &&
-		contents.includes("COCODE_NODE_EXECUTABLE") &&
-		contents.includes("cocode-tui.mjs")
-	)
-}
-
-function isDirectoryOnPath(directory: string): boolean {
-	const configuredPath = process.env.PATH ?? process.env.Path ?? ""
-	const normalizedDirectory = normalizePathForComparison(directory)
-	return configuredPath
-		.split(path.delimiter)
-		.filter((entry) => entry.length > 0)
-		.some((entry) => normalizePathForComparison(entry) === normalizedDirectory)
-}
-
-function normalizePathForComparison(value: string): string {
-	const normalized = path.normalize(path.resolve(value))
-	return process.platform === "win32" ? normalized.toLowerCase() : normalized
-}
-
-function isMissingFileError(error: unknown): boolean {
-	return typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT"
-}
-
-function errorMessage(error: unknown): string {
-	return error instanceof Error ? error.message : String(error)
+function shimName(): string {
+	return process.platform === "win32" ? "cocode.cmd" : "cocode"
 }
 
 function resolveRuntimeChannel(value: string | undefined): "stable" | "preview" | "dev" {
 	return value === "preview" || value === "dev" ? value : "stable"
-}
-
-function posixShim(invocation: TuiInvocation): string {
-	const env = invocation.env
-	return [
-		"#!/bin/sh",
-		DESKTOP_SHIM_MARKER,
-		"set -eu",
-		`if [ -z "\${DSH_HOME:-}" ]; then export DSH_HOME=${shellQuote(env.DSH_HOME ?? "")}; fi`,
-		`export COCODE_NODE_EXECUTABLE=${shellQuote(
-			env.COCODE_NODE_EXECUTABLE ?? invocation.executable,
-		)}`,
-		`export COCODE_SUPERVISOR_SERVICE_ENTRY=${shellQuote(
-			env.COCODE_SUPERVISOR_SERVICE_ENTRY ?? "",
-		)}`,
-		`export COCODE_TUI_CLIENT_KIND=${shellQuote(env.COCODE_TUI_CLIENT_KIND ?? "desktop-tui")}`,
-		`export DSH_PROFILE=${shellQuote(env.DSH_PROFILE ?? "web")}`,
-		`export COCODE_HOST_CONFIG_FINGERPRINT=${shellQuote(
-			env.COCODE_HOST_CONFIG_FINGERPRINT ?? "cocode-web-jsonrpc-v1",
-		)}`,
-		`export COCODE_RUNTIME_CHANNEL=${shellQuote(env.COCODE_RUNTIME_CHANNEL ?? "stable")}`,
-		`exec ${shellQuote(invocation.executable)} ${shellQuote(invocation.args[0] ?? "")} "$@"`,
-		"",
-	].join("\n")
-}
-
-function windowsShim(invocation: TuiInvocation): string {
-	const env = invocation.env
-	return [
-		"@echo off",
-		WINDOWS_DESKTOP_SHIM_MARKER,
-		`if not defined DSH_HOME set "DSH_HOME=${env.DSH_HOME ?? ""}"`,
-		`set "COCODE_NODE_EXECUTABLE=${env.COCODE_NODE_EXECUTABLE ?? invocation.executable}"`,
-		`set "COCODE_SUPERVISOR_SERVICE_ENTRY=${env.COCODE_SUPERVISOR_SERVICE_ENTRY ?? ""}"`,
-		`set "COCODE_TUI_CLIENT_KIND=${env.COCODE_TUI_CLIENT_KIND ?? "desktop-tui"}"`,
-		`set "DSH_PROFILE=${env.DSH_PROFILE ?? "web"}"`,
-		`set "COCODE_HOST_CONFIG_FINGERPRINT=${
-			env.COCODE_HOST_CONFIG_FINGERPRINT ?? "cocode-web-jsonrpc-v1"
-		}"`,
-		`set "COCODE_RUNTIME_CHANNEL=${env.COCODE_RUNTIME_CHANNEL ?? "stable"}"`,
-		`"${invocation.executable}" "${invocation.args[0] ?? ""}" %*`,
-		"",
-	].join("\r\n")
 }
 
 function shellCommand(invocation: TuiInvocation): string {

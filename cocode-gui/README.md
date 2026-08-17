@@ -57,3 +57,20 @@ calling `autoUpdater.quitAndInstall()`.
 The release workflow keeps Windows ARM64 installers available for manual download,
 but excludes their Squirrel `RELEASES`/`.nupkg` metadata from the shared update
 feed because x64 and ARM64 cannot safely share one Squirrel feed.
+
+## Desktop CLI installation
+
+The production macOS release includes a signed PKG in addition to the optional
+DMG/ZIP artifacts. The PKG installs `Cocode.app` into `/Applications` and
+registers `/usr/local/bin/cocode`, so a new terminal can run `cocode` before the
+Desktop window is opened. The DMG is a drag-and-drop application carrier; when
+the app is copied from a DMG, its first launch performs the same idempotent CLI
+check and repair.
+
+Windows Squirrel Setup registers `%LOCALAPPDATA%\\Cocode\\bin\\cocode.cmd` and
+adds that directory to the current user's persistent PATH during install and
+update. Uninstall removes only the Desktop-managed shim and PATH entry.
+
+The Desktop settings page reports the shim path, runtime validity, registration
+source, current-process PATH visibility, and persistent PATH visibility. A new
+terminal is required after a PATH change.

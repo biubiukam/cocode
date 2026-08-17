@@ -36,6 +36,8 @@
 		"build:tui": "node scripts/build-tui.mjs",
 		"build:runtime": "node scripts/build-runtime.mjs",
 		"verify:runtime": "node scripts/verify-dsh-runtime.mjs --runtime-root .cache/cocode/release-runtime",
+		"verify:mac-pkg": "node scripts/release/verify-mac-pkg.mjs",
+		"uninstall:mac-cli": "node scripts/release/uninstall-mac-cli.mjs",
 		"check:release-env": "node scripts/check-release-env.mjs",
 		"prepackage": "node scripts/harden-electron-default-app.mjs && corepack pnpm@10.34.5 run build:runtime -- --clean && corepack pnpm@10.34.5 run build:tui",
 		"package": "electron-forge package",

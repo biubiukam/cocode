@@ -9,23 +9,26 @@ import {
 	selectGitHubReleaseArtifacts,
 } from "../../scripts/release/release-hooks"
 
-test("normalizes macOS DMG and ZIP artifact names with platform and architecture", () => {
+test("normalizes macOS DMG, ZIP and PKG artifact names with platform and architecture", () => {
 	const root = mkdtempSync(path.join(os.tmpdir(), "cocode-release-hooks-"))
 	try {
 		const dmg = path.join(root, "Cocode Desktop.dmg")
 		const zip = path.join(root, "Cocode Desktop.zip")
+		const pkg = path.join(root, "Cocode Desktop.pkg")
 		writeFileSync(dmg, "dmg")
 		writeFileSync(zip, "zip")
+		writeFileSync(pkg, "pkg")
 		const result: ForgeMakeResult = {
 			platform: "darwin",
 			arch: "arm64",
 			packageJSON: { version: "1.2.3" },
-			artifacts: [dmg, zip],
+			artifacts: [dmg, zip, pkg],
 		}
 		const [normalized] = normalizeArtifactNames([result])
 		assert.deepEqual(normalized?.artifacts, [
 			path.join(root, "Cocode-Desktop-1.2.3-darwin-arm64.dmg"),
 			path.join(root, "Cocode-Desktop-1.2.3-darwin-arm64.zip"),
+			path.join(root, "Cocode-Desktop-1.2.3-darwin-arm64.pkg"),
 		])
 	} finally {
 		rmSync(root, { recursive: true, force: true })

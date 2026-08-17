@@ -33,6 +33,8 @@ export function normalizeArtifactNames(makeResults: readonly ForgeMakeResult[]):
 				? ".dmg"
 				: artifact.toLowerCase().endsWith(".zip")
 				? ".zip"
+				: artifact.toLowerCase().endsWith(".pkg")
+				? ".pkg"
 				: undefined
 			if (!extension) return artifact
 			const target = path.join(
@@ -103,13 +105,42 @@ export async function notarizeFinalMacArtifacts(
 	if (!credentials) throw new Error("Mac notarization credentials are missing.")
 	const dmgs = makeResults
 		.flatMap((result) => result.artifacts)
-		.filter((artifact) => artifact.toLowerCase().endsWith(".dmg"))
-	if (dmgs.length === 0) throw new Error("No DMG artifact was generated for the macOS release.")
+		.filter((artifact) => /\.(dmg|pkg)$/i.test(artifact))
+	if (dmgs.length === 0)
+		throw new Error("No DMG or PKG artifact was generated for the macOS release.")
 	for (const artifact of dmgs) {
 		await notarize({ appPath: artifact, ...credentials })
 		run("xcrun", ["stapler", "validate", artifact])
-		run("hdiutil", ["imageinfo", artifact])
+		if (artifact.toLowerCase().endsWith(".dmg")) run("hdiutil", ["imageinfo", artifact])
+		else run("pkgutil", ["--check-signature", artifact])
 	}
+}
+
+export function addMacPkgArtifact(makeResults: readonly ForgeMakeResult[]): ForgeMakeResult[] {
+	if (process.platform !== "darwin")
+		return makeResults.map((result) => ({ ...result, artifacts: [...result.artifacts] }))
+	const resultIndex = makeResults.findIndex((result) => result.platform === "darwin")
+	if (resultIndex === -1)
+		return makeResults.map((result) => ({ ...result, artifacts: [...result.artifacts] }))
+	const result = makeResults[resultIndex]
+	const outputDirectory = path.dirname(
+		result.artifacts[0] ?? path.resolve(process.env.FORGE_OUT_DIR ?? "out"),
+	)
+	const appRoot = path.resolve(process.env.FORGE_OUT_DIR ?? "out")
+	const appPath = findMacAppWithTui(appRoot)
+	if (!appPath) throw new Error(`No packaged macOS App bundle was found under ${appRoot}.`)
+	const version = String(result.packageJSON.version ?? "0.0.0")
+	const outputPath = path.join(
+		outputDirectory,
+		`Cocode-Desktop-${version}-${result.platform}-${result.arch}.pkg`,
+	)
+	run(process.execPath, ["scripts/release/build-mac-pkg.mjs", appPath, outputPath, version])
+	run(process.execPath, ["scripts/release/verify-mac-pkg.mjs", outputPath])
+	return makeResults.map((candidate, index) =>
+		index === resultIndex
+			? { ...candidate, artifacts: [...candidate.artifacts, outputPath] }
+			: { ...candidate, artifacts: [...candidate.artifacts] },
+	)
 }
 
 export function verifyMadeArtifacts(makeResults: readonly ForgeMakeResult[]): void {
@@ -126,6 +157,8 @@ export function verifyMadeArtifacts(makeResults: readonly ForgeMakeResult[]): vo
 				run("unzip", ["-t", artifact])
 			if (target.platform === "darwin" && artifact.toLowerCase().endsWith(".dmg"))
 				run("hdiutil", ["imageinfo", artifact])
+			if (target.platform === "darwin" && artifact.toLowerCase().endsWith(".pkg"))
+				run("pkgutil", ["--check-signature", artifact])
 			if (
 				target.platform === "win32" &&
 				/\.(exe|msi)$/i.test(artifact) &&
@@ -315,6 +348,20 @@ function findFirstByExtension(root: string, extension: string): string | undefin
 	if (root.endsWith(extension)) return root
 	for (const entry of readdirSync(root, { withFileTypes: true })) {
 		const found = findFirstByExtension(path.join(root, entry.name), extension)
+		if (found) return found
+	}
+	return undefined
+}
+
+function findMacAppWithTui(root: string): string | undefined {
+	if (!existsSync(root)) return undefined
+	if (root.endsWith(".app") && statSync(root).isDirectory()) {
+		return existsSync(path.join(root, "Contents", "Resources", "tui", "manifest.json"))
+			? root
+			: undefined
+	}
+	for (const entry of readdirSync(root, { withFileTypes: true })) {
+		const found = findMacAppWithTui(path.join(root, entry.name))
 		if (found) return found
 	}
 	return undefined

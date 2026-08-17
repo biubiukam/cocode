@@ -25,6 +25,7 @@ import {
 } from "./scripts/release/release-config"
 import {
 	appendChecksumManifest,
+	addMacPkgArtifact,
 	cleanupWindowsSignLedger,
 	notarizeFinalMacArtifacts,
 	normalizeArtifactNames,
@@ -136,7 +137,7 @@ const config: ForgeConfig = {
 			await verifyPackagedApplication(packageResult)
 		},
 		postMake: async (_config, makeResults) => {
-			const normalized = normalizeArtifactNames(makeResults)
+			const normalized = normalizeArtifactNames(addMacPkgArtifact(makeResults))
 			await notarizeFinalMacArtifacts(normalized)
 			verifyMadeArtifacts(normalized)
 			const result = appendChecksumManifest(selectGitHubReleaseArtifacts(normalized))
