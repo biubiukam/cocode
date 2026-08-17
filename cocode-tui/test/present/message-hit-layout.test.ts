@@ -12,6 +12,7 @@ import {
 } from '../../src/present/visible-tail.ts'
 import { BLOCK_GAP, MESSAGE_CHROME } from '../../src/present/layout.ts'
 import {
+  maxMessageScrollOffset,
   resolveMessageWindow,
   transcriptPaintColumns,
 } from '../../src/present/message-scroll.ts'
@@ -190,8 +191,7 @@ describe('message hit layout', () => {
   })
 
   it('maps the tool line and the thinking after it when the transcript overflows', async () => {
-    const afterTool =
-      'I need to actually run a command to explore the project.'
+    const afterTool = 'I need to actually run a command to explore the project.'
     const nodes: ConversationNode[] = [
       ...Array.from({ length: 6 }, (_, index) => ({
         kind: 'user' as const,
@@ -244,9 +244,7 @@ describe('message hit layout', () => {
       maxColumns,
     )
     const lines = await renderLines(nodes, maxColumns, maxRows)
-    const toolRow = lines.findIndex((line) =>
-      line.includes('browser_snapshot'),
-    )
+    const toolRow = lines.findIndex((line) => line.includes('browser_snapshot'))
     const thinkingRow = lines.findIndex((line) =>
       line.includes('I need to actually'),
     )
@@ -383,9 +381,7 @@ describe('message hit layout', () => {
       maxColumns,
     )
     const lines = await renderLines(nodes, maxColumns, maxRows)
-    const toolRow = lines.findIndex((line) =>
-      line.includes('browser_snapshot'),
-    )
+    const toolRow = lines.findIndex((line) => line.includes('browser_snapshot'))
 
     expect(toolRow).toBeGreaterThan(0)
     expect(estimatedViewportRow(nodes, maxRows, paintColumns, 't1')).toBe(
@@ -453,9 +449,7 @@ describe('message hit layout', () => {
       0,
     )
     const thinkRow = lines.findIndex((line) => line.includes('MARKER-THINK'))
-    const toolRow = lines.findIndex((line) =>
-      line.includes('browser_snapshot'),
-    )
+    const toolRow = lines.findIndex((line) => line.includes('browser_snapshot'))
     const afterRow = lines.findIndex((line) => line.includes('MARKER-AFTER'))
 
     expect({ lines, estimated, thinkRow, toolRow, afterRow }).toEqual({
@@ -478,7 +472,7 @@ describe('message hit layout', () => {
 
   it('does not paint the tool on top of the last thinking line', async () => {
     const reasoning = [
-      "The user keeps saying \"hello\" repeatedly. Maybe they're testing, or maybe they expect something. Let me just respond warmly and maybe offer to do something concrete. I shouldn't just keep repeating the same response. Perhaps I can proactively explore the project to be more helpful. Let me offer to take a look at the codebase.",
+      'The user keeps saying "hello" repeatedly. Maybe they\'re testing, or maybe they expect something. Let me just respond warmly and maybe offer to do something concrete. I shouldn\'t just keep repeating the same response. Perhaps I can proactively explore the project to be more helpful. Let me offer to take a look at the codebase.',
       '',
       'Actually, rather than asking again, let me just do something useful — check the current working directory contents to give an overview. That would show initiative.',
     ].join('\n')
@@ -529,7 +523,7 @@ describe('message hit layout', () => {
 
   it('does not overlap the tool when the transcript column is squeezed', () => {
     const reasoning = [
-      "The user keeps saying \"hello\" repeatedly. Maybe they're testing, or maybe they expect something. Let me just respond warmly and maybe offer to do something concrete. I shouldn't just keep repeating the same response. Perhaps I can proactively explore the project to be more helpful. Let me offer to take a look at the codebase.",
+      'The user keeps saying "hello" repeatedly. Maybe they\'re testing, or maybe they expect something. Let me just respond warmly and maybe offer to do something concrete. I shouldn\'t just keep repeating the same response. Perhaps I can proactively explore the project to be more helpful. Let me offer to take a look at the codebase.',
       '',
       'Actually, rather than asking again, let me just do something useful — check the current working directory contents to give an overview. That would show initiative.',
     ].join('\n')
@@ -704,6 +698,52 @@ describe('message hit layout', () => {
     expect(frame).toContain('Fix or implement something')
   })
 
+  it('scrolls thinking rows instead of pinning the assistant bottom', async () => {
+    const reasoning = [
+      'THINK-START I am reading the workspace layout first.',
+      ...Array.from(
+        { length: 30 },
+        (_, index) => `THINK-MID-${String(index + 1).padStart(2, '0')} filler`,
+      ),
+      'THINK-END ready to write the reply.',
+    ].join('\n')
+    const nodes: ConversationNode[] = [
+      {
+        kind: 'assistant',
+        id: 'scroll',
+        seq: 1,
+        time: 1,
+        turn: 1,
+        step: 0,
+        text: 'BODY-END here is the finished answer.',
+        reasoning,
+        streaming: false,
+      },
+    ]
+    const maxColumns = 80
+    const maxRows = 6
+    const maxOffset = maxMessageScrollOffset(
+      nodes,
+      maxRows,
+      false,
+      undefined,
+      maxColumns,
+    )
+    expect(maxOffset).toBeGreaterThan(0)
+
+    const tail = await renderLines(nodes, maxColumns, maxRows, {
+      scrollOffset: 0,
+    })
+    const top = await renderLines(nodes, maxColumns, maxRows, {
+      scrollOffset: maxOffset,
+    })
+
+    expect(tail.join('\n')).toContain('BODY-END')
+    expect(tail.join('\n')).not.toContain('earlier lines hidden')
+    expect(top.join('\n')).toContain('earlier lines hidden')
+    expect(top.join('\n')).not.toContain('BODY-END')
+  })
+
   it('counts running question tools as the extra rows ToolCard paints', () => {
     const node: ConversationNode = {
       kind: 'tool',
@@ -815,10 +855,7 @@ function renderTranscript(
     ),
     { columns: maxColumns },
   )
-  const lines = frame
-    .replace(ANSI_PATTERN, '')
-    .replaceAll('\r', '')
-    .split('\n')
+  const lines = frame.replace(ANSI_PATTERN, '').replaceAll('\r', '').split('\n')
   while (lines.at(-1) === '') lines.pop()
   return lines
 }
@@ -830,6 +867,7 @@ async function renderLines(
   options?: {
     selectedNodeId?: string
     textSelection?: MessageTextSelection
+    scrollOffset?: number
   },
 ): Promise<string[]> {
   const stdout = new CaptureStream(maxColumns, maxRows ?? 30)
@@ -843,6 +881,7 @@ async function renderLines(
         locale: 'en',
         maxColumns,
         maxRows,
+        scrollOffset: options?.scrollOffset,
         selectedNodeId: options?.selectedNodeId,
         textSelection: options?.textSelection,
       }),

@@ -13,6 +13,7 @@ import type {
   TuiRuntime,
 } from '@cocode/tui-connection'
 import { Chat } from '../../src/present/chat.tsx'
+import { createTerminalOutput } from '../../src/present/terminal-output.ts'
 import { createTuiApp } from '../../src/runtime/app.ts'
 import { P0_CAPABILITIES } from '../../src/runtime/capabilities.ts'
 import { DEFAULT_BINDINGS, type Keymap } from '../../src/runtime/keymap.ts'
@@ -262,9 +263,7 @@ describe('Chat', () => {
       expect(toolLine, lines.join('\n')).toBeGreaterThan(0)
 
       const y = toolLine + 1
-      chat.stdin.write(
-        `\u001b[<0;4;${y}M\u001b[<32;40;${y}M\u001b[<0;40;${y}m`,
-      )
+      chat.stdin.write(`\u001b[<0;4;${y}M\u001b[<32;40;${y}M\u001b[<0;40;${y}m`)
       await renderFlush()
 
       const dispatch = vi
@@ -276,9 +275,7 @@ describe('Chat', () => {
       const copied = dispatch.mock.calls.find(
         (call) => call[0]?.type === 'copyText',
       )?.[0] as { type: string; text?: string } | undefined
-      expect(copied?.text ?? '', lines.join('\n')).toContain(
-        'browser_snapshot',
-      )
+      expect(copied?.text ?? '', lines.join('\n')).toContain('browser_snapshot')
       expect(copied?.text ?? '').not.toContain('warmly and maybe')
       dispatch.mockRestore()
     } finally {
@@ -334,6 +331,87 @@ describe('Chat', () => {
     }
   })
 
+  it.each([
+    [80, 24],
+    [120, 30],
+  ])(
+    'keeps the hardware caret on the draft row after a reply is painted at %ix%i',
+    async (columns, rows) => {
+      const runtime = createTestRuntime()
+      const app = createTuiApp({
+        runtime: runtime.value,
+        cwd: '/tmp',
+        provider: 'test-provider',
+        model: 'test-model',
+        sessionId: 'session-1',
+        locale: 'en',
+        capabilities: P0_CAPABILITIES,
+      })
+      await app.start()
+      const stdin = new InputStream()
+      const target = new CaptureStream(columns, rows)
+      const stdout = createTerminalOutput(
+        target as unknown as NodeJS.WriteStream,
+      )
+      const screen = render(
+        React.createElement(Chat, {
+          app,
+          mouseSupported: false,
+          mouseInput: stdin,
+          mouseOutput: stdout,
+        }),
+        {
+          stdin: stdin as unknown as NodeJS.ReadStream,
+          stdout,
+          patchConsole: false,
+          exitOnCtrlC: false,
+          kittyKeyboard: { mode: 'enabled' },
+        },
+      )
+
+      try {
+        runtime.emit({
+          method: 'session.event',
+          params: {
+            sessionId: 'session-1',
+            event: {
+              type: 'request/header',
+              seq: 1,
+              time: 1,
+              data: {
+                header: { config: { reasoningEffort: 'high' } },
+              },
+            },
+          },
+        })
+        emitAssistantMessage(
+          runtime,
+          2,
+          'The user said hello.',
+          'Hello! How can I help?',
+        )
+        await expect.poll(() => app.snapshot().nodes.length).toBeGreaterThan(0)
+        await expect
+          .poll(() => app.snapshot().status.telemetry.reasoningEffort)
+          .toBe('high')
+        app.dispatch({ type: 'setDraft', text: 'csn' })
+        await renderFlush()
+
+        const lines = latestPlainLines(target.output)
+        const draftRow = lines.findIndex((line) => line.includes('> csn'))
+        const caret = terminalCursorPosition(target.output)
+
+        expect(draftRow, lines.join('\n')).toBeGreaterThanOrEqual(0)
+        expect(caret.row, lines.join('\n')).toBe(draftRow)
+      } finally {
+        screen.unmount()
+        await flush()
+        screen.cleanup()
+        await app.close()
+      }
+    },
+  )
+
   it('does not paint hello or the tool on top of thinking', async () => {
     const runtime = createTestRuntime()
     const chat = await renderChat(runtime.value, {
@@ -365,7 +443,7 @@ describe('Chat', () => {
         runtime,
         2,
         [
-          "The user keeps saying \"hello\" repeatedly. Maybe they're testing, or maybe they expect something. Let me just respond warmly and maybe offer to do something concrete. I shouldn't just keep repeating the same response. Perhaps I can proactively explore the project to be more helpful. Let me offer to take a look at the codebase.",
+          'The user keeps saying "hello" repeatedly. Maybe they\'re testing, or maybe they expect something. Let me just respond warmly and maybe offer to do something concrete. I shouldn\'t just keep repeating the same response. Perhaps I can proactively explore the project to be more helpful. Let me offer to take a look at the codebase.',
           '',
           'Actually, rather than asking again, let me just do something useful — check the current working directory contents to give an overview. That would show initiative.',
         ].join('\n'),
@@ -403,15 +481,11 @@ describe('Chat', () => {
       await renderFlush()
 
       const lines = latestPlainLines(chat.stdout.output)
-      const thinkLine = lines.findIndex((line) =>
-        line.includes('MARKER-THINK'),
-      )
+      const thinkLine = lines.findIndex((line) => line.includes('MARKER-THINK'))
       expect(thinkLine, lines.join('\n')).toBeGreaterThan(0)
 
       const y = thinkLine + 1
-      chat.stdin.write(
-        `\u001b[<0;3;${y}M\u001b[<32;28;${y}M\u001b[<0;28;${y}m`,
-      )
+      chat.stdin.write(`\u001b[<0;3;${y}M\u001b[<32;28;${y}M\u001b[<0;28;${y}m`)
       await renderFlush()
 
       const dispatch = vi
@@ -668,9 +742,7 @@ describe('Chat', () => {
 
     try {
       chat.app.dispatch({ type: 'command', line: '/plugins' })
-      await expect
-        .poll(() => chat.app.snapshot().pluginPicker?.open)
-        .toBe(true)
+      await expect.poll(() => chat.app.snapshot().pluginPicker?.open).toBe(true)
       await renderFlush()
       chat.app.dispatch({ type: 'plugins.setQuery', query: 'legacy' })
       expect(chat.app.snapshot().pluginPicker?.query).toBe('legacy')
@@ -976,9 +1048,7 @@ describe('Chat', () => {
       await expect(questionAnswer).rejects.toThrow('interrupted')
 
       chat.app.dispatch({ type: 'command', line: '/review' })
-      await expect
-        .poll(() => chat.app.snapshot().reviewPicker?.open)
-        .toBe(true)
+      await expect.poll(() => chat.app.snapshot().reviewPicker?.open).toBe(true)
       await renderFlush()
       chat.stdin.write('\u000f')
       await renderFlush()
@@ -1021,9 +1091,7 @@ describe('Chat', () => {
       })
       await expect.poll(() => chat.app.snapshot().nodes.length).toBe(2)
       chat.app.dispatch({ type: 'rewind.open' })
-      await expect
-        .poll(() => chat.app.snapshot().rewindPicker?.open)
-        .toBe(true)
+      await expect.poll(() => chat.app.snapshot().rewindPicker?.open).toBe(true)
       await renderFlush()
       chat.stdin.write('\u000f')
       await renderFlush()
@@ -1058,11 +1126,9 @@ function createTestRuntime(
   const handlers = new Set<(notification: TuiNotification) => void>()
   const plugins = options.plugins ?? []
   let approvalHandler:
-    | ((request: TuiApprovalRequest) => Promise<TuiApprovalAnswer>)
-    | undefined
+    ((request: TuiApprovalRequest) => Promise<TuiApprovalAnswer>) | undefined
   let questionHandler:
-    | ((request: TuiQuestionRequest) => Promise<TuiQuestionAnswer>)
-    | undefined
+    ((request: TuiQuestionRequest) => Promise<TuiQuestionAnswer>) | undefined
   const emit = (notification: TuiNotification): void => {
     for (const handler of handlers) handler(notification)
   }
@@ -1242,6 +1308,53 @@ function emitToolError(
       },
     },
   })
+}
+
+function terminalCursorPosition(output: string): {
+  row: number
+  column: number
+} {
+  let row = 0
+  let column = 0
+  let index = 0
+
+  while (index < output.length) {
+    const escape = /^\u001b\[([0-9;?]*)([A-Za-z])/.exec(output.slice(index))
+    if (escape !== null) {
+      const amount = Number.parseInt(escape[1] ?? '', 10) || 1
+      switch (escape[2]) {
+        case 'A':
+          row = Math.max(0, row - amount)
+          break
+        case 'B':
+          row += amount
+          break
+        case 'G':
+          column = amount - 1
+          break
+        case 'H': {
+          const [targetRow = '1', targetColumn = '1'] = (escape[1] ?? '').split(
+            ';',
+          )
+          row = (Number.parseInt(targetRow, 10) || 1) - 1
+          column = (Number.parseInt(targetColumn, 10) || 1) - 1
+          break
+        }
+      }
+      index += escape[0].length
+      continue
+    }
+
+    if (output[index] === '\n') {
+      row += 1
+      column = 0
+    } else if (output[index] !== '\r') {
+      column += 1
+    }
+    index += 1
+  }
+
+  return { row, column }
 }
 
 function latestPlainLines(output: string): string[] {

@@ -49,10 +49,9 @@ function slotHeights(
     const natural = Math.max(0, estimated - topSkip)
     if (maxRows === undefined) return { slot: undefined, skip: topSkip }
     const slot = Math.min(natural, Math.max(0, maxRows - used))
-    // A clipped later node is bottom-pinned, so hide its extra top rows.
-    const skip = topSkip + (natural - slot)
+    // Only the first window node is top-clipped; later overflow is bottom-clipped.
     used += slot
-    return { slot, skip }
+    return { slot, skip: topSkip }
   })
 }
 

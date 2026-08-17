@@ -1,7 +1,10 @@
 /** Pure row projection for the multiline composer. */
 
 import stringWidth from 'string-width'
-import { graphemeSegments, normalizeGraphemeOffset } from '../runtime/grapheme.ts'
+import {
+  graphemeSegments,
+  normalizeGraphemeOffset,
+} from '../runtime/grapheme.ts'
 
 export type ComposerSpan = {
   text: string
@@ -55,29 +58,38 @@ export function composerImeCaret(options: {
   maxInputRows: number
   maxColumns: number
 }): ComposerImeCaret {
-  const inputRows = options.text === ''
-    ? []
-    : visibleComposerRows(
-        renderComposerRows(options.text, options.cursor, options.selection, { caretCell: false }),
-        options.maxInputRows,
-      ).map((row) =>
-        clipComposerRow(
-          row,
-          Math.max(1, Math.trunc(options.maxColumns) - COMPOSER_PROMPT_PREFIX_CELLS),
-        ),
-      )
+  const inputRows =
+    options.text === ''
+      ? []
+      : visibleComposerRows(
+          renderComposerRows(options.text, options.cursor, options.selection, {
+            caretCell: false,
+          }),
+          options.maxInputRows,
+        ).map((row) =>
+          clipComposerRow(
+            row,
+            Math.max(
+              1,
+              Math.trunc(options.maxColumns) - COMPOSER_PROMPT_PREFIX_CELLS,
+            ),
+          ),
+        )
   const cursorRow = inputRows.findIndex(hasCursor)
   const rowIndex = cursorRow < 0 ? 0 : cursorRow
   const row = inputRows[rowIndex]
-  const cursorSpanIndex = row?.spans.findIndex((span) => span.cursor === true) ?? -1
-  const beforeCursor = row === undefined
-    ? 0
-    : row.caretAtEnd === true || cursorSpanIndex < 0
-      ? spansWidth(row.spans)
-      : spansWidth(row.spans.slice(0, cursorSpanIndex))
+  const cursorSpanIndex =
+    row?.spans.findIndex((span) => span.cursor === true) ?? -1
+  const beforeCursor =
+    row === undefined
+      ? 0
+      : row.caretAtEnd === true || cursorSpanIndex < 0
+        ? spansWidth(row.spans)
+        : spansWidth(row.spans.slice(0, cursorSpanIndex))
+  const maxColumn = Math.max(0, Math.trunc(options.maxColumns) - 1)
   return {
     rowIndex,
-    column: COMPOSER_PROMPT_PREFIX_CELLS + beforeCursor,
+    column: Math.min(COMPOSER_PROMPT_PREFIX_CELLS + beforeCursor, maxColumn),
   }
 }
 
@@ -134,22 +146,34 @@ export function renderComposerRows(
   return rows
 }
 
-export function visibleComposerRows(rows: readonly ComposerRow[], maxRows: number): ComposerRow[] {
+export function visibleComposerRows(
+  rows: readonly ComposerRow[],
+  maxRows: number,
+): ComposerRow[] {
   const size = Math.max(1, Math.trunc(maxRows))
   if (rows.length <= size) return [...rows]
   const cursorIndex = Math.max(0, rows.findIndex(hasCursor))
-  const start = Math.max(0, Math.min(cursorIndex - size + 1, rows.length - size))
+  const start = Math.max(
+    0,
+    Math.min(cursorIndex - size + 1, rows.length - size),
+  )
   return rows.slice(start, start + size)
 }
 
-export function clipComposerRow(row: ComposerRow, maxCells: number): ComposerRow {
+export function clipComposerRow(
+  row: ComposerRow,
+  maxCells: number,
+): ComposerRow {
   const width = Math.max(1, Math.trunc(maxCells))
   if (rowWidth(row) <= width) return row
 
   const cursorIndex = row.spans.findIndex((span) => span.cursor === true)
   if (cursorIndex < 0) {
     return {
-      spans: clipSpansStart(row.spans, width),
+      spans:
+        row.caretAtEnd === true
+          ? clipSpansEnd(row.spans, width)
+          : clipSpansStart(row.spans, width),
       ...(row.caretAtEnd === true ? { caretAtEnd: true } : {}),
     }
   }
@@ -183,7 +207,9 @@ export function composerRowText(row: ComposerRow): string {
 }
 
 function hasCursor(row: ComposerRow): boolean {
-  return row.caretAtEnd === true || row.spans.some((span) => span.cursor === true)
+  return (
+    row.caretAtEnd === true || row.spans.some((span) => span.cursor === true)
+  )
 }
 
 function rowWidth(row: ComposerRow): number {
@@ -194,14 +220,20 @@ function spansWidth(spans: readonly ComposerSpan[]): number {
   return stringWidth(spans.map((span) => span.text).join(''))
 }
 
-function clipSpansStart(spans: readonly ComposerSpan[], maxCells: number): ComposerSpan[] {
+function clipSpansStart(
+  spans: readonly ComposerSpan[],
+  maxCells: number,
+): ComposerSpan[] {
   if (spansWidth(spans) <= maxCells) return [...spans]
   if (maxCells <= 0) return []
   if (maxCells === 1) return [{ text: '…' }]
   return [...takeSpanGraphemes(spans, maxCells - 1, false), { text: '…' }]
 }
 
-function clipSpansEnd(spans: readonly ComposerSpan[], maxCells: number): ComposerSpan[] {
+function clipSpansEnd(
+  spans: readonly ComposerSpan[],
+  maxCells: number,
+): ComposerSpan[] {
   if (spansWidth(spans) <= maxCells) return [...spans]
   if (maxCells <= 0) return []
   if (maxCells === 1) return [{ text: '…' }]
@@ -262,10 +294,18 @@ function normalizeSelection(
   if (selection === undefined) return undefined
   if (selection.start === selection.end) return undefined
   const start = normalizeGraphemeOffset(text, selection.start, 'previous')
-  const end = Math.max(start, normalizeGraphemeOffset(text, selection.end, 'next'))
+  const end = Math.max(
+    start,
+    normalizeGraphemeOffset(text, selection.end, 'next'),
+  )
   return start === end ? undefined : { start, end }
 }
 
-function isSelected(index: number, selection: ComposerSelection | undefined): boolean {
-  return selection !== undefined && index >= selection.start && index < selection.end
+function isSelected(
+  index: number,
+  selection: ComposerSelection | undefined,
+): boolean {
+  return (
+    selection !== undefined && index >= selection.start && index < selection.end
+  )
 }
