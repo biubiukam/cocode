@@ -445,7 +445,13 @@ describe('Chat', () => {
           .poll(() => app.snapshot().status.telemetry.reasoningEffort)
           .toBe('high')
         app.dispatch({ type: 'setDraft', text: 'csn' })
-        await renderFlush()
+        await expect
+          .poll(() =>
+            latestPlainLines(target.output).findIndex((line) =>
+              line.includes('> csn'),
+            ),
+          )
+          .toBeGreaterThanOrEqual(0)
 
         const lines = latestPlainLines(target.output)
         const draftRow = lines.findIndex((line) => line.includes('> csn'))

@@ -207,6 +207,7 @@ export function Chat(props: {
   const [inspectorMouseInput, setInspectorMouseInput] =
     useState<InspectorMouseInput>()
   const mouseClickId = useRef(0)
+  const planReviewWheelTicks = useRef(0)
   // Mouse press/move packets can share one stdin chunk; this ref keeps the
   // drag session available before React commits the reducer update.
   const messageSelectionDragging = useRef(false)
