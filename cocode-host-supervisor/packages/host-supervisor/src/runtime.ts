@@ -3,7 +3,7 @@ import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, re
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { runtimeSlotDirectory } from './paths.js'
-import { hostKey, type HostRuntimeEnv, type HostScope } from './protocol.js'
+import { hostKey, stableJson, type HostRuntimeEnv, type HostScope } from './protocol.js'
 
 export type RuntimeSlot = { root: string; entry: string; version: string; buildId?: string; patch: string; jsonRpcEndpoint: string }
 
@@ -25,6 +25,14 @@ type RuntimePackageManifest = {
   name?: string
   version?: string
   dependencies?: Record<string, string>
+  optionalDependencies?: Record<string, string>
+  peerDependencies?: Record<string, string>
+  peerDependenciesMeta?: Record<string, { optional?: boolean }>
+}
+
+type RuntimePackage = {
+  root: string
+  manifest: RuntimePackageManifest
 }
 
 export function resolveDshPackage(): { root: string; entry: string; version: string; buildId?: string } {
@@ -52,7 +60,7 @@ export function prepareRuntimeSlot(scope: HostScope, jsonRpcEndpoint: string, pl
       .filter((item) => item.isDirectory())
       .map((item) => join(pluginRoot, item.name))
     : []
-  if (!isRuntimePackageComplete(dsh.root, dshSlotRoot)) {
+  if (!isRuntimePackageComplete(dsh.root, dshSlotRoot, pluginSources)) {
     rmSync(slot, { recursive: true, force: true })
     mkdirSync(join(slot, 'node_modules', '@deepseek-ai'), { recursive: true })
     copyPackageClosure(dsh.root, slot, pluginSources)
@@ -90,7 +98,7 @@ export function prepareRuntimeSlot(scope: HostScope, jsonRpcEndpoint: string, pl
   return { root: slot, entry, version: dsh.version, ...(dsh.buildId === undefined ? {} : { buildId: dsh.buildId }), patch, jsonRpcEndpoint }
 }
 
-function isRuntimePackageComplete(sourceRoot: string, targetRoot: string): boolean {
+function isRuntimePackageComplete(sourceRoot: string, targetRoot: string, pluginSources: readonly string[]): boolean {
   if (!existsSync(targetRoot)) return false
   const sourceManifestPath = join(sourceRoot, 'package.json')
   const targetManifestPath = join(targetRoot, 'package.json')
@@ -98,7 +106,17 @@ function isRuntimePackageComplete(sourceRoot: string, targetRoot: string): boole
   const sourceManifest = JSON.parse(readFileSync(sourceManifestPath, 'utf8')) as { version?: string }
   const targetManifest = JSON.parse(readFileSync(targetManifestPath, 'utf8')) as { version?: string }
   if (sourceManifest.version !== targetManifest.version) return false
-  return listPackageFiles(sourceRoot).every((sourcePath) => existsSync(join(targetRoot, relative(sourceRoot, sourcePath))))
+  if (!listPackageFiles(sourceRoot).every((sourcePath) => existsSync(join(targetRoot, relative(sourceRoot, sourcePath))))) return false
+
+  // A slot can keep a complete DSH package while a newly copied plugin has a
+  // dependency that the old flat node_modules tree never materialized.
+  const targetModules = dirname(dirname(targetRoot))
+  return collectPackageClosure(pluginSources, sourceRoot).every(({ manifest }) => {
+    if (manifest.name === undefined) return false
+    const targetManifestPath = join(targetModules, ...manifest.name.split('/'), 'package.json')
+    if (!existsSync(targetManifestPath)) return false
+    return stableJson(readManifest(targetManifestPath)) === stableJson(manifest)
+  })
 }
 
 function listPackageFiles(root: string, current = root): string[] {
@@ -193,30 +211,33 @@ function copyPackageClosure(dshRoot: string, slot: string, additionalRoots: read
    * by DSH's profile fallback healer.
    */
   const targetModules = join(slot, 'node_modules')
-  const pending = [realpathSync(dshRoot), ...additionalRoots.map((root) => realpathSync(root))]
-  const copied = new Set<string>()
-  const resolved = new Map<string, string>()
-  while (pending.length > 0) {
-    const sourceRoot = pending.shift()!
-    const manifestPath = join(sourceRoot, 'package.json')
-    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
-      name?: string
-      dependencies?: Record<string, string>
-      optionalDependencies?: Record<string, string>
-      peerDependencies?: Record<string, string>
-      peerDependenciesMeta?: Record<string, { optional?: boolean }>
-    }
-    if (typeof manifest.name !== 'string' || copied.has(manifest.name)) continue
-    copied.add(manifest.name)
-    resolved.set(manifest.name, sourceRoot)
-
+  for (const { root, manifest } of collectPackageClosure([dshRoot, ...additionalRoots], dshRoot)) {
+    if (typeof manifest.name !== 'string') continue
     const destination = join(targetModules, ...manifest.name.split('/'))
     mkdirSync(dirname(destination), { recursive: true })
-    cpSync(sourceRoot, destination, {
+    cpSync(root, destination, {
       recursive: true,
       dereference: true,
       filter: (source) => basename(source) !== 'node_modules',
     })
+  }
+}
+
+function readManifest(path: string): RuntimePackageManifest {
+  return JSON.parse(readFileSync(path, 'utf8')) as RuntimePackageManifest
+}
+
+function collectPackageClosure(roots: readonly string[], fallbackRoot: string): RuntimePackage[] {
+  const pending = roots.map((root) => realpathSync(root))
+  const visited = new Set<string>()
+  const packages: RuntimePackage[] = []
+  while (pending.length > 0) {
+    const root = pending.shift()!
+    const manifestPath = join(root, 'package.json')
+    const manifest = readManifest(manifestPath)
+    if (typeof manifest.name !== 'string' || visited.has(manifest.name)) continue
+    visited.add(manifest.name)
+    packages.push({ root, manifest })
 
     const dependencies = {
       ...manifest.dependencies,
@@ -225,16 +246,15 @@ function copyPackageClosure(dshRoot: string, slot: string, additionalRoots: read
     }
     const packageRequire = createRequire(manifestPath)
     for (const dependency of Object.keys(dependencies)) {
-      if (resolved.has(dependency)) continue
       try {
-        const dependencyRoot = resolvePackageRoot(packageRequire, dependency, dshRoot)
-        pending.push(dependencyRoot)
+        pending.push(resolvePackageRoot(packageRequire, dependency, fallbackRoot))
       } catch (error) {
         if (manifest.optionalDependencies?.[dependency] !== undefined || manifest.peerDependenciesMeta?.[dependency]?.optional === true) continue
-        throw new Error(`Unable to resolve DSH runtime dependency ${dependency} from ${sourceRoot}: ${String(error)}`)
+        throw new Error(`Unable to resolve DSH runtime dependency ${dependency} from ${root}: ${String(error)}`)
       }
     }
   }
+  return packages
 }
 
 function resolvePackageRoot(require: NodeRequire, packageName: string, fallbackRoot?: string): string {
