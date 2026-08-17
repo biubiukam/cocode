@@ -399,6 +399,11 @@ function snapshotUsage(snapshot: AccountSnapshot, key: "fiveHour" | "week" | "mo
   return snapshot.usage?.[key]
 }
 
+function remainingUsagePercent(used: number | undefined): number | undefined {
+  if (typeof used !== "number" || !Number.isFinite(used)) return undefined
+  return 100 - Math.max(0, Math.min(100, Math.round(used)))
+}
+
 function usageSyncLabel(snapshot: AccountSnapshot): string {
   if (snapshot.usage?.error !== undefined) return `同步失败：${snapshot.usage.error}`
   if (snapshot.usage?.syncedAt === undefined) return "正在同步账号用量…"
@@ -434,14 +439,14 @@ function AccountPanel({ kind, snapshot, provider, onClose }: {
     || (provider === null && (snapshot.cloud.status === "ready" || snapshot.cloud.status === "conflict"))
   const providerLabel = isCloud ? "Cocode Nut" : provider?.name ?? "当前 Provider"
   const usageMetric = (label: string, value: number | undefined): ReturnType<typeof createElement> => {
-    const percentage = typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(100, Math.round(value))) : undefined
+    const percentage = remainingUsagePercent(value)
     return createElement("div", { className: css.usageMetric },
       createElement("div", { className: css.usageMetricHeader },
         createElement("span", { className: css.usageMetricLabel }, label),
         createElement("strong", { className: css.usageMetricPercent }, percentage === undefined ? "—" : `${percentage}%`),
       ),
       createElement("div", { className: css.usageTrack }, createElement("span", { className: css.usageFill, style: { width: `${percentage ?? 0}%` } })),
-      createElement("span", { className: css.panelSecondary }, percentage === undefined ? (snapshot.usage?.error === undefined ? "正在同步" : "同步失败") : "已使用"),
+      createElement("span", { className: css.panelSecondary }, percentage === undefined ? (snapshot.usage?.error === undefined ? "正在同步" : "同步失败") : "剩余"),
     )
   }
   const body = kind === "usage"
@@ -456,7 +461,7 @@ function AccountPanel({ kind, snapshot, provider, onClose }: {
             usageMetric("周限额", snapshotUsage(snapshot, "week")),
             usageMetric("月限额", snapshotUsage(snapshot, "month")),
           ),
-          createElement("p", { className: css.panelHint }, "百分比代表当前周期已使用额度。本地 Provider 的请求不会计入 Cocode Nut 用量。"),
+          createElement("p", { className: css.panelHint }, "百分比代表当前周期剩余额度。本地 Provider 的请求不会计入 Cocode Nut 用量。"),
         )
       : createElement("div", { className: css.panelStack },
           createElement("div", { className: css.providerHelpCard },
