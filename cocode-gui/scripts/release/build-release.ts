@@ -52,6 +52,7 @@ if (target.platform === "win32" && resolveWindowsSignMode(environment) === "serv
 }
 
 const command = process.platform === "win32" ? "corepack.cmd" : "corepack"
+const commandOptions = process.platform === "win32" ? { shell: true } : {}
 const runtime = spawnSync(
 	command,
 	[
@@ -63,7 +64,7 @@ const runtime = spawnSync(
 		"--output",
 		environment.COCODE_RUNTIME_ARTIFACT_ROOT,
 	],
-	{ cwd: process.cwd(), env: environment, stdio: "inherit" },
+	{ cwd: process.cwd(), env: environment, stdio: "inherit", ...commandOptions },
 )
 if (runtime.error) throw runtime.error
 if (runtime.status !== 0)
@@ -81,7 +82,7 @@ const forge = spawnSync(
 		"--arch",
 		target.arch,
 	],
-	{ cwd: process.cwd(), env: environment, stdio: "inherit" },
+	{ cwd: process.cwd(), env: environment, stdio: "inherit", ...commandOptions },
 )
 if (forge.error) throw forge.error
 process.exitCode = forge.status ?? 1

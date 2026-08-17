@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process"
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
 import path from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
+import { shellCommandOptions } from "./lib/child-process-options.mjs"
 import { hashFiles, listFiles, sha256File } from "./runtime-build-helpers.mjs"
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
@@ -83,7 +84,7 @@ export function buildSupervisor({ clean = false, manifestPath = defaultManifestP
 		execFileSync(
 			process.platform === "win32" ? "corepack.cmd" : "corepack",
 			["pnpm@10.34.5", "run", "build:with-gui-plugins"],
-			{ cwd: supervisorRoot, stdio: "inherit" },
+			shellCommandOptions({ cwd: supervisorRoot, stdio: "inherit" }),
 		)
 	}
 	const artifacts = Object.fromEntries(

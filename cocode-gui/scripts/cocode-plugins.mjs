@@ -12,6 +12,7 @@ import {
 import { createRequire } from "node:module"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
+import { shellCommandOptions } from "./lib/child-process-options.mjs"
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const pluginsRoot = path.join(repositoryRoot, "packages", "cocode")
@@ -59,18 +60,18 @@ export function buildCocodePlugins() {
 				"-p",
 				"tsconfig.build.json",
 			],
-			{
+			shellCommandOptions({
 				cwd: repositoryRoot,
 				stdio: "inherit",
-			},
+			}),
 		)
 		execFileSync(
 			corepackCommand,
 			[...pinnedPnpmArgs, "--filter", plugin.name, "exec", "tsdown"],
-			{
+			shellCommandOptions({
 				cwd: repositoryRoot,
 				stdio: "inherit",
-			},
+			}),
 		)
 	}
 }
@@ -207,10 +208,10 @@ else if (command === "typecheck") {
 				"-p",
 				"tsconfig.build.json",
 			],
-			{
+			shellCommandOptions({
 				cwd: repositoryRoot,
 				stdio: "inherit",
-			},
+			}),
 		)
 	}
 } else if (command === "test") {
@@ -219,10 +220,10 @@ else if (command === "typecheck") {
 		execFileSync(
 			corepackCommand,
 			[...pinnedPnpmArgs, "--filter", plugin.name, "exec", "vitest", "run"],
-			{
+			shellCommandOptions({
 				cwd: repositoryRoot,
 				stdio: "inherit",
-			},
+			}),
 		)
 	}
 }

@@ -178,6 +178,7 @@ function runPnpm(cwd, args, label) {
 		execFileSync(process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm', args, {
 			cwd,
 			stdio: 'inherit',
+			shell: process.platform === 'win32',
 		})
 	} catch {
 		fail(`${label}失败，请在 ${relative(repoRoot, cwd) || '.'} 目录重试：pnpm ${args.join(' ')}`)

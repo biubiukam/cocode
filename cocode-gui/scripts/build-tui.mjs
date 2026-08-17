@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process"
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import path from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
+import { shellCommandOptions } from "./lib/child-process-options.mjs"
 
 const guiRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const tuiRoot = path.resolve(guiRoot, "../cocode-tui")
@@ -14,8 +15,7 @@ export function buildTui({ output = outputRoot } = {}) {
 
 	const corepack = process.platform === "win32" ? "corepack.cmd" : "corepack"
 	execFileSync(corepack, ["pnpm@10.34.5", "run", "build"], {
-		cwd: tuiRoot,
-		stdio: "inherit",
+		...shellCommandOptions({ cwd: tuiRoot, stdio: "inherit" }),
 	})
 
 	const sourceEntry = path.join(tuiRoot, "dist", "cocode-tui.mjs")

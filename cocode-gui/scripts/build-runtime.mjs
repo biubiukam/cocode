@@ -5,14 +5,14 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 import { buildSupervisor } from "./build-supervisor.mjs"
 import { hashDirectory, hashFiles, hashJson } from "./runtime-build-helpers.mjs"
 import { verifyRuntime } from "./verify-dsh-runtime.mjs"
+import { shellCommandOptions } from "./lib/child-process-options.mjs"
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 
 export function buildRuntime({ clean = false, output = defaultOutput() } = {}) {
 	const command = process.platform === "win32" ? "corepack.cmd" : "corepack"
 	execFileSync(command, ["pnpm@10.34.5", "run", "build:cocode-plugins"], {
-		cwd: repositoryRoot,
-		stdio: "inherit",
+		...shellCommandOptions({ cwd: repositoryRoot, stdio: "inherit" }),
 	})
 	const supervisor = buildSupervisor({ clean })
 	const inputFingerprint = hashJson({
