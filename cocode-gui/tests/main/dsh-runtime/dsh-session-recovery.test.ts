@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import os from "node:os"
-import path from "node:path"
+import * as path from "pathe"
 import { afterEach, describe, it } from "node:test"
 import { zstdCompressSync } from "node:zlib"
 import { quarantineCorruptDshSessions } from "../../../src/main/contexts/dsh-runtime/infrastructure/dsh-session-recovery"

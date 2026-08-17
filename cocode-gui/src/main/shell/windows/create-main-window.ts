@@ -1,5 +1,5 @@
 import { BrowserWindow, shell } from "electron"
-import path from "node:path"
+import * as path from "pathe"
 import { registerDshWebSocketTransport } from "../security/register-dsh-websocket-transport"
 import { resolveAppIcon } from "./app-icon"
 import type { DesktopLogger } from "../../shared/logging/desktop-logger"

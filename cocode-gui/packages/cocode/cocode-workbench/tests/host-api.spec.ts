@@ -1,6 +1,6 @@
 import { mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { join } from "pathe"
 import { describe, expect, it } from "vitest"
 import { createWorkbenchApi } from "../src/host-api.ts"
 import type { SandboxMode, WorkbenchContext } from "../src/host-types.ts"

@@ -1,6 +1,6 @@
 import { app } from "electron"
 import { readFile, unlink, writeFile } from "node:fs/promises"
-import { join } from "node:path"
+import { join } from "pathe"
 import type { DefaultSelection } from "./dsh-cloud-config-port"
 
 /**

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import os from "node:os"
-import path from "node:path"
+import * as path from "pathe"
 import test from "node:test"
 import type { ForgeMakeResult } from "@electron-forge/shared-types"
 import {

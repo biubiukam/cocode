@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { existsSync, mkdtempSync, rmSync } from "node:fs"
 import os from "node:os"
-import path from "node:path"
+import * as path from "pathe"
 import { afterEach, describe, it } from "node:test"
 import { BetterSqliteDatabaseRepositoryProvider } from "../../../src/main/contexts/database/infrastructure/repositories/better-sqlite-database-repository-provider"
 import { DatabasePathResolver } from "../../../src/main/contexts/database/infrastructure/persistence/database-path-resolver"

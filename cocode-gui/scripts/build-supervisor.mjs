@@ -1,8 +1,9 @@
 import { execFileSync } from "node:child_process"
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
-import path from "node:path"
+import * as path from "pathe"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { shellCommandOptions } from "./lib/child-process-options.mjs"
+import { ensureWorkspaceDependencies } from "./lib/workspace-dependencies.mjs"
 import { hashFiles, listFiles, sha256File } from "./runtime-build-helpers.mjs"
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
@@ -130,18 +131,14 @@ export function buildSupervisor({ clean = false, manifestPath = defaultManifestP
 }
 
 function ensureSupervisorDependencies() {
-	const required = [
-		path.join(supervisorRoot, "node_modules", "esbuild", "package.json"),
-		path.join(supervisorRoot, "node_modules", "typescript", "package.json"),
-	]
-	if (required.every(existsSync)) return
-
-	console.log("[supervisor-build] installing @cocode/host-supervisor dependencies")
-	execFileSync(
-		process.platform === "win32" ? "corepack.cmd" : "corepack",
-		["pnpm@10.34.5", "install", "--frozen-lockfile"],
-		shellCommandOptions({ cwd: supervisorRoot, stdio: "inherit" }),
-	)
+	ensureWorkspaceDependencies({
+		root: supervisorRoot,
+		label: "@cocode/host-supervisor",
+		requiredPaths: [
+			path.join(supervisorRoot, "node_modules", "esbuild", "package.json"),
+			path.join(supervisorRoot, "node_modules", "typescript", "package.json"),
+		],
+	})
 }
 
 function discoverGuiPlugins() {

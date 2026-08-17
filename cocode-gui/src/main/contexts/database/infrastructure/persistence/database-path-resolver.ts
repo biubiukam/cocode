@@ -1,5 +1,5 @@
 import { mkdirSync } from "node:fs"
-import path from "node:path"
+import * as path from "pathe"
 import type { SessionId } from "../../domain/value-objects/session-id"
 
 export class DatabasePathResolver {

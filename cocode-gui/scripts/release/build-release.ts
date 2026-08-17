@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process"
 import { mkdirSync, rmSync } from "node:fs"
-import path from "node:path"
+import * as path from "pathe"
 import {
 	loadReleaseEnvironment,
 	requireReleaseCredentials,

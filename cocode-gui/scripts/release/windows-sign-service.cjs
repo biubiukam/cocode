@@ -1,7 +1,7 @@
 const { execFileSync } = require("node:child_process")
 const { createHash, webcrypto } = require("node:crypto")
 const { mkdir, readFile, rename, rm, writeFile } = require("node:fs/promises")
-const path = require("node:path")
+const path = require("pathe")
 
 const KEYTAR_SERVICE = "cocode-windows-sign"
 

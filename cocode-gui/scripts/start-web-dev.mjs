@@ -7,7 +7,7 @@
  */
 import { spawn } from "node:child_process"
 import os from "node:os"
-import path from "node:path"
+import * as path from "pathe"
 import { createChildSupervisor } from "./lib/child-supervisor.mjs"
 import { forkClientWatcher } from "./lib/client-watcher.mjs"
 import { buildDevRuntime } from "./lib/dev-build.mjs"

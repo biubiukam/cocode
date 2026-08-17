@@ -1,6 +1,6 @@
 import { mkdtemp, readFile, readdir, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import path from "node:path"
+import * as path from "pathe"
 import test from "node:test"
 import assert from "node:assert/strict"
 import { serializeError } from "../../../src/main/shared/logging/error-serializer"

@@ -18,7 +18,7 @@ import {
 	writeFileSync,
 } from "node:fs"
 import os from "node:os"
-import path from "node:path"
+import * as path from "pathe"
 
 const CACHE_MARKER = ".cocode-runtime-cache.json"
 const FINGERPRINT_VERSION = 3

@@ -2,6 +2,8 @@ import { createHash } from "node:crypto"
 import { readFile } from "node:fs/promises"
 import { existsSync } from "node:fs"
 import { spawn } from "node:child_process"
+// Paths here end up in shell command strings and escaping, so keep OS separators.
+// eslint-disable-next-line no-restricted-imports
 import path from "node:path"
 import { app } from "electron"
 import { resolveDshHome } from "../../dsh-runtime/infrastructure/dsh-home"

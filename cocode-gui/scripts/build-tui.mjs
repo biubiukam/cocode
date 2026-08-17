@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto"
 import { execFileSync } from "node:child_process"
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
-import path from "node:path"
+import * as path from "pathe"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { shellCommandOptions } from "./lib/child-process-options.mjs"
 

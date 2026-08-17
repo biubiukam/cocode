@@ -10,7 +10,7 @@ import {
 	writeFileSync,
 } from "node:fs"
 import { createRequire } from "node:module"
-import path from "node:path"
+import * as path from "pathe"
 import { fileURLToPath } from "node:url"
 import { shellCommandOptions } from "./lib/child-process-options.mjs"
 

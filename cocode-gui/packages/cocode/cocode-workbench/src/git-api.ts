@@ -8,7 +8,7 @@
  */
 import { execFile } from "node:child_process"
 import { access, appendFile, readFile } from "node:fs/promises"
-import { isAbsolute, join, relative, resolve } from "node:path"
+import { isAbsolute, join, relative, resolve } from "pathe"
 import { promisify } from "node:util"
 import { resolveSessionCwd } from "./session-cwd.ts"
 import { countDiffLines, parseLog, parseStashes, parseStatus, type GitFile, type GitGroup, type GitOperation } from "./git-status.ts"
@@ -87,11 +87,12 @@ function safePaths(root: string, payload: Record<string, unknown>): string[] {
   return list.map(item => {
     if (item.includes("\0")) throw new Error("path is invalid")
     const absolute = isAbsolute(item) ? resolve(item) : resolve(root, item)
+    // pathe emits forward-slash output, so a single posix check suffices.
     const rel = relative(root, absolute)
-    if (rel === "" || rel === ".." || rel.startsWith("../") || rel.startsWith("..\\") || isAbsolute(rel)) {
+    if (rel === "" || rel === ".." || rel.startsWith("../") || isAbsolute(rel)) {
       throw new Error("path is outside the repository")
     }
-    return rel.split("\\").join("/")
+    return rel
   })
 }
 

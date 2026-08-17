@@ -62,12 +62,18 @@ test("generates architecture-safe Squirrel names", () => {
 	)
 })
 
-test("uses the application signing identity as the PKG signing fallback", () => {
+test("requires a dedicated installer signing identity for PKG releases", () => {
 	assert.equal(
 		resolveMacInstallerSigningIdentity({
 			MAC_SIGNING_IDENTITY: "Developer ID Application: Test",
 		}),
-		"Developer ID Application: Test",
+		undefined,
+	)
+	assert.equal(
+		resolveMacInstallerSigningIdentity({
+			MAC_INSTALLER_SIGNING_IDENTITY: "Developer ID Installer: Test",
+		}),
+		"Developer ID Installer: Test",
 	)
 	assert.equal(resolveMacCliInstallPath({}), "/usr/local/bin/cocode")
 	assert.equal(

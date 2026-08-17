@@ -285,6 +285,9 @@ importers:
       lint-staged:
         specifier: 15.5.2
         version: 15.5.2
+      pathe:
+        specifier: ^2.0.3
+        version: 2.0.3
       postcss:
         specifier: ^8.5.26
         version: 8.5.26
@@ -482,6 +485,9 @@ importers:
       cordis:
         specifier: ^4.0.0-rc.7
         version: 4.0.0-rc.8(@cordisjs/plugin-loader@1.0.0-rc.5)
+      pathe:
+        specifier: ^2.0.3
+        version: 2.0.3
       react:
         specifier: ^18.2.0
         version: 18.3.1

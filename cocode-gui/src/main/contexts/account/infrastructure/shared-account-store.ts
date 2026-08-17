@@ -1,7 +1,7 @@
 import { constants } from "node:fs"
 import { chmod, lstat, mkdir, open, rename, rm, stat, unlink } from "node:fs/promises"
 import { homedir } from "node:os"
-import { dirname, join, resolve } from "node:path"
+import { dirname, join, resolve } from "pathe"
 import { parse, stringify } from "yaml"
 import type { IdentityState } from "../application/account-service"
 import { SecureVault } from "./secure-vault"

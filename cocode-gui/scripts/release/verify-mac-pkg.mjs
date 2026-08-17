@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process"
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs"
 import os from "node:os"
-import path from "node:path"
+import * as path from "pathe"
 
 const args = process.argv.slice(2)
 const pkgPath = args[0] === "--" ? args[1] : args[0]

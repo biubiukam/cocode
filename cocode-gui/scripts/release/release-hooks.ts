@@ -11,7 +11,7 @@ import {
 	mkdtempSync,
 } from "node:fs"
 import os from "node:os"
-import path from "node:path"
+import * as path from "pathe"
 import type { ForgeMakeResult } from "@electron-forge/shared-types"
 import { notarize } from "@electron/notarize"
 import {

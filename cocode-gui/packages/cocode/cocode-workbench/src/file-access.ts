@@ -16,14 +16,19 @@
  */
 import { realpathSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { basename, dirname, isAbsolute, resolve } from "node:path"
+import { basename, dirname, isAbsolute, resolve } from "pathe"
 import type { SandboxMode, WorkbenchContext } from "./host-types.ts"
+import { isUnder, toPosix } from "./paths.ts"
 import { resolveSessionCwd } from "./session-cwd.ts"
 
-/** Resolve symlinks the way the harness sandbox does, so `/tmp` matches `/private/tmp`. */
+/**
+ * Resolve symlinks the way the harness sandbox does, so `/tmp` matches
+ * `/private/tmp`. The native result uses OS separators on Windows, while every
+ * comparison below runs on posix form, so normalize here.
+ */
 function canonical(path: string): string | undefined {
   try {
-    return realpathSync.native(path)
+    return toPosix(realpathSync.native(path))
   } catch { return undefined }
 }
 
@@ -43,11 +48,6 @@ function canonicalTarget(path: string): string {
     tail.push(basename(current))
     current = parent
   }
-}
-
-/** True when `path` is the root itself or sits under it. */
-function isUnder(root: string, path: string): boolean {
-  return path === root || path.startsWith(root.endsWith("/") ? root : `${root}/`)
 }
 
 /**

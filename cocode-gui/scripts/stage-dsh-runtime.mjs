@@ -10,7 +10,7 @@ import {
 } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { createRequire } from 'node:module'
-import path from 'node:path'
+import * as path from 'pathe'
 import process from 'node:process'
 
 const destination = readArgument('--destination')
@@ -60,10 +60,11 @@ function copyTree(source, target) {
 		recursive: true,
 		dereference: true,
 		filter: (entry) => {
+			// pathe normalizes relative paths to forward slashes on every platform.
 			const relative = path.relative(source, entry)
 			if (relative === '') return true
-			if (relative === 'node_modules' || relative.startsWith(`node_modules${path.sep}`)) return false
-			return !relative.split(path.sep).includes('.cache')
+			if (relative === 'node_modules' || relative.startsWith('node_modules/')) return false
+			return !relative.split('/').includes('.cache')
 		},
 	})
 	for (const candidate of [
@@ -128,7 +129,7 @@ function copyPackageTree(source, target) {
 		filter: (entry) => {
 			const relative = path.relative(source, entry)
 			if (relative === '') return true
-			return path.basename(entry) !== 'node_modules' && !relative.split(path.sep).includes('.cache')
+			return path.basename(entry) !== 'node_modules' && !relative.split('/').includes('.cache')
 		},
 	})
 }

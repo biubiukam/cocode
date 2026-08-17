@@ -1,5 +1,5 @@
 import { homedir } from "node:os"
-import path from "node:path"
+import * as path from "pathe"
 
 const DSH_HOME_DIR_NAME = ".dsh"
 const DSH_HOME_ENV = "DSH_HOME"

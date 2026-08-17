@@ -5,7 +5,7 @@ import { PreviewIcon, ReloadIcon } from "./icons.tsx"
 import { State, message, useRemote } from "./panel-state.tsx"
 import { fileUrl, workbenchRequest } from "./runtime-api.ts"
 import { resolveMarkdownImages } from "./markdown-assets.ts"
-import { relativeTo } from "./files-actions.ts"
+import { baseName, relativeTo } from "../paths.ts"
 import { GitDiffView } from "./git-diff.tsx"
 import type { GitGroup } from "./git-client.ts"
 import { t } from "./locales.ts"
@@ -77,16 +77,11 @@ function preferredMode(kind: PreviewKind | undefined, hasSource: boolean): ViewM
   return kind === undefined || kind === "code" ? "source" : "preview"
 }
 
-function fileName(path: string): string {
-  const boundary = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"))
-  return boundary < 0 ? path : path.slice(boundary + 1)
-}
-
 /** Show a file under the current workspace, falling back to its bare name. */
 function workspaceRelativePath(root: string | undefined, path: string): string {
-  if (root === undefined || root === "") return fileName(path)
+  if (root === undefined || root === "") return baseName(path)
   const relative = relativeTo(root, path)
-  return relative === "" ? fileName(path) : relative
+  return relative === "" ? baseName(path) : relative
 }
 
 /** Cache-bust binary previews when the user explicitly reloads from disk. */

@@ -1,5 +1,5 @@
 import { existsSync, lstatSync, readFileSync, readdirSync, statSync } from "node:fs"
-import path from "node:path"
+import * as path from "pathe"
 import { fileURLToPath } from "node:url"
 import { hashDirectory, hashJson } from "./runtime-build-helpers.mjs"
 

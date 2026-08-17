@@ -14,7 +14,7 @@
 import { closeSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { createHash } from "node:crypto"
 import os from "node:os"
-import path from "node:path"
+import * as path from "pathe"
 import { isProcessAlive, readProcessCommand, stopProcess } from "./process-control.mjs"
 
 /** Each attempt either wins the lock or displaces one distinct holder. */

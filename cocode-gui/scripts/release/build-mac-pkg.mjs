@@ -10,7 +10,7 @@ import {
 	writeFileSync,
 } from "node:fs"
 import os from "node:os"
-import path from "node:path"
+import * as path from "pathe"
 
 const DEFAULT_APP_INSTALL_LOCATION = "/Applications"
 const DEFAULT_CLI_INSTALL_PATH = "/usr/local/bin/cocode"
@@ -35,9 +35,7 @@ export function buildMacPkg({ appPath, outputPath, version, environment = proces
 		writeFileSync(postinstall, macCliPostinstall(environment, cliInstallPath), { mode: 0o755 })
 		chmodSync(postinstall, 0o755)
 
-		const installerIdentity =
-			environment.MAC_INSTALLER_SIGNING_IDENTITY?.trim() ||
-			environment.MAC_SIGNING_IDENTITY?.trim()
+		const installerIdentity = environment.MAC_INSTALLER_SIGNING_IDENTITY?.trim()
 		const appIdentifier =
 			environment.MAC_INSTALLER_APP_IDENTIFIER?.trim() || "com.cocode.desktop"
 		const cliIdentifier =
@@ -45,7 +43,7 @@ export function buildMacPkg({ appPath, outputPath, version, environment = proces
 		const signArgs = installerIdentity ? ["--sign", installerIdentity] : []
 		if (environment.RELEASE_REQUIRE_SIGNING === "1" && !installerIdentity) {
 			throw new Error(
-				"MAC_INSTALLER_SIGNING_IDENTITY is required for a signed macOS PKG release.",
+				"MAC_INSTALLER_SIGNING_IDENTITY (Developer ID Installer) is required for a signed macOS PKG release.",
 			)
 		}
 

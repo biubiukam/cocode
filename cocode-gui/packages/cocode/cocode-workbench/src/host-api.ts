@@ -1,8 +1,9 @@
 import { execFile } from "node:child_process"
 import { cp, mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises"
-import { basename, dirname, isAbsolute, join, relative } from "node:path"
+import { basename, dirname, isAbsolute, join, relative } from "pathe"
 import { promisify } from "node:util"
 import type { WorkbenchContext, WorkbenchRequest, WorkbenchResponse, WorkbenchRoute } from "./host-types.ts"
+import { hasSeparator } from "./paths.ts"
 import { applyBrowserHost } from "./browser/host.ts"
 import { absolutePath, assertWritable, canWrite, readablePath, sessionCwd, writablePath } from "./file-access.ts"
 import { gitDispatch } from "./git-api.ts"
@@ -47,7 +48,7 @@ function textField(payload: Record<string, unknown>, key: string): string | unde
 function destinationPath(ctx: WorkbenchContext, cwd: string, source: string, payload: Record<string, unknown>): string {
   const to = textField(payload, "to")
   if (to === undefined || to.includes("\0")) throw new Error("a target name is required")
-  const absolute = to.includes("/") || to.includes("\\")
+  const absolute = hasSeparator(to)
     ? absolutePath(cwd, to)
     : join(dirname(source), to)
   return assertWritable(ctx, payload, absolute)

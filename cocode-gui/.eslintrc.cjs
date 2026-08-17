@@ -100,5 +100,34 @@ module.exports = {
 				"@typescript-eslint/no-var-requires": "off",
 			},
 		},
+		{
+			// Portable-path policy: logical paths use forward slashes on every
+			// platform, so path handling goes through pathe. The rare module that
+			// genuinely needs OS separators (PATH registration, shell command
+			// strings, native installer invocations) documents the reason with a
+			// file-local eslint-disable. The renderer is excluded because its own
+			// override above already bans every Node.js built-in.
+			files: ["src/**/*.{ts,tsx}", "scripts/**/*.{js,cjs,mjs,ts}", "tests/**/*.{ts,tsx}"],
+			excludedFiles: ["src/renderer/**"],
+			rules: {
+				"no-restricted-imports": [
+					"error",
+					{
+						paths: [
+							{
+								name: "path",
+								message:
+									"Import pathe instead: it keeps logical paths forward-slash on every platform.",
+							},
+							{
+								name: "node:path",
+								message:
+									"Import pathe instead: it keeps logical paths forward-slash on every platform.",
+							},
+						],
+					},
+				],
+			},
+		},
 	],
 }

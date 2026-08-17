@@ -2,7 +2,7 @@ import { spawn } from "node:child_process"
 import { createRequire } from "node:module"
 import { access, mkdtemp, readFile, readdir, rename, rm, writeFile } from "node:fs/promises"
 import os from "node:os"
-import path from "node:path"
+import * as path from "pathe"
 import { createPackage, extractAll } from "@electron/asar"
 
 const require = createRequire(import.meta.url)

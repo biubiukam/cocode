@@ -1,4 +1,6 @@
 import { spawn } from "node:child_process"
+// Builds the native Update.exe invocation for Squirrel, so keep OS separators.
+// eslint-disable-next-line no-restricted-imports
 import path from "node:path"
 import { app } from "electron"
 import { TuiLauncher } from "../contexts/tui/infrastructure/tui-launcher"

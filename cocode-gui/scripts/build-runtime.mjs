@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process"
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs"
-import path from "node:path"
+import * as path from "pathe"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { buildSupervisor } from "./build-supervisor.mjs"
 import { hashDirectory, hashFiles, hashJson } from "./runtime-build-helpers.mjs"

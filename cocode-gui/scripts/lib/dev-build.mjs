@@ -6,7 +6,7 @@
  * output. Running them from inside the lock makes concurrent starts serialize.
  */
 import { spawnSync } from "node:child_process"
-import path from "node:path"
+import * as path from "pathe"
 
 export function buildDevRuntime({ hardenElectron = false } = {}) {
 	if (hardenElectron) runScript("scripts/harden-electron-default-app.mjs")

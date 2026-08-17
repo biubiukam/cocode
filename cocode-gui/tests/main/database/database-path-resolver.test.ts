@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import path from "node:path"
+import * as path from "pathe"
 import { describe, it } from "node:test"
 import { SessionId } from "../../../src/main/contexts/database/domain/value-objects/session-id"
 import { DatabasePathResolver } from "../../../src/main/contexts/database/infrastructure/persistence/database-path-resolver"

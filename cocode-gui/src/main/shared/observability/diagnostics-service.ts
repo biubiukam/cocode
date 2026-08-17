@@ -9,7 +9,7 @@ import {
 	statSync,
 	writeFileSync,
 } from "node:fs"
-import path from "node:path"
+import * as path from "pathe"
 import { create as createTar } from "tar"
 import type {
 	DiagnosticsBundleDto,

@@ -1,5 +1,5 @@
 import { copyFileSync, existsSync, readFileSync, readdirSync, renameSync, statSync } from "node:fs"
-import path from "node:path"
+import * as path from "pathe"
 import process from "node:process"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { watch } from "chokidar"

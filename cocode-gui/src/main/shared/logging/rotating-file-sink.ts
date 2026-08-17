@@ -13,7 +13,7 @@ import {
 	writeSync,
 	fsyncSync,
 } from "node:fs"
-import path from "node:path"
+import * as path from "pathe"
 import { Writable } from "node:stream"
 import { pipeline } from "node:stream/promises"
 

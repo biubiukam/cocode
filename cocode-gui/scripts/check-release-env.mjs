@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs"
-import path from "node:path"
+import * as path from "pathe"
 
 const root = process.cwd()
 const example = path.join(root, ".env.release.example")

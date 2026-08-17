@@ -1,6 +1,6 @@
 import { app, safeStorage } from "electron"
 import { readFile, unlink, writeFile } from "node:fs/promises"
-import { join } from "node:path"
+import { join } from "pathe"
 
 export class SecureVault<T> {
 	private loaded = false

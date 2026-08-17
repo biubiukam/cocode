@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs"
-import path from "node:path"
+import * as path from "pathe"
 import { loadEnvFile } from "node:process"
 import type { MakerDMGConfig } from "@electron-forge/maker-dmg"
 import type { MakerSquirrelConfig } from "@electron-forge/maker-squirrel"
@@ -186,11 +186,7 @@ export function createMacSignOptions(environment = process.env): MacSignOptions 
 }
 
 export function resolveMacInstallerSigningIdentity(environment = process.env): string | undefined {
-	return (
-		environment.MAC_INSTALLER_SIGNING_IDENTITY?.trim() ||
-		environment.MAC_SIGNING_IDENTITY?.trim() ||
-		undefined
-	)
+	return environment.MAC_INSTALLER_SIGNING_IDENTITY?.trim() || undefined
 }
 
 export function resolveMacCliInstallPath(environment = process.env): string {
@@ -359,7 +355,7 @@ export function requireReleaseCredentials(target: ReleaseTarget, environment = p
 			throw new Error("MAC_SIGNING_IDENTITY is required for a signed macOS release.")
 		if (!resolveMacInstallerSigningIdentity(environment))
 			throw new Error(
-				"MAC_INSTALLER_SIGNING_IDENTITY or MAC_SIGNING_IDENTITY is required for a signed macOS PKG release.",
+				"MAC_INSTALLER_SIGNING_IDENTITY (Developer ID Installer) is required for a signed macOS PKG release.",
 			)
 		if (!createMacNotarizeOptions(environment))
 			throw new Error(
