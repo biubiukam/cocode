@@ -148,6 +148,11 @@ const config: ForgeConfig = {
 	// proxy resets the connection.
 	rebuildConfig: {
 		headerURL: "https://artifacts.electronjs.org/headers/dist",
+		// The linked Supervisor checkout drags node-pty into the module walk, but
+		// only the Supervisor's own Node process loads it, and its prebuilt binary
+		// is Node-API so no Electron ABI build applies. Compiling it here would
+		// additionally require the MSVC Spectre-mitigated libraries on Windows.
+		ignoreModules: ["node-pty"],
 	},
 	makers: [
 		new MakerSquirrel(
