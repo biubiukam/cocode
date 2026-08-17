@@ -11,7 +11,10 @@
  * neutral grey. A fifth hue would exceed what a reader can keep mapped.
  */
 
+import { execFileSync } from 'node:child_process'
+
 export type ThemeName = 'dark' | 'light'
+export type ThemeMode = ThemeName | 'system'
 
 export const DEFAULT_THEME: ThemeName = 'dark'
 
@@ -90,6 +93,58 @@ export function resolveTheme(name: ThemeName, trueColor: boolean): ThemeTokens {
   return trueColor ? themes[name] : basicTokens
 }
 
+export type InitialThemeOptions = {
+  platform?: NodeJS.Platform
+  readSystemTheme?: () => ThemeName | undefined
+}
+
+/**
+ * Pick a startup theme without making the terminal canvas part of the app
+ * state. Explicit configuration wins; on macOS, AppleInterfaceStyle is the
+ * source of truth. COLORFGBG remains a fallback for other terminal setups.
+ */
+export function resolveInitialTheme(
+  env: NodeJS.ProcessEnv = process.env,
+  options: InitialThemeOptions = {},
+): ThemeName {
+  const configured = parseThemeMode(env.COCODE_TUI_THEME ?? '')
+  if (configured !== undefined && configured !== 'system') return configured
+
+  const platform = options.platform ?? process.platform
+  const systemTheme =
+    platform === 'darwin'
+      ? (options.readSystemTheme ?? readMacSystemTheme)()
+      : undefined
+  if (systemTheme !== undefined) return systemTheme
+
+  const background = env.COLORFGBG?.split(';').at(-1)
+  const backgroundId = background === undefined ? undefined : Number(background)
+  if (Number.isInteger(backgroundId)) {
+    if ([3, 6, 7, 10, 11, 14, 15].includes(backgroundId)) return 'light'
+    if ([0, 1, 2, 4, 5, 8, 9, 12, 13].includes(backgroundId)) return 'dark'
+  }
+
+  return DEFAULT_THEME
+}
+
+function readMacSystemTheme(): ThemeName | undefined {
+  try {
+    const value = execFileSync('defaults', ['read', '-g', 'AppleInterfaceStyle'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+      .trim()
+      .toLowerCase()
+    return value === 'dark' ? 'dark' : value === 'light' ? 'light' : undefined
+  } catch (error) {
+    // macOS omits AppleInterfaceStyle in Light appearance. A missing command
+    // is different and should continue to the other detection fallbacks.
+    return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT'
+      ? undefined
+      : 'light'
+  }
+}
+
 export function supportsTrueColor(
   stream: Pick<NodeJS.WriteStream, 'getColorDepth'> | undefined = process.stdout,
   env: NodeJS.ProcessEnv = process.env,
@@ -110,6 +165,11 @@ export function getTheme(name: ThemeName): ThemeTokens {
 export function parseThemeName(input: string): ThemeName | undefined {
   const name = input.trim().toLowerCase()
   return name === 'dark' || name === 'light' ? name : undefined
+}
+
+export function parseThemeMode(input: string): ThemeMode | undefined {
+  const mode = input.trim().toLowerCase()
+  return mode === 'system' ? 'system' : parseThemeName(mode)
 }
 
 export function setTheme(name: ThemeName, trueColor = supportsTrueColor()): void {

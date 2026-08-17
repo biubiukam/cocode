@@ -177,6 +177,8 @@ TUI 仍然要求真实 TTY；管道、重定向和 CI 环境不会进入交互�
 
 回合从运行变为空闲时，TUI 默认发送 OSC 9 终端通知。设置 `COCODE_TUI_NOTIFY=off` 可关闭；需要 OSC 777 的终端可以设置为 `osc777`。通知是尽力而为的终端控制序列，写入失败不会影响会话。
 
+启动时会优先使用 `COCODE_TUI_THEME=dark|light|system`。使用 `system` 或未设置时，macOS 会读取系统外观；其他环境会读取终端提供的 `COLORFGBG` 背景提示，无法判断时默认使用深色主题。
+
 ## 错误
 
 失败时状态栏显示 `CODE · 解释`。语言由 `COCODE_LANG` 决定，未设置时跟随 `LANG` / `LC_MESSAGES`。完整目录见 [错误码](./errors.md)。
