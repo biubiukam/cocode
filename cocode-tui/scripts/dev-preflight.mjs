@@ -39,15 +39,19 @@ function main() {
 
 	const hostBuildOutput = join(hostRoot, 'packages', 'host-supervisor', 'lib', 'index.js')
 	const pluginBuildNeeded = hasCocodePluginBuildsNeeded()
-	const hostBuildNeeded = !existsSync(hostBuildOutput) || hasNewerSource(hostRoot, hostBuildOutput)
+	const hostBuildNeeded =
+		!existsSync(hostBuildOutput) ||
+		hasNewerSource(hostRoot, hostBuildOutput) ||
+		hasMissingGuiRuntimePlugins()
 	if (pluginBuildNeeded) {
 		if (checkOnly) {
 			fail('Cocode GUI 插件构建产物已缺失或过期，请运行 `pnpm --dir cocode-gui run build:cocode-plugins`。')
 		}
-		runPnpm(guiRoot, ['run', 'build:cocode-plugins'], '构建 Cocode GUI 插件和 Host runtime')
-	} else if (hostBuildNeeded) {
-		if (checkOnly) fail('Host Supervisor 构建产物已缺失或过期，请运行 `pnpm --dir cocode-host-supervisor build`。')
-		runPnpm(hostRoot, ['run', 'build'], '构建 Host Supervisor runtime')
+		runPnpm(guiRoot, ['run', 'build:cocode-plugins'], '构建 Cocode GUI 插件')
+	}
+	if (hostBuildNeeded) {
+		if (checkOnly) fail('Host Supervisor 构建产物已缺失或过期，请运行 `pnpm --dir cocode-host-supervisor run build:with-gui-plugins`。')
+		runPnpm(hostRoot, ['run', 'build:with-gui-plugins'], '构建带 GUI 插件的 Host runtime')
 	}
 
 	if (!checkOnly) {
@@ -117,6 +121,35 @@ function hasCocodePluginBuildsNeeded() {
 		const output = join(pluginRoot, 'lib', 'index.js')
 		return !existsSync(output) || hasNewerPluginSource(pluginRoot, output)
 	})
+}
+
+function hasMissingGuiRuntimePlugins() {
+	const manifestPath = join(hostRoot, 'runtime', 'plugins.json')
+	if (!existsSync(manifestPath)) return true
+
+	const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+	const bundled = new Set(Array.isArray(manifest.plugins) ? manifest.plugins : [])
+	return discoverGuiPluginNames().some((name) => {
+		const pluginRoot = join(hostRoot, 'runtime', 'plugins', name)
+		return !bundled.has(name) ||
+			!existsSync(join(pluginRoot, 'package.json')) ||
+			!existsSync(join(pluginRoot, 'lib', 'index.js'))
+	})
+}
+
+function discoverGuiPluginNames() {
+	const pluginsRoot = join(guiRoot, 'packages', 'cocode')
+	if (!existsSync(pluginsRoot)) return []
+	return readdirSync(pluginsRoot, { withFileTypes: true })
+		.filter((entry) => entry.isDirectory())
+		.flatMap((entry) => {
+			const manifestPath = join(pluginsRoot, entry.name, 'package.json')
+			if (!existsSync(manifestPath)) return []
+			const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+			return manifest.private === true && manifest.cocode && typeof manifest.name === 'string'
+				? [manifest.name]
+				: []
+		})
 }
 
 function hasNewerPluginSource(root, output) {
