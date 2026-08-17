@@ -4,7 +4,6 @@ import { createHash } from "node:crypto"
 import { existsSync, readdirSync } from "node:fs"
 import fs from "node:fs/promises"
 import path from "node:path"
-import { MakerDMG } from "@electron-forge/maker-dmg"
 import { MakerSquirrel } from "@electron-forge/maker-squirrel"
 import { MakerZIP } from "@electron-forge/maker-zip"
 import { MakerDeb } from "@electron-forge/maker-deb"
@@ -14,7 +13,6 @@ import { FusesPlugin } from "@electron-forge/plugin-fuses"
 import { FuseV1Options, FuseVersion } from "@electron/fuses"
 import packageMetadata from "./package.json"
 import {
-	createDmgConfig,
 	createMacNotarizeOptions,
 	createMacSignOptions,
 	createSquirrelConfig,
@@ -157,7 +155,6 @@ const config: ForgeConfig = {
 			["win32"],
 		),
 		new MakerZIP({}, ["darwin"]),
-		new MakerDMG(createDmgConfig(), ["darwin"]),
 		new MakerRpm({}),
 		new MakerDeb({}),
 	],
