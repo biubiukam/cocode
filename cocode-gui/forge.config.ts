@@ -25,6 +25,7 @@ import {
 } from "./scripts/release/release-config"
 import {
 	appendChecksumManifest,
+	cleanupWindowsSignLedger,
 	notarizeFinalMacArtifacts,
 	normalizeArtifactNames,
 	prepareMacDmgDependencies,
@@ -138,7 +139,9 @@ const config: ForgeConfig = {
 			const normalized = normalizeArtifactNames(makeResults)
 			await notarizeFinalMacArtifacts(normalized)
 			verifyMadeArtifacts(normalized)
-			return appendChecksumManifest(selectGitHubReleaseArtifacts(normalized))
+			const result = appendChecksumManifest(selectGitHubReleaseArtifacts(normalized))
+			cleanupWindowsSignLedger()
+			return result
 		},
 	},
 	// Use the final headers host directly. The default electronjs.org URL

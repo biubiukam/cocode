@@ -1,9 +1,11 @@
 import { spawnSync } from "node:child_process"
+import { mkdirSync, rmSync } from "node:fs"
 import path from "node:path"
 import {
 	loadReleaseEnvironment,
 	requireReleaseCredentials,
 	resolveReleaseTarget,
+	resolveWindowsSignMode,
 } from "./release-config"
 
 loadReleaseEnvironment()
@@ -23,6 +25,8 @@ const environment: NodeJS.ProcessEnv = {
 		process.env.COCODE_RUNTIME_ARTIFACT_ROOT ??
 		path.resolve(`release/${platform}/${arch}/runtime`),
 }
+environment.WINDOWS_SIGN_LEDGER_DIR = path.resolve(environment.FORGE_OUT_DIR, "windows-sign-ledger")
+delete environment.SIGN_CERTIFICATE
 delete environment.COREPACK_ROOT
 const target = resolveReleaseTarget(environment)
 if (target.platform !== process.platform)
@@ -34,6 +38,19 @@ if (target.arch !== process.arch)
 		`Release builds must run on native ${target.arch}; current process is ${process.arch}.`,
 	)
 requireReleaseCredentials(target, environment)
+
+if (target.platform === "win32" && resolveWindowsSignMode(environment) === "service") {
+	rmSync(environment.WINDOWS_SIGN_LEDGER_DIR, { recursive: true, force: true })
+	mkdirSync(environment.WINDOWS_SIGN_LEDGER_DIR, { recursive: true })
+	const credentialCheck = spawnSync(
+		process.execPath,
+		["scripts/release/windows-sign-credentials.cjs", "check"],
+		{ cwd: process.cwd(), env: environment, stdio: "inherit" },
+	)
+	if (credentialCheck.error) throw credentialCheck.error
+	if (credentialCheck.status !== 0)
+		throw new Error("Windows signing service credential preflight failed.")
+}
 
 const command = process.platform === "win32" ? "corepack.cmd" : "corepack"
 const runtime = spawnSync(

@@ -8,7 +8,9 @@ import {
 	rmSync,
 	statSync,
 	writeFileSync,
+	mkdtempSync,
 } from "node:fs"
+import os from "node:os"
 import path from "node:path"
 import type { ForgeMakeResult } from "@electron-forge/shared-types"
 import { notarize } from "@electron/notarize"
@@ -16,7 +18,11 @@ import {
 	createMacNotarizeOptions,
 	isReleaseSigningRequired,
 	resolveReleaseTarget,
+	resolveWindowsSignLedgerDir,
+	resolveWindowsSignMode,
 } from "./release-config"
+
+const WINDOWS_SIGNABLE_FILE = /\.(exe|dll|node|sys|efi|scr)$/i
 
 export function normalizeArtifactNames(makeResults: readonly ForgeMakeResult[]): ForgeMakeResult[] {
 	return makeResults.map((result) => {
@@ -83,8 +89,10 @@ export async function verifyPackagedApplication(packageResult: {
 		run("codesign", ["--verify", "--deep", "--strict", "--verbose=2", appPath])
 		return
 	}
-	const files = collectFiles(packagePath).filter((file) => /\.(exe|dll|node|msi)$/i.test(file))
+	const files = collectFiles(packagePath).filter((file) => WINDOWS_SIGNABLE_FILE.test(file))
 	if (files.length === 0) throw new Error(`No Windows PE artifacts found under ${packagePath}.`)
+	verifyWindowsSigningLedger(files)
+	for (const file of files) verifyWindowsFile(file)
 }
 
 export async function notarizeFinalMacArtifacts(
@@ -124,8 +132,23 @@ export function verifyMadeArtifacts(makeResults: readonly ForgeMakeResult[]): vo
 				process.platform === "win32"
 			)
 				verifyWindowsFile(artifact)
+			if (
+				target.platform === "win32" &&
+				artifact.toLowerCase().endsWith(".nupkg") &&
+				process.platform === "win32"
+			)
+				verifyWindowsNupkg(artifact)
 		}
+		if (target.platform === "win32" && process.platform === "win32")
+			verifyWindowsReleaseMetadata(result.artifacts)
 	}
+}
+
+export function cleanupWindowsSignLedger(): void {
+	if (resolveReleaseTarget().platform !== "win32" || resolveWindowsSignMode() !== "service")
+		return
+	const ledgerDir = resolveWindowsSignLedgerDir()
+	if (existsSync(ledgerDir)) rmSync(ledgerDir, { recursive: true, force: true })
 }
 
 export function appendChecksumManifest(makeResults: readonly ForgeMakeResult[]): ForgeMakeResult[] {
@@ -175,11 +198,106 @@ function verifyWindowsFile(file: string): void {
 	const script = [
 		"$signature = Get-AuthenticodeSignature -LiteralPath $env:VERIFY_FILE",
 		"if ($signature.Status -ne 'Valid') { throw \"Invalid Authenticode signature: $env:VERIFY_FILE\" }",
+		"$certificate = $signature.SignerCertificate",
+		'if ($null -eq $certificate) { throw "Signer certificate is missing: $env:VERIFY_FILE" }',
+		"[PSCustomObject]@{ Subject=$certificate.Subject; Thumbprint=$certificate.Thumbprint; Status=$signature.Status } | ConvertTo-Json -Compress",
 	].join(" ")
-	execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], {
-		env: { ...process.env, VERIFY_FILE: file },
-		stdio: "inherit",
-	})
+	const output = execFileSync(
+		"powershell.exe",
+		["-NoProfile", "-NonInteractive", "-Command", script],
+		{
+			env: { ...process.env, VERIFY_FILE: file },
+			encoding: "utf8",
+		},
+	).trim()
+	const signature = JSON.parse(output) as { Subject?: string; Thumbprint?: string }
+	const expectedSubject = process.env.WINDOWS_SIGN_CERTIFICATE_SUBJECT?.trim()
+	const expectedThumbprint = normalizeThumbprint(process.env.WINDOWS_SIGN_CERTIFICATE_SHA1)
+	if (expectedSubject && signature.Subject !== expectedSubject)
+		throw new Error(`Unexpected Windows signer subject: ${file}`)
+	if (expectedThumbprint && normalizeThumbprint(signature.Thumbprint) !== expectedThumbprint)
+		throw new Error(`Unexpected Windows signer certificate: ${file}`)
+}
+
+function verifyWindowsSigningLedger(files: readonly string[]): void {
+	if (resolveWindowsSignMode() !== "service") return
+	const ledgerDir = resolveWindowsSignLedgerDir()
+	for (const file of files) {
+		const ledgerPath = path.join(
+			ledgerDir,
+			`${createHash("sha256").update(path.resolve(file)).digest("hex")}.json`,
+		)
+		if (!existsSync(ledgerPath))
+			throw new Error(`Windows signing ledger entry is missing: ${file}`)
+		const entry = JSON.parse(readFileSync(ledgerPath, "utf8")) as {
+			filePath?: string
+			inputSha256?: string
+			outputSha256?: string
+			status?: string
+		}
+		if (
+			entry.filePath !== path.resolve(file) ||
+			entry.status !== "signed" ||
+			!isSha256(entry.inputSha256) ||
+			!isSha256(entry.outputSha256) ||
+			createHash("sha256").update(readFileSync(file)).digest("hex") !== entry.outputSha256
+		)
+			throw new Error(`Windows signing ledger entry is invalid: ${file}`)
+	}
+}
+
+function verifyWindowsReleaseMetadata(artifacts: readonly string[]): void {
+	const releases = artifacts.find((artifact) => path.basename(artifact) === "RELEASES")
+	if (!releases) throw new Error("Squirrel RELEASES metadata is missing.")
+	const rows = readFileSync(releases, "utf8")
+		.split(/\r?\n/)
+		.map((line) => line.trim())
+		.filter(Boolean)
+	if (rows.length === 0) throw new Error("Squirrel RELEASES metadata is empty.")
+	for (const row of rows) {
+		const [expectedSha1, fileName, expectedSize, ...rest] = row.split(/\s+/)
+		if (rest.length > 0 || !/^[a-f0-9]{40}$/i.test(expectedSha1) || !fileName)
+			throw new Error(`Invalid Squirrel RELEASES row: ${row}`)
+		const artifact = path.join(path.dirname(releases), fileName)
+		if (!existsSync(artifact))
+			throw new Error(`RELEASES references a missing file: ${fileName}`)
+		if (expectedSize && Number(expectedSize) !== statSync(artifact).size)
+			throw new Error(`RELEASES size mismatch: ${fileName}`)
+		const actualSha1 = createHash("sha1").update(readFileSync(artifact)).digest("hex")
+		if (actualSha1.toLowerCase() !== expectedSha1.toLowerCase())
+			throw new Error(`RELEASES hash mismatch: ${fileName}`)
+	}
+}
+
+function isSha256(value: string | undefined): value is string {
+	return Boolean(value && /^[a-f0-9]{64}$/i.test(value))
+}
+
+function verifyWindowsNupkg(file: string): void {
+	const directory = mkdtempSync(path.join(os.tmpdir(), "cocode-nupkg-"))
+	try {
+		execFileSync(
+			"powershell.exe",
+			[
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				"$ErrorActionPreference='Stop'; Expand-Archive -LiteralPath $env:NUPKG_FILE -DestinationPath $env:NUPKG_DIR -Force",
+			],
+			{ env: { ...process.env, NUPKG_FILE: file, NUPKG_DIR: directory }, stdio: "inherit" },
+		)
+		const files = collectFiles(directory).filter((candidate) =>
+			WINDOWS_SIGNABLE_FILE.test(candidate),
+		)
+		if (files.length === 0) throw new Error(`No signed PE artifacts found inside ${file}.`)
+		for (const candidate of files) verifyWindowsFile(candidate)
+	} finally {
+		rmSync(directory, { recursive: true, force: true })
+	}
+}
+
+function normalizeThumbprint(value: string | undefined): string {
+	return value?.replace(/\s+/g, "").toUpperCase() || ""
 }
 
 function collectFiles(root: string): string[] {

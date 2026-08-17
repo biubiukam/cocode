@@ -5,9 +5,22 @@ import type { MakerDMGConfig } from "@electron-forge/maker-dmg"
 import type { MakerSquirrelConfig } from "@electron-forge/maker-squirrel"
 import type { OsxSignOptions } from "@electron/packager"
 import type { NotaryToolCredentials } from "@electron/notarize/lib/types"
+import type { SignToolOptions as CjsSignToolOptions } from "@electron/windows-sign/dist/cjs/types"
+import type { SignToolOptions } from "@electron/windows-sign/dist/esm/types"
 
 export type ReleasePlatform = "darwin" | "win32"
 export type ReleaseArchitecture = "x64" | "arm64"
+export type WindowsSignMode = "service" | "pfx"
+
+export interface WindowsSignServiceOptions {
+	readonly serviceUrl: string
+	readonly credentialTarget: string
+	readonly description: string
+	readonly website?: string
+	readonly hashAlgorithm: "sha256"
+	readonly timeoutMs: number
+	readonly retryCount: number
+}
 
 export type MacSignOptions = OsxSignOptions & { readonly continueOnError?: boolean }
 
@@ -52,6 +65,16 @@ const RELEASE_KEYS = new Set([
 	"WINDOWS_CERTIFICATE_PASSWORD",
 	"WINDOWS_TIMESTAMP_SERVER",
 	"WINDOWS_SIGN_WITH_PARAMS",
+	"WINDOWS_SIGN_MODE",
+	"WINDOWS_SIGN_SERVICE_URL",
+	"WINDOWS_SIGN_CREDENTIAL_TARGET",
+	"WINDOWS_SIGN_DESCRIPTION",
+	"WINDOWS_SIGN_WEBSITE",
+	"WINDOWS_SIGN_TIMEOUT_MS",
+	"WINDOWS_SIGN_RETRY_COUNT",
+	"WINDOWS_SIGN_CERTIFICATE_SUBJECT",
+	"WINDOWS_SIGN_CERTIFICATE_SHA1",
+	"WINDOWS_SIGN_LEDGER_DIR",
 	"RELEASE_ENV_FILE",
 	"RELEASE_PLATFORM",
 	"RELEASE_ARCH",
@@ -199,7 +222,92 @@ export function createMacNotarizeOptions(
 	return undefined
 }
 
-export function createWindowsSignOptions(environment = process.env) {
+export function resolveWindowsSignMode(environment = process.env): WindowsSignMode | undefined {
+	const configuredMode = environment.WINDOWS_SIGN_MODE?.trim()
+	if (configuredMode && configuredMode !== "service" && configuredMode !== "pfx") {
+		throw new Error(`Unsupported WINDOWS_SIGN_MODE: ${configuredMode}.`)
+	}
+	if (configuredMode) return configuredMode as WindowsSignMode
+	if (isReleaseSigningRequired(environment)) return "service"
+	const configuredFile = environment.WINDOWS_CERTIFICATE_FILE?.trim()
+	const configuredPassword = environment.WINDOWS_CERTIFICATE_PASSWORD
+	const configuredParams = environment.WINDOWS_SIGN_WITH_PARAMS?.trim()
+	return configuredFile || configuredPassword !== undefined || configuredParams
+		? "pfx"
+		: undefined
+}
+
+function parsePositiveEnvironmentInteger(
+	value: string | undefined,
+	defaultValue: number,
+	label: string,
+): number {
+	if (!value?.trim()) return defaultValue
+	const parsed = Number(value)
+	if (!Number.isInteger(parsed) || parsed <= 0)
+		throw new Error(`${label} must be a positive integer.`)
+	return parsed
+}
+
+export function resolveWindowsSignServiceOptions(
+	environment = process.env,
+): WindowsSignServiceOptions {
+	const serviceUrl = environment.WINDOWS_SIGN_SERVICE_URL?.trim()
+	if (!serviceUrl) throw new Error("WINDOWS_SIGN_SERVICE_URL is required for service signing.")
+	try {
+		const url = new URL(serviceUrl)
+		if (url.protocol !== "http:" && url.protocol !== "https:")
+			throw new Error("unsupported protocol")
+	} catch {
+		throw new Error(`WINDOWS_SIGN_SERVICE_URL is invalid: ${serviceUrl}`)
+	}
+	const website = environment.WINDOWS_SIGN_WEBSITE?.trim() || environment.RELEASE_HOMEPAGE?.trim()
+	return {
+		serviceUrl: serviceUrl.replace(/\/$/, ""),
+		credentialTarget:
+			environment.WINDOWS_SIGN_CREDENTIAL_TARGET?.trim() || "cocode/windows-sign",
+		description:
+			environment.WINDOWS_SIGN_DESCRIPTION?.trim() ||
+			environment.RELEASE_DESCRIPTION?.trim() ||
+			"Cocode Desktop",
+		...(website ? { website } : {}),
+		hashAlgorithm: "sha256",
+		timeoutMs: parsePositiveEnvironmentInteger(
+			environment.WINDOWS_SIGN_TIMEOUT_MS,
+			30_000,
+			"WINDOWS_SIGN_TIMEOUT_MS",
+		),
+		retryCount: parsePositiveEnvironmentInteger(
+			environment.WINDOWS_SIGN_RETRY_COUNT,
+			2,
+			"WINDOWS_SIGN_RETRY_COUNT",
+		),
+	}
+}
+
+export function resolveWindowsSignLedgerDir(environment = process.env): string {
+	return path.resolve(
+		environment.WINDOWS_SIGN_LEDGER_DIR?.trim() ||
+			path.join(".cache", "cocode", "windows-sign-ledger"),
+	)
+}
+
+export function createWindowsSignOptions(environment = process.env): SignToolOptions | undefined {
+	const mode = resolveWindowsSignMode(environment)
+	if (!mode) return undefined
+	if (mode === "service") {
+		const service = resolveWindowsSignServiceOptions(environment)
+		const hookModulePath = path.resolve("scripts/release/windows-sign-hook.cjs")
+		if (!existsSync(hookModulePath))
+			throw new Error(`Windows signing hook does not exist: ${hookModulePath}`)
+		return {
+			hookModulePath,
+			hashes: ["sha256"] as unknown as NonNullable<SignToolOptions["hashes"]>,
+			description: service.description,
+			website: service.website,
+			debug: false,
+		}
+	}
 	const configuredFile = environment.WINDOWS_CERTIFICATE_FILE?.trim()
 	const certificatePassword = environment.WINDOWS_CERTIFICATE_PASSWORD
 	const signWithParams = environment.WINDOWS_SIGN_WITH_PARAMS?.trim()
@@ -238,6 +346,10 @@ export function requireReleaseCredentials(target: ReleaseTarget, environment = p
 			)
 		return
 	}
+	if (resolveWindowsSignMode(environment) !== "service")
+		throw new Error(
+			"Signed Windows releases must use WINDOWS_SIGN_MODE=service and the team signing service.",
+		)
 	if (!createWindowsSignOptions(environment))
 		throw new Error("Windows signing credentials are required for a signed Windows release.")
 }
@@ -273,7 +385,7 @@ export function createSquirrelConfig(
 		),
 		setupExe: `${artifactRoot}-Setup.exe`,
 		setupMsi: `${artifactRoot}-Setup.msi`,
-		windowsSign: windowsSignOptions,
+		windowsSign: windowsSignOptions as unknown as CjsSignToolOptions | undefined,
 	}
 }
 

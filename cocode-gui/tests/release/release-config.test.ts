@@ -6,6 +6,8 @@ import {
 	createWindowsSignOptions,
 	requireReleaseCredentials,
 	resolveReleaseTarget,
+	resolveWindowsSignMode,
+	resolveWindowsSignServiceOptions,
 } from "../../scripts/release/release-config"
 
 test("resolves only native darwin and win32 targets", () => {
@@ -69,5 +71,86 @@ test("treats empty Windows certificate values as unconfigured", () => {
 			WINDOWS_CERTIFICATE_PASSWORD: "",
 		}),
 		undefined,
+	)
+})
+
+test("uses the team signing hook for a signed Windows release", () => {
+	const options = createWindowsSignOptions({
+		RELEASE_REQUIRE_SIGNING: "1",
+		WINDOWS_SIGN_MODE: "service",
+		WINDOWS_SIGN_SERVICE_URL: "https://signing.example.test",
+		WINDOWS_SIGN_DESCRIPTION: "Cocode Desktop",
+		WINDOWS_SIGN_WEBSITE: "https://cocode.example.test",
+	})
+	assert.ok(options)
+	assert.equal(options?.hashes?.join(","), "sha256")
+	assert.equal(options?.description, "Cocode Desktop")
+	assert.equal(options?.website, "https://cocode.example.test")
+	assert.equal(options?.debug, false)
+	assert.match(options?.hookModulePath ?? "", /windows-sign-hook\.cjs$/)
+})
+
+test("service mode does not require or consume PFX values", () => {
+	assert.equal(
+		resolveWindowsSignMode({
+			WINDOWS_SIGN_MODE: "service",
+			WINDOWS_CERTIFICATE_FILE: "C:\\ignored\\certificate.pfx",
+			WINDOWS_CERTIFICATE_PASSWORD: "ignored",
+		}),
+		"service",
+	)
+	assert.doesNotThrow(() =>
+		requireReleaseCredentials(
+			{ platform: "win32", arch: "x64" },
+			{
+				RELEASE_REQUIRE_SIGNING: "1",
+				WINDOWS_SIGN_MODE: "service",
+				WINDOWS_SIGN_SERVICE_URL: "https://signing.example.test",
+				WINDOWS_CERTIFICATE_FILE: "C:\\ignored\\certificate.pfx",
+				WINDOWS_CERTIFICATE_PASSWORD: "ignored",
+			},
+		),
+	)
+})
+
+test("signed Windows releases reject explicit PFX mode", () => {
+	assert.throws(() =>
+		requireReleaseCredentials(
+			{ platform: "win32", arch: "x64" },
+			{
+				RELEASE_REQUIRE_SIGNING: "1",
+				WINDOWS_SIGN_MODE: "pfx",
+				WINDOWS_CERTIFICATE_FILE: "C:\\certificate.pfx",
+				WINDOWS_CERTIFICATE_PASSWORD: "secret",
+			},
+		),
+	)
+})
+
+test("validates service URL and bounded retry settings", () => {
+	assert.deepEqual(
+		resolveWindowsSignServiceOptions({
+			WINDOWS_SIGN_SERVICE_URL: "https://signing.example.test/",
+			WINDOWS_SIGN_CREDENTIAL_TARGET: "team/windows-sign",
+			WINDOWS_SIGN_TIMEOUT_MS: "45000",
+			WINDOWS_SIGN_RETRY_COUNT: "3",
+		}),
+		{
+			serviceUrl: "https://signing.example.test",
+			credentialTarget: "team/windows-sign",
+			description: "Cocode Desktop",
+			hashAlgorithm: "sha256",
+			timeoutMs: 45000,
+			retryCount: 3,
+		},
+	)
+	assert.throws(() =>
+		resolveWindowsSignServiceOptions({ WINDOWS_SIGN_SERVICE_URL: "file:///tmp/sign" }),
+	)
+	assert.throws(() =>
+		resolveWindowsSignServiceOptions({
+			WINDOWS_SIGN_SERVICE_URL: "https://signing.example.test",
+			WINDOWS_SIGN_TIMEOUT_MS: "0",
+		}),
 	)
 })
