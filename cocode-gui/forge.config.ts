@@ -54,6 +54,7 @@ const windowsSignOptions =
 	releaseTarget?.platform === "darwin" ? undefined : createWindowsSignOptions()
 
 const config: ForgeConfig = {
+	...(process.env.FORGE_OUT_DIR ? { outDir: path.resolve(process.env.FORGE_OUT_DIR) } : {}),
 	packagerConfig: {
 		asar: false,
 		appBundleId: process.env.ELECTRON_APP_ID ?? "com.cocode.desktop",
@@ -65,7 +66,6 @@ const config: ForgeConfig = {
 		osxSign: macSignOptions,
 		osxNotarize: macNotarizeOptions,
 		windowsSign: windowsSignOptions,
-		...(process.env.FORGE_OUT_DIR ? { outDir: process.env.FORGE_OUT_DIR } : {}),
 		afterExtract: [
 			(buildPath, _electronVersion, platform, _arch, callback) => {
 				const resourcesRoot =
