@@ -19,6 +19,11 @@ interface SigningServiceResult {
 }
 
 interface SigningServiceModule {
+	getCredential(
+		target: string,
+		credentialProvider?: (target: string) => string | Promise<string>,
+		environment?: NodeJS.ProcessEnv,
+	): Promise<string>
 	requestSignature(
 		filePath: string,
 		credentialValue: string,
@@ -27,9 +32,18 @@ interface SigningServiceModule {
 }
 
 const localRequire = createRequire(__filename)
-const { requestSignature } = localRequire(
+const { getCredential, requestSignature } = localRequire(
 	"../../scripts/release/windows-sign-service.cjs",
 ) as SigningServiceModule
+
+test("uses SIGN_CERTIFICATE from the environment before Credential Manager", async () => {
+	await assert.doesNotReject(async () => {
+		const credential = await getCredential("cocode/windows-sign", undefined, {
+			SIGN_CERTIFICATE: "env-signing-credential",
+		})
+		assert.equal(credential, "env-signing-credential")
+	})
+})
 
 test("speaks the Magic Desktop challenge and sign protocol", async () => {
 	const client = await createX25519KeyPair()

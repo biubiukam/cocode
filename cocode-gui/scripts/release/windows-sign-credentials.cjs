@@ -63,8 +63,8 @@ async function main() {
 		throw new Error(`Unknown windows-sign command: ${command}`)
 	if (process.platform !== "win32")
 		throw new Error("Windows signing credentials can only be managed on Windows.")
-	const keytar = loadKeytar()
 	if (command === "configure") {
+		const keytar = loadKeytar()
 		const value = await promptSecret("SIGN_CERTIFICATE (input hidden): ")
 		if (!value) throw new Error("No signing credential was provided.")
 		await keytar.setPassword(KEYTAR_SERVICE, target, value)
@@ -72,6 +72,7 @@ async function main() {
 		return
 	}
 	if (command === "clear") {
+		const keytar = loadKeytar()
 		const deleted = await keytar.deletePassword(KEYTAR_SERVICE, target)
 		console.log(
 			deleted
@@ -81,7 +82,8 @@ async function main() {
 		return
 	}
 	if (command === "status" || command === "check") {
-		const value = await keytar.getPassword(KEYTAR_SERVICE, target)
+		const configured = process.env.SIGN_CERTIFICATE?.trim()
+		const value = configured || (await loadKeytar().getPassword(KEYTAR_SERVICE, target))
 		if (!value) throw new Error(`Windows signing credential is not configured for ${target}.`)
 		if (command === "status")
 			console.log(`Windows signing credential is configured for ${target}.`)

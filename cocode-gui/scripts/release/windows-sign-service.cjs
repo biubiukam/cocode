@@ -94,8 +94,10 @@ function positiveInteger(value, fallback) {
 	return parsed
 }
 
-async function getCredential(target, credentialProvider) {
+async function getCredential(target, credentialProvider, environment = process.env) {
 	if (credentialProvider) return credentialProvider(target)
+	const configured = environment.SIGN_CERTIFICATE?.trim()
+	if (configured) return configured
 	let keytar
 	try {
 		keytar = require("keytar")
@@ -320,7 +322,11 @@ async function signFile(filePath, options = {}) {
 			const signature = inspectAuthenticode(filePath, environment)
 			return { inputSha256, outputSha256: inputSha256, signature, skipped: true }
 		}
-		const credential = await getCredential(config.credentialTarget, options.credentialProvider)
+		const credential = await getCredential(
+			config.credentialTarget,
+			options.credentialProvider,
+			environment,
+		)
 		const result = await requestSignature(filePath, credential, config)
 		const temporary = path.join(
 			path.dirname(filePath),

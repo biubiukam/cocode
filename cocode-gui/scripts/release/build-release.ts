@@ -26,7 +26,6 @@ const environment: NodeJS.ProcessEnv = {
 		path.resolve(`release/${platform}/${arch}/runtime`),
 }
 environment.WINDOWS_SIGN_LEDGER_DIR = path.resolve(environment.FORGE_OUT_DIR, "windows-sign-ledger")
-delete environment.SIGN_CERTIFICATE
 delete environment.COREPACK_ROOT
 const target = resolveReleaseTarget(environment)
 if (target.platform !== process.platform)
