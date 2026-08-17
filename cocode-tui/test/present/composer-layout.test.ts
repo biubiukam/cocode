@@ -14,10 +14,16 @@ import {
 describe('composer row projection', () => {
   it('budgets one metadata row plus independent attachment and image summaries', () => {
     expect(composerInputRows('', 6)).toBe(1)
-    expect(composerInputRows('one\ntwo\nthree\nfour\nfive\nsix\nseven', 6)).toBe(6)
+    expect(
+      composerInputRows('one\ntwo\nthree\nfour\nfive\nsix\nseven', 6),
+    ).toBe(6)
     expect(composerRenderedRows({ text: '', maxRows: 6 })).toBe(2)
-    expect(composerRenderedRows({ text: 'draft', maxRows: 6, hasAttachments: true })).toBe(3)
-    expect(composerRenderedRows({ text: 'draft', maxRows: 6, hasImages: true })).toBe(3)
+    expect(
+      composerRenderedRows({ text: 'draft', maxRows: 6, hasAttachments: true }),
+    ).toBe(3)
+    expect(
+      composerRenderedRows({ text: 'draft', maxRows: 6, hasImages: true }),
+    ).toBe(3)
     expect(
       composerRenderedRows({
         text: 'draft',
@@ -42,20 +48,27 @@ describe('composer row projection', () => {
   })
 
   it('uses an underline cursor in Apple Terminal', () => {
-    expect(composerCursorStyle(false, false)).toEqual({ inverse: true, underline: false })
-    expect(composerCursorStyle(true, false)).toEqual({ inverse: false, underline: true })
-    expect(composerCursorStyle(true, true)).toEqual({ inverse: false, underline: false })
+    expect(composerCursorStyle(false, false)).toEqual({
+      inverse: true,
+      underline: false,
+    })
+    expect(composerCursorStyle(true, false)).toEqual({
+      inverse: false,
+      underline: true,
+    })
+    expect(composerCursorStyle(true, true)).toEqual({
+      inverse: false,
+      underline: false,
+    })
   })
 
   it('renders exactly one cursor across multiple lines', () => {
     const rows = renderComposerRows('one\ntwo\nthree', 5)
-    expect(rows.filter((row) => row.spans.some((span) => span.cursor))).toHaveLength(1)
+    expect(
+      rows.filter((row) => row.spans.some((span) => span.cursor)),
+    ).toHaveLength(1)
     expect(rows[1]).toEqual({
-      spans: [
-        { text: 't' },
-        { text: 'w', cursor: true },
-        { text: 'o' },
-      ],
+      spans: [{ text: 't' }, { text: 'w', cursor: true }, { text: 'o' }],
     })
   })
 
@@ -89,7 +102,9 @@ describe('composer row projection', () => {
       ]) {
         const row = renderComposerRows(value, value.length)[0]!
         const clipped = clipComposerRow(row, columns - 2)
-        expect(stringWidth(composerRowText(clipped))).toBeLessThanOrEqual(columns - 2)
+        expect(stringWidth(composerRowText(clipped))).toBeLessThanOrEqual(
+          columns - 2,
+        )
       }
     },
   )
@@ -107,7 +122,9 @@ describe('composer row projection', () => {
   })
 
   it('expands malformed selection offsets to whole graphemes', () => {
-    expect(renderComposerRows('a🙂b', 4, { start: 2, end: 3 })[0]?.spans).toEqual([
+    expect(
+      renderComposerRows('a🙂b', 4, { start: 2, end: 3 })[0]?.spans,
+    ).toEqual([
       { text: 'a' },
       { text: '🙂', selected: true },
       { text: 'b' },
@@ -146,8 +163,39 @@ describe('composer row projection', () => {
   })
 
   it('does not paint a trailing caret cell when the hardware cursor is used', () => {
-    expect(renderComposerRows('你好终于', 4, undefined, { caretCell: false })).toEqual([
-      { spans: [{ text: '你好终于' }], caretAtEnd: true },
-    ])
+    expect(
+      renderComposerRows('你好终于', 4, undefined, { caretCell: false }),
+    ).toEqual([{ spans: [{ text: '你好终于' }], caretAtEnd: true }])
+  })
+
+  it('clips a hardware-caret line toward the end being edited', () => {
+    const row = renderComposerRows(
+      'abcdefghijklmnopqrstuvwxyz',
+      26,
+      undefined,
+      {
+        caretCell: false,
+      },
+    )[0]!
+    const clipped = clipComposerRow(row, 10)
+
+    expect(row.caretAtEnd).toBe(true)
+    expect(composerRowText(clipped).startsWith('…')).toBe(true)
+    expect(composerRowText(clipped).endsWith('z')).toBe(true)
+    expect(stringWidth(composerRowText(clipped))).toBeLessThanOrEqual(10)
+  })
+
+  it('keeps the hardware IME caret on the draft row when the line is clipped', () => {
+    const text = 'x'.repeat(80)
+    const caret = composerImeCaret({
+      text,
+      cursor: text.length,
+      maxInputRows: 6,
+      maxColumns: 40,
+    })
+
+    expect(caret.rowIndex).toBe(0)
+    expect(caret.column).toBeGreaterThanOrEqual(2)
+    expect(caret.column).toBeLessThan(40)
   })
 })

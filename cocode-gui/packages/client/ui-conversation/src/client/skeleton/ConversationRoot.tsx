@@ -45,7 +45,7 @@ export function ConversationRoot({
   // send; its reason is already localized by whoever raised it.
   const composerBlock = useComposerBlock(block => block)
 
-  const logoPreference = useStore(state => state.logoPreference)
+  const logoPreference = useStore(state => state.logoPreference) ?? 'cocode'
 
   const [pickerOpen, setPickerOpen] = useState(false)
   const [workspaceSelection, setWorkspaceSelection] = useState<WorkspaceSelection | undefined>()

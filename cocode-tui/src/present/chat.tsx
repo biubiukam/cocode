@@ -2581,18 +2581,9 @@ export function Chat(props: {
   )
 }
 
-function hasTelemetry(telemetry: TuiSnapshot['status']['telemetry']): boolean {
-  return (
-    telemetry.tps !== undefined ||
-    telemetry.cacheHitRate !== undefined ||
-    telemetry.reasoningEffort !== undefined ||
-    telemetry.activity !== undefined
-  )
-}
-
 function hasStatusDetails(status: TuiSnapshot['status']): boolean {
   return (
-    hasTelemetry(status.telemetry) ||
+    status.telemetry.activity !== undefined ||
     status.todos.length > 0 ||
     status.goal !== undefined ||
     status.agentPreset !== undefined ||
