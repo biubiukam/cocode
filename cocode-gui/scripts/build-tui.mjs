@@ -8,9 +8,7 @@ import { shellCommandOptions } from "./lib/child-process-options.mjs"
 const guiRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const tuiRoot = path.resolve(guiRoot, "../cocode-tui")
 const supervisorRoot = path.resolve(guiRoot, "../cocode-host-supervisor")
-const outputRoot = path.join(guiRoot, ".cache", "cocode", "tui")
-
-export function buildTui({ output = outputRoot } = {}) {
+export function buildTui({ output = defaultOutput() } = {}) {
 	if (!existsSync(tuiRoot)) throw new Error(`TUI checkout not found: ${tuiRoot}`)
 
 	const corepack = process.platform === "win32" ? "corepack.cmd" : "corepack"
@@ -58,6 +56,13 @@ export function buildTui({ output = outputRoot } = {}) {
 	return { output, manifest }
 }
 
+function defaultOutput() {
+	return path.resolve(
+		process.env.COCODE_TUI_ARTIFACT_ROOT?.trim() ||
+			path.join(guiRoot, ".cache", "cocode", "tui"),
+	)
+}
+
 function readJson(file) {
 	return JSON.parse(readFileSync(file, "utf8"))
 }
@@ -68,5 +73,6 @@ function sha256File(file) {
 
 const invokedPath = process.argv[1]
 if (invokedPath && import.meta.url === pathToFileURL(path.resolve(invokedPath)).href) {
-	buildTui()
+	const outputIndex = process.argv.indexOf("--output")
+	buildTui(outputIndex >= 0 ? { output: path.resolve(process.argv[outputIndex + 1]) } : {})
 }
