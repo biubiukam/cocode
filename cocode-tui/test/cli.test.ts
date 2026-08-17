@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest'
 import {
   applyScopeOptions,
   formatHostStatus,
+  launchDsh,
   parseCliArgs,
+  resolveDshLaunch,
   resolveGuiLaunch,
 } from '../bin/cli.mjs'
 
@@ -30,6 +32,18 @@ describe('cocode CLI', () => {
     })
   })
 
+  it('treats dsh as a passthrough command and preserves its flags', () => {
+    expect(parseCliArgs(['dsh', 'plugin', '--profile', 'web', 'add', 'dshmarket'])).toMatchObject({
+      command: 'dsh',
+      commandArgs: ['plugin', '--profile', 'web', 'add', 'dshmarket'],
+    })
+    expect(parseCliArgs(['--profile', 'web', 'dsh', 'plugin', '--profile', 'preview'])).toMatchObject({
+      command: 'dsh',
+      profile: 'web',
+      commandArgs: ['plugin', '--profile', 'preview'],
+    })
+  })
+
   it('validates runtime channels before changing the environment', () => {
     const env: NodeJS.ProcessEnv = {}
     expect(() => applyScopeOptions({ runtimeChannel: 'nightly' }, env)).toThrow(
@@ -44,6 +58,33 @@ describe('cocode CLI', () => {
     expect(resolveGuiLaunch({ COCODE_GUI_EXECUTABLE: './Cocode' }, 'linux')).toEqual({
       executable: expect.stringMatching(/Cocode$/),
       args: [],
+    })
+  })
+
+  it('resolves an explicit bundled DSH entry without consulting PATH', () => {
+    expect(resolveDshLaunch(
+      { staged: false },
+      { COCODE_DSH_CLI_ENTRY: process.execPath, COCODE_NODE_EXECUTABLE: '/opt/Cocode/node' },
+      { resolve: () => { throw new Error('unexpected package lookup') } },
+    )).toEqual({ executable: '/opt/Cocode/node', entry: process.execPath })
+  })
+
+  it('passes DSH arguments unchanged and returns its exit code', () => {
+    let invocation
+    const status = launchDsh(
+      ['plugin', '--profile', 'web', 'add', 'dshmarket'],
+      { staged: false },
+      { COCODE_DSH_CLI_ENTRY: process.execPath, COCODE_NODE_EXECUTABLE: '/opt/Cocode/node' },
+      (executable, args, options) => {
+        invocation = { executable, args, options }
+        return { status: 7 }
+      },
+    )
+    expect(status).toBe(7)
+    expect(invocation).toMatchObject({
+      executable: '/opt/Cocode/node',
+      args: [process.execPath, 'plugin', '--profile', 'web', 'add', 'dshmarket'],
+      options: { stdio: 'inherit' },
     })
   })
 })

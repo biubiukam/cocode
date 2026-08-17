@@ -9,6 +9,7 @@ import { pathToFileURL } from 'node:url'
 import {
   applyScopeOptions,
   formatHostStatus,
+  launchDsh,
   launchGui,
   parseCliArgs,
   stagedPaths,
@@ -44,6 +45,16 @@ if (options.command === 'gui') {
     process.exit(1)
   }
   process.exit(0)
+}
+
+if (options.command === 'dsh') {
+  try {
+    await configureRuntimeEnvironment(paths)
+    process.exit(launchDsh(options.commandArgs, paths, process.env))
+  } catch (error) {
+    process.stderr.write(`cocode dsh: ${error instanceof Error ? error.message : String(error)}\n`)
+    process.exit(1)
+  }
 }
 
 if (options.command === 'host-status' || options.command === 'host-stop' || options.command === 'doctor') {

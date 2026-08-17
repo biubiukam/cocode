@@ -1,8 +1,11 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { spawn, spawnSync } from 'node:child_process'
+import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+
+const require = createRequire(import.meta.url)
 
 export function parseCliArgs(args) {
   const options = { command: 'tui', commandArgs: [], force: false, json: false, help: false, version: false }
@@ -23,6 +26,7 @@ export function parseCliArgs(args) {
     }
     if (value === '--gui' || value === 'gui') { options.command = 'gui'; options.commandArgs = remaining; break }
     if (value === '--tui' || value === 'tui') { options.command = 'tui'; options.commandArgs = remaining; break }
+    if (value === 'dsh') { options.command = 'dsh'; options.commandArgs = remaining; break }
     if (value === '--doctor' || value === 'doctor') { options.command = 'doctor'; options.commandArgs = remaining; break }
     if (value === '--stop-host' || value === 'stop-host') { options.command = 'host-stop'; options.commandArgs = remaining; break }
     if (value === 'status') { options.command = 'host-status'; options.commandArgs = remaining; break }
@@ -37,6 +41,7 @@ export function parseCliArgs(args) {
     options.commandArgs.push(value, ...remaining)
     break
   }
+  if (options.command === 'dsh') return options
   for (const value of options.commandArgs) {
     if (value === '--force' || value === '-f') options.force = true
     if (value === '--json') options.json = true
@@ -90,6 +95,52 @@ export function launchGui(args, env = process.env) {
   child.unref()
 }
 
+export function launchDsh(args, runtimePaths, env = process.env, spawnSyncImpl = spawnSync) {
+  const launch = resolveDshLaunch(runtimePaths, env)
+  const result = spawnSyncImpl(launch.executable, [launch.entry, ...args], {
+    cwd: process.cwd(),
+    env,
+    stdio: 'inherit',
+    windowsHide: true,
+  })
+  if (result.error) throw result.error
+  return result.status ?? 1
+}
+
+export function resolveDshLaunch(runtimePaths, env = process.env, requireImpl = require) {
+  const explicit = env.COCODE_DSH_CLI_ENTRY?.trim()
+  const candidates = explicit ? [resolve(explicit)] : []
+  const serviceEntry = env.COCODE_SUPERVISOR_SERVICE_ENTRY?.trim()
+  if (serviceEntry) {
+    const runtimeRoot = resolve(dirname(serviceEntry), '..', '..', '..')
+    candidates.push(...runtimeDshEntries(runtimeRoot))
+  }
+  if (runtimePaths.staged) {
+    candidates.push(...runtimeDshEntries(resolve(runtimePaths.packageRoot, '..', 'dsh-runtime')))
+  }
+  try {
+    candidates.push(requireImpl.resolve('@deepseek-ai/dsh/lib/bin.js'))
+  } catch {
+    // The bundled DSH is resolved from the Host Supervisor package below.
+  }
+  try {
+    const supervisorPackage = requireImpl.resolve('@cocode/host-supervisor/package.json')
+    candidates.push(createRequire(supervisorPackage).resolve('@deepseek-ai/dsh/lib/bin.js'))
+  } catch {
+    // A packaged runtime does not expose Node's package resolution tree.
+  }
+  const entry = candidates.find((candidate) => existsSync(candidate))
+  if (!entry) throw new Error('Bundled DSH CLI is missing from this Cocode installation.')
+  return { executable: env.COCODE_NODE_EXECUTABLE?.trim() || process.execPath, entry }
+}
+
+function runtimeDshEntries(root) {
+  return [
+    join(root, 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js'),
+    join(root, 'dsh-runtime', 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js'),
+  ]
+}
+
 export function resolveGuiLaunch(env = process.env, platform = process.platform) {
   const configured = env.COCODE_GUI_EXECUTABLE?.trim() || env.COCODE_GUI_PATH?.trim()
   if (configured) return { executable: resolve(configured), args: [] }
@@ -134,5 +185,5 @@ export function stagedPaths(scriptUrl) {
 }
 
 export function usage(version) {
-  return `Cocode ${version}\n\nUsage: cocode <command> [options]\n\nCommands:\n  gui [args...]              Open Cocode GUI\n  tui [args...]              Open Cocode TUI (default)\n  host status [--json]       Show the shared Host status\n  host stop [--force]        Stop the Host and Supervisor\n  doctor                     Check TUI and Host prerequisites\n  version                    Show the installed Cocode version\n\nOptions:\n  -h, --help                 Show this help\n  -v, --version              Show the installed version\n  -f, --force                Stop Host even when clients still hold leases\n      --json                 Print machine-readable status\n      --dsh-home <path>      Select the shared DSH home\n      --profile <name>       Select the DSH profile\n      --runtime-channel <c>  Select stable, preview, or dev runtime\n\nEnvironment:\n  COCODE_GUI_EXECUTABLE      Explicit GUI executable path\n  COCODE_GUI_PATH            Alias for COCODE_GUI_EXECUTABLE\n`
+  return `Cocode ${version}\n\nUsage: cocode <command> [options]\n\nCommands:\n  gui [args...]              Open Cocode GUI\n  tui [args...]              Open Cocode TUI (default)\n  dsh [args...]              Run the bundled DSH CLI\n  host status [--json]       Show the shared Host status\n  host stop [--force]        Stop the Host and Supervisor\n  doctor                     Check TUI and Host prerequisites\n  version                    Show the installed Cocode version\n\nOptions:\n  -h, --help                 Show this help\n  -v, --version              Show the installed version\n  -f, --force                Stop Host even when clients still hold leases\n      --json                 Print machine-readable status\n      --dsh-home <path>      Select the shared DSH home\n      --profile <name>       Select the DSH profile\n      --runtime-channel <c>  Select stable, preview, or dev runtime\n\nEnvironment:\n  COCODE_GUI_EXECUTABLE      Explicit GUI executable path\n  COCODE_GUI_PATH            Alias for COCODE_GUI_EXECUTABLE\n  COCODE_DSH_CLI_ENTRY       Explicit bundled DSH CLI entry path\n`
 }
