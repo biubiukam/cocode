@@ -207,6 +207,7 @@ export function Chat(props: {
   const [inspectorMouseInput, setInspectorMouseInput] =
     useState<InspectorMouseInput>()
   const mouseClickId = useRef(0)
+  const planReviewWheelTicks = useRef(0)
   // Mouse press/move packets can share one stdin chunk; this ref keeps the
   // drag session available before React commits the reducer update.
   const messageSelectionDragging = useRef(false)
@@ -733,6 +734,10 @@ export function Chat(props: {
   }, [mainColumns, snap.notice?.message])
 
   useEffect(() => {
+    if (!questionOpen) planReviewWheelTicks.current = 0
+  }, [questionOpen])
+
+  useEffect(() => {
     if (followTranscript) setMessageScrollOffset(0)
   }, [
     followTranscript,
@@ -819,6 +824,20 @@ export function Chat(props: {
       }
       const wheelDelta = mouseWheelDelta(event)
       if (wheelDelta !== undefined) {
+        if (
+          questionOpen &&
+          snap.question !== undefined &&
+          isPlanReviewQuestion(snap.question.question)
+        ) {
+          planReviewWheelTicks.current += wheelDelta
+          setQuestionMousePointer({
+            id: mouseClickId.current++,
+            row: layoutRowFromMouseY(event.y),
+            action: 'move',
+            wheelDelta: planReviewWheelTicks.current,
+          })
+          return
+        }
         if (
           layout.tooSmall ||
           commandPaletteOpen ||

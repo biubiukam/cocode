@@ -1,265 +1,191 @@
-import stringWidth from "string-width";
-import {
-  graphemeSegments,
-  normalizeGraphemeOffset,
-} from "../runtime/grapheme.ts";
-import { readableNodeText } from "../runtime/clipboard.ts";
-import type {
-  AssistantNode,
-  ConversationNode,
-} from "../runtime/nodes/types.ts";
-import { nodeKey } from "../runtime/nodes/types.ts";
-import { BLOCK_GAP, MESSAGE_CHROME, messageContentColumns } from "./layout.ts";
-import { formatToolSummaryLine } from "./tool-display.ts";
-import { formatReasoning } from "./text-format.ts";
-import { wrapPlainText } from "./text-wrap.ts";
-import { layoutMarkdownSource } from "./markdown-layout.ts";
-import { estimateNodeRows, nodeAttached } from "./visible-tail.ts";
-import { resolveMessageWindow } from "./message-scroll.ts";
+import stringWidth from 'string-width'
+import { graphemeSegments, normalizeGraphemeOffset } from '../runtime/grapheme.ts'
+import { readableNodeText } from '../runtime/clipboard.ts'
+import type { AssistantNode, ConversationNode } from '../runtime/nodes/types.ts'
+import { nodeKey } from '../runtime/nodes/types.ts'
+import { BLOCK_GAP, MESSAGE_CHROME, messageContentColumns } from './layout.ts'
+import { formatToolSummaryLine } from './tool-display.ts'
+import { formatReasoning } from './text-format.ts'
+import { wrapPlainText } from './text-wrap.ts'
+import { layoutMarkdownSource } from './markdown-layout.ts'
+import { estimateNodeRows, nodeAttached } from './visible-tail.ts'
+import { resolveMessageWindow } from './message-scroll.ts'
 
 export type MessageTextPoint = {
-  nodeKey: string;
-  offset: number;
-};
+  nodeKey: string
+  offset: number
+}
 
 export type MessageTextSelection = {
-  anchor: MessageTextPoint;
-  focus: MessageTextPoint;
-};
+  anchor: MessageTextPoint
+  focus: MessageTextPoint
+}
 
 export type MessageTextRange = {
-  start: number;
-  end: number;
-};
+  start: number
+  end: number
+}
 
 export type MessageTextView = {
-  verbose?: boolean;
-  expandedNodeIds?: ReadonlySet<string>;
-  locale?: "en" | "zh";
-  maxColumns?: number;
-};
+  verbose?: boolean
+  expandedNodeIds?: ReadonlySet<string>
+  locale?: 'en' | 'zh'
+  maxColumns?: number
+}
 
 type TextLine = {
-  start: number;
-  end: number;
-  indent?: number;
-};
+  start: number
+  end: number
+  indent?: number
+}
 
 /** Convert a 1-based SGR column to the message body cell. */
 export function contentColumnFromMouseX(x: number): number {
-  return Math.trunc(x) - 1 - MESSAGE_CHROME;
+  return Math.trunc(x) - 1 - MESSAGE_CHROME
 }
 
 /** Visible text a drag can land on, including thinking when it is shown. */
-export function selectableNodeText(
-  node: ConversationNode,
-  view: MessageTextView = {},
-): string {
-  if (node.kind === "tool") {
-    return formatToolSummaryLine(
-      node,
-      view.locale ?? "en",
-      view.maxColumns ?? 80,
-    );
+export function selectableNodeText(node: ConversationNode, view: MessageTextView = {}): string {
+  if (node.kind === 'tool') {
+    return formatToolSummaryLine(node, view.locale ?? 'en', view.maxColumns ?? 80)
   }
-  if (node.kind !== "assistant") return readableNodeText(node);
-  const parts = assistantSelectionParts(node, viewFor(node, view));
-  if (parts.reasoning !== undefined && parts.body !== "") {
-    return `${parts.reasoning}\n${parts.body}`;
+  if (node.kind !== 'assistant') return readableNodeText(node)
+  const parts = assistantSelectionParts(node, viewFor(node, view))
+  if (parts.reasoning !== undefined && parts.body !== '') {
+    return `${parts.reasoning}\n${parts.body}`
   }
-  return parts.reasoning ?? parts.body;
+  return parts.reasoning ?? parts.body
 }
 
-export function assistantSelectionParts(
-  node: AssistantNode,
-  options: { verbose: boolean; expandedLevel?: 0 | 1 | 2 },
-): { reasoning: string | undefined; body: string } {
+export function assistantSelectionParts(node: AssistantNode, options: { verbose: boolean; expandedLevel?: 0 | 1 | 2 }): { reasoning: string | undefined; body: string } {
   return {
-    reasoning: formatReasoning(
-      node.reasoning,
-      options.verbose,
-      node.streaming && node.thinking !== false,
-      node.thinkingDurationMs,
-      options.expandedLevel ?? (options.verbose ? 2 : 0),
-    ),
+    reasoning: formatReasoning(node.reasoning, options.verbose, node.streaming && node.thinking !== false, node.thinkingDurationMs, options.expandedLevel ?? (options.verbose ? 2 : 0)),
     body: node.text,
-  };
+  }
 }
 
 /** Map a node-local range onto one visible slice of that node. */
-export function localTextRange(
-  selection: MessageTextRange | undefined,
-  sourceStart: number,
-  length: number,
-): MessageTextRange | undefined {
-  if (selection === undefined || length <= 0) return undefined;
-  const sourceEnd = sourceStart + length;
-  const start = Math.max(selection.start, sourceStart);
-  const end = Math.min(selection.end, sourceEnd);
-  return start < end
-    ? { start: start - sourceStart, end: end - sourceStart }
-    : undefined;
+export function localTextRange(selection: MessageTextRange | undefined, sourceStart: number, length: number): MessageTextRange | undefined {
+  if (selection === undefined || length <= 0) return undefined
+  const sourceEnd = sourceStart + length
+  const start = Math.max(selection.start, sourceStart)
+  const end = Math.min(selection.end, sourceEnd)
+  return start < end ? { start: start - sourceStart, end: end - sourceStart } : undefined
 }
 
 /** Return the selected substring across an inclusive message range. */
-export function selectedMessageText(
-  nodes: readonly ConversationNode[],
-  selection: MessageTextSelection | undefined,
-  view: MessageTextView = {},
-): string {
-  const ordered = orderedSelection(nodes, selection, view);
-  if (ordered === undefined) return "";
-  const { startIndex, startOffset, endIndex, endOffset } = ordered;
-  const startNode = nodes[startIndex];
-  if (startNode === undefined) return "";
+export function selectedMessageText(nodes: readonly ConversationNode[], selection: MessageTextSelection | undefined, view: MessageTextView = {}): string {
+  const ordered = orderedSelection(nodes, selection, view)
+  if (ordered === undefined) return ''
+  const { startIndex, startOffset, endIndex, endOffset } = ordered
+  const startNode = nodes[startIndex]
+  if (startNode === undefined) return ''
   if (startIndex === endIndex) {
-    return selectableNodeText(startNode, view).slice(startOffset, endOffset);
+    return selectableNodeText(startNode, view).slice(startOffset, endOffset)
   }
-  const values: string[] = [];
+  const values: string[] = []
   for (let index = startIndex; index <= endIndex; index += 1) {
-    const node = nodes[index];
-    if (node === undefined) continue;
-    const value = selectableNodeText(node, view);
-    if (index === startIndex) values.push(value.slice(startOffset));
-    else if (index === endIndex) values.push(value.slice(0, endOffset));
-    else values.push(value);
+    const node = nodes[index]
+    if (node === undefined) continue
+    const value = selectableNodeText(node, view)
+    if (index === startIndex) values.push(value.slice(startOffset))
+    else if (index === endIndex) values.push(value.slice(0, endOffset))
+    else values.push(value)
   }
-  return values.join("\n\n");
+  return values.join('\n\n')
 }
 
 /** Return the local text range selected in one message, if any. */
-export function textRangeForMessage(
-  nodes: readonly ConversationNode[],
-  selection: MessageTextSelection | undefined,
-  key: string,
-  view: MessageTextView = {},
-): MessageTextRange | undefined {
-  const ordered = orderedSelection(nodes, selection, view);
-  if (ordered === undefined) return undefined;
-  const index = nodes.findIndex((node) => nodeKey(node.kind, node.id) === key);
-  if (index < 0 || index < ordered.startIndex || index > ordered.endIndex)
-    return undefined;
-  const node = nodes[index];
-  if (node === undefined) return undefined;
-  const text = selectableNodeText(node, view);
-  const start = index === ordered.startIndex ? ordered.startOffset : 0;
-  const end = index === ordered.endIndex ? ordered.endOffset : text.length;
-  return start < end ? { start, end } : undefined;
+export function textRangeForMessage(nodes: readonly ConversationNode[], selection: MessageTextSelection | undefined, key: string, view: MessageTextView = {}): MessageTextRange | undefined {
+  const ordered = orderedSelection(nodes, selection, view)
+  if (ordered === undefined) return undefined
+  const index = nodes.findIndex((node) => nodeKey(node.kind, node.id) === key)
+  if (index < 0 || index < ordered.startIndex || index > ordered.endIndex) return undefined
+  const node = nodes[index]
+  if (node === undefined) return undefined
+  const text = selectableNodeText(node, view)
+  const start = index === ordered.startIndex ? ordered.startOffset : 0
+  const end = index === ordered.endIndex ? ordered.endOffset : text.length
+  return start < end ? { start, end } : undefined
 }
 
 /** Resolve a mouse cell to a grapheme-safe point in the visible transcript. */
-export function textPointAtViewportRow(options: {
-  nodes: readonly ConversationNode[];
-  maxRows: number;
-  viewportRow: number;
-  cellColumn: number;
-  verbose?: boolean;
-  expandedNodeIds?: ReadonlySet<string>;
-  scrollOffset?: number;
-  maxColumns?: number;
-  locale?: "en" | "zh";
-}): MessageTextPoint | undefined {
-  const verbose = options.verbose ?? false;
-  const expandedNodeIds = options.expandedNodeIds;
+export function textPointAtViewportRow(options: { nodes: readonly ConversationNode[]; maxRows: number; viewportRow: number; cellColumn: number; verbose?: boolean; expandedNodeIds?: ReadonlySet<string>; scrollOffset?: number; maxColumns?: number; locale?: 'en' | 'zh' }): MessageTextPoint | undefined {
+  const verbose = options.verbose ?? false
+  const expandedNodeIds = options.expandedNodeIds
   const view: MessageTextView = {
     verbose,
     expandedNodeIds,
     locale: options.locale,
     maxColumns: options.maxColumns,
-  };
-  const window = resolveMessageWindow(
-    options.nodes,
-    options.maxRows,
-    verbose,
-    expandedNodeIds,
-    options.scrollOffset,
-    options.maxColumns,
-  );
-  const columns = messageContentColumns(options.maxColumns) ?? 80;
-  let rowStart = -window.hiddenRowsBefore;
-  const startIndex =
-    window.nodes[0] === undefined ? 0 : options.nodes.indexOf(window.nodes[0]);
+  }
+  const window = resolveMessageWindow(options.nodes, options.maxRows, verbose, expandedNodeIds, options.scrollOffset, options.maxColumns)
+  const columns = messageContentColumns(options.maxColumns) ?? 80
+  let rowStart = -window.hiddenRowsBefore
+  const startIndex = window.nodes[0] === undefined ? 0 : options.nodes.indexOf(window.nodes[0])
   for (let offset = 0; offset < window.nodes.length; offset += 1) {
-    const node = window.nodes[offset];
-    if (node === undefined) continue;
-    const key = nodeKey(node.kind, node.id);
-    const attached = nodeAttached(options.nodes, startIndex + offset);
-    const nodeRows = estimateNodeRows(
-      node,
-      verbose,
-      expandedNodeIds?.has(key) === true,
-      options.maxColumns,
-      attached,
-    );
-    if (
-      options.viewportRow >= rowStart &&
-      options.viewportRow < rowStart + nodeRows
-    ) {
-      const text = selectableNodeText(node, view);
-      if (text === "") return undefined;
-      const lines = layoutNodeText(node, view, columns);
-      const textRow =
-        options.viewportRow - rowStart - leadingChromeRows(attached);
-      if (textRow < 0) return { nodeKey: key, offset: 0 };
-      const line = lines[Math.min(textRow, lines.length - 1)];
-      if (line === undefined) return { nodeKey: key, offset: text.length };
+    const node = window.nodes[offset]
+    if (node === undefined) continue
+    const key = nodeKey(node.kind, node.id)
+    const attached = nodeAttached(options.nodes, startIndex + offset)
+    const nodeRows = estimateNodeRows(node, verbose, expandedNodeIds?.has(key) === true, options.maxColumns, attached)
+    if (options.viewportRow >= rowStart && options.viewportRow < rowStart + nodeRows) {
+      const text = selectableNodeText(node, view)
+      if (text === '') return undefined
+      const lines = layoutNodeText(node, view, columns)
+      const textRow = options.viewportRow - rowStart - leadingChromeRows(attached)
+      if (textRow < 0) return { nodeKey: key, offset: 0 }
+      const line = lines[Math.min(textRow, lines.length - 1)]
+      if (line === undefined) return { nodeKey: key, offset: text.length }
       return {
         nodeKey: key,
         offset: offsetAtCell(text, line, options.cellColumn),
-      };
+      }
     }
-    rowStart += nodeRows;
+    rowStart += nodeRows
   }
-  return undefined;
+  return undefined
 }
 
-function viewFor(
-  node: ConversationNode,
-  view: MessageTextView,
-): { verbose: boolean; expandedLevel?: 0 | 1 | 2 } {
-  const expanded =
-    view.expandedNodeIds?.has(nodeKey(node.kind, node.id)) === true;
-  return { verbose: view.verbose === true || expanded };
+function viewFor(node: ConversationNode, view: MessageTextView): { verbose: boolean; expandedLevel?: 0 | 1 | 2 } {
+  const expanded = view.expandedNodeIds?.has(nodeKey(node.kind, node.id)) === true
+  return { verbose: view.verbose === true || expanded }
 }
 
 function leadingChromeRows(attached: boolean): number {
-  return attached ? 0 : BLOCK_GAP;
+  return attached ? 0 : BLOCK_GAP
 }
 
-function layoutNodeText(
-  node: ConversationNode,
-  view: MessageTextView,
-  columns: number,
-): TextLine[] {
-  if (node.kind === "tool") {
-    const text = selectableNodeText(node, view);
-    return [{ start: 0, end: text.length }];
+function layoutNodeText(node: ConversationNode, view: MessageTextView, columns: number): TextLine[] {
+  if (node.kind === 'tool') {
+    const text = selectableNodeText(node, view)
+    return [{ start: 0, end: text.length }]
   }
-  if (node.kind !== "assistant") {
-    return wrapPlainText(selectableNodeText(node, view), columns);
+  if (node.kind !== 'assistant') {
+    return wrapPlainText(selectableNodeText(node, view), columns)
   }
-  const parts = assistantSelectionParts(node, viewFor(node, view));
-  const lines: TextLine[] = [];
-  if (parts.reasoning !== undefined && parts.reasoning !== "") {
-    lines.push(...wrapPlainText(parts.reasoning, columns));
-    if (parts.body !== "") {
+  const parts = assistantSelectionParts(node, viewFor(node, view))
+  const lines: TextLine[] = []
+  if (parts.reasoning !== undefined && parts.reasoning !== '') {
+    lines.push(...wrapPlainText(parts.reasoning, columns))
+    if (parts.body !== '') {
       lines.push({
         start: parts.reasoning.length,
         end: parts.reasoning.length,
-      });
+      })
     }
   }
-  if (parts.body !== "") {
-    const bodyStart = parts.reasoning ? parts.reasoning.length + 1 : 0;
+  if (parts.body !== '') {
+    const bodyStart = parts.reasoning ? parts.reasoning.length + 1 : 0
     for (const line of layoutMarkdownSource(parts.body, columns)) {
       lines.push({
         start: line.start + bodyStart,
         end: line.end + bodyStart,
         ...(line.indent !== undefined ? { indent: line.indent } : {}),
-      });
+      })
     }
   }
-  return lines.length === 0 ? [{ start: 0, end: 0 }] : lines;
+  return lines.length === 0 ? [{ start: 0, end: 0 }] : lines
 }
 
 function orderedSelection(
@@ -268,65 +194,48 @@ function orderedSelection(
   view: MessageTextView,
 ):
   | {
-      startIndex: number;
-      startOffset: number;
-      endIndex: number;
-      endOffset: number;
+      startIndex: number
+      startOffset: number
+      endIndex: number
+      endOffset: number
     }
   | undefined {
-  if (selection === undefined) return undefined;
-  const anchorIndex = nodes.findIndex(
-    (node) => nodeKey(node.kind, node.id) === selection.anchor.nodeKey,
-  );
-  const focusIndex = nodes.findIndex(
-    (node) => nodeKey(node.kind, node.id) === selection.focus.nodeKey,
-  );
-  if (anchorIndex < 0 || focusIndex < 0) return undefined;
-  const anchorNode = nodes[anchorIndex];
-  const focusNode = nodes[focusIndex];
-  if (anchorNode === undefined || focusNode === undefined) return undefined;
-  const anchorText = selectableNodeText(anchorNode, view);
-  const focusText = selectableNodeText(focusNode, view);
-  const anchorOffset = normalizeGraphemeOffset(
-    anchorText,
-    selection.anchor.offset,
-  );
-  const focusOffset = normalizeGraphemeOffset(
-    focusText,
-    selection.focus.offset,
-  );
-  if (
-    anchorIndex < focusIndex ||
-    (anchorIndex === focusIndex && anchorOffset <= focusOffset)
-  ) {
+  if (selection === undefined) return undefined
+  const anchorIndex = nodes.findIndex((node) => nodeKey(node.kind, node.id) === selection.anchor.nodeKey)
+  const focusIndex = nodes.findIndex((node) => nodeKey(node.kind, node.id) === selection.focus.nodeKey)
+  if (anchorIndex < 0 || focusIndex < 0) return undefined
+  const anchorNode = nodes[anchorIndex]
+  const focusNode = nodes[focusIndex]
+  if (anchorNode === undefined || focusNode === undefined) return undefined
+  const anchorText = selectableNodeText(anchorNode, view)
+  const focusText = selectableNodeText(focusNode, view)
+  const anchorOffset = normalizeGraphemeOffset(anchorText, selection.anchor.offset)
+  const focusOffset = normalizeGraphemeOffset(focusText, selection.focus.offset)
+  if (anchorIndex < focusIndex || (anchorIndex === focusIndex && anchorOffset <= focusOffset)) {
     return {
       startIndex: anchorIndex,
       startOffset: anchorOffset,
       endIndex: focusIndex,
       endOffset: focusOffset,
-    };
+    }
   }
   return {
     startIndex: focusIndex,
     startOffset: focusOffset,
     endIndex: anchorIndex,
     endOffset: anchorOffset,
-  };
+  }
 }
 
-function offsetAtCell(
-  text: string,
-  line: TextLine,
-  cellColumn: number,
-): number {
-  const target = Math.max(0, Math.trunc(cellColumn) - (line.indent ?? 0));
-  let width = 0;
+function offsetAtCell(text: string, line: TextLine, cellColumn: number): number {
+  const target = Math.max(0, Math.trunc(cellColumn) - (line.indent ?? 0))
+  let width = 0
   for (const entry of graphemeSegments(text.slice(line.start, line.end))) {
-    const entryWidth = stringWidth(entry.segment);
+    const entryWidth = stringWidth(entry.segment)
     if (target < width + Math.max(1, entryWidth) / 2) {
-      return line.start + entry.index;
+      return line.start + entry.index
     }
-    width += entryWidth;
+    width += entryWidth
   }
-  return line.end;
+  return line.end
 }

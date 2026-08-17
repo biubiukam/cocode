@@ -13,105 +13,105 @@
 
 export type Glyphs = {
   /** Tool and task status marks, paired with color so state never relies on hue alone. */
-  successMark: string;
-  runningMark: string;
-  waitingMark: string;
-  errorMark: string;
-  canceledMark: string;
+  successMark: string
+  runningMark: string
+  waitingMark: string
+  errorMark: string
+  canceledMark: string
   /**
    * Turn rail: one cell left of every message and tool body, so an assistant
    * reply and the tools it called read as one continuous vertical line.
    */
-  rail: string;
-  railSelected: string;
+  rail: string
+  railSelected: string
   /** List and menu selection. */
-  optionActive: string;
-  optionInactive: string;
+  optionActive: string
+  optionInactive: string
   /** Checklist item states. */
-  checkDone: string;
-  checkActive: string;
-  checkTodo: string;
-  panelMark: string;
-  searchMark: string;
-  editMark: string;
-  resizeMark: string;
-  chevronDown: string;
-  listBullet: string;
-  quoteRail: string;
+  checkDone: string
+  checkActive: string
+  checkTodo: string
+  panelMark: string
+  searchMark: string
+  editMark: string
+  resizeMark: string
+  chevronDown: string
+  listBullet: string
+  quoteRail: string
   /** Overflow track on the right of a clipped transcript. */
-  scrollTrack: string;
+  scrollTrack: string
   /** Thumb on the transcript overflow track. */
-  scrollThumb: string;
-  rule: string;
-  idleMark: string;
-  deadMark: string;
-  spinner: readonly string[];
-  startingSpinner: readonly string[];
-};
+  scrollThumb: string
+  rule: string
+  idleMark: string
+  deadMark: string
+  spinner: readonly string[]
+  startingSpinner: readonly string[]
+}
 
 const unicodeGlyphs: Glyphs = {
-  successMark: "✓",
-  runningMark: "◌",
-  waitingMark: "…",
-  errorMark: "×",
-  canceledMark: "−",
-  rail: "│",
-  railSelected: "▌",
-  optionActive: "▸",
-  optionInactive: "·",
-  checkDone: "✓",
-  checkActive: "●",
-  checkTodo: "○",
-  panelMark: "◆",
-  searchMark: "⌕",
-  editMark: "✎",
-  resizeMark: "⇄",
-  chevronDown: "⌄",
-  listBullet: "•",
-  quoteRail: "│",
-  scrollTrack: "│",
-  scrollThumb: "█",
-  rule: "─",
-  idleMark: "●",
-  deadMark: "×",
-  spinner: ["◐", "◓", "◑", "◒"],
-  startingSpinner: ["○", "◌", "◍", "◌"],
-};
+  successMark: '✓',
+  runningMark: '◌',
+  waitingMark: '…',
+  errorMark: '×',
+  canceledMark: '−',
+  rail: '│',
+  railSelected: '▌',
+  optionActive: '▸',
+  optionInactive: '·',
+  checkDone: '✓',
+  checkActive: '●',
+  checkTodo: '○',
+  panelMark: '◆',
+  searchMark: '⌕',
+  editMark: '✎',
+  resizeMark: '⇄',
+  chevronDown: '⌄',
+  listBullet: '•',
+  quoteRail: '│',
+  scrollTrack: '│',
+  scrollThumb: '█',
+  rule: '─',
+  idleMark: '●',
+  deadMark: '×',
+  spinner: ['◐', '◓', '◑', '◒'],
+  startingSpinner: ['○', '◌', '◍', '◌'],
+}
 
 const asciiGlyphs: Glyphs = {
-  successMark: "+",
-  runningMark: "*",
-  waitingMark: ".",
-  errorMark: "x",
-  canceledMark: "-",
-  rail: "|",
-  railSelected: "|",
-  optionActive: ">",
-  optionInactive: " ",
-  checkDone: "+",
-  checkActive: "*",
-  checkTodo: "o",
-  panelMark: "*",
-  searchMark: "/",
-  editMark: "+",
-  resizeMark: "=",
-  chevronDown: "v",
-  listBullet: "*",
-  quoteRail: "|",
-  scrollTrack: "|",
-  scrollThumb: "#",
-  rule: "-",
-  idleMark: "*",
-  deadMark: "x",
-  spinner: ["-", "\\", "|", "/"],
-  startingSpinner: [".", "o", "O", "o"],
-};
+  successMark: '+',
+  runningMark: '*',
+  waitingMark: '.',
+  errorMark: 'x',
+  canceledMark: '-',
+  rail: '|',
+  railSelected: '|',
+  optionActive: '>',
+  optionInactive: ' ',
+  checkDone: '+',
+  checkActive: '*',
+  checkTodo: 'o',
+  panelMark: '*',
+  searchMark: '/',
+  editMark: '+',
+  resizeMark: '=',
+  chevronDown: 'v',
+  listBullet: '*',
+  quoteRail: '|',
+  scrollTrack: '|',
+  scrollThumb: '#',
+  rule: '-',
+  idleMark: '*',
+  deadMark: 'x',
+  spinner: ['-', '\\', '|', '/'],
+  startingSpinner: ['.', 'o', 'O', 'o'],
+}
 
 /** Mutable singleton, mirroring `theme`, so detection happens once at startup. */
-export const glyphs: Glyphs = { ...unicodeGlyphs };
+export const glyphs: Glyphs = { ...unicodeGlyphs }
 
 export function resolveGlyphs(unicode: boolean): Glyphs {
-  return unicode ? unicodeGlyphs : asciiGlyphs;
+  return unicode ? unicodeGlyphs : asciiGlyphs
 }
 
 /**
@@ -119,23 +119,15 @@ export function resolveGlyphs(unicode: boolean): Glyphs {
  * every user a degraded screen, while a false positive only affects terminals
  * that already announce a non-UTF-8 locale.
  */
-export function supportsUnicode(
-  env: NodeJS.ProcessEnv = process.env,
-  platform: NodeJS.Platform = process.platform,
-): boolean {
-  if (platform === "win32") {
-    return Boolean(
-      env.WT_SESSION ||
-      env.TERM_PROGRAM ||
-      env.ConEmuANSI ||
-      env.TERMINAL_EMULATOR,
-    );
+export function supportsUnicode(env: NodeJS.ProcessEnv = process.env, platform: NodeJS.Platform = process.platform): boolean {
+  if (platform === 'win32') {
+    return Boolean(env.WT_SESSION || env.TERM_PROGRAM || env.ConEmuANSI || env.TERMINAL_EMULATOR)
   }
-  const locale = env.LC_ALL ?? env.LC_CTYPE ?? env.LANG;
-  if (locale === undefined || locale === "") return true;
-  return /utf-?8/i.test(locale);
+  const locale = env.LC_ALL ?? env.LC_CTYPE ?? env.LANG
+  if (locale === undefined || locale === '') return true
+  return /utf-?8/i.test(locale)
 }
 
 export function setGlyphs(unicode: boolean): void {
-  Object.assign(glyphs, resolveGlyphs(unicode));
+  Object.assign(glyphs, resolveGlyphs(unicode))
 }

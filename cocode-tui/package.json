@@ -19,6 +19,8 @@
     "format": "pnpm run lint:fix",
     "format:check": "pnpm run lint",
     "build": "node scripts/build.mjs",
+    "prepack": "node scripts/publishable-manifest.mjs apply",
+    "postpack": "node scripts/publishable-manifest.mjs restore",
     "pack:check": "pnpm run build && node scripts/release-check.mjs",
     "release:check": "pnpm run pack:check"
   },

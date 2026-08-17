@@ -10,6 +10,16 @@ import { isMouseInput, type TuiMousePointer } from '../mouse.ts'
 import { approvalActionAtRow } from '../mouse-hit.ts'
 import { PanelFrame } from './PanelFrame.tsx'
 
+const APPROVAL_ACTIONS = ['allowed-once', 'allowed-for-turn', 'rejected'] as const
+
+type ApprovalChoice = (typeof APPROVAL_ACTIONS)[number]
+
+function cycleApprovalAction(current: ApprovalChoice, delta: 1 | -1): ApprovalChoice {
+  const index = APPROVAL_ACTIONS.indexOf(current)
+  const next = (index + delta + APPROVAL_ACTIONS.length) % APPROVAL_ACTIONS.length
+  return APPROVAL_ACTIONS[next] ?? current
+}
+
 export function ApprovalPanel(props: {
   state: TuiApprovalSnapshot
   locale: UiLocale
@@ -17,12 +27,14 @@ export function ApprovalPanel(props: {
   mousePointer?: TuiMousePointer
   dispatch: (action: TuiAction) => void
 }) {
-  const [hoveredAction, setHoveredAction] = useState<ReturnType<typeof approvalActionAtRow>>()
+  const [selectedAction, setSelectedAction] = useState<ApprovalChoice>('allowed-once')
   const [inputReady, setInputReady] = useState(false)
-  const lastPointerId = useRef<number | undefined>(undefined)
+  const lastPointerId = useRef(props.mousePointer?.id)
 
   useEffect(() => {
     setInputReady(false)
+    setSelectedAction('allowed-once')
+    lastPointerId.current = props.mousePointer?.id
     const timer = setTimeout(() => setInputReady(true), 700)
     return () => clearTimeout(timer)
   }, [props.state.request.callId, props.state.request.toolName])
@@ -32,20 +44,32 @@ export function ApprovalPanel(props: {
     if (!inputReady || pointer === undefined || pointer.id === lastPointerId.current) return
     lastPointerId.current = pointer.id
     const action = approvalActionAtRow(pointer.row, props.panelStartRow)
-    setHoveredAction(action)
+    if (action !== undefined) setSelectedAction(action)
     if (pointer.action === 'press' && action !== undefined) {
       props.dispatch({ type: 'approval.answer', outcome: action })
     }
   }, [inputReady, props])
 
   useInput((input, key) => {
-    if (isMouseInput(input)) return
     if (!inputReady) return
+    if (key.upArrow) {
+      setSelectedAction((current) => cycleApprovalAction(current, -1))
+      return
+    }
+    if (key.downArrow || key.tab) {
+      setSelectedAction((current) => cycleApprovalAction(current, 1))
+      return
+    }
+    if (isMouseInput(input)) return
     if (key.escape || (key.ctrl && input === 'c')) {
       props.dispatch({ type: 'approval.cancel' })
       return
     }
-    if (input === 'a' || key.return) {
+    if (key.return) {
+      props.dispatch({ type: 'approval.answer', outcome: selectedAction })
+      return
+    }
+    if (input === 'a') {
       props.dispatch({ type: 'approval.answer', outcome: 'allowed-once' })
       return
     }
@@ -88,17 +112,17 @@ export function ApprovalPanel(props: {
         {text(props.locale, 'approvalSource')}: {sanitizeSingleLine(request.source ?? 'runtime')}
       </Text>
       <ApprovalAction
-        active={hoveredAction === 'allowed-once'}
+        active={selectedAction === 'allowed-once'}
         label={props.locale === 'zh' ? '允许一次' : 'Allow once'}
-        shortcut="a / enter"
+        shortcut="a"
       />
       <ApprovalAction
-        active={hoveredAction === 'allowed-for-turn'}
+        active={selectedAction === 'allowed-for-turn'}
         label={props.locale === 'zh' ? '本轮允许' : 'Allow for turn'}
         shortcut="t"
       />
       <ApprovalAction
-        active={hoveredAction === 'rejected'}
+        active={selectedAction === 'rejected'}
         label={props.locale === 'zh' ? '拒绝' : 'Deny'}
         shortcut="d / n"
       />
@@ -108,11 +132,9 @@ export function ApprovalPanel(props: {
 
 function ApprovalAction(props: { active: boolean; label: string; shortcut: string }) {
   return (
-    <Text
-      {...selectionStyle(props.active)}
-      wrap="truncate-end"
-    >
-      {props.active ? glyphs.optionActive : glyphs.optionInactive} {props.label} <Text color={theme.dim}>{props.shortcut}</Text>
+    <Text {...selectionStyle(props.active)} wrap="truncate-end">
+      {props.active ? glyphs.optionActive : glyphs.optionInactive} {props.label}{' '}
+      <Text color={theme.dim}>{props.shortcut}</Text>
     </Text>
   )
 }

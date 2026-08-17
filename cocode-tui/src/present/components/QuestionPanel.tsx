@@ -38,9 +38,11 @@ export function QuestionPanel(props: {
   const [custom, setCustom] = useState(() => savedAnswer?.custom ?? '')
   const [dirty, setDirty] = useState(false)
   const inputFocused = focus === inputIndex
+  const lastOptionFocus = useRef(0)
+  if (focus < options.length) lastOptionFocus.current = focus
   const customLines = custom.split('\n')
   const visibleCustomLines = customLines.slice(-3)
-  const lastPointerId = useRef<number | undefined>(undefined)
+  const lastPointerId = useRef(props.mousePointer?.id)
   const tabs = props.state.tabs ?? [fallbackTab(props.state)]
   const prompt = questionPrompt(props.state.question, text(props.locale, 'questionUnavailable'))
 
@@ -50,6 +52,7 @@ export function QuestionPanel(props: {
     setSelected(savedSelected)
     setCustom(savedAnswer?.custom ?? '')
     setDirty(false)
+    lastOptionFocus.current = selectedIndex ?? 0
   }, [inputIndex, props.state.key])
 
   useEffect(() => {
@@ -137,20 +140,32 @@ export function QuestionPanel(props: {
       return
     }
     if (key.return) {
-      if (inputFocused || multiSelect) {
-        const trimmedCustom = custom.trim()
-        if (trimmedCustom === '' && selected.size === 0) return
+      const trimmedCustom = custom.trim()
+      if (trimmedCustom !== '') {
+        props.dispatch({
+          type: 'question.answer',
+          selected: multiSelect
+            ? [...selected]
+                .sort((a, b) => a - b)
+                .map((index) => options[index]?.label)
+                .filter((label): label is string => label !== undefined)
+            : [],
+          custom: trimmedCustom,
+        })
+        return
+      }
+      if (multiSelect) {
+        if (selected.size === 0) return
         props.dispatch({
           type: 'question.answer',
           selected: [...selected]
             .sort((a, b) => a - b)
             .map((index) => options[index]?.label)
             .filter((label): label is string => label !== undefined),
-          ...(trimmedCustom === '' ? {} : { custom: trimmedCustom }),
         })
         return
       }
-      const option = options[focus]
+      const option = options[inputFocused ? lastOptionFocus.current : focus]
       if (option === undefined) return
       props.dispatch({ type: 'question.answer', selected: [option.label] })
       return
