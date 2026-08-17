@@ -1,8 +1,12 @@
 import net from 'node:net'
 import { chmodSync, existsSync, unlinkSync } from 'node:fs'
 import { CompanionTransport } from './transport.js'
-import { TuiCompanionGateway } from './gateway.js'
-import type { RuntimeContext } from './types.js'
+import {
+  registerUserQuestionProvider,
+  TuiCompanionGateway,
+  type UserQuestionsService,
+} from './gateway.js'
+import type { Agent, RuntimeContext } from './types.js'
 
 export { TuiCompanionGateway } from './gateway.js'
 
@@ -12,17 +16,22 @@ export const inject = ['agents']
 export function apply(ctx: RuntimeContext, config: { endpoint: string; protocolRevision?: string } = { endpoint: '' }): void {
   if (!config.endpoint) throw new Error('cocode-host-jsonrpc requires an endpoint')
   const clients = new Set<TuiCompanionGateway>()
-  let questionOwner: TuiCompanionGateway | undefined
+  let questionDisposer: (() => void) | undefined
+  const registerQuestionProvider = (): void => {
+    if (questionDisposer !== undefined) return
+    const service = ctx.get('userQuestions') as UserQuestionsService | undefined
+    if (service === undefined) return
+    questionDisposer = registerUserQuestionProvider(service, async (request) => {
+      const owner = resolveQuestionOwner(clients, request.agent)
+      if (owner === undefined) throw new Error('no connected TUI owns the question request')
+      return owner.askQuestion(request)
+    })
+  }
   const server = net.createServer((socket) => {
     let authenticated = false
     let buffer = ''
     const transport = new CompanionTransport(socket, socket)
     const gateway = new TuiCompanionGateway(ctx, transport, { registerQuestionProvider: false })
-    clients.add(gateway)
-    if (questionOwner === undefined) {
-      questionOwner = gateway
-      gateway.tryRegisterQuestionProvider()
-    }
     const onData = (chunk: Buffer | string) => {
       buffer += chunk.toString()
       const newline = buffer.indexOf('\n')
@@ -33,6 +42,8 @@ export function apply(ctx: RuntimeContext, config: { endpoint: string; protocolR
       try { frame = JSON.parse(first) } catch { socket.destroy(); return }
       if (frame.method !== 'cocode/host/connect' || typeof frame.id !== 'number') { socket.destroy(); return }
       authenticated = true
+      clients.add(gateway)
+      registerQuestionProvider()
       socket.write(`${JSON.stringify({ jsonrpc: '2.0', id: frame.id, result: { protocolRevision: config.protocolRevision ?? '1.0', capabilities: ['session', 'event', 'workspace'] } })}\n`)
       socket.off('data', onData)
       if (buffer) socket.emit('data', Buffer.from(buffer))
@@ -43,9 +54,9 @@ export function apply(ctx: RuntimeContext, config: { endpoint: string; protocolR
       clients.delete(gateway)
       void gateway.disconnect().catch(() => undefined)
       transport.close()
-      if (questionOwner === gateway) {
-        questionOwner = clients.values().next().value
-        questionOwner?.tryRegisterQuestionProvider()
+      if (clients.size === 0) {
+        questionDisposer?.()
+        questionDisposer = undefined
       }
     })
     transport.onRequest(async (method, params) => gateway.handleRequest(method, params))
@@ -53,5 +64,20 @@ export function apply(ctx: RuntimeContext, config: { endpoint: string; protocolR
   if (process.platform !== 'win32' && existsSync(config.endpoint)) unlinkSync(config.endpoint)
   server.listen(config.endpoint)
   if (process.platform !== 'win32') { try { chmodSync(config.endpoint, 0o600) } catch {} }
-  ctx.effect?.(() => async () => { await new Promise<void>((resolve) => server.close(() => resolve())); }, 'cocode-host-jsonrpc.serve')
+  ctx.effect?.(() => async () => {
+    questionDisposer?.()
+    questionDisposer = undefined
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+  }, 'cocode-host-jsonrpc.serve')
+}
+
+function resolveQuestionOwner(
+  clients: ReadonlySet<TuiCompanionGateway>,
+  agent: Agent | undefined,
+): TuiCompanionGateway | undefined {
+  if (agent !== undefined) {
+    const owners = [...clients].filter(client => client.ownsAgent(agent))
+    return owners.length === 1 ? owners[0] : undefined
+  }
+  return clients.size === 1 ? clients.values().next().value : undefined
 }
