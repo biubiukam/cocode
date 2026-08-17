@@ -462,8 +462,8 @@ export class SessionRuntime implements ISessions {
   }
 
   /** Rebuild the Session baseline and every opened window after connection. */
-  handleConnected(): void {
-    this.manager.handleConnected()
+  handleConnected(): Promise<void> {
+    return this.manager.handleConnected()
   }
 
   /** Drop generation-scoped live interaction state the moment a connection generation dies. */

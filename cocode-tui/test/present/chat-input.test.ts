@@ -6,6 +6,7 @@ import {
   dispatchComposerTab,
   dispatchHelpInput,
   dispatchKeyCommand,
+  isCopyShortcut,
   moveSelection,
 } from '../../src/present/chat-input.ts'
 
@@ -129,5 +130,15 @@ describe('chat input helpers', () => {
       [{ type: 'copyDraftSelection' }],
       [{ type: 'cutDraftSelection' }],
     ])
+  })
+
+  it('treats bare C and modifier+C as copy chords', () => {
+    expect(isCopyShortcut('c', {})).toBe(true)
+    expect(isCopyShortcut('c', { ctrl: true })).toBe(true)
+    expect(isCopyShortcut('c', { meta: true })).toBe(true)
+    expect(isCopyShortcut('c', { super: true })).toBe(true)
+    expect(isCopyShortcut('C', { ctrl: true })).toBe(true)
+    expect(isCopyShortcut('c', { shift: true })).toBe(false)
+    expect(isCopyShortcut('x', { ctrl: true })).toBe(false)
   })
 })

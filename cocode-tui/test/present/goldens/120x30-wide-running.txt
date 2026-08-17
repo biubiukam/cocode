@@ -4,9 +4,9 @@
 │ [transcript] inspect the terminal layout                                               │ status: [status] running
                                                                                          │ queue: 1
 │ Stable fixture reasoning.                                                              │
-│ The render contract is streaming.                                                      │ context
-│ ◌ read · running · 2s · /workspace/very/long/路径/README.md                            │ tokens: 1234 in · 567 out
-                                                                                         │ window: 33%
+│                                                                                        │ context
+│ The render contract is streaming.                                                      │ tokens: 1234 in · 567 out
+│ ◌ read · running · 2s · /workspace/very/long/路径/README.md                            │ window: 33%
                                                                                          │ speed: 18.8 t/s
                                                                                          │ reasoning: high
                                                                                          │

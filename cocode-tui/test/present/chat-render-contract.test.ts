@@ -243,8 +243,13 @@ describe.sequential('Chat multi-viewport render contract', () => {
     })
     const chat = await renderChatContract(testCase)
     try {
+      const statusBefore = regionLine(chat.frame, 'status')
+      const composerBefore = regionLine(chat.frame, 'composer')
       await chat.write('\u001b[1;2A')
       expect(chat.frame).toContain('↑↓ move')
+      expect(chat.frame).not.toContain('Message actions')
+      expect(regionLine(chat.frame, 'status')).toBe(statusBefore)
+      expect(regionLine(chat.frame, 'composer')).toBe(composerBefore)
       await chat.write('m')
       await chat.write('\r')
       expect(chat.frame).toContain('args {"path":"/workspace/very/long/路径/README.md"}')

@@ -101,6 +101,7 @@ function footerCandidates(context: FooterProjectionContext): readonly FooterHint
   if (context.messageSelection) {
     return [
       fixed('message-move', 'footerMove', 100, 'navigation'),
+      fixed('message-copy', 'footerCopyMessages', 98, 'primary'),
       fixed('message-actions', 'footerMessageActions', 95, 'primary'),
       ...(context.messageDetailsAvailable === true
         ? [command(

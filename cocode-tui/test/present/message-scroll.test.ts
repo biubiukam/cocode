@@ -4,6 +4,7 @@ import {
   maxMessageScrollOffset,
   resolveMessageWindow,
   scrollOffsetForMessage,
+  transcriptPaintColumns,
   visibleMessageWindow,
 } from '../../src/present/message-scroll.ts'
 
@@ -19,7 +20,7 @@ describe('message scroll window', () => {
       '2',
       '3',
     ])
-    expect(visibleMessageWindow(nodes, 4, false, undefined, 3).map((node) => node.id)).toEqual([
+    expect(visibleMessageWindow(nodes, 4, false, undefined, 2).map((node) => node.id)).toEqual([
       '1',
       '2',
     ])
@@ -28,8 +29,8 @@ describe('message scroll window', () => {
   it('tracks rows hidden inside one message that is taller than the viewport', () => {
     const nodes = [user('1', '1\n2\n3\n4\n5\n6\n7\n8')]
 
-    expect(resolveMessageWindow(nodes, 4, false, undefined, 0).hiddenRowsBefore).toBe(6)
-    expect(resolveMessageWindow(nodes, 4, false, undefined, 3).hiddenRowsBefore).toBe(3)
+    expect(resolveMessageWindow(nodes, 4, false, undefined, 0).hiddenRowsBefore).toBe(5)
+    expect(resolveMessageWindow(nodes, 4, false, undefined, 3).hiddenRowsBefore).toBe(2)
   })
 
   it('counts terminal wrapping when calculating the scroll range', () => {
@@ -38,8 +39,16 @@ describe('message scroll window', () => {
     expect(maxMessageScrollOffset(nodes, 3, false, undefined, 5)).toBeGreaterThan(0)
   })
 
+  it('reserves a scrollbar column only once the transcript overflows', () => {
+    const nodes = [user('1', 'hello')]
+    const long = Array.from({ length: 8 }, (_, index) => user(String(index + 1), 'hello'))
+
+    expect(transcriptPaintColumns(nodes, 6, false, undefined, 40)).toBe(40)
+    expect(transcriptPaintColumns(long, 6, false, undefined, 40)).toBe(39)
+  })
+
   it('reserves a selectable body row for an empty user message', () => {
-    expect(maxMessageScrollOffset([user('1', '')], 2)).toBe(1)
+    expect(maxMessageScrollOffset([user('1', '')], 2)).toBe(0)
   })
 
   it('moves the transcript when selection reaches an older hidden message', () => {

@@ -270,8 +270,8 @@ export class WorkspaceManager {
   }
 
   /** Re-pull the baseline after each connection generation. */
-  handleConnected(): void {
-    void this.refresh()
+  handleConnected(): Promise<void> {
+    return this.refresh().catch(() => undefined)
   }
 
   /**

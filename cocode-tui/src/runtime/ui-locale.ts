@@ -75,6 +75,7 @@ export type UiTextKey =
   | 'footerUse'
   | 'footerRun'
   | 'footerToggle'
+  | 'footerCopyMessages'
   | 'footerMessageActions'
   | 'footerMessageExpand'
   | 'footerMessageCollapse'
@@ -370,6 +371,7 @@ const TEXT: Record<UiLocale, Record<UiTextKey, string>> = {
     footerUse: 'enter use',
     footerRun: 'enter run',
     footerToggle: 'space toggle',
+    footerCopyMessages: 'Ctrl+C copy',
     footerMessageActions: 'M actions',
     footerMessageExpand: 'or enter expand details',
     footerMessageCollapse: 'or enter collapse details',
@@ -664,6 +666,7 @@ const TEXT: Record<UiLocale, Record<UiTextKey, string>> = {
     footerUse: '回车使用',
     footerRun: '回车执行',
     footerToggle: '空格切换',
+    footerCopyMessages: 'Ctrl+C 复制',
     footerMessageActions: 'M 操作',
     footerMessageExpand: '或回车展开详情',
     footerMessageCollapse: '或回车收起详情',

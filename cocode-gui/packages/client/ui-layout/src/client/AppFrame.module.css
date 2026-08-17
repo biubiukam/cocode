@@ -221,3 +221,35 @@
      swallow the workbench header. */
   pointer-events: none;
 }
+
+.recoveryBanner {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(680px, calc(100% - 32px));
+  padding: 7px 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  transform: translateX(-50%);
+  background: var(--dsw-alias-bg-overlay);
+  color: var(--dsw-alias-label-primary);
+  box-shadow: var(--ds-shadow-md, 0 4px 16px rgb(0 0 0 / 18%));
+  font-size: 12px;
+  line-height: 18px;
+  pointer-events: auto;
+}
+
+.recoveryBanner button {
+  flex: none;
+  border: 0;
+  border-radius: 5px;
+  padding: 3px 8px;
+  background: var(--cocode-accent);
+  color: var(--dsw-alias-label-primary-foreground);
+  cursor: pointer;
+  font: inherit;
+}

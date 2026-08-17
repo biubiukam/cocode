@@ -18,6 +18,27 @@ export type ThemeMode = ThemeName | 'system'
 
 export const DEFAULT_THEME: ThemeName = 'dark'
 
+/**
+ * Pick a readable startup theme for terminals whose canvas is outside our
+ * control. Explicit configuration wins; COLORFGBG is the conventional shell
+ * hint, and Apple Terminal defaults to a light canvas for new profiles.
+ */
+export function resolveStartupTheme(env: NodeJS.ProcessEnv = process.env): ThemeName {
+  const configured = parseThemeName(env.COCODE_TUI_THEME ?? '')
+  if (configured !== undefined) return configured
+
+  const colorFgbg = env.COLORFGBG?.split(';')
+  const background = colorFgbg?.at(-1)
+  if (background !== undefined && /^\d+$/.test(background)) {
+    const value = Number(background)
+    if (value >= 8) return 'light'
+    if (value >= 0) return 'dark'
+  }
+
+  if (env.TERM_PROGRAM === 'Apple_Terminal') return 'light'
+  return DEFAULT_THEME
+}
+
 export type ThemeTokens = {
   /** Primary body text. Design system `--foreground`. */
   text: string

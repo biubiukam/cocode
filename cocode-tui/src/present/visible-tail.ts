@@ -4,13 +4,14 @@
 
 import type { ConversationNode } from '../runtime/nodes/types.ts'
 import { nodeKey } from '../runtime/nodes/types.ts'
-import stringWidth from 'string-width'
 import { formatReasoning, formatToolResult } from './text-format.ts'
 import {
   extractPartialJsonStringArgument,
   truncatePlanProgress,
 } from '../runtime/nodes/tool-view.ts'
-import { BODY_INDENT, MESSAGE_CHROME } from './layout.ts'
+import { BLOCK_GAP, BODY_INDENT, MESSAGE_CHROME } from './layout.ts'
+import { countMarkdownRows } from './markdown-layout.ts'
+import { countWrappedRows } from './text-wrap.ts'
 
 export function visibleTail(
   nodes: readonly ConversationNode[],
@@ -26,7 +27,13 @@ export function visibleTail(
   for (let index = nodes.length - 1; index >= 0; index -= 1) {
     const node = nodes[index]
     if (node === undefined) continue
-    const rows = estimateNodeRows(node, verbose, expandedNodeIds.has(nodeKey(node.kind, node.id)))
+    const rows = estimateNodeRows(
+      node,
+      verbose,
+      expandedNodeIds.has(nodeKey(node.kind, node.id)),
+      undefined,
+      nodeAttached(nodes, index),
+    )
     if (rows === 0) {
       start = index
       continue
@@ -45,24 +52,34 @@ export function visibleTail(
   )
 }
 
+export function nodeAttached(
+  nodes: readonly ConversationNode[],
+  index: number,
+): boolean {
+  const node = nodes[index]
+  const previous = nodes[index - 1]
+  return node?.kind === 'tool' && isRailedKind(previous?.kind)
+}
+
 export function estimateNodeRows(
   node: ConversationNode,
   verbose = false,
   expanded = false,
   maxColumns?: number,
+  attached = false,
 ): number {
   const detailed = verbose || expanded
   switch (node.kind) {
     case 'user':
-      return 2 + Math.max(1, lineCount(node.text, contentColumns(maxColumns, MESSAGE_CHROME)))
+      return BLOCK_GAP + Math.max(1, countWrappedRows(node.text, contentColumns(maxColumns, MESSAGE_CHROME)))
     case 'context': {
       if (!detailed) return 0
       if (!expanded && verbose) return 2
       const columns = contentColumns(maxColumns, MESSAGE_CHROME)
-      if (node.sections.length === 0) return 2 + lineCount(node.text, columns)
+      if (node.sections.length === 0) return 2 + countWrappedRows(node.text, columns)
       return 2 + node.sections.reduce(
         (rows, section, index) =>
-          rows + Number(index > 0) + 1 + lineCount(section.text, columns),
+          rows + Number(index > 0) + 1 + countWrappedRows(section.text, columns),
         0,
       )
     }
@@ -76,7 +93,11 @@ export function estimateNodeRows(
       const columns = contentColumns(maxColumns, MESSAGE_CHROME)
       const thinkingIndicator =
         node.streaming && node.thinking !== false && node.text === '' && reasoning === undefined ? 1 : 0
-      return 2 + lineCount(reasoning, columns) + thinkingIndicator + lineCount(node.text, columns)
+      const thinkingRows =
+        countWrappedRows(reasoning, columns) + thinkingIndicator
+      const bodyRows = countMarkdownRows(node.text, columns)
+      const thinkingGap = thinkingRows > 0 && bodyRows > 0 ? BLOCK_GAP : 0
+      return BLOCK_GAP + thinkingRows + thinkingGap + bodyRows
     }
     case 'tool': {
       const result = formatToolResult(node.result, detailed)
@@ -87,37 +108,32 @@ export function estimateNodeRows(
       const planRows =
         plan === undefined
           ? 0
-          : lineCount(
+          : countWrappedRows(
               truncatePlanProgress(plan),
               contentColumns(maxColumns, MESSAGE_CHROME + BODY_INDENT),
             ) + 1
-      if (!detailed) return 2 + planRows
+      const gap = attached ? 0 : BLOCK_GAP
+      if (!detailed) return gap + 1 + planRows
       const columns = contentColumns(maxColumns, MESSAGE_CHROME)
       return (
-        2 +
+        gap +
+        1 +
         planRows +
-        lineCount(node.args, columns) +
-        lineCount(result, columns) +
+        countWrappedRows(node.args, columns) +
+        countWrappedRows(result, columns) +
         (node.error === undefined ? 0 : 1)
       )
     }
     case 'notice':
       if (node.verboseOnly === true && !verbose) return 0
-      return 1 + lineCount(node.message, maxColumns)
+      return 1 + countWrappedRows(node.message, maxColumns)
   }
 }
 
 const EMPTY_EXPANDED_NODES: ReadonlySet<string> = new Set()
 
-function lineCount(text: string | undefined, maxColumns?: number): number {
-  if (text === undefined || text === '') return 0
-  const lines = text.replace(/\r\n?/g, '\n').split('\n')
-  if (maxColumns === undefined) return lines.length
-  const columns = Math.max(1, Math.trunc(maxColumns))
-  return lines.reduce(
-    (rows, line) => rows + Math.max(1, Math.ceil(stringWidth(line) / columns)),
-    0,
-  )
+function isRailedKind(kind: string | undefined): boolean {
+  return kind === 'user' || kind === 'assistant' || kind === 'tool'
 }
 
 function contentColumns(maxColumns: number | undefined, chromeColumns: number): number | undefined {

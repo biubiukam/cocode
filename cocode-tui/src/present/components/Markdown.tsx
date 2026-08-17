@@ -5,6 +5,8 @@ import { memo, useMemo, useRef } from 'react'
 import stringWidth from 'string-width'
 import { glyphs } from '../glyphs.ts'
 import { theme } from '../theme.ts'
+import type { MessageTextRange } from '../message-text-selection.ts'
+import { SelectableText } from './SelectableText.tsx'
 
 export type MarkdownBlock =
   | { kind: 'heading'; depth: number; text: string }
@@ -21,22 +23,38 @@ const BLOCK_CACHE_CHARS = 160_000
 const blockCache = new Map<string, readonly MarkdownBlock[]>()
 let blockCacheChars = 0
 
-export const Markdown = memo(function Markdown(props: { text: string; maxColumns?: number }) {
+export const Markdown = memo(function Markdown(props: {
+  text: string
+  maxColumns?: number
+  selection?: MessageTextRange
+}) {
   const blocks = useMemo(() => parseMarkdownBlocks(props.text), [props.text])
+  let sourceCursor = 0
   return (
     <Box flexDirection="column">
-      {blocks.map((block, index) => (
-        <MarkdownBlockView
-          block={block}
-          key={`${block.kind}:${index}`}
-          maxColumns={props.maxColumns}
-        />
-      ))}
+      {blocks.map((block, index) => {
+        const sourceOffset = blockSourceOffset(props.text, block, sourceCursor)
+        sourceCursor = sourceOffset + blockSourceText(block).length
+        return (
+          <MarkdownBlockView
+            block={block}
+            key={`${block.kind}:${index}`}
+            maxColumns={props.maxColumns}
+            selection={props.selection}
+            sourceOffset={sourceOffset}
+            sourceText={props.text}
+          />
+        )
+      })}
     </Box>
   )
 })
 
-export function StreamingMarkdown(props: { text: string; maxColumns?: number }) {
+export function StreamingMarkdown(props: {
+  text: string
+  maxColumns?: number
+  selection?: MessageTextRange
+}) {
   const stablePrefix = useRef('')
   const split = useMemo(
     () => splitStreamingMarkdown(props.text, stablePrefix.current),
@@ -46,10 +64,10 @@ export function StreamingMarkdown(props: { text: string; maxColumns?: number }) 
   return (
     <Box flexDirection="column">
       {split.stablePrefix !== '' ? (
-        <Markdown text={split.stablePrefix} maxColumns={props.maxColumns} />
+        <Markdown text={split.stablePrefix} maxColumns={props.maxColumns} selection={props.selection} />
       ) : null}
       {split.unstableSuffix !== '' ? (
-        <Markdown text={split.unstableSuffix} maxColumns={props.maxColumns} />
+        <Markdown text={split.unstableSuffix} maxColumns={props.maxColumns} selection={props.selection} />
       ) : null}
     </Box>
   )
@@ -136,13 +154,19 @@ function toBlocks(token: Token): MarkdownBlock[] {
   }
 }
 
-function MarkdownBlockView(props: { block: MarkdownBlock; maxColumns?: number }) {
+function MarkdownBlockView(props: {
+  block: MarkdownBlock
+  maxColumns?: number
+  selection?: MessageTextRange
+  sourceOffset: number
+  sourceText: string
+}) {
   const { block } = props
   if (block.kind === 'heading') {
     return (
       <Text color={theme.text} bold>
         <Text color={theme.mute}>{'#'.repeat(Math.min(block.depth, 3))}</Text>{' '}
-        {renderInline(block.text)}
+        {renderInline(block.text, props.selection, props.sourceOffset)}
       </Text>
     )
   }
@@ -153,26 +177,43 @@ function MarkdownBlockView(props: { block: MarkdownBlock; maxColumns?: number })
     return (
       <Box flexDirection="column">
         {block.lang ? <Text color={theme.mute}>{block.lang}</Text> : null}
-        <RailedLines text={block.text} color={theme.dim} />
+        <RailedLines
+          text={block.text}
+          color={theme.dim}
+          selection={props.selection}
+          sourceOffset={props.sourceOffset}
+        />
       </Box>
     )
   }
   if (block.kind === 'list') {
+    let itemCursor = props.sourceOffset
     return (
       <Box flexDirection="column">
-        {block.items.map((item, index) => (
-          <Text key={`${index}:${item}`} color={theme.text}>
-            <Text color={theme.mute}>
-              {block.ordered ? `${index + 1}.` : glyphs.listBullet}
-            </Text>{' '}
-            {renderInline(item)}
-          </Text>
-        ))}
+        {block.items.map((item, index) => {
+          const itemOffset = sourceIndexOf(props.sourceText, item, itemCursor)
+          itemCursor = itemOffset + item.length
+          return (
+            <Text key={`${index}:${item}`} color={theme.text}>
+              <Text color={theme.mute}>
+                {block.ordered ? `${index + 1}.` : glyphs.listBullet}
+              </Text>{' '}
+              {renderInline(item, props.selection, itemOffset)}
+            </Text>
+          )
+        })}
       </Box>
     )
   }
   if (block.kind === 'quote') {
-    return <RailedLines text={block.text} color={theme.dim} />
+    return (
+      <RailedLines
+        text={block.text}
+        color={theme.dim}
+        selection={props.selection}
+        sourceOffset={props.sourceOffset}
+      />
+    )
   }
   if (block.kind === 'table') {
     return (
@@ -182,61 +223,147 @@ function MarkdownBlockView(props: { block: MarkdownBlock; maxColumns?: number })
     )
   }
   if (block.kind === 'rule') return <Text color={theme.border}>{glyphs.rule.repeat(24)}</Text>
-  return <Text color={theme.text}>{renderInline(block.text)}</Text>
+  return <Text color={theme.text}>{renderInline(block.text, props.selection, props.sourceOffset)}</Text>
 }
 
 /** Left rail repeated per line, so a multi-line block reads as one region. */
-function RailedLines(props: { text: string; color: string }) {
+function RailedLines(props: {
+  text: string
+  color: string
+  selection?: MessageTextRange
+  sourceOffset: number
+}) {
+  let offset = props.sourceOffset
   return (
     <Box flexDirection="column">
-      {props.text.replace(/\r\n?/g, '\n').split('\n').map((line, index) => (
-        <Text key={`${index}:${line}`}>
-          <Text color={theme.border}>{glyphs.quoteRail} </Text>
-          <Text color={props.color}>{line}</Text>
-        </Text>
-      ))}
+      {props.text.replace(/\r\n?/g, '\n').split('\n').map((line, index) => {
+        const lineOffset = offset
+        offset += line.length + 1
+        return (
+          <Text key={`${index}:${line}`}>
+            <Text color={theme.border}>{glyphs.quoteRail} </Text>
+            <SelectableText
+              color={props.color}
+              text={line}
+              selection={localSelection(props.selection, lineOffset, line.length)}
+            />
+          </Text>
+        )
+      })}
     </Box>
   )
 }
 
-function renderInline(text: string): ReactNode {
+function renderInline(
+  text: string,
+  selection?: MessageTextRange,
+  sourceOffset = 0,
+): ReactNode {
   const nodes: ReactNode[] = []
   const pattern = /(\*\*[^*]+\*\*|__[^_]+__|`[^`]+`|\[[^\]]+\]\([^)]+\)|\*[^*]+\*|_[^_]+_)/g
   let cursor = 0
   for (const match of text.matchAll(pattern)) {
     const value = match[0]
     const index = match.index ?? 0
-    if (index > cursor) nodes.push(text.slice(cursor, index))
+    if (index > cursor) {
+      const plain = text.slice(cursor, index)
+      nodes.push(
+        <SelectableText
+          key={`${index}:plain`}
+          text={plain}
+          selection={localSelection(selection, sourceOffset + cursor, plain.length)}
+        />,
+      )
+    }
     if (value.startsWith('**') || value.startsWith('__')) {
       nodes.push(
         <Text key={`${index}:strong`} bold>
-          {value.slice(2, -2)}
+          <SelectableText
+            text={value.slice(2, -2)}
+            selection={localSelection(selection, sourceOffset + index + 2, value.length - 4)}
+          />
         </Text>,
       )
     } else if (value.startsWith('`')) {
       nodes.push(
         <Text key={`${index}:code`} color={theme.accent}>
-          {value.slice(1, -1)}
+          <SelectableText
+            text={value.slice(1, -1)}
+            selection={localSelection(selection, sourceOffset + index + 1, value.length - 2)}
+          />
         </Text>,
       )
     } else if (value.startsWith('[')) {
       const labelEnd = value.indexOf('](')
       nodes.push(
         <Text key={`${index}:link`} color={theme.accent}>
-          {value.slice(1, labelEnd)}
+          <SelectableText
+            text={value.slice(1, labelEnd)}
+            selection={localSelection(selection, sourceOffset + index + 1, Math.max(0, labelEnd - 1))}
+          />
         </Text>,
       )
     } else {
       nodes.push(
         <Text key={`${index}:em`} italic>
-          {value.slice(1, -1)}
+          <SelectableText
+            text={value.slice(1, -1)}
+            selection={localSelection(selection, sourceOffset + index + 1, value.length - 2)}
+          />
         </Text>,
       )
     }
     cursor = index + value.length
   }
-  if (cursor < text.length) nodes.push(text.slice(cursor))
+  if (cursor < text.length) {
+    const plain = text.slice(cursor)
+    nodes.push(
+      <SelectableText
+        key={`${cursor}:plain-tail`}
+        text={plain}
+        selection={localSelection(selection, sourceOffset + cursor, plain.length)}
+      />,
+    )
+  }
   return nodes
+}
+
+function blockSourceText(block: MarkdownBlock): string {
+  switch (block.kind) {
+    case 'list':
+      return block.items.join('\n')
+    case 'table':
+      return [...block.header, ...block.rows.flat()].join(' ')
+    case 'rule':
+      return ''
+    default:
+      return block.text
+  }
+}
+
+function blockSourceOffset(text: string, block: MarkdownBlock, from: number): number {
+  const source = blockSourceText(block)
+  if (source === '') return from
+  const index = text.indexOf(source, from)
+  return index < 0 ? from : index
+}
+
+function sourceIndexOf(source: string, snippet: string, from: number): number {
+  if (snippet === '') return from
+  const index = source.indexOf(snippet, from)
+  return index < 0 ? from : index
+}
+
+function localSelection(
+  selection: MessageTextRange | undefined,
+  sourceStart: number,
+  length: number,
+): MessageTextRange | undefined {
+  if (selection === undefined || length <= 0) return undefined
+  const sourceEnd = sourceStart + length
+  const start = Math.max(selection.start, sourceStart)
+  const end = Math.min(selection.end, sourceEnd)
+  return start < end ? { start: start - sourceStart, end: end - sourceStart } : undefined
 }
 
 /**

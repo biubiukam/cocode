@@ -263,6 +263,7 @@ export type TuiAction =
   | { type: 'checklist.move'; delta: number }
   | { type: 'checklist.close' }
   | { type: 'copyNode'; nodeKey: string }
+  | { type: 'copyText'; text: string }
   | { type: 'review.move'; delta: number }
   | { type: 'review.close' }
   | { type: 'review.confirm' }
@@ -1187,6 +1188,9 @@ class TuiAppImpl implements TuiApp {
         return
       case 'copyNode':
         this.copyNode(action.nodeKey)
+        return
+      case 'copyText':
+        this.copyText(action.text)
         return
       case 'review.move':
         if (this.reviewPicker !== undefined) {

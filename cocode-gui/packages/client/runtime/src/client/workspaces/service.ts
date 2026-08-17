@@ -336,8 +336,8 @@ export class WorkspaceRuntime implements IWorkspaces {
   }
 
   /** Rebuild the Workspace baseline after connection. */
-  handleConnected(): void {
-    this.manager.handleConnected()
+  handleConnected(): Promise<void> {
+    return this.manager.handleConnected()
   }
 
   private project(): void {

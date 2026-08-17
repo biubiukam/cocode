@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   formatReasoning,
+  formatThinkingDuration,
   formatToolResult,
   sanitizeSingleLine,
   truncateText,
@@ -10,9 +11,10 @@ describe('presentation text formatting', () => {
   it('shows active reasoning and collapses it after completion by default', () => {
     expect(formatReasoning('thinking', false, true)).toBe('thinking')
     expect(formatReasoning('thinking', false, false)).toBe('thinking')
-    expect(formatReasoning('thinking', false, false, 1250)).toBe('thinking\n\nThought for 1.3s')
+    expect(formatReasoning('thinking', false, false, 1250)).toBe('thinking')
     expect(formatReasoning('thinking', true, false)).toBe('thinking')
     expect(formatReasoning('', false, false)).toBeUndefined()
+    expect(formatThinkingDuration(1250)).toBe('1.3s')
   })
 
   it('keeps non-verbose tool previews to one line', () => {
