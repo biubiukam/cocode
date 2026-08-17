@@ -101,12 +101,15 @@ class ConversationAssembler implements Assembler {
     const next: ConversationNode[] = []
     for (const context of this.order) {
       if (context.dirty) {
-        context.node = context.definition.buildViewNode({
+        const built = context.definition.buildViewNode({
           kind: context.kind,
           id: context.id,
           startSeq: context.startSeq,
           state: context.state,
         })
+        // Definitions mutate their state in place, so copy on publish: the
+        // presentation layer keys render caches on node identity.
+        context.node = built === null ? null : ({ ...built } as ConversationNode)
         context.dirty = false
       }
       if (context.node !== null) next.push(context.node)

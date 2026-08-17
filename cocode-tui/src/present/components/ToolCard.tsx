@@ -1,4 +1,5 @@
 import { Box, Text } from 'ink'
+import { memo } from 'react'
 import type { ToolNode } from '../../runtime/nodes/types.ts'
 import { formatToolResult } from '../text-format.ts'
 import { BODY_INDENT, messageContentColumns } from '../layout.ts'
@@ -12,7 +13,9 @@ import type { MessageTextRange } from '../message-text-selection.ts'
 import { SelectableText } from './SelectableText.tsx'
 import { useAnimationTick } from '../use-spinner.ts'
 
-export function ToolCard(props: { node: ToolNode; verbose: boolean; locale: UiLocale; maxColumns?: number; selected?: boolean; attached?: boolean; textSelection?: MessageTextRange }) {
+// A running tool keeps re-rendering through its animation tick, so memoising
+// here only skips cards whose call has already finished.
+export const ToolCard = memo(function ToolCard(props: { node: ToolNode; verbose: boolean; locale: UiLocale; maxColumns?: number; selected?: boolean; attached?: boolean; textSelection?: MessageTextRange }) {
   const { node, verbose } = props
   useAnimationTick(node.status === 'running')
   const summary = projectToolSummary(node, props.locale, props.maxColumns ?? 120, Date.now())
@@ -62,7 +65,7 @@ export function ToolCard(props: { node: ToolNode; verbose: boolean; locale: UiLo
       </Box>
     </MessageRail>
   )
-}
+})
 
 function DiffLines(props: { summary: NonNullable<Extract<ToolNode['view'], { kind: 'diff' }>['summary']> }) {
   return (

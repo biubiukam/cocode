@@ -102,6 +102,39 @@ describe('Assembler', () => {
     ])
   })
 
+  it('republishes a changed node as a new object and keeps settled ones stable', () => {
+    const a = assembler()
+    a.ingest(
+      ev('user/message', 1, {
+        id: 'm1',
+        role: 'user',
+        content: [{ type: 'text', text: 'hello' }],
+        source: { kind: 'user' },
+      }),
+    )
+    a.ingest(
+      ev('assistant/chunk', 2, {
+        turn: 1,
+        step: 0,
+        chunk: { type: 'text-delta', index: 0, text: 'Hel' },
+      }),
+    )
+    const first = a.snapshot()
+    a.ingest(
+      ev('assistant/chunk', 3, {
+        turn: 1,
+        step: 0,
+        chunk: { type: 'text-delta', index: 0, text: 'lo' },
+      }),
+    )
+    const second = a.snapshot()
+
+    expect(second[0]).toBe(first[0])
+    expect(second[1]).not.toBe(first[1])
+    expect(first[1]).toMatchObject({ text: 'Hel' })
+    expect(second[1]).toMatchObject({ text: 'Hello' })
+  })
+
   it('merges assistant chunks then seals on message', () => {
     const a = assembler()
     a.ingest(

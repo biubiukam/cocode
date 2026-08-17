@@ -1,4 +1,5 @@
 import { Box, Text } from 'ink'
+import { memo } from 'react'
 import type { AssistantNode } from '../../runtime/nodes/types.ts'
 import { Markdown, StreamingMarkdown } from './Markdown.tsx'
 import { MessageRail } from './MessageRail.tsx'
@@ -23,7 +24,9 @@ function shiftRange(
   return { start: selection.start + offset, end: selection.end + offset }
 }
 
-export function AssistantRow(props: {
+// A streaming reply is republished as a new node per chunk, so memoising here
+// only skips replies that have already settled.
+export const AssistantRow = memo(function AssistantRow(props: {
   node: AssistantNode
   verbose: boolean
   locale: UiLocale
@@ -106,4 +109,4 @@ export function AssistantRow(props: {
       ) : null}
     </MessageRail>
   )
-}
+})

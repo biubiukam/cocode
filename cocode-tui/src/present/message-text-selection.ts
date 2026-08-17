@@ -8,8 +8,8 @@ import { formatToolSummaryLine } from './tool-display.ts'
 import { formatReasoning } from './text-format.ts'
 import { wrapPlainText } from './text-wrap.ts'
 import { layoutMarkdownSource } from './markdown-layout.ts'
-import { estimateNodeRows, nodeAttached } from './visible-tail.ts'
-import { resolveMessageWindow } from './message-scroll.ts'
+import { nodeAttached } from './visible-tail.ts'
+import { measureTranscript } from './transcript-layout.ts'
 
 export type MessageTextPoint = {
   nodeKey: string
@@ -119,16 +119,24 @@ export function textPointAtViewportRow(options: { nodes: readonly ConversationNo
     locale: options.locale,
     maxColumns: options.maxColumns,
   }
-  const window = resolveMessageWindow(options.nodes, options.maxRows, verbose, expandedNodeIds, options.scrollOffset, options.maxColumns)
+  const layout = measureTranscript({
+    nodes: options.nodes,
+    maxRows: options.maxRows,
+    verbose,
+    expandedNodeIds,
+    maxColumns: options.maxColumns,
+    scrollOffset: options.scrollOffset,
+  })
+  const window = layout.window
   const columns = messageContentColumns(options.maxColumns) ?? 80
   let rowStart = -window.hiddenRowsBefore
-  const startIndex = window.nodes[0] === undefined ? 0 : options.nodes.indexOf(window.nodes[0])
+  const startIndex = window.startIndex
   for (let offset = 0; offset < window.nodes.length; offset += 1) {
     const node = window.nodes[offset]
     if (node === undefined) continue
     const key = nodeKey(node.kind, node.id)
     const attached = nodeAttached(options.nodes, startIndex + offset)
-    const nodeRows = estimateNodeRows(node, verbose, expandedNodeIds?.has(key) === true, options.maxColumns, attached)
+    const nodeRows = layout.rows[startIndex + offset] ?? 0
     if (options.viewportRow >= rowStart && options.viewportRow < rowStart + nodeRows) {
       const text = selectableNodeText(node, view)
       if (text === '') return undefined

@@ -628,14 +628,23 @@ export function Chat(props: {
     mainChecklistRows +
     statusRows +
     editorRows
-  const messageContentColumns =
-    transcriptPaintColumns(
+  const messageContentColumns = useMemo(
+    () =>
+      transcriptPaintColumns(
+        displayNodes,
+        messageMaxRows,
+        snap.verbose,
+        expandedMessageIds,
+        mainColumns,
+      ) ?? Math.max(1, mainColumns),
+    [
       displayNodes,
-      messageMaxRows,
-      snap.verbose,
       expandedMessageIds,
       mainColumns,
-    ) ?? Math.max(1, mainColumns)
+      messageMaxRows,
+      snap.verbose,
+    ],
+  )
   const composerHeader = composerHeaderLayout({
     composer: snap.composer,
     agent: snap.agent,

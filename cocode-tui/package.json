@@ -14,6 +14,7 @@
     "start": "node ./bin/cocode-tui.mjs",
     "typecheck": "tsc --noEmit && pnpm -r typecheck",
     "test": "vitest run",
+    "bench": "vitest bench --run",
     "lint": "oxlint src packages test",
     "lint:fix": "oxlint --fix src packages test",
     "format": "pnpm run lint:fix",
