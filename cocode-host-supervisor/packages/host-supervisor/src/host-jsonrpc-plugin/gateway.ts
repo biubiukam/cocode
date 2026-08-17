@@ -21,6 +21,11 @@ import type {
 
 type SessionRecord = { handle: AgentHandle; seed?: SessionEvent[]; owned: boolean }
 
+type AgentPresetsService = {
+  resolve(id?: string): Promise<{ id: string }>
+  mount(agentCtx: unknown, id?: string): Promise<unknown>
+}
+
 type UserQuestion = {
   id: string
   question: string
@@ -139,6 +144,7 @@ type PersistenceService = {
       cwd?: string
       parentSession?: string
       seedLength?: number
+      agentPreset?: string
     }
     events: SessionEvent[]
   }>
@@ -601,6 +607,9 @@ export class TuiCompanionGateway {
     const sessionId = params.childSessionId ?? `session-${randomUUID().replaceAll('-', '')}`
     if (this.ctx.agents.get(sessionId) !== undefined)
       throw new Error(`session "${sessionId}" already exists`)
+    const composition = await this.agentComposition(
+      resolveSessionPreset(source.handle.agent.session.header, source.handle.agent.session.events),
+    )
     const handle = await this.ctx.agents.create({
       sessionId,
       seed,
@@ -608,12 +617,16 @@ export class TuiCompanionGateway {
         cwd: this.cwd,
         parentSession: source.handle.agent.session.id,
         seedLength: seed.length,
+        ...(composition.agentPreset === undefined
+          ? {}
+          : { agentPreset: composition.agentPreset }),
       },
       agentOptions: {
         provider: this.provider,
         model: this.model,
         ...(this.maxTokens === undefined ? {} : { maxTokens: this.maxTokens }),
       },
+      ...(composition.setup === undefined ? {} : { setup: composition.setup }),
     })
     this.sessions.set(sessionId, { handle, owned: true })
     await this.replaceSession(params.replaceSessionId, sessionId)
@@ -920,14 +933,21 @@ export class TuiCompanionGateway {
   }
 
   private async createSession(sessionId: string): Promise<SessionRecord> {
+    const composition = await this.agentComposition()
     const handle = await this.ctx.agents.create({
       sessionId,
-      meta: { cwd: this.cwd },
+      meta: {
+        cwd: this.cwd,
+        ...(composition.agentPreset === undefined
+          ? {}
+          : { agentPreset: composition.agentPreset }),
+      },
       agentOptions: {
         provider: this.provider,
         model: this.model,
         ...(this.maxTokens === undefined ? {} : { maxTokens: this.maxTokens }),
       },
+      ...(composition.setup === undefined ? {} : { setup: composition.setup }),
     })
     const record = { handle, owned: true }
     this.sessions.set(sessionId, record)
@@ -941,6 +961,9 @@ export class TuiCompanionGateway {
     const inspection = await persistence.inspect(sessionId)
     if (inspection.meta.cwd !== this.cwd)
       throw new Error(`session belongs to a different workspace: ${sessionId}`)
+    const composition = await this.agentComposition(
+      resolveSessionPreset(inspection.meta, inspection.events),
+    )
     const handle = await this.ctx.agents.resume({
       resumeSessionId: sessionId,
       agentOptions: {
@@ -948,8 +971,24 @@ export class TuiCompanionGateway {
         model: this.model,
         ...(this.maxTokens === undefined ? {} : { maxTokens: this.maxTokens }),
       },
+      ...(composition.setup === undefined ? {} : { setup: composition.setup }),
     })
     return { handle, seed: [...inspection.events], owned: true }
+  }
+
+  private async agentComposition(agentPreset?: string): Promise<{
+    agentPreset?: string
+    setup?: (agentCtx: unknown) => Promise<void>
+  }> {
+    const presets = this.ctx.get<AgentPresetsService>('agentPresets')
+    if (presets === undefined) return {}
+    const resolved = await presets.resolve(agentPreset)
+    return {
+      agentPreset: resolved.id,
+      setup: async (agentCtx) => {
+        await presets.mount(agentCtx, resolved.id)
+      },
+    }
   }
 
   private borrowSession(agent: Agent): SessionRecord {
@@ -1262,6 +1301,20 @@ function pluginFiberPhase(state: unknown): PluginFiberPhase {
   if (state === 3 || state === 'FAILED') return 'failed'
   if (state === 5 || state === 'UNLOADING') return 'unloading'
   return null
+}
+
+function resolveSessionPreset(
+  header: { agentPreset?: string },
+  events: readonly SessionEvent[],
+): string | undefined {
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index]
+    if (event?.type !== 'agent-preset/selected' || !isRecord(event.data)) continue
+    if (typeof event.data.agentPreset === 'string' && event.data.agentPreset.trim() !== '') {
+      return event.data.agentPreset
+    }
+  }
+  return header.agentPreset
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

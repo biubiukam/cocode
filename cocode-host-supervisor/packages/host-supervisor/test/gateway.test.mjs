@@ -4,6 +4,7 @@ import { TuiCompanionGateway } from '../lib/host-jsonrpc-plugin.js'
 
 function createContext(options = {}) {
   const followed = []
+  const created = []
   let activeAgent
   const ctx = {
     agents: {
@@ -11,13 +12,23 @@ function createContext(options = {}) {
         return activeAgent?.id === id ? activeAgent : undefined
       },
       async create(agentOptions) {
+        if (typeof agentOptions.setup === 'function') {
+          await agentOptions.setup({ agent: { id: 'agent-1' } })
+        }
         activeAgent = {
           id: 'agent-1',
           options: agentOptions,
           session: {
             id: agentOptions.sessionId,
             events: [],
-            header: { id: agentOptions.sessionId, createdAt: 1, cwd: agentOptions.meta?.cwd },
+            header: {
+              id: agentOptions.sessionId,
+              createdAt: 1,
+              cwd: agentOptions.meta?.cwd,
+              ...(typeof agentOptions.meta?.agentPreset === 'string'
+                ? { agentPreset: agentOptions.meta.agentPreset }
+                : {}),
+            },
           },
           status: 'idle',
           followup(message) {
@@ -27,6 +38,7 @@ function createContext(options = {}) {
           cancel() {},
           async whenIdle() {},
         }
+        created.push(activeAgent)
         return { agent: activeAgent, async dispose() {} }
       },
       async resume() {
@@ -62,6 +74,7 @@ function createContext(options = {}) {
       }
       if (name === 'cocodeVision') return options.vision
       if (name === 'skills') return options.skills
+      if (name === 'agentPresets') return options.agentPresets
       if (name === 'loader') {
         return options.loader ?? {
           entries() {
@@ -75,7 +88,7 @@ function createContext(options = {}) {
       return () => undefined
     },
   }
-  return { ctx, followed }
+  return { ctx, followed, created }
 }
 
 function createGateway(ctx) {
@@ -165,6 +178,98 @@ test('passes images directly to models that declare native image input', async (
   await gateway.prompt({ sessionId: 's1', contentBlocks: [imageBlock] })
 
   assert.deepEqual(followed[0]?.content, [imageBlock])
+})
+
+test('mounts the default agent preset before creating a TUI session', async () => {
+  const mounted = []
+  const { ctx, followed } = createContext({
+    agentPresets: {
+      async resolve(id) {
+        return { id: id ?? 'standard' }
+      },
+      async mount(_agentCtx, id) {
+        mounted.push(id)
+        return { id: id ?? 'standard' }
+      },
+    },
+  })
+  const gateway = createGateway(ctx)
+  await initialize(gateway)
+
+  await gateway.prompt({ sessionId: 's1', contentBlocks: [{ type: 'text', text: 'hello' }] })
+
+  assert.deepEqual(mounted, ['standard'])
+  assert.equal(followed.length, 1)
+})
+
+test('restores the latest preset selected in a persisted session log', async () => {
+  const mounted = []
+  const { ctx } = createContext({
+    agentPresets: {
+      async resolve(id) {
+        return { id: id ?? 'standard' }
+      },
+      async mount(_agentCtx, id) {
+        mounted.push(id)
+      },
+    },
+  })
+  const originalGet = ctx.get.bind(ctx)
+  ctx.get = name => name === 'sessionPersistence'
+    ? {
+        async inspect() {
+          return {
+            meta: { id: 'persisted', createdAt: 1, cwd: '/tmp', agentPreset: 'standard' },
+            events: [{
+              type: 'agent-preset/selected',
+              seq: 1,
+              time: 1,
+              data: { agentPreset: 'minimal' },
+            }],
+          }
+        },
+      }
+    : originalGet(name)
+  ctx.agents.resume = async agentOptions => ctx.agents.create({
+    sessionId: 'persisted',
+    meta: { cwd: '/tmp' },
+    setup: agentOptions.setup,
+  })
+  const gateway = createGateway(ctx)
+  await initialize(gateway)
+
+  await gateway.open({ sessionId: 'persisted' })
+
+  assert.deepEqual(mounted, ['minimal'])
+})
+
+test('inherits the source session preset when forking a TUI session', async () => {
+  const mounted = []
+  const { ctx, created } = createContext({
+    agentPresets: {
+      async resolve(id) {
+        return { id: id ?? 'standard' }
+      },
+      async mount(_agentCtx, id) {
+        mounted.push(id)
+      },
+    },
+  })
+  const gateway = createGateway(ctx)
+  await initialize(gateway)
+
+  await gateway.prompt({ sessionId: 'source', contentBlocks: [{ type: 'text', text: 'hello' }] })
+  created[0].session.events.push({
+    type: 'agent-preset/selected',
+    seq: 1,
+    time: 1,
+    data: { agentPreset: 'minimal' },
+  })
+
+  await gateway.fork({ sourceSessionId: 'source', childSessionId: 'child' })
+
+  assert.deepEqual(mounted, ['standard', 'minimal'])
+  assert.equal(created[1].options.meta.agentPreset, 'minimal')
 })
 
 test('uses exact model capabilities when a native vision model is not listed', async () => {
