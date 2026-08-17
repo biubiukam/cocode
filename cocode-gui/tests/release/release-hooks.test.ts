@@ -36,19 +36,53 @@ test("normalizes macOS DMG, ZIP and PKG artifact names with platform and archite
 	}
 })
 
-test("preserves the complete Windows arm64 Squirrel feed for isolated publication", () => {
+test("normalizes Windows MSIX names by architecture", () => {
+	const root = mkdtempSync(path.join(os.tmpdir(), "cocode-release-hooks-"))
+	try {
+		const msix = path.join(root, "Cocode.msix")
+		writeFileSync(msix, "msix")
+		const result: ForgeMakeResult = {
+			platform: "win32",
+			arch: "arm64",
+			packageJSON: { version: "1.2.3" },
+			artifacts: [msix],
+		}
+		const [normalized] = normalizeArtifactNames([result])
+		assert.deepEqual(normalized?.artifacts, [
+			path.join(root, "Cocode-Desktop-1.2.3-win32-arm64.msix"),
+		])
+	} finally {
+		rmSync(root, { recursive: true, force: true })
+	}
+})
+
+test("publishes x64 Squirrel metadata but filters ARM64 metadata", () => {
+	const x64: ForgeMakeResult = {
+		platform: "win32",
+		arch: "x64",
+		packageJSON: { version: "1.2.3" },
+		artifacts: ["/tmp/x64-Setup.exe", "/tmp/RELEASES", "/tmp/x64.nupkg"],
+	}
+	const arm64: ForgeMakeResult = {
+		platform: "win32",
+		arch: "arm64",
+		packageJSON: { version: "1.2.3" },
+		artifacts: ["/tmp/arm64.msix", "/tmp/RELEASES", "/tmp/arm64.nupkg"],
+	}
+	const [selectedX64, selectedArm64] = selectGitHubReleaseArtifacts([x64, arm64])
+	assert.deepEqual(selectedX64?.artifacts, x64.artifacts)
+	assert.deepEqual(selectedArm64?.artifacts, ["/tmp/arm64.msix"])
+})
+
+test("preserves non-feed Windows ARM64 manual installers", () => {
 	const result: ForgeMakeResult = {
 		platform: "win32",
 		arch: "arm64",
 		packageJSON: { version: "1.2.3" },
-		artifacts: ["/tmp/arm64-Setup.exe", "/tmp/RELEASES", "/tmp/arm64.nupkg"],
+		artifacts: ["/tmp/Cocode-Desktop-1.2.3-win32-arm64-Setup.exe"],
 	}
 	const [selected] = selectGitHubReleaseArtifacts([result])
-	assert.deepEqual(selected?.artifacts, [
-		"/tmp/arm64-Setup.exe",
-		"/tmp/RELEASES",
-		"/tmp/arm64.nupkg",
-	])
+	assert.deepEqual(selected?.artifacts, result.artifacts)
 })
 
 test("skips files while searching for the packaged macOS app", () => {

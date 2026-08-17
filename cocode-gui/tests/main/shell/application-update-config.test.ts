@@ -3,6 +3,7 @@ import test from "node:test"
 import {
 	resolveApplicationUpdateConfig,
 	resolveGitHubRepositoryFromUrl,
+	resolvePublicMsixFeedUrl,
 } from "../../../src/main/shell/updater/application-update-config"
 
 const base = {
@@ -17,6 +18,7 @@ test("enables packaged macOS updates with a ten-minute default interval", () => 
 		enabled: true,
 		repository: "cocode-agency/cocode",
 		updateInterval: "10 minutes",
+		channel: "macos",
 	})
 })
 
@@ -29,59 +31,82 @@ test("honors the repository and interval environment overrides", () => {
 				ELECTRON_UPDATE_INTERVAL: "1 hour",
 			},
 		}),
-		{ enabled: true, repository: "acme/desktop", updateInterval: "1 hour" },
+		{ enabled: true, repository: "acme/desktop", updateInterval: "1 hour", channel: "macos" },
 	)
 })
 
-test("enables packaged Windows x64 and arm64 updates", () => {
+test("enables packaged Windows Squirrel x64 and MSIX x64/arm64 updates", () => {
 	assert.deepEqual(
-		resolveApplicationUpdateConfig({ ...base, platform: "win32", architecture: "x64" }),
+		resolveApplicationUpdateConfig({
+			...base,
+			platform: "win32",
+			architecture: "x64",
+			windowsStore: false,
+		}),
 		{
 			enabled: true,
 			repository: "cocode-agency/cocode",
 			updateInterval: "10 minutes",
+			channel: "squirrel",
 		},
 	)
 	assert.deepEqual(
 		resolveApplicationUpdateConfig({
 			...base,
 			platform: "win32",
-			architecture: "arm64",
-			embeddedWindowsArm64Repository: "cocode-agency/cocode-win32-arm64",
+			architecture: "x64",
+			windowsStore: true,
 		}),
 		{
 			enabled: true,
-			repository: "cocode-agency/cocode-win32-arm64",
+			repository: "cocode-agency/cocode",
 			updateInterval: "10 minutes",
+			channel: "msix",
+		},
+	)
+	assert.deepEqual(
+		resolveApplicationUpdateConfig({
+			...base,
+			platform: "win32",
+			architecture: "arm64",
+			windowsStore: true,
+		}),
+		{
+			enabled: true,
+			repository: "cocode-agency/cocode",
+			updateInterval: "10 minutes",
+			channel: "msix",
 		},
 	)
 })
 
-test("prefers a runtime Windows arm64 repository over the embedded release repository", () => {
+test("disables legacy Windows arm64 Squirrel updates", () => {
 	assert.deepEqual(
 		resolveApplicationUpdateConfig({
 			...base,
 			platform: "win32",
 			architecture: "arm64",
-			embeddedWindowsArm64Repository: "acme/embedded-arm64",
-			environment: {
-				ELECTRON_UPDATE_REPOSITORY_WIN32_ARM64: "acme/runtime-arm64",
-				ELECTRON_UPDATE_REPOSITORY: "acme/generic",
-			},
+			windowsStore: false,
 		}),
-		{ enabled: true, repository: "acme/runtime-arm64", updateInterval: "10 minutes" },
+		{ enabled: false, reason: "legacy-squirrel-package" },
 	)
 })
 
-test("falls back to the generic repository when an arm64-specific repository is absent", () => {
+test("uses the shared repository override for MSIX updates", () => {
 	assert.deepEqual(
 		resolveApplicationUpdateConfig({
 			...base,
 			platform: "win32",
 			architecture: "arm64",
-			environment: { ELECTRON_UPDATE_REPOSITORY: "acme/generic" },
+			windowsStore: true,
+			environment: { ELECTRON_UPDATE_REPOSITORY: "acme/desktop" },
 		}),
-		{ enabled: true, repository: "acme/generic", updateInterval: "10 minutes" },
+		{
+			enabled: true,
+			repository: "acme/desktop",
+			updateInterval: "10 minutes",
+			channel: "msix",
+		},
 	)
 })
 
@@ -117,10 +142,18 @@ test("allows explicit opt-out and rejects unsafe intervals or repository values"
 	assert.throws(() =>
 		resolveApplicationUpdateConfig({
 			...base,
-			platform: "win32",
-			architecture: "arm64",
-			environment: { ELECTRON_UPDATE_REPOSITORY_WIN32_ARM64: "acme" },
+			environment: { ELECTRON_UPDATE_INTERVAL: "0 hours" },
 		}),
+	)
+	assert.throws(() =>
+		resolveApplicationUpdateConfig({
+			...base,
+			environment: { ELECTRON_UPDATE_REPOSITORY: "acme" },
+		}),
+	)
+	assert.equal(
+		resolvePublicMsixFeedUrl("acme/desktop", "arm64", "1.2.3"),
+		"https://update.electronjs.org/acme/desktop/win32-arm64/msix/1.2.3",
 	)
 })
 

@@ -4,6 +4,7 @@ import { createHash } from "node:crypto"
 import { existsSync, readdirSync } from "node:fs"
 import fs from "node:fs/promises"
 import path from "node:path"
+import { MakerMSIX } from "@electron-forge/maker-msix"
 import { MakerSquirrel } from "@electron-forge/maker-squirrel"
 import { MakerZIP } from "@electron-forge/maker-zip"
 import { MakerDeb } from "@electron-forge/maker-deb"
@@ -15,6 +16,7 @@ import packageMetadata from "./package.json"
 import {
 	createMacNotarizeOptions,
 	createMacSignOptions,
+	createMsixConfig,
 	createSquirrelConfig,
 	createWindowsSignOptions,
 	loadReleaseEnvironment,
@@ -159,6 +161,9 @@ const config: ForgeConfig = {
 			createSquirrelConfig(packageMetadata.version, process.env, windowsSignOptions),
 			["win32"],
 		),
+		new MakerMSIX(createMsixConfig(packageMetadata.version, process.env, windowsSignOptions), [
+			"win32",
+		]),
 		new MakerZIP({}, ["darwin"]),
 		new MakerRpm({}),
 		new MakerDeb({}),
@@ -167,7 +172,7 @@ const config: ForgeConfig = {
 		{
 			name: "@electron-forge/publisher-github",
 			config: {
-				repository: resolveGitHubReleaseRepository(process.env, releaseTarget),
+				repository: resolveGitHubReleaseRepository(process.env),
 				tagPrefix: "v",
 				draft: true,
 				prerelease: false,

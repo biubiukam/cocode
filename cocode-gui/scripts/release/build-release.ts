@@ -4,7 +4,6 @@ import * as path from "pathe"
 import {
 	loadReleaseEnvironment,
 	requireReleaseCredentials,
-	requireReleaseUpdateRepository,
 	resolveReleaseTarget,
 	resolveWindowsSignMode,
 } from "./release-config"
@@ -38,7 +37,6 @@ if (target.arch !== process.arch)
 		`Release builds must run on native ${target.arch}; current process is ${process.arch}.`,
 	)
 requireReleaseCredentials(target, environment)
-requireReleaseUpdateRepository(target, environment)
 
 if (target.platform === "win32" && resolveWindowsSignMode(environment) === "service") {
 	rmSync(environment.WINDOWS_SIGN_LEDGER_DIR, { recursive: true, force: true })

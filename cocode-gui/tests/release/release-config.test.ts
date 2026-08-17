@@ -2,16 +2,16 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import {
 	createMacNotarizeOptions,
+	createMsixConfig,
 	createSquirrelConfig,
 	createWindowsSignOptions,
 	requireReleaseCredentials,
-	requireReleaseUpdateRepository,
 	resolveGitHubReleaseRepository,
 	resolveMacCliInstallPath,
 	resolveMacInstallerSigningIdentity,
+	resolveMsixPackageVersion,
 	resolveReleaseTarget,
 	resolveWindowsSignMode,
-	resolveWindowsArm64UpdateRepository,
 	resolveWindowsSignServiceOptions,
 } from "../../scripts/release/release-config"
 
@@ -69,27 +69,42 @@ test("generates architecture-safe Squirrel names", () => {
 	)
 })
 
-test("requires and selects an isolated Windows arm64 update repository", () => {
+test("uses the main repository for every release architecture", () => {
 	const environment = {
 		GITHUB_REPOSITORY: "acme/cocode",
-		ELECTRON_UPDATE_REPOSITORY_WIN32_ARM64: "acme/cocode-win32-arm64",
 	}
-	assert.equal(resolveWindowsArm64UpdateRepository(environment), "acme/cocode-win32-arm64")
-	assert.deepEqual(
-		resolveGitHubReleaseRepository(environment, { platform: "win32", arch: "arm64" }),
-		{ owner: "acme", name: "cocode-win32-arm64" },
-	)
-	assert.deepEqual(
-		resolveGitHubReleaseRepository(environment, { platform: "win32", arch: "x64" }),
-		{ owner: "acme", name: "cocode" },
-	)
-	assert.doesNotThrow(() =>
-		requireReleaseUpdateRepository({ platform: "win32", arch: "arm64" }, environment),
-	)
-	assert.throws(() => requireReleaseUpdateRepository({ platform: "win32", arch: "arm64" }, {}))
+	assert.deepEqual(resolveGitHubReleaseRepository(environment), {
+		owner: "acme",
+		name: "cocode",
+	})
+})
+
+test("creates architecture-safe MSIX configuration", () => {
+	const config = createMsixConfig("1.2.3", {
+		RELEASE_ARCH: "arm64",
+		WINDOWS_MSIX_PACKAGE_ID: "CocodeDesktop",
+		WINDOWS_MSIX_PUBLISHER: "CN=Cocode Contributors",
+		WINDOWS_MSIX_PUBLISHER_DISPLAY_NAME: "Cocode Contributors",
+		WINDOWS_MSIX_PACKAGE_DISPLAY_NAME: "Cocode Desktop",
+	})
+	assert.equal(config.packageName, "Cocode-Desktop-1.2.3-win32-arm64")
+	assert.deepEqual(config.manifestVariables, {
+		packageIdentity: "CocodeDesktop",
+		publisher: "CN=Cocode Contributors",
+		publisherDisplayName: "Cocode Contributors",
+		packageDisplayName: "Cocode Desktop",
+		packageDescription: "Cocode Desktop",
+		packageVersion: "1.2.3.0",
+		targetArch: "arm64",
+	})
+	assert.equal(resolveMsixPackageVersion("1.2.3"), "1.2.3.0")
+	assert.throws(() => resolveMsixPackageVersion("1.2.3-beta.1"))
+	assert.throws(() => resolveMsixPackageVersion("01.2.3"))
+	assert.throws(() => resolveMsixPackageVersion("65536.0.0"))
 	assert.throws(() =>
-		resolveWindowsArm64UpdateRepository({
-			ELECTRON_UPDATE_REPOSITORY_WIN32_ARM64: "invalid",
+		createMsixConfig("1.2.3", {
+			RELEASE_ARCH: "x64",
+			WINDOWS_MSIX_PACKAGE_ID: "invalid_identity",
 		}),
 	)
 })
@@ -162,6 +177,8 @@ test("service mode does not require or consume PFX values", () => {
 				WINDOWS_SIGN_SERVICE_URL: "https://signing.example.test",
 				WINDOWS_CERTIFICATE_FILE: "C:\\ignored\\certificate.pfx",
 				WINDOWS_CERTIFICATE_PASSWORD: "ignored",
+				WINDOWS_MSIX_PACKAGE_ID: "CocodeDesktop",
+				WINDOWS_MSIX_PUBLISHER: "CN=Cocode Contributors",
 			},
 		),
 	)
