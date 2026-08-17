@@ -451,8 +451,7 @@ describe('AuthStore', () => {
       openUrl: () => undefined,
     })
     store.dispatch({ type: 'chooseCocode' })
-    await new Promise((resolve) => setTimeout(resolve, 10))
-    expect(store.snapshot().phase).toBe('failed')
+    await waitFor(store, (snap) => snap.phase === 'failed')
     expect((await readCredentials(home)).COCODE_NUT_API_KEY).toBeUndefined()
     expect(await readAccount(home)).toBeUndefined()
   })
