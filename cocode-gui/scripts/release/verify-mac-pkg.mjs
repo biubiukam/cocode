@@ -19,15 +19,20 @@ const payload = execFileSync("pkgutil", ["--payload-files", pkgPath], {
 })
 const required = [
 	"Cocode.app/Contents/Resources/cocode-node",
+	"Cocode.app/Contents/Resources/tui/cocode-cli.mjs",
+	"Cocode.app/Contents/Resources/tui/cli.mjs",
 	"Cocode.app/Contents/Resources/tui/cocode-tui.mjs",
 	"Cocode.app/Contents/Resources/dsh-runtime/packages/host-supervisor/lib/bin.js",
 ]
 // pkgutil lists payload paths relative to the component install location, so
 // entries may or may not carry the "Applications/" prefix depending on macOS.
 const entries = new Set(
-	payload
-		.split(/\r?\n/)
-		.map((entry) => entry.trim().replace(/^\.\//, "").replace(/^Applications\//, "")),
+	payload.split(/\r?\n/).map((entry) =>
+		entry
+			.trim()
+			.replace(/^\.\//, "")
+			.replace(/^Applications\//, ""),
+	),
 )
 for (const file of required) {
 	if (!entries.has(file)) {

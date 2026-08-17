@@ -1,8 +1,8 @@
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { endpointFor, leaseDirectory, scopeDirectory, scopePath, supervisorHome } from './paths.js'
+import { descriptorPath, endpointFor, leaseDirectory, scopeDirectory, scopePath, supervisorHome } from './paths.js'
 import { canonicalizeScope, isHostDescriptorCompatible, LEASE_TTL_MS, SUPERVISOR_BUILD_REVISION, type AcquireHostRequest, type HostDescriptor, type HostLease, type HostScope, type HostSupervisorClient } from './protocol.js'
 import { openLineConnection, type LinePeer } from './ipc.js'
 
@@ -91,6 +91,35 @@ export class LocalHostSupervisorClient implements HostSupervisorClient {
     finally {
       // `peer` is intentionally scoped to this status request and never owns a lease.
       // The finally block is below the try so connection errors are also cleaned up.
+      peer?.close()
+    }
+  }
+
+  async stop(scope: HostScope, options: { force?: boolean } = {}): Promise<{ stopped: boolean; descriptor: HostDescriptor | null }> {
+    const directory = scopeDirectory(canonicalizeScope(scope))
+    let peer: LinePeer | undefined
+    try {
+      peer = await openLineConnection(endpointFor(directory))
+      const descriptor = await peer.request<HostDescriptor | null>('status', { scope: canonicalizeScope(scope) })
+      await peer.request('stop', { force: options.force === true })
+      return { stopped: true, descriptor }
+    } catch (error) {
+      if (isConnectionUnavailable(error)) {
+        const orphan = readDescriptor(directory)
+        if (orphan === null || !isProcessAlive(orphan.hostPid) || isProcessAlive(orphan.supervisorPid)) {
+          return { stopped: false, descriptor: orphan }
+        }
+        const lease = await this.acquire({
+          scope: canonicalizeScope(scope),
+          clientKind: 'standalone-tui',
+          requiredServices: [],
+          minProtocolRevision: '1.0',
+        })
+        await lease.release().catch(() => undefined)
+        return this.stop(scope, options)
+      }
+      throw error
+    } finally {
       peer?.close()
     }
   }
@@ -203,6 +232,17 @@ function isProcessAlive(pid: number): boolean {
   } catch (error) {
     return (error as NodeJS.ErrnoException).code === 'EPERM'
   }
+}
+
+function isConnectionUnavailable(error: unknown): boolean {
+  const code = typeof error === 'object' && error !== null && 'code' in error
+    ? (error as NodeJS.ErrnoException).code
+    : undefined
+  return code === 'ENOENT' || code === 'ECONNREFUSED' || code === 'ENOTFOUND' || String(error).includes('IPC connection closed')
+}
+
+function readDescriptor(directory: string): HostDescriptor | null {
+  try { return JSON.parse(readFileSync(descriptorPath(directory), 'utf8')) as HostDescriptor } catch { return null }
 }
 
 export function createHostSupervisorClient(options?: SupervisorClientOptions): HostSupervisorClient {

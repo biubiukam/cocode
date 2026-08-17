@@ -18,13 +18,20 @@ export function buildTui({ output = defaultOutput() } = {}) {
 
 	const sourceEntry = path.join(tuiRoot, "dist", "cocode-tui.mjs")
 	const sourceMeta = path.join(tuiRoot, "dist", "cocode-tui.meta.json")
+	const sourceCli = path.join(tuiRoot, "bin", "cocode-tui.mjs")
+	const sourceCliModule = path.join(tuiRoot, "bin", "cli.mjs")
 	if (!existsSync(sourceEntry)) throw new Error(`TUI build did not emit ${sourceEntry}`)
 	if (!existsSync(sourceMeta)) throw new Error(`TUI build did not emit ${sourceMeta}`)
+	if (!existsSync(sourceCli)) throw new Error(`TUI CLI entry is missing: ${sourceCli}`)
+	if (!existsSync(sourceCliModule))
+		throw new Error(`TUI CLI module is missing: ${sourceCliModule}`)
 
 	rmSync(output, { recursive: true, force: true })
 	mkdirSync(output, { recursive: true })
 	copyFileSync(sourceEntry, path.join(output, "cocode-tui.mjs"))
 	copyFileSync(sourceMeta, path.join(output, "cocode-tui.meta.json"))
+	copyFileSync(sourceCli, path.join(output, "cocode-cli.mjs"))
+	copyFileSync(sourceCliModule, path.join(output, "cli.mjs"))
 
 	const guiPackage = readJson(path.join(guiRoot, "package.json"))
 	const tuiPackage = readJson(path.join(tuiRoot, "package.json"))
@@ -37,8 +44,9 @@ export function buildTui({ output = defaultOutput() } = {}) {
 	const runtimeManifest = existsSync(runtimeManifestPath)
 		? readJson(runtimeManifestPath)
 		: undefined
-	const entryHash = sha256File(path.join(output, "cocode-tui.mjs"))
-	const buildId = process.env.GITHUB_SHA?.trim() || `local-${entryHash.slice(0, 12)}`
+	const runtimeHash = sha256File(path.join(output, "cocode-tui.mjs"))
+	const cliHash = sha256File(path.join(output, "cocode-cli.mjs"))
+	const buildId = process.env.GITHUB_SHA?.trim() || `local-${runtimeHash.slice(0, 12)}`
 
 	const manifest = {
 		schemaVersion: 1,
@@ -47,8 +55,9 @@ export function buildTui({ output = defaultOutput() } = {}) {
 		supervisorVersion: String(supervisorPackage.version),
 		dshRuntimeVersion: String(runtimeManifest?.dsh?.version ?? "unknown"),
 		protocolRevision: "1.0",
-		entry: "tui/cocode-tui.mjs",
-		sha256: entryHash,
+		entry: "tui/cocode-cli.mjs",
+		sha256: cliHash,
+		runtimeSha256: runtimeHash,
 		buildId,
 	}
 	writeFileSync(path.join(output, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`)

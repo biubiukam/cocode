@@ -244,9 +244,11 @@ function runNodeScript(script: string, args: string[]): Promise<void> {
 
 async function verifyTuiArtifact(root: string): Promise<void> {
 	const entry = path.join(root, "cocode-tui.mjs")
+	const cliEntry = path.join(root, "cocode-cli.mjs")
+	const cliModule = path.join(root, "cli.mjs")
 	const meta = path.join(root, "cocode-tui.meta.json")
 	const manifestPath = path.join(root, "manifest.json")
-	for (const file of [entry, meta, manifestPath]) {
+	for (const file of [entry, cliEntry, cliModule, meta, manifestPath]) {
 		try {
 			await fs.access(file)
 		} catch {
@@ -256,15 +258,20 @@ async function verifyTuiArtifact(root: string): Promise<void> {
 	const manifest = JSON.parse(await fs.readFile(manifestPath, "utf8")) as {
 		entry?: string
 		sha256?: string
+		runtimeSha256?: string
 		schemaVersion?: number
 	}
-	if (manifest.schemaVersion !== 1 || manifest.entry !== "tui/cocode-tui.mjs") {
+	if (manifest.schemaVersion !== 1 || manifest.entry !== "tui/cocode-cli.mjs") {
 		throw new Error("TUI artifact manifest is invalid.")
 	}
-	const hash = createHash("sha256")
+	const cliHash = createHash("sha256")
+		.update(await fs.readFile(cliEntry))
+		.digest("hex")
+	const runtimeHash = createHash("sha256")
 		.update(await fs.readFile(entry))
 		.digest("hex")
-	if (hash !== manifest.sha256) throw new Error("TUI artifact hash does not match its manifest.")
+	if (cliHash !== manifest.sha256 || runtimeHash !== manifest.runtimeSha256)
+		throw new Error("TUI artifact hash does not match its manifest.")
 }
 
 type ForgePackageResultLike = {

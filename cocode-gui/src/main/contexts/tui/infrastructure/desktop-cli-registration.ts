@@ -360,7 +360,7 @@ export function isManagedShim(contents: string | undefined): boolean {
 		(contents.includes("COCODE_TUI_CLIENT_KIND") &&
 			contents.includes("desktop-tui") &&
 			contents.includes("COCODE_NODE_EXECUTABLE") &&
-			contents.includes("cocode-tui.mjs"))
+			(contents.includes("cocode-cli.mjs") || contents.includes("cocode-tui.mjs")))
 	)
 }
 

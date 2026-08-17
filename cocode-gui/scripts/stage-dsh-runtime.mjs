@@ -63,8 +63,12 @@ function copyTree(source, target) {
 			// pathe normalizes relative paths to forward slashes on every platform.
 			const relative = path.relative(source, entry)
 			if (relative === '') return true
-			if (relative === 'node_modules' || relative.startsWith('node_modules/')) return false
-			return !relative.split('/').includes('.cache')
+			// Every installed tree is skipped, including the one pnpm creates inside
+			// each workspace package. Those directories hold links into the local
+			// store that `dereference` cannot resolve once a layout switch leaves one
+			// dangling, and materializeDependencyClosure rebuilds the closure anyway.
+			const segments = relative.split('/')
+			return !segments.includes('node_modules') && !segments.includes('.cache')
 		},
 	})
 	for (const candidate of [
