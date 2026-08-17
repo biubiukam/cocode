@@ -101,8 +101,9 @@ export function estimateNodeRows(
     }
     case 'tool': {
       const result = formatToolResult(node.result, detailed)
+      const toolName = node.name.trim() === '' ? 'tool' : node.name
       const plan =
-        (node.name === '' ? 'tool' : node.name) === 'exit_plan_mode'
+        toolName === 'exit_plan_mode'
           ? extractPartialJsonStringArgument(node.args, 'plan')
           : undefined
       const planRows =
@@ -112,13 +113,22 @@ export function estimateNodeRows(
               truncatePlanProgress(plan),
               contentColumns(maxColumns, MESSAGE_CHROME + BODY_INDENT),
             ) + 1
+      const questionRows =
+        toolName === 'ask_user_question' && node.status === 'running'
+          ? 1 +
+            (extractPartialJsonStringArgument(node.args, 'question') ===
+            undefined
+              ? 0
+              : 1)
+          : 0
       const gap = attached ? 0 : BLOCK_GAP
-      if (!detailed) return gap + 1 + planRows
+      if (!detailed) return gap + 1 + planRows + questionRows
       const columns = contentColumns(maxColumns, MESSAGE_CHROME)
       return (
         gap +
         1 +
         planRows +
+        questionRows +
         countWrappedRows(node.args, columns) +
         countWrappedRows(result, columns) +
         (node.error === undefined ? 0 : 1)

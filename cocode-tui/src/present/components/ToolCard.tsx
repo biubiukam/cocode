@@ -1,60 +1,60 @@
-import { Box, Text } from "ink";
-import type { ToolNode } from "../../runtime/nodes/types.ts";
-import { formatToolResult } from "../text-format.ts";
-import { BODY_INDENT, messageContentColumns } from "../layout.ts";
-import { MessageRail } from "./MessageRail.tsx";
-import { theme } from "../theme.ts";
-import { text, type UiLocale } from "../../runtime/ui-locale.ts";
+import { Box, Text } from 'ink'
+import type { ToolNode } from '../../runtime/nodes/types.ts'
+import { formatToolResult } from '../text-format.ts'
+import { BODY_INDENT, messageContentColumns } from '../layout.ts'
+import { MessageRail } from './MessageRail.tsx'
+import { theme } from '../theme.ts'
+import { text, type UiLocale } from '../../runtime/ui-locale.ts'
 import {
   extractPartialJsonStringArgument,
   truncatePlanProgress,
-} from "../../runtime/nodes/tool-view.ts";
-import { Markdown, StreamingMarkdown } from "./Markdown.tsx";
+} from '../../runtime/nodes/tool-view.ts'
+import { Markdown, StreamingMarkdown } from './Markdown.tsx'
 import {
   joinToolSummary,
   projectToolSummary,
   toolErrorSummary,
-} from "../tool-display.ts";
-import type { MessageTextRange } from "../message-text-selection.ts";
-import { SelectableText } from "./SelectableText.tsx";
+} from '../tool-display.ts'
+import type { MessageTextRange } from '../message-text-selection.ts'
+import { SelectableText } from './SelectableText.tsx'
 
 export function ToolCard(props: {
-  node: ToolNode;
-  verbose: boolean;
-  locale: UiLocale;
-  maxColumns?: number;
-  selected?: boolean;
-  attached?: boolean;
-  textSelection?: MessageTextRange;
+  node: ToolNode
+  verbose: boolean
+  locale: UiLocale
+  maxColumns?: number
+  selected?: boolean
+  attached?: boolean
+  textSelection?: MessageTextRange
 }) {
-  const { node, verbose } = props;
+  const { node, verbose } = props
   const summary = projectToolSummary(
     node,
     props.locale,
     props.maxColumns ?? 120,
     Date.now(),
-  );
-  const contentColumns = messageContentColumns(props.maxColumns);
-  const result = formatToolResult(node.result, verbose);
+  )
+  const contentColumns = messageContentColumns(props.maxColumns)
+  const result = formatToolResult(node.result, verbose)
   const diffSummary =
-    node.view?.kind === "diff" ? node.view.summary : undefined;
-  const toolName = node.name.trim() === "" ? "tool" : node.name;
+    node.view?.kind === 'diff' ? node.view.summary : undefined
+  const toolName = node.name.trim() === '' ? 'tool' : node.name
   const plan =
-    toolName === "exit_plan_mode"
-      ? extractPartialJsonStringArgument(node.args, "plan")
-      : undefined;
+    toolName === 'exit_plan_mode'
+      ? extractPartialJsonStringArgument(node.args, 'plan')
+      : undefined
   const planProgress =
-    plan === undefined ? undefined : truncatePlanProgress(plan);
+    plan === undefined ? undefined : truncatePlanProgress(plan)
   const isQuestionRunning =
-    toolName === "ask_user_question" && node.status === "running";
+    toolName === 'ask_user_question' && node.status === 'running'
   const questionProgress = isQuestionRunning
-    ? extractPartialJsonStringArgument(node.args, "question")
-    : undefined;
+    ? extractPartialJsonStringArgument(node.args, 'question')
+    : undefined
   return (
     // Same rail as the assistant reply that called this tool.
     <MessageRail
       color={
-        props.selected === true || node.status === "running"
+        props.selected === true || node.status === 'running'
           ? theme.accent
           : theme.mute
       }
@@ -63,18 +63,20 @@ export function ToolCard(props: {
       width={props.maxColumns}
     >
       <Box flexDirection="column" minWidth={0}>
-        <SelectableText
-          color={theme[summary.tone]}
-          wrap="truncate-end"
-          text={joinToolSummary(summary)}
-          selection={props.textSelection}
-        />
+        <Box height={1} overflowY="hidden">
+          <SelectableText
+            color={theme[summary.tone]}
+            wrap="truncate-end"
+            text={joinToolSummary(summary)}
+            selection={props.textSelection}
+          />
+        </Box>
         {planProgress !== undefined ? (
           <Box flexDirection="column" paddingLeft={BODY_INDENT}>
             <Text color={theme.accent} wrap="truncate-end">
               {text(
                 props.locale,
-                node.streaming ? "planStreaming" : "planReady",
+                node.streaming ? 'planStreaming' : 'planReady',
               )}
             </Text>
             {node.streaming ? (
@@ -97,7 +99,7 @@ export function ToolCard(props: {
             <Text color={theme.accent} wrap="truncate-end">
               {text(
                 props.locale,
-                node.streaming ? "questionStreaming" : "questionReady",
+                node.streaming ? 'questionStreaming' : 'questionReady',
               )}
             </Text>
             {questionProgress === undefined ? null : (
@@ -108,7 +110,7 @@ export function ToolCard(props: {
           </Box>
         ) : null}
         {verbose &&
-        node.args !== "" &&
+        node.args !== '' &&
         planProgress === undefined &&
         !isQuestionRunning ? (
           <Text color={theme.mute}>args {node.args}</Text>
@@ -126,11 +128,11 @@ export function ToolCard(props: {
         ) : null}
       </Box>
     </MessageRail>
-  );
+  )
 }
 
 function DiffLines(props: {
-  summary: NonNullable<Extract<ToolNode["view"], { kind: "diff" }>["summary"]>;
+  summary: NonNullable<Extract<ToolNode['view'], { kind: 'diff' }>['summary']>
 }) {
   return (
     <Box flexDirection="column">
@@ -141,16 +143,16 @@ function DiffLines(props: {
             <Text
               key={`${file.path}:${index}`}
               color={
-                line.kind === "add"
+                line.kind === 'add'
                   ? theme.success
-                  : line.kind === "remove"
+                  : line.kind === 'remove'
                     ? theme.danger
                     : theme.dim
               }
               wrap="truncate-end"
             >
-              {line.kind === "add" ? "+" : line.kind === "remove" ? "-" : " "}{" "}
-              {String(line.newLine ?? line.oldLine ?? "").padStart(4, " ")}{" "}
+              {line.kind === 'add' ? '+' : line.kind === 'remove' ? '-' : ' '}{' '}
+              {String(line.newLine ?? line.oldLine ?? '').padStart(4, ' ')}{' '}
               {line.text}
             </Text>
           ))}
@@ -160,5 +162,5 @@ function DiffLines(props: {
         </Box>
       ))}
     </Box>
-  );
+  )
 }

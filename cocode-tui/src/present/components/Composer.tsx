@@ -69,7 +69,7 @@ export function Composer(props: {
       : { x: caret.column, y: props.inputRow + caret.rowIndex },
   )
   return (
-    <Box flexDirection="column" width="100%">
+    <Box flexDirection="column" width="100%" flexShrink={0}>
       {/* Native IME follows Ink's hardware cursor on the draft row. */}
       {composer.attachments.length > 0 ? (
         <Text color={theme.accent} wrap="truncate-end">
