@@ -3,6 +3,7 @@ import type {
 	DshBootEntryDto,
 	DshBootManifestDto,
 	DshRuntimeBootstrapDto,
+	DshRuntimeRecoveryRequestDto,
 	DshRuntimeRequestDto,
 } from "../ipc/dsh-runtime.contract"
 import { isDshRuntimeRequestPath } from "../dsh-runtime-path"
@@ -64,4 +65,13 @@ export function parseDshRuntimeRequest(value: unknown): DshRuntimeRequestDto {
 
 export function parseDshRuntimeRequestId(value: unknown): string {
 	return z.uuid().parse(value)
+}
+
+const dshRuntimeRecoveryRequestSchema = z.object({
+	reason: z.enum(["host_unreachable", "host_exit", "bootstrap_failed", "health_failed"]),
+	endpointGeneration: z.number().int().nonnegative(),
+})
+
+export function parseDshRuntimeRecoveryRequest(value: unknown): DshRuntimeRecoveryRequestDto {
+	return dshRuntimeRecoveryRequestSchema.parse(value)
 }

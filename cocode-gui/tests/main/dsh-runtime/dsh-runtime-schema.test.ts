@@ -1,6 +1,7 @@
 import { describe, it } from "node:test"
 import assert from "node:assert/strict"
 import {
+	parseDshRuntimeRecoveryRequest,
 	parseDshRuntimeRequest,
 	parseDshRuntimeRequestId,
 } from "../../../src/contracts/schemas/dsh-runtime.schema"
@@ -61,5 +62,23 @@ describe("DSH runtime IPC schemas", () => {
 			}),
 		)
 		assert.throws(() => parseDshRuntimeRequestId("not-a-uuid"))
+	})
+
+	it("accepts recovery requests and rejects invalid generations", () => {
+		const request = parseDshRuntimeRecoveryRequest({
+			reason: "host_unreachable",
+			endpointGeneration: 3,
+		})
+
+		assert.deepEqual(request, {
+			reason: "host_unreachable",
+			endpointGeneration: 3,
+		})
+		assert.throws(() =>
+			parseDshRuntimeRecoveryRequest({
+				reason: "host_unreachable",
+				endpointGeneration: -1,
+			}),
+		)
 	})
 })

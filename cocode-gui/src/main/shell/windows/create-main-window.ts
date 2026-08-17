@@ -17,7 +17,15 @@ const WINDOW_CONTROL_DIAMETER_PX = 14
 /** AppKit's own left inset for the controls, kept so only their height moves. */
 const WINDOW_CONTROL_INSET_X_PX = 9
 
-export const createMainWindow = (dshRuntimeUrl: string, logger?: DesktopLogger): BrowserWindow => {
+export interface MainWindowOptions {
+	readonly registerRuntimeOriginRebind?: (rebind: (origin: string) => void) => void
+}
+
+export const createMainWindow = (
+	dshRuntimeUrl: string,
+	logger?: DesktopLogger,
+	options: MainWindowOptions = {},
+): BrowserWindow => {
 	// Windows/Linux take the frame icon from the window itself; macOS uses the Dock image.
 	const windowIcon = process.platform === "darwin" ? undefined : resolveAppIcon()
 	const mainWindow = new BrowserWindow({
@@ -54,6 +62,9 @@ export const createMainWindow = (dshRuntimeUrl: string, logger?: DesktopLogger):
 			? new URL(MAIN_WINDOW_VITE_DEV_SERVER_URL).origin
 			: undefined,
 	)
+	options.registerRuntimeOriginRebind?.((origin) =>
+		unregisterDshWebSocketTransport.updateRuntimeOrigin(origin),
+	)
 
 	mainWindow.webContents.setWindowOpenHandler(({ url }) => {
 		logger?.log("warn", "security.external-navigation", {
@@ -72,7 +83,7 @@ export const createMainWindow = (dshRuntimeUrl: string, logger?: DesktopLogger):
 		})
 		if (url.startsWith("https://") || url.startsWith("http://")) void shell.openExternal(url)
 	})
-	mainWindow.once("closed", unregisterDshWebSocketTransport)
+	mainWindow.once("closed", unregisterDshWebSocketTransport.dispose)
 	mainWindow.once("ready-to-show", () => {
 		logger?.log("info", "window.ready-to-show", { attributes: { windowId: mainWindow.id } })
 		mainWindow.show()

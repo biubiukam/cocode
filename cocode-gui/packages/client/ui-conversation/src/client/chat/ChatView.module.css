@@ -51,6 +51,12 @@
    measurement/mount unit for a virtualizer without changing the column gap. */
 .flowItem {
   min-width: 0;
+  /* Let Chromium skip layout/paint work for off-screen transcript rows. The
+     row remains in the document so paging anchors and scroll geometry stay
+     correct, while very long chats no longer keep every subtree hot. */
+  content-visibility: auto;
+  contain: layout paint style;
+  contain-intrinsic-size: auto 120px;
 }
 
 /* A keyed renderer may intentionally decline its row after dispatch (the

@@ -1,4 +1,4 @@
-import type { Session } from "electron"
+import type { Session, WebRequestFilter } from "electron"
 
 /**
  * Scope direct sidecar browser transport to loopback DSH downlinks, Cocode
@@ -7,42 +7,66 @@ import type { Session } from "electron"
  * browser-owned resources such as iframe, image and script URLs reach the
  * sidecar directly with same-origin trust markers.
  */
+export interface DshWebSocketTransportController {
+	updateRuntimeOrigin(origin: string): void
+	dispose(): void
+}
+
 export function registerDshWebSocketTransport(
 	targetSession: Session,
 	runtimeOrigin: string,
 	rendererOrigin?: string,
-): () => void {
-	const websocketOrigin = new URL(runtimeOrigin)
-	websocketOrigin.protocol = websocketOrigin.protocol === "https:" ? "wss:" : "ws:"
-	const runtimeHttpOrigin = new URL(runtimeOrigin).origin
-	const filter = {
-		urls: [
-			`${websocketOrigin.origin}/api/events.mux*`,
-			`${websocketOrigin.origin}/api/events.host*`,
-			`${websocketOrigin.origin}/sidebar/ws/*`,
-			`${runtimeHttpOrigin}/sidebar/*`,
-		],
-	}
-	const eventsFilter = { urls: [`${runtimeHttpOrigin}/plugins/events*`] }
+): DshWebSocketTransportController {
+	let currentOrigin = new URL(runtimeOrigin).origin
+	type InstalledFilters = { filter: WebRequestFilter; eventsFilter: WebRequestFilter }
+	let installed: InstalledFilters
 
-	targetSession.webRequest.onBeforeSendHeaders(filter, (details, callback) => {
-		const requestHeaders = { ...details.requestHeaders }
-		setHeader(requestHeaders, "Origin", runtimeOrigin)
-		setHeader(requestHeaders, "Sec-Fetch-Site", "same-origin")
-		callback({ requestHeaders })
-	})
-	if (rendererOrigin !== undefined) {
-		targetSession.webRequest.onHeadersReceived(eventsFilter, (details, callback) => {
-			const responseHeaders = { ...details.responseHeaders }
-			setHeader(responseHeaders, "Access-Control-Allow-Origin", rendererOrigin)
-			callback({ responseHeaders })
+	const install = (origin: string): InstalledFilters => {
+		const websocketOrigin = new URL(origin)
+		websocketOrigin.protocol = websocketOrigin.protocol === "https:" ? "wss:" : "ws:"
+		const filter: WebRequestFilter = {
+			urls: [
+				`${websocketOrigin.origin}/api/events.mux*`,
+				`${websocketOrigin.origin}/api/events.host*`,
+				`${origin}/sidebar/ws/*`,
+				`${origin}/sidebar/*`,
+			],
+		}
+		const eventsFilter: WebRequestFilter = { urls: [`${origin}/plugins/events*`] }
+
+		targetSession.webRequest.onBeforeSendHeaders(filter, (details, callback) => {
+			const requestHeaders = { ...details.requestHeaders }
+			setHeader(requestHeaders, "Origin", origin)
+			setHeader(requestHeaders, "Sec-Fetch-Site", "same-origin")
+			callback({ requestHeaders })
 		})
+		if (rendererOrigin !== undefined) {
+			targetSession.webRequest.onHeadersReceived(eventsFilter, (details, callback) => {
+				const responseHeaders = { ...details.responseHeaders }
+				setHeader(responseHeaders, "Access-Control-Allow-Origin", rendererOrigin)
+				callback({ responseHeaders })
+			})
+		}
+		return { filter, eventsFilter }
 	}
 
-	return () => {
-		targetSession.webRequest.onBeforeSendHeaders(filter, null)
+	const uninstall = (filters: InstalledFilters): void => {
+		targetSession.webRequest.onBeforeSendHeaders(filters.filter, null)
 		if (rendererOrigin !== undefined)
-			targetSession.webRequest.onHeadersReceived(eventsFilter, null)
+			targetSession.webRequest.onHeadersReceived(filters.eventsFilter, null)
+	}
+
+	installed = install(currentOrigin)
+	return {
+		updateRuntimeOrigin(origin) {
+			const nextOrigin = new URL(origin).origin
+			if (nextOrigin === currentOrigin) return
+			const previous = installed
+			currentOrigin = nextOrigin
+			installed = install(nextOrigin)
+			uninstall(previous)
+		},
+		dispose: () => uninstall(installed),
 	}
 }
 

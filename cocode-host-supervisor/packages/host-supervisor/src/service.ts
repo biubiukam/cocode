@@ -1,6 +1,6 @@
 import net from 'node:net'
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync, renameSync } from 'node:fs'
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { endpointFor, descriptorPath, leaseDirectory, lockPath, scopePath } from './paths.js'
@@ -189,6 +189,10 @@ class SupervisorService {
         COCODE_DSH_PROFILE: this.scope.profile,
       },
       stdio: ['ignore', 'pipe', 'pipe'],
+      // A Host owns its descendants.  On POSIX this gives us a stable process
+      // group so shutdown can terminate the whole tree instead of only the
+      // Node leader.  Windows uses taskkill /T in terminateProcessTree below.
+      detached: process.platform !== 'win32',
     })
     const startupBuffer = new RingBuffer(256 * 1024)
     const streamBuffers = { stdout: '', stderr: '' }
@@ -306,14 +310,19 @@ class SupervisorService {
   }
   private async terminateHost(host: HostProcess): Promise<void> {
     const pid = host.child?.pid ?? host.descriptor.hostPid
-    await terminateProcess(
+    await terminateProcessTree(
       pid,
       () => {
-        if (host.child !== null) host.child.kill('SIGTERM')
-        else process.kill(pid, 'SIGTERM')
+        if (process.platform === 'win32') {
+          if (host.child !== null) host.child.kill('SIGTERM')
+          else process.kill(pid, 'SIGTERM')
+        } else {
+          signalProcessGroup(pid, 'SIGTERM')
+        }
       },
       () => this.logger.log('warn', 'dsh.host.stop.escalated', { hostPid: pid, graceMs: HOST_TERMINATE_GRACE_MS }),
     )
+    this.logger.log('info', 'dsh.host.process-tree.stopped', { hostPid: pid })
   }
   private cleanupLeases(): void {
     const now = Date.now()
@@ -457,7 +466,10 @@ async function waitForProcessExit(pid: number, timeoutMs: number): Promise<void>
 
 async function terminateChild(child: ReturnType<typeof spawn>): Promise<void> {
   if (child.pid === undefined) return
-  await terminateProcess(child.pid, () => child.kill('SIGTERM'))
+  await terminateProcessTree(child.pid, () => {
+    if (process.platform === 'win32') child.kill('SIGTERM')
+    else signalProcessGroup(child.pid!, 'SIGTERM')
+  })
 }
 
 async function terminateProcess(pid: number, terminate: () => void, onEscalate?: () => void): Promise<void> {
@@ -468,6 +480,46 @@ async function terminateProcess(pid: number, terminate: () => void, onEscalate?:
   onEscalate?.()
   try { process.kill(pid, 'SIGKILL') } catch { /* already gone */ }
   await waitForProcessExit(pid, HOST_KILL_GRACE_MS)
+}
+
+/** Terminate a Host and every descendant it owns, not only the leader PID. */
+async function terminateProcessTree(pid: number, terminate: () => void, onEscalate?: () => void): Promise<void> {
+  if (pid <= 0 || !isProcessAlive(pid)) return
+  try { terminate() } catch { /* the process may have exited between checks */ }
+  await waitForProcessTreeExit(pid, HOST_TERMINATE_GRACE_MS)
+  if (!isProcessTreeAlive(pid)) return
+  onEscalate?.()
+  try {
+    if (process.platform === 'win32') {
+      spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' })
+    } else {
+      signalProcessGroup(pid, 'SIGKILL')
+    }
+  } catch { /* already gone */ }
+  await waitForProcessTreeExit(pid, HOST_KILL_GRACE_MS)
+}
+
+function signalProcessGroup(pid: number, signal: NodeJS.Signals): void {
+  // The Host is spawned detached on POSIX, so -pid addresses its process group.
+  process.kill(-pid, signal)
+}
+
+function isProcessTreeAlive(pid: number): boolean {
+  if (!isProcessAlive(pid)) return false
+  if (process.platform === 'win32') return true
+  try {
+    process.kill(-pid, 0)
+    return true
+  } catch (error) {
+    return error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'EPERM'
+  }
+}
+
+async function waitForProcessTreeExit(pid: number, timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline && isProcessTreeAlive(pid)) {
+    await new Promise((resolve) => setTimeout(resolve, 100))
+  }
 }
 
 async function hostHealth(descriptor: HostDescriptor): Promise<boolean> {

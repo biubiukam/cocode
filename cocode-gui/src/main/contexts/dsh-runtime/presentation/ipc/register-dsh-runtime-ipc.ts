@@ -1,6 +1,7 @@
-import { ipcMain, type WebContents } from "electron"
+import { BrowserWindow, ipcMain, type WebContents } from "electron"
 import { dshRuntimeChannels } from "../../../../../contracts/ipc/dsh-runtime.contract"
 import {
+	parseDshRuntimeRecoveryRequest,
 	parseDshRuntimeRequest,
 	parseDshRuntimeRequestId,
 } from "../../../../../contracts/schemas/dsh-runtime.schema"
@@ -14,8 +15,30 @@ interface SenderRequestState {
 }
 
 const senderStates = new Map<number, SenderRequestState>()
+let disposeRecoveryState: (() => void) | undefined
+let disposeRebound: (() => void) | undefined
 
-export function registerDshRuntimeIpc(runtime: DshRuntimeProcess, logger?: DesktopLogger): void {
+export interface DshRuntimeIpcOptions {
+	readonly onRebound?: (origin: string) => void
+}
+
+export function registerDshRuntimeIpc(
+	runtime: DshRuntimeProcess,
+	logger?: DesktopLogger,
+	options: DshRuntimeIpcOptions = {},
+): void {
+	disposeRecoveryState = runtime.onRecoveryState((state) => {
+		for (const window of BrowserWindow.getAllWindows()) {
+			if (!window.isDestroyed())
+				window.webContents.send(dshRuntimeChannels.recoveryState, state)
+		}
+	})
+	disposeRebound = runtime.onRebound((event) => {
+		options.onRebound?.(event.bootstrap.origin)
+		for (const window of BrowserWindow.getAllWindows()) {
+			if (!window.isDestroyed()) window.webContents.send(dshRuntimeChannels.rebound, event)
+		}
+	})
 	ipcMain.handle(dshRuntimeChannels.bootstrap, () => {
 		const started = Date.now()
 		return runtime.getBootstrap().then(
@@ -82,6 +105,18 @@ export function registerDshRuntimeIpc(runtime: DshRuntimeProcess, logger?: Deskt
 			}
 		}
 	})
+	ipcMain.handle(dshRuntimeChannels.requestRecovery, async (event, value: unknown) => {
+		if (event.sender.isDestroyed()) throw new Error("DSH runtime recovery sender is destroyed.")
+		const request = parseDshRuntimeRecoveryRequest(value)
+		logger?.log("info", "dsh.runtime.recovery.requested", {
+			attributes: {
+				reason: request.reason,
+				endpointGeneration: request.endpointGeneration,
+				senderId: event.sender.id,
+			},
+		})
+		return runtime.recover(request.reason, request.endpointGeneration)
+	})
 	ipcMain.on(dshRuntimeChannels.cancelRequest, (event, value: unknown) => {
 		let requestId: string
 		try {
@@ -113,8 +148,13 @@ function pathTemplate(value: string): string {
 }
 
 export function unregisterDshRuntimeIpc(): void {
+	disposeRecoveryState?.()
+	disposeRecoveryState = undefined
+	disposeRebound?.()
+	disposeRebound = undefined
 	ipcMain.removeHandler(dshRuntimeChannels.bootstrap)
 	ipcMain.removeHandler(dshRuntimeChannels.request)
+	ipcMain.removeHandler(dshRuntimeChannels.requestRecovery)
 	ipcMain.removeAllListeners(dshRuntimeChannels.cancelRequest)
 	for (const state of senderStates.values()) {
 		state.sender.removeListener("destroyed", state.onDestroyed)

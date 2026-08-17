@@ -54,6 +54,7 @@
 		"commitlint": "commitlint",
 		"prepare": "husky",
 		"check:env": "node scripts/check-env.mjs",
+		"reconcile:processes": "node scripts/reconcile-owned-processes.mjs",
 		"typecheck": "tsc --noEmit"
 	},
 	"keywords": [],

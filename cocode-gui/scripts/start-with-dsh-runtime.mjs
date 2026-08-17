@@ -13,6 +13,7 @@ import { buildDevRuntime } from "./lib/dev-build.mjs"
 import { acquireDevLock } from "./lib/dev-lock.mjs"
 import { stopProcessesMatching } from "./lib/process-control.mjs"
 import { cleanupRuntime, prepareRuntime, resolveRuntimeRoot } from "./lib/runtime-cache.mjs"
+import { reconcile as reconcileOwnedProcesses } from "./reconcile-owned-processes.mjs"
 
 const ENTRY_SCRIPT = "start-with-dsh-runtime.mjs"
 // Benign macOS IMK / Chromium stderr noise; see electron/electron#45002.
@@ -43,6 +44,9 @@ try {
 
 /** Resolves to the exit code this runner should report. */
 async function run() {
+	// Migration guard for older acceptance runners. Normal DSH Hosts are owned
+	// by the Supervisor lease and do not match this narrow legacy signature.
+	await reconcileOwnedProcesses({ apply: true })
 	await stopStrayElectron()
 	buildDevRuntime({ hardenElectron: true })
 	prepareRuntime(runtime)
