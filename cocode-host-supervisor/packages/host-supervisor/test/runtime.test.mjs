@@ -73,6 +73,34 @@ test('repairs an incomplete DSH runtime slot before booting it', () => {
   }
 })
 
+test('repairs a complete slot when a plugin runtime dependency is missing', () => {
+  const runtimeHome = mkdtempSync(join(tmpdir(), 'cocode-runtime-dependency-slot-test-'))
+  const previousRuntimeHome = process.env.COCODE_HOST_RUNTIME_HOME
+  process.env.COCODE_HOST_RUNTIME_HOME = runtimeHome
+  const scope = {
+    dshHome: '/tmp/cocode-missing-plugin-dependency-dsh',
+    profile: 'web',
+    hostConfigFingerprint: 'test-missing-plugin-dependency',
+    runtimeChannel: 'stable',
+  }
+  try {
+    const pluginPath = fileURLToPath(new URL('../lib/host-jsonrpc-plugin.js', import.meta.url))
+    const slot = prepareRuntimeSlot(scope, '/tmp/cocode-missing-plugin-dependency-jsonrpc.sock', pluginPath)
+    const dependencyManifest = join(slot.root, 'node_modules', 'yaml', 'package.json')
+    assert.equal(existsSync(dependencyManifest), true)
+
+    rmSync(join(slot.root, 'node_modules', 'yaml'), { recursive: true, force: true })
+    assert.equal(existsSync(dependencyManifest), false)
+
+    const repaired = prepareRuntimeSlot(scope, '/tmp/cocode-missing-plugin-dependency-jsonrpc.sock', pluginPath)
+    assert.equal(existsSync(join(repaired.root, 'node_modules', 'yaml', 'package.json')), true)
+  } finally {
+    if (previousRuntimeHome === undefined) delete process.env.COCODE_HOST_RUNTIME_HOME
+    else process.env.COCODE_HOST_RUNTIME_HOME = previousRuntimeHome
+    rmSync(runtimeHome, { recursive: true, force: true })
+  }
+})
+
 test('addRuntimePluginDependencies extends the DSH install closure', () => {
   const manifest = addRuntimePluginDependencies(
     {

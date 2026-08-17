@@ -50,6 +50,10 @@ const RELEASE_KEYS = new Set([
 	"DMG_FORMAT",
 	"DMG_ICON_SIZE",
 	"MAC_SIGNING_IDENTITY",
+	"MAC_INSTALLER_SIGNING_IDENTITY",
+	"MAC_INSTALLER_APP_IDENTIFIER",
+	"MAC_INSTALLER_CLI_IDENTIFIER",
+	"MAC_CLI_INSTALL_PATH",
 	"MAC_SIGNING_KEYCHAIN",
 	"MAC_ENTITLEMENTS_PATH",
 	"MAC_PLUGIN_ENTITLEMENTS_PATH",
@@ -178,6 +182,18 @@ export function createMacSignOptions(environment = process.env): MacSignOptions 
 			hardenedRuntime: true,
 		}),
 	}
+}
+
+export function resolveMacInstallerSigningIdentity(environment = process.env): string | undefined {
+	return (
+		environment.MAC_INSTALLER_SIGNING_IDENTITY?.trim() ||
+		environment.MAC_SIGNING_IDENTITY?.trim() ||
+		undefined
+	)
+}
+
+export function resolveMacCliInstallPath(environment = process.env): string {
+	return environment.MAC_CLI_INSTALL_PATH?.trim() || "/usr/local/bin/cocode"
 }
 
 export function createMacNotarizeOptions(
@@ -340,6 +356,10 @@ export function requireReleaseCredentials(target: ReleaseTarget, environment = p
 	if (target.platform === "darwin") {
 		if (!createMacSignOptions(environment))
 			throw new Error("MAC_SIGNING_IDENTITY is required for a signed macOS release.")
+		if (!resolveMacInstallerSigningIdentity(environment))
+			throw new Error(
+				"MAC_INSTALLER_SIGNING_IDENTITY or MAC_SIGNING_IDENTITY is required for a signed macOS PKG release.",
+			)
 		if (!createMacNotarizeOptions(environment))
 			throw new Error(
 				"Apple notarization credentials are required for a signed macOS release.",

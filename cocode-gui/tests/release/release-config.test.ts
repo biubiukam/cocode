@@ -5,6 +5,8 @@ import {
 	createSquirrelConfig,
 	createWindowsSignOptions,
 	requireReleaseCredentials,
+	resolveMacCliInstallPath,
+	resolveMacInstallerSigningIdentity,
 	resolveReleaseTarget,
 	resolveWindowsSignMode,
 	resolveWindowsSignServiceOptions,
@@ -57,6 +59,20 @@ test("generates architecture-safe Squirrel names", () => {
 	assert.equal(
 		createSquirrelConfig("1.2.3", { RELEASE_ARCH: "arm64" }).setupMsi,
 		"Cocode-Desktop-1.2.3-arm64-Setup.msi",
+	)
+})
+
+test("uses the application signing identity as the PKG signing fallback", () => {
+	assert.equal(
+		resolveMacInstallerSigningIdentity({
+			MAC_SIGNING_IDENTITY: "Developer ID Application: Test",
+		}),
+		"Developer ID Application: Test",
+	)
+	assert.equal(resolveMacCliInstallPath({}), "/usr/local/bin/cocode")
+	assert.equal(
+		resolveMacCliInstallPath({ MAC_CLI_INSTALL_PATH: "/custom/bin/cocode" }),
+		"/custom/bin/cocode",
 	)
 })
 

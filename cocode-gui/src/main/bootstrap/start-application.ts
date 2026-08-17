@@ -1,5 +1,4 @@
 import { app, type BrowserWindow } from "electron"
-import started from "electron-squirrel-startup"
 import { DshRuntimeProcess } from "../contexts/dsh-runtime/infrastructure/dsh-runtime-process"
 import { DshCloudConfigPort } from "../contexts/account/infrastructure/dsh-cloud-config-port"
 import { AgencyClient } from "../contexts/account/infrastructure/agency-client"
@@ -33,10 +32,12 @@ import { createDesktopObservability } from "../shared/observability/desktop-obse
 import { registerElectronObservers } from "../shared/observability/register-electron-observers"
 import { TuiLauncher } from "../contexts/tui/infrastructure/tui-launcher"
 import { registerTuiIpc, unregisterTuiIpc } from "../contexts/tui/presentation/ipc/register-tui-ipc"
+import { detectSquirrelEvent, handleSquirrelEvent } from "./squirrel-events"
 
 export const startApplication = (): void => {
-	if (started) {
-		app.quit()
+	const squirrelEvent = detectSquirrelEvent()
+	if (squirrelEvent !== undefined) {
+		void handleSquirrelEvent(squirrelEvent)
 		return
 	}
 
@@ -95,6 +96,8 @@ export const startApplication = (): void => {
 								state: result.status.state,
 								changed: result.changed,
 								directoryOnPath: result.status.directoryOnPath,
+								persistentPathConfigured: result.status.persistentPathConfigured,
+								registrationSource: result.status.registrationSource,
 							},
 						},
 					)
@@ -119,7 +122,6 @@ export const startApplication = (): void => {
 					allowLocalHttp: !app.isPackaged,
 				}),
 				{},
-				observability.logger,
 			)
 			registerAccountIpc(account, observability.logger)
 			void account.hydrate().then(

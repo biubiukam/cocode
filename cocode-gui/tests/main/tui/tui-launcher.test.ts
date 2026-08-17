@@ -1,12 +1,5 @@
 import assert from "node:assert/strict"
-import {
-	chmodSync,
-	mkdirSync,
-	mkdtempSync,
-	readFileSync,
-	rmSync,
-	writeFileSync,
-} from "node:fs"
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import test from "node:test"
@@ -34,11 +27,28 @@ test("Desktop CLI installation is idempotent and preserves unmanaged commands", 
 			assert.equal(first.status.state, "installed")
 			assert.equal(first.status.managedByDesktop, true)
 			assert.equal(first.status.directoryOnPath, true)
+			assert.equal(first.status.persistentPathConfigured, true)
+			assert.equal(first.status.registrationSource, "desktop-startup")
+			assert.equal(first.status.runtimeValid, true)
 			assert.match(readFileSync(fixture.shimPath, "utf8"), /cocode-desktop-cli-shim:v1/)
 
 			const second = await launcher.ensureCommandLineTool()
 			assert.equal(second.changed, false)
 			assert.equal(second.status.state, "installed")
+		} finally {
+			fixture.dispose()
+		}
+	})
+
+	await t.test("records installer ownership and removes only the managed shim", async () => {
+		const fixture = createFixture()
+		try {
+			const launcher = new TuiLauncher()
+			const installed = await launcher.ensureCommandLineTool("installer")
+			assert.equal(installed.status.registrationSource, "installer")
+			const removed = await launcher.uninstallCommandLineTool()
+			assert.equal(removed.changed, true)
+			assert.equal(removed.status.state, "missing")
 		} finally {
 			fixture.dispose()
 		}
@@ -138,4 +148,3 @@ function createFixture(): {
 		},
 	}
 }
-

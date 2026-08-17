@@ -50,7 +50,7 @@ export function Header(props: {
       ].filter((value): value is string => value !== undefined && value !== '').join(' · ')
     : ''
   return (
-    <Box flexDirection="column" marginBottom={1}>
+    <Box flexDirection="column" flexShrink={0} marginBottom={1}>
       <Box width="100%" justifyContent="space-between">
         <Box gap={1} flexGrow={1} flexShrink={1} minWidth={0}>
           <Text color={theme.text} wrap="truncate-end">

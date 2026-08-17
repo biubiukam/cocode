@@ -39,6 +39,15 @@ export function CommandLineSection(): JSX.Element {
       .finally(() => setBusy(false))
   }
 
+  const copyDiagnostics = (): void => {
+    if (status === undefined || busy) return
+    setBusy(true)
+    setMessage(undefined)
+    void navigator.clipboard.writeText(JSON.stringify(status, null, 2))
+      .then(() => setMessage(isChinese() ? "CLI 诊断信息已复制。" : "CLI diagnostics copied."), (error: unknown) => setMessage(safeMessage(error)))
+      .finally(() => setBusy(false))
+  }
+
   if (api === undefined) {
     return <section style={styles.section}>
       <h2 style={styles.title}>{isChinese() ? "命令行工具" : "Command line"}</h2>
@@ -48,18 +57,23 @@ export function CommandLineSection(): JSX.Element {
 
   return <section style={styles.section}>
     <h2 style={styles.title}>{isChinese() ? "命令行工具" : "Command line"}</h2>
-    <p style={styles.description}>{isChinese() ? "Cocode 会在桌面启动时自动检查并安装 CLI。TUI 只会在你执行 cocode 或打开终端时启动。" : "Cocode checks and installs the CLI when Desktop starts. The TUI starts only when you run cocode or open a terminal."}</p>
+    <p style={styles.description}>{isChinese() ? "安装器会注册 Desktop CLI；Desktop 启动时还会幂等检查并修复。TUI 只会在你执行 cocode 或打开终端时启动。" : "The installer registers the Desktop CLI, and Desktop also checks and repairs it idempotently on startup. The TUI starts only when you run cocode or open a terminal."}</p>
     <div style={styles.grid}>
       <Metric label={isChinese() ? "状态" : "Status"} value={statusLabel(status)} />
       <Metric label={isChinese() ? "命令路径" : "Command path"} value={status?.path ?? "—"} />
       <Metric label={isChinese() ? "PATH 目录" : "PATH directory"} value={status === undefined ? "—" : status.directoryOnPath ? (isChinese() ? "已包含" : "Available") : (isChinese() ? "未检测到" : "Not detected")} />
+      <Metric label={isChinese() ? "持久化 PATH" : "Persistent PATH"} value={status === undefined ? "—" : status.persistentPathConfigured ? (isChinese() ? "已注册" : "Registered") : (isChinese() ? "未注册" : "Not registered")} />
+      <Metric label={isChinese() ? "注册来源" : "Registration"} value={registrationLabel(status)} />
+      <Metric label={isChinese() ? "运行时" : "Runtime"} value={runtimeLabel(status)} />
     </div>
     {status?.detail !== undefined && <p style={styles.notice}>{status.detail}</p>}
     {status !== undefined && !status.directoryOnPath && <p style={styles.notice}>{isChinese() ? `请确认 ${status.directory} 已加入终端 PATH。` : `Make sure ${status.directory} is included in your terminal PATH.`}</p>}
+    {status !== undefined && status.persistentPathConfigured && !status.directoryOnPath && <p style={styles.notice}>{isChinese() ? "PATH 已写入系统，但当前应用进程尚未刷新；请打开一个新终端。" : "The persistent PATH is configured, but this process has not refreshed it; open a new terminal."}</p>}
     <div style={styles.actions}>
       <button type="button" disabled={busy || status?.canRepair !== true} onClick={repair}>{isChinese() ? "修复命令行工具" : "Repair command line"}</button>
       <button type="button" disabled={busy} onClick={openInTerminal}>{isChinese() ? "在终端中打开 Cocode" : "Open Cocode in terminal"}</button>
       <button type="button" disabled={busy} onClick={refresh}>{isChinese() ? "刷新状态" : "Refresh status"}</button>
+      <button type="button" disabled={busy || status === undefined} onClick={copyDiagnostics}>{isChinese() ? "复制诊断信息" : "Copy diagnostics"}</button>
     </div>
     {message !== undefined && <p role="status" style={styles.notice}>{message}</p>}
   </section>
@@ -88,6 +102,24 @@ function statusLabel(status: TuiCommandLineToolStatus | undefined): string {
 function statusMessage(status: TuiCommandLineToolStatus): string {
   if (status.state === "conflict") return isChinese() ? "检测到未由 Cocode 管理的 cocode 命令，未覆盖。" : "An unmanaged cocode command was found; it was not overwritten."
   return statusLabel(status)
+}
+
+function registrationLabel(status: TuiCommandLineToolStatus | undefined): string {
+  if (status === undefined) return "—"
+  if (!isChinese()) return status.registrationSource
+  return {
+    installer: "安装器",
+    "desktop-startup": "Desktop 启动",
+    manual: "手动修复",
+    unknown: "未知",
+  }[status.registrationSource]
+}
+
+function runtimeLabel(status: TuiCommandLineToolStatus | undefined): string {
+  if (status === undefined) return "—"
+  if (!status.runtimeValid) return isChinese() ? "不可用" : "Invalid"
+  const version = status.tuiVersion ?? status.runtimeVersion
+  return version === undefined ? (isChinese() ? "有效" : "Valid") : version
 }
 
 function successMessage(): string {

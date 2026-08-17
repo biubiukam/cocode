@@ -5,8 +5,12 @@ import { memo, useMemo, useRef } from 'react'
 import stringWidth from 'string-width'
 import { glyphs } from '../glyphs.ts'
 import { theme } from '../theme.ts'
-import type { MessageTextRange } from '../message-text-selection.ts'
-import { SelectableText } from './SelectableText.tsx'
+import {
+  localTextRange,
+  type MessageTextRange,
+} from '../message-text-selection.ts'
+import { wrapPlainText } from '../text-wrap.ts'
+import { SelectableText, WrappedSelectableText } from './SelectableText.tsx'
 
 export type MarkdownBlock =
   | { kind: 'heading'; depth: number; text: string }
@@ -31,7 +35,7 @@ export const Markdown = memo(function Markdown(props: {
   const blocks = useMemo(() => parseMarkdownBlocks(props.text), [props.text])
   let sourceCursor = 0
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" flexShrink={0}>
       {blocks.map((block, index) => {
         const sourceOffset = blockSourceOffset(props.text, block, sourceCursor)
         sourceCursor = sourceOffset + blockSourceText(block).length
@@ -64,10 +68,18 @@ export function StreamingMarkdown(props: {
   return (
     <Box flexDirection="column">
       {split.stablePrefix !== '' ? (
-        <Markdown text={split.stablePrefix} maxColumns={props.maxColumns} selection={props.selection} />
+        <Markdown
+          text={split.stablePrefix}
+          maxColumns={props.maxColumns}
+          selection={props.selection}
+        />
       ) : null}
       {split.unstableSuffix !== '' ? (
-        <Markdown text={split.unstableSuffix} maxColumns={props.maxColumns} selection={props.selection} />
+        <Markdown
+          text={split.unstableSuffix}
+          maxColumns={props.maxColumns}
+          selection={props.selection}
+        />
       ) : null}
     </Box>
   )
@@ -83,7 +95,10 @@ export function parseMarkdownBlocks(text: string): readonly MarkdownBlock[] {
     blocks = [{ kind: 'text', text }]
   }
   if (text.length <= BLOCK_CACHE_CHARS) {
-    if (blockCache.size >= BLOCK_CACHE_LIMIT || blockCacheChars + text.length > BLOCK_CACHE_CHARS) {
+    if (
+      blockCache.size >= BLOCK_CACHE_LIMIT ||
+      blockCacheChars + text.length > BLOCK_CACHE_CHARS
+    ) {
       blockCache.clear()
       blockCacheChars = 0
     }
@@ -103,7 +118,8 @@ export function splitStreamingMarkdown(
   try {
     const tokens = marked.lexer(text.slice(prefix.length))
     let lastContent = tokens.length - 1
-    while (lastContent >= 0 && tokens[lastContent]?.type === 'space') lastContent -= 1
+    while (lastContent >= 0 && tokens[lastContent]?.type === 'space')
+      lastContent -= 1
     let advance = 0
     for (let index = 0; index < lastContent; index += 1) {
       advance += tokens[index]?.raw.length ?? 0
@@ -122,7 +138,13 @@ function toBlocks(token: Token): MarkdownBlock[] {
     case 'paragraph':
       return [{ kind: 'paragraph', text: token.text }]
     case 'code':
-      return [{ kind: 'code', text: token.text, ...(token.lang ? { lang: token.lang } : {}) }]
+      return [
+        {
+          kind: 'code',
+          text: token.text,
+          ...(token.lang ? { lang: token.lang } : {}),
+        },
+      ]
     case 'list':
       return [
         {
@@ -188,18 +210,22 @@ function MarkdownBlockView(props: {
   }
   if (block.kind === 'list') {
     let itemCursor = props.sourceOffset
+    const columns = Math.max(1, props.maxColumns ?? 80)
     return (
-      <Box flexDirection="column">
+      <Box flexDirection="column" flexShrink={0}>
         {block.items.map((item, index) => {
           const itemOffset = sourceIndexOf(props.sourceText, item, itemCursor)
           itemCursor = itemOffset + item.length
+          const prefix = `${block.ordered ? `${index + 1}.` : glyphs.listBullet} `
           return (
-            <Text key={`${index}:${item}`} color={theme.text}>
-              <Text color={theme.mute}>
-                {block.ordered ? `${index + 1}.` : glyphs.listBullet}
-              </Text>{' '}
-              {renderInline(item, props.selection, itemOffset)}
-            </Text>
+            <ListItemLines
+              key={`${index}:${item}`}
+              item={item}
+              prefix={prefix}
+              columns={columns}
+              selection={props.selection}
+              sourceOffset={itemOffset}
+            />
           )
         })}
       </Box>
@@ -222,8 +248,62 @@ function MarkdownBlockView(props: {
       </Text>
     )
   }
-  if (block.kind === 'rule') return <Text color={theme.border}>{glyphs.rule.repeat(24)}</Text>
-  return <Text color={theme.text}>{renderInline(block.text, props.selection, props.sourceOffset)}</Text>
+  if (block.kind === 'rule')
+    return <Text color={theme.border}>{glyphs.rule.repeat(24)}</Text>
+  return (
+    <WrappedSelectableText
+      color={theme.text}
+      columns={props.maxColumns ?? 80}
+      text={block.text}
+      selection={localTextRange(
+        props.selection,
+        props.sourceOffset,
+        block.text.length,
+      )}
+    />
+  )
+}
+
+/** Paint one list item with the same wrapPlainText rows hit-testing uses. */
+function ListItemLines(props: {
+  item: string
+  prefix: string
+  columns: number
+  selection?: MessageTextRange
+  sourceOffset: number
+}) {
+  const visual = `${props.prefix}${props.item}`
+  return (
+    <Box flexDirection="column" flexShrink={0}>
+      {wrapPlainText(visual, props.columns).map((line, index) => {
+        const bodyStart = Math.max(0, line.start - props.prefix.length)
+        const bodyEnd = Math.max(0, line.end - props.prefix.length)
+        const prefixSlice =
+          line.start < props.prefix.length
+            ? props.prefix.slice(line.start)
+            : ''
+        const body = props.item.slice(bodyStart, bodyEnd)
+        return (
+          <Text key={`${line.start}:${index}`} wrap="truncate-end">
+            {prefixSlice === '' ? null : (
+              <Text color={theme.mute}>{prefixSlice}</Text>
+            )}
+            {body === '' ? null : (
+              <SelectableText
+                wrap="truncate-end"
+                text={body}
+                selection={localTextRange(
+                  props.selection,
+                  props.sourceOffset + bodyStart,
+                  body.length,
+                )}
+              />
+            )}
+          </Text>
+        )
+      })}
+    </Box>
+  )
 }
 
 /** Left rail repeated per line, so a multi-line block reads as one region. */
@@ -236,20 +316,27 @@ function RailedLines(props: {
   let offset = props.sourceOffset
   return (
     <Box flexDirection="column">
-      {props.text.replace(/\r\n?/g, '\n').split('\n').map((line, index) => {
-        const lineOffset = offset
-        offset += line.length + 1
-        return (
-          <Text key={`${index}:${line}`}>
-            <Text color={theme.border}>{glyphs.quoteRail} </Text>
-            <SelectableText
-              color={props.color}
-              text={line}
-              selection={localSelection(props.selection, lineOffset, line.length)}
-            />
-          </Text>
-        )
-      })}
+      {props.text
+        .replace(/\r\n?/g, '\n')
+        .split('\n')
+        .map((line, index) => {
+          const lineOffset = offset
+          offset += line.length + 1
+          return (
+            <Text key={`${index}:${line}`}>
+              <Text color={theme.border}>{glyphs.quoteRail} </Text>
+              <SelectableText
+                color={props.color}
+                text={line}
+                selection={localSelection(
+                  props.selection,
+                  lineOffset,
+                  line.length,
+                )}
+              />
+            </Text>
+          )
+        })}
     </Box>
   )
 }
@@ -260,7 +347,8 @@ function renderInline(
   sourceOffset = 0,
 ): ReactNode {
   const nodes: ReactNode[] = []
-  const pattern = /(\*\*[^*]+\*\*|__[^_]+__|`[^`]+`|\[[^\]]+\]\([^)]+\)|\*[^*]+\*|_[^_]+_)/g
+  const pattern =
+    /(\*\*[^*]+\*\*|__[^_]+__|`[^`]+`|\[[^\]]+\]\([^)]+\)|\*[^*]+\*|_[^_]+_)/g
   let cursor = 0
   for (const match of text.matchAll(pattern)) {
     const value = match[0]
@@ -271,7 +359,11 @@ function renderInline(
         <SelectableText
           key={`${index}:plain`}
           text={plain}
-          selection={localSelection(selection, sourceOffset + cursor, plain.length)}
+          selection={localSelection(
+            selection,
+            sourceOffset + cursor,
+            plain.length,
+          )}
         />,
       )
     }
@@ -280,7 +372,11 @@ function renderInline(
         <Text key={`${index}:strong`} bold>
           <SelectableText
             text={value.slice(2, -2)}
-            selection={localSelection(selection, sourceOffset + index + 2, value.length - 4)}
+            selection={localSelection(
+              selection,
+              sourceOffset + index + 2,
+              value.length - 4,
+            )}
           />
         </Text>,
       )
@@ -289,7 +385,11 @@ function renderInline(
         <Text key={`${index}:code`} color={theme.accent}>
           <SelectableText
             text={value.slice(1, -1)}
-            selection={localSelection(selection, sourceOffset + index + 1, value.length - 2)}
+            selection={localSelection(
+              selection,
+              sourceOffset + index + 1,
+              value.length - 2,
+            )}
           />
         </Text>,
       )
@@ -299,7 +399,11 @@ function renderInline(
         <Text key={`${index}:link`} color={theme.accent}>
           <SelectableText
             text={value.slice(1, labelEnd)}
-            selection={localSelection(selection, sourceOffset + index + 1, Math.max(0, labelEnd - 1))}
+            selection={localSelection(
+              selection,
+              sourceOffset + index + 1,
+              Math.max(0, labelEnd - 1),
+            )}
           />
         </Text>,
       )
@@ -308,7 +412,11 @@ function renderInline(
         <Text key={`${index}:em`} italic>
           <SelectableText
             text={value.slice(1, -1)}
-            selection={localSelection(selection, sourceOffset + index + 1, value.length - 2)}
+            selection={localSelection(
+              selection,
+              sourceOffset + index + 1,
+              value.length - 2,
+            )}
           />
         </Text>,
       )
@@ -321,7 +429,11 @@ function renderInline(
       <SelectableText
         key={`${cursor}:plain-tail`}
         text={plain}
-        selection={localSelection(selection, sourceOffset + cursor, plain.length)}
+        selection={localSelection(
+          selection,
+          sourceOffset + cursor,
+          plain.length,
+        )}
       />,
     )
   }
@@ -341,7 +453,11 @@ function blockSourceText(block: MarkdownBlock): string {
   }
 }
 
-function blockSourceOffset(text: string, block: MarkdownBlock, from: number): number {
+function blockSourceOffset(
+  text: string,
+  block: MarkdownBlock,
+  from: number,
+): number {
   const source = blockSourceText(block)
   if (source === '') return from
   const index = text.indexOf(source, from)
@@ -363,7 +479,9 @@ function localSelection(
   const sourceEnd = sourceStart + length
   const start = Math.max(selection.start, sourceStart)
   const end = Math.min(selection.end, sourceEnd)
-  return start < end ? { start: start - sourceStart, end: end - sourceStart } : undefined
+  return start < end
+    ? { start: start - sourceStart, end: end - sourceStart }
+    : undefined
 }
 
 /**
@@ -378,7 +496,11 @@ export function renderTable(
   rows: readonly (readonly string[])[],
   maxColumns = 80,
 ): string {
-  const columnCount = Math.max(header.length, ...rows.map((row) => row.length), 1)
+  const columnCount = Math.max(
+    header.length,
+    ...rows.map((row) => row.length),
+    1,
+  )
   const allRows = [header, ...rows]
   const widths = tableColumnWidths(allRows, columnCount, maxColumns)
   const line = (row: readonly string[]) =>
@@ -388,7 +510,9 @@ export function renderTable(
         .join(TABLE_COLUMN_GAP)
         .trimEnd(),
     )
-  const divider = widths.map((width) => glyphs.rule.repeat(width)).join(TABLE_COLUMN_GAP)
+  const divider = widths
+    .map((width) => glyphs.rule.repeat(width))
+    .join(TABLE_COLUMN_GAP)
   return [...line(header), divider, ...rows.flatMap(line)].join('\n')
 }
 
@@ -411,7 +535,10 @@ function tableColumnWidths(
     )
     return Math.max(3, Math.min(TABLE_CELL_CAP, contentWidth))
   })
-  const minimum = Math.min(TABLE_MIN_CELL_WIDTH, Math.max(1, Math.floor(available / columnCount)))
+  const minimum = Math.min(
+    TABLE_MIN_CELL_WIDTH,
+    Math.max(1, Math.floor(available / columnCount)),
+  )
   const widths = preferred.map((width) => Math.max(minimum, width))
   while (sum(widths) > available) {
     const index = widestShrinkingColumn(widths, minimum)
@@ -421,17 +548,26 @@ function tableColumnWidths(
   return widths
 }
 
-function widestShrinkingColumn(widths: readonly number[], minimum: number): number {
+function widestShrinkingColumn(
+  widths: readonly number[],
+  minimum: number,
+): number {
   let index = -1
   for (let candidate = 0; candidate < widths.length; candidate += 1) {
     if ((widths[candidate] ?? 0) <= minimum) continue
-    if (index === -1 || (widths[candidate] ?? 0) > (widths[index] ?? 0)) index = candidate
+    if (index === -1 || (widths[candidate] ?? 0) > (widths[index] ?? 0))
+      index = candidate
   }
   return index
 }
 
-function rowLines(row: readonly string[], widths: readonly number[]): string[][] {
-  const lines = widths.map((width, column) => wrapCell(row[column] ?? '', width))
+function rowLines(
+  row: readonly string[],
+  widths: readonly number[],
+): string[][] {
+  const lines = widths.map((width, column) =>
+    wrapCell(row[column] ?? '', width),
+  )
   const rowHeight = Math.max(1, ...lines.map((cellLines) => cellLines.length))
   return Array.from({ length: rowHeight }, (_, line) =>
     lines.map((cellLines) => cellLines[line] ?? ''),
@@ -490,7 +626,10 @@ function hardWrap(value: string, width: number): string[] {
 }
 
 function splitCellLines(value: string): string[] {
-  return value.split(/\r?\n/).map((line) => line.trim()).filter((line) => line !== '')
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line !== '')
 }
 
 function padCell(value: string, width: number): string {
