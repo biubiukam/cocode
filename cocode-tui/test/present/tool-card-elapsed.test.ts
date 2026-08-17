@@ -46,6 +46,8 @@ describe('running tool elapsed clock', () => {
         stdout: stdout as unknown as NodeJS.WriteStream,
         patchConsole: false,
         exitOnCtrlC: false,
+        // CI/GITHUB_ACTIONS makes Ink defer frames until unmount.
+        interactive: true,
       },
     )
 
@@ -98,6 +100,8 @@ describe('running tool elapsed clock', () => {
         stdout: stdout as unknown as NodeJS.WriteStream,
         patchConsole: false,
         exitOnCtrlC: false,
+        // CI/GITHUB_ACTIONS makes Ink defer frames until unmount.
+        interactive: true,
       },
     )
 

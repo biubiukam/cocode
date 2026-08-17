@@ -25,18 +25,32 @@ describe('Chat', () => {
       startBeforeRender: true,
       mouseSupported: true,
       columns: 100,
+      rows: 24,
     })
 
     try {
       emitUserMessages(runtime, 18)
       await expect.poll(() => chat.app.snapshot().nodes.length).toBe(18)
-      await renderFlush()
+      await expect
+        .poll(() => latestPlainLines(chat.stdout.output).join('\n'))
+        .toContain('message-17')
+      expect(latestPlainLines(chat.stdout.output).join('\n')).not.toContain(
+        'message-0',
+      )
+
       chat.stdout.output = ''
-
-      chat.stdin.write('\u001b[<64;10;10M'.repeat(8))
-      await renderFlush()
-
-      expect(plainOutput(chat.stdout.output)).toContain('message-0')
+      for (let tick = 0; tick < 12; tick += 1) {
+        chat.stdin.write('\u001b[<64;10;10M')
+        await renderFlush()
+        if (
+          latestPlainLines(chat.stdout.output).join('\n').includes('message-0')
+        ) {
+          break
+        }
+      }
+      expect(latestPlainLines(chat.stdout.output).join('\n')).toContain(
+        'message-0',
+      )
     } finally {
       await closeChat(chat)
     }
@@ -416,6 +430,8 @@ describe('Chat', () => {
           patchConsole: false,
           exitOnCtrlC: false,
           kittyKeyboard: { mode: 'enabled' },
+          // CI/GITHUB_ACTIONS makes Ink defer frames until unmount.
+          interactive: true,
         },
       )
 
