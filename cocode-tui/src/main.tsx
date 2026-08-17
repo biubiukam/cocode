@@ -36,7 +36,7 @@ if (process.stdin.isTTY !== true || process.stdout.isTTY !== true) {
   process.stderr.write('Cocode TUI requires a TTY.\n')
   process.exitCode = 1
 } else {
-  void main(createTerminalOutput(process.stdout, { extraRows: 1 })).catch((error: unknown) => {
+  void main(createTerminalOutput(process.stdout)).catch((error: unknown) => {
     process.stderr.write(`Cocode TUI failed to start: ${startErrorMessage(error)}\n`)
     process.exitCode = 1
   })
