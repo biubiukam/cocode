@@ -7,6 +7,7 @@
  */
 import { spawn } from "node:child_process"
 import * as path from "pathe"
+import { shellCommandOptions } from "./lib/child-process-options.mjs"
 import { createChildSupervisor } from "./lib/child-supervisor.mjs"
 import { forkClientWatcher } from "./lib/client-watcher.mjs"
 import { buildDevRuntime } from "./lib/dev-build.mjs"
@@ -22,6 +23,11 @@ const BENIGN_MACOS_STDERR_PATTERNS = [
 	/\+\[IMKClient subclass\]: chose IMKClient_Modern/,
 	/\+\[IMKInputSession subclass\]: chose IMKInputSession_Modern/,
 ]
+
+// Windows exposes pnpm as a .cmd shim that spawn cannot execute directly, so
+// dev runners go through Corepack at the pinned version like every build script.
+const corepackCommand = process.platform === "win32" ? "corepack.cmd" : "corepack"
+const pinnedPnpmArgs = ["pnpm@10.34.5"]
 
 const workspace = path.resolve(process.cwd())
 const supervisorEntry = path.resolve(
@@ -77,16 +83,24 @@ async function run() {
 
 function startElectron() {
 	const electron = children.track(
-		spawn("pnpm", ["exec", "electron-forge", "start"], {
-			stdio: ["inherit", "inherit", process.platform === "darwin" ? "pipe" : "inherit"],
-			cwd: workspace,
-			env: {
-				...process.env,
-				DSH_RUNTIME_ROOT: runtime.root,
-				COCODE_SUPERVISOR_SERVICE_ENTRY: supervisorEntry,
-				COCODE_NODE_EXECUTABLE: process.execPath,
-			},
-		}),
+		spawn(
+			corepackCommand,
+			[...pinnedPnpmArgs, "exec", "electron-forge", "start"],
+			shellCommandOptions({
+				stdio: [
+					"inherit",
+					"inherit",
+					process.platform === "darwin" ? "pipe" : "inherit",
+				],
+				cwd: workspace,
+				env: {
+					...process.env,
+					DSH_RUNTIME_ROOT: runtime.root,
+					COCODE_SUPERVISOR_SERVICE_ENTRY: supervisorEntry,
+					COCODE_NODE_EXECUTABLE: process.execPath,
+				},
+			}),
+		),
 		"Electron",
 	)
 	electron.stderr?.on("data", (chunk) => {

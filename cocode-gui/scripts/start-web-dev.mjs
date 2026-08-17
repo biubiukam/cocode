@@ -8,6 +8,7 @@
 import { spawn } from "node:child_process"
 import os from "node:os"
 import * as path from "pathe"
+import { shellCommandOptions } from "./lib/child-process-options.mjs"
 import { createChildSupervisor } from "./lib/child-supervisor.mjs"
 import { forkClientWatcher } from "./lib/client-watcher.mjs"
 import { buildDevRuntime } from "./lib/dev-build.mjs"
@@ -16,6 +17,11 @@ import { cleanupRuntime, prepareRuntime, resolveRuntimeRoot } from "./lib/runtim
 
 const ENTRY_SCRIPT = "start-web-dev.mjs"
 const VITE_PORT = "5273"
+
+// Windows exposes pnpm as a .cmd shim that spawn cannot execute directly, so
+// dev runners go through Corepack at the pinned version like every build script.
+const corepackCommand = process.platform === "win32" ? "corepack.cmd" : "corepack"
+const pinnedPnpmArgs = ["pnpm@10.34.5"]
 
 const workspace = path.resolve(process.cwd())
 const supervisorEntry = path.resolve(
@@ -90,9 +96,17 @@ async function acquireHostEndpoint() {
 function startVite(runtimeUrl) {
 	return children.track(
 		spawn(
-			"pnpm",
-			["exec", "vite", "--config", "vite.renderer.config.ts", "--port", VITE_PORT],
-			{
+			corepackCommand,
+			[
+				...pinnedPnpmArgs,
+				"exec",
+				"vite",
+				"--config",
+				"vite.renderer.config.ts",
+				"--port",
+				VITE_PORT,
+			],
+			shellCommandOptions({
 				stdio: "inherit",
 				cwd: workspace,
 				env: {
@@ -102,7 +116,7 @@ function startVite(runtimeUrl) {
 					COCODE_SUPERVISOR_SERVICE_ENTRY: supervisorEntry,
 					COCODE_NODE_EXECUTABLE: process.execPath,
 				},
-			},
+			}),
 		),
 		"Vite",
 	)
