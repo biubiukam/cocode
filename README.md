@@ -6,6 +6,11 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
+> **Project status:** Developer preview. The repository supports source builds on
+> macOS, Windows, and Linux; the current release scripts target macOS and
+> Windows artifacts. Cocode is an independent distribution, and this repository
+> does not include a hosted backend or a vendored Harness checkout.
+
 DeepSeek Harness is a composable agent runtime — every capability is a plugin,
 and you assemble it through configuration. Cocode is the distribution that ships
 it already assembled: models, tools, skills, sessions, and permission boundaries
@@ -18,9 +23,8 @@ files, running commands, or accessing the network — before dangerous actions �
 and returns with the changes, the tests it ran, and the conclusions — all on
 one auditable task timeline.
 
-> Cocode is built on the DeepSeek Harness developer preview. It is an
-> independent distribution, not an official DeepSeek product; upstream
-> compatibility may change.
+> Cocode is built on the DeepSeek Harness developer preview. It is not an
+> official DeepSeek product, and upstream compatibility may change.
 
 ---
 
@@ -31,9 +35,10 @@ one auditable task timeline.
 | **Cocode GUI** | A desktop workspace built on Electron. Sessions, files, terminals, and runtime state live on one surface. Diffs and attachments open in a preview panel, so you see exactly what changed before you confirm. |
 | **Cocode TUI** | A terminal client for keyboard-first and remote work. SSH into a machine and keep pushing tasks with no graphical environment required. |
 
-Both attach to the same Host through `@cocode/host-supervisor`, so they share
-sessions and task state. Switching between the desktop app and the terminal does
-not reset your work.
+Both attach to the same Host through `@cocode/host-supervisor`, so they can share
+sessions and task state when they use the same `DSH_HOME`, profile, and Host
+configuration scope. Switching between the desktop app and the terminal does
+not reset your work within that scope.
 
 ## Repository layout
 
@@ -65,7 +70,7 @@ Cocode TUI ─┘
 
 If you are working on the Harness runtime itself, use a sibling clone at
 `../cocode-harness`. A nested copy inside this repository is gitignored on
-purpose.
+purpose and is not part of the public source tree.
 
 ## Requirements
 
@@ -78,8 +83,10 @@ to build:
 | `cocode-tui` | `^22.19` or `>=24` | any recent version |
 | `cocode-host-supervisor` | `>=22.12.0` | any recent version |
 
-The GUI additionally needs Python 3 for native module builds, and runs on macOS
-12+, Windows 10+, or 64-bit Linux, on `x64` and `arm64`.
+The GUI additionally needs Python 3 for native module builds, and source builds
+run on macOS 12+, Windows 10+, or 64-bit Linux, on `x64` and `arm64`. The current
+release scripts target macOS and Windows; Linux users should use a source build
+unless a Linux artifact is listed for a release.
 
 Use Corepack so the GUI gets its pinned pnpm:
 
@@ -136,15 +143,23 @@ Platform-specific release builds live in `cocode-gui`, as
 `release:mac:x64`, `release:mac:arm64`, `release:win:x64`, and
 `release:win:arm64`.
 
+The GUI is a private Electron workspace rather than an npm application package.
+The TUI and Host Supervisor have public publish configuration, but registry
+installation should only use matching versions listed in the same GitHub
+Release and npm release.
+
 ## Models and credentials
 
-Cocode does not bundle a model. You supply access in one of two ways:
+Cocode does not bundle a model or a hosted backend. You supply access in one of
+two ways:
 
 - **Your own key.** Paste a DeepSeek API key on first launch. It is stored in the
   DSH credentials file under `$DSH_HOME` and never enters the session log.
-- **Cocode Nut.** Sign in to Cocode and use the hosted model service — DeepSeek
-  V4 Pro and Flash, no API key to apply for or rotate. Identity tokens live in
-  `account.yaml` under `~/.cocode`. See [cocode.agency/nut](https://cocode.agency/nut).
+- **A hosted Cocode account, where available.** Hosted service availability,
+  model lineup, pricing, and account requirements are controlled by that
+  separate service and are not part of this repository. Identity tokens live in
+  `account.yaml` under `~/.cocode`. See the [hosted service
+  documentation](https://cocode.agency/nut).
 
 Relevant environment variables: `DSH_HOME` and `DSH_PROFILE` select the shared
 Host scope, `COCODE_HOST_CONFIG_FINGERPRINT` pins a custom Host composition,
@@ -155,12 +170,12 @@ session files.
 
 | | |
 | --- | --- |
-| [`AGENTS.md`](AGENTS.md) | Repository boundaries and the engineering contract |
-| [`cocode-gui/AGENTS.md`](cocode-gui/AGENTS.md) | GUI architecture rules — DDD layering, IPC, TypeScript, React |
-| [`cocode-gui/.dev/guide/design-system.html`](cocode-gui/.dev/guide/design-system.html) | The visual source of truth for the design system |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Contribution workflow, checks, and change boundaries |
+| [`SECURITY.md`](SECURITY.md) | Vulnerability reporting process |
 | [`cocode-tui/docs/`](cocode-tui/docs/) | TUI user guides, in English and Chinese |
 | [`cocode-host-supervisor/README.md`](cocode-host-supervisor/README.md) | Supervisor lease protocol and client API |
-| [`.dev/rfc/`](cocode-gui/.dev/rfc/) | Design RFCs, per component |
+| [`cocode-gui/README.md`](cocode-gui/README.md) | GUI development, packaging, and update behavior |
+| [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) | Third-party sources and license notices |
 
 Product documentation lives at [doc.cocode.agency](https://doc.cocode.agency).
 
@@ -168,8 +183,8 @@ Product documentation lives at [doc.cocode.agency](https://doc.cocode.agency).
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) first — it covers the commit convention,
 which checks are mandatory, and how changes are scoped across the three
-components. By participating you agree to the
-[Code of Conduct](CODE_OF_CONDUCT.md).
+components. Please keep changes focused on the component they affect and avoid
+committing local runtimes, caches, credentials, or generated output.
 
 To report a security vulnerability, follow [SECURITY.md](SECURITY.md) rather than
 opening a public issue.
