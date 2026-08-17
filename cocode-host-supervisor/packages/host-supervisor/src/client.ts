@@ -147,6 +147,9 @@ export class LocalHostSupervisorClient implements HostSupervisorClient {
     const child = spawn(node, [serviceEntry, 'service', '--state-dir', directory], {
       detached: true,
       stdio: 'ignore',
+      // The Supervisor is a headless daemon that logs to its state directory, so
+      // it must never surface a console window a user could close.
+      windowsHide: true,
       env: { ...process.env, COCODE_SUPERVISOR_STATE_DIR: directory },
     })
     child.unref()

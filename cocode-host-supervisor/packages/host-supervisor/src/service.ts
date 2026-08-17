@@ -193,6 +193,11 @@ class SupervisorService {
       // group so shutdown can terminate the whole tree instead of only the
       // Node leader.  Windows uses taskkill /T in terminateProcessTree below.
       detached: process.platform !== 'win32',
+      // The Supervisor that spawns this Host has no console of its own, so
+      // Windows would give the Host a fresh console window whose close button
+      // terminates the runtime under the client.  Both output streams are piped
+      // into the Supervisor log, so the Host never needs a console.
+      windowsHide: true,
     })
     const startupBuffer = new RingBuffer(256 * 1024)
     const streamBuffers = { stdout: '', stderr: '' }

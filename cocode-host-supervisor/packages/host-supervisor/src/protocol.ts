@@ -68,7 +68,7 @@ export interface HostSupervisorClient {
 }
 
 export const SUPERVISOR_PROTOCOL_REVISION = '1.0'
-export const SUPERVISOR_BUILD_REVISION = 'runtime-lifecycle-v4'
+export const SUPERVISOR_BUILD_REVISION = 'runtime-lifecycle-v5'
 export const HOST_PROTOCOL_REVISION = '1.0'
 export const LEASE_TTL_MS = 30_000
 
