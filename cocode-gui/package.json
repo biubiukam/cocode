@@ -51,8 +51,10 @@
 		"test": "tsx --test \"tests/**/*.test.ts\"",
 		"lint": "eslint --ext .js,.cjs,.mjs,.ts,.tsx --max-warnings=0 .",
 		"lint:fix": "eslint --ext .js,.cjs,.mjs,.ts,.tsx --max-warnings=0 --fix .",
+		"lint:ci": "node scripts/check-changed-files.mjs lint",
 		"format": "prettier --write .",
 		"format:check": "prettier --check .",
+		"format:ci": "node scripts/check-changed-files.mjs format",
 		"commitlint": "commitlint",
 		"prepare": "husky",
 		"check:env": "node scripts/check-env.mjs",
@@ -60,7 +62,8 @@
 		"windows-sign:clear": "node scripts/release/windows-sign-credentials.cjs clear",
 		"windows-sign:status": "node scripts/release/windows-sign-credentials.cjs status",
 		"reconcile:processes": "node scripts/reconcile-owned-processes.mjs",
-		"typecheck": "tsc --noEmit"
+		"typecheck": "tsc --noEmit",
+		"typecheck:ci": "tsc --noEmit --project tsconfig.ci.json"
 	},
 	"keywords": [],
 	"license": "MIT",

@@ -1,0 +1,15 @@
+{
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"noEmit": true,
+		"pretty": false
+	},
+	"include": [
+		"src/**/*.ts",
+		"src/**/*.tsx",
+		"forge.config.ts",
+		"forge.env.d.ts",
+		"vite*.config.ts"
+	],
+	"exclude": ["node_modules", "packages/client", "packages/cocode", "vendor", ".cache", "release"]
+}

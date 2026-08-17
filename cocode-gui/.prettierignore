@@ -1,12 +1,15 @@
 .vite/
+.cache/
 coverage/
 dist/
 dist-electron/
 node_modules/
 out/
+release/
 docs/
 packages/client/
 packages/cocode/
+packages/**/lib/
 vendor/
 *.md
 pnpm-lock.yaml

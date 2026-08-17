@@ -1,0 +1,144 @@
+name: Cocode GUI checks
+
+# Public CI validates source quality and rebuildability only. Formal Desktop
+# release/signing remains outside GitHub Actions because Windows signing is an
+# internal service and the release scripts require native signing credentials.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "cocode-gui/**"
+      - "cocode-tui/**"
+      - "cocode-host-supervisor/**"
+      - ".github/workflows/cocode-gui-check.yml"
+      - ".github/workflows/cocode-gui-release.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "cocode-gui/**"
+      - "cocode-tui/**"
+      - "cocode-host-supervisor/**"
+      - ".github/workflows/cocode-gui-check.yml"
+      - ".github/workflows/cocode-gui-release.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cocode-gui-check-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    name: GUI checks / ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows
+            runner: windows-2022
+          - platform: macos
+            runner: macos-14
+
+    defaults:
+      run:
+        working-directory: cocode-gui
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.2
+          cache: pnpm
+          cache-dependency-path: |
+            cocode-gui/pnpm-lock.yaml
+            cocode-tui/pnpm-lock.yaml
+            cocode-host-supervisor/pnpm-lock.yaml
+
+      - name: Check build environment
+        run: corepack pnpm@10.34.5 run check:env
+
+      - name: Install Host Supervisor dependencies
+        working-directory: cocode-host-supervisor
+        run: corepack pnpm@10.34.5 install --frozen-lockfile --ignore-scripts
+
+      - name: Install TUI dependencies
+        working-directory: cocode-tui
+        run: corepack pnpm@10.34.5 install --frozen-lockfile --ignore-scripts
+
+      - name: Install GUI dependencies
+        run: corepack pnpm@10.34.5 install --frozen-lockfile
+
+      - name: Check patch whitespace
+        working-directory: .
+        run: git diff --check
+
+      - name: Check workflow syntax and formatting
+        run: corepack pnpm@10.34.5 exec prettier --check ../.github/workflows/cocode-gui-check.yml
+
+      - name: Check GUI formatting
+        run: corepack pnpm@10.34.5 run format:ci
+
+      - name: Typecheck GUI-owned source
+        run: corepack pnpm@10.34.5 run typecheck:ci
+
+      - name: Lint GUI source
+        run: corepack pnpm@10.34.5 run lint:ci
+
+      - name: Test GUI source
+        run: corepack pnpm@10.34.5 run test
+
+      - name: Build Cocode plugins
+        run: corepack pnpm@10.34.5 run build:cocode-plugins
+
+      - name: Typecheck Cocode plugins
+        run: node scripts/cocode-plugins.mjs typecheck
+
+      - name: Test Cocode plugins
+        run: node scripts/cocode-plugins.mjs test
+
+      - name: Typecheck Host Supervisor
+        working-directory: cocode-host-supervisor
+        run: corepack pnpm@10.34.5 run typecheck
+
+      - name: Test Host Supervisor
+        working-directory: cocode-host-supervisor
+        run: corepack pnpm@10.34.5 test
+
+      - name: Build Host Supervisor with GUI plugins
+        run: corepack pnpm@10.34.5 run build:supervisor
+
+      - name: Build DSH runtime
+        run: corepack pnpm@10.34.5 run build:runtime -- --clean
+
+      - name: Verify DSH runtime
+        run: corepack pnpm@10.34.5 run verify:runtime
+
+      - name: Build staged TUI runtime
+        run: corepack pnpm@10.34.5 run build:tui
+
+      - name: Upload CI manifests on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cocode-gui-ci-manifests-${{ matrix.platform }}-${{ github.run_id }}
+          if-no-files-found: ignore
+          path: |
+            cocode-gui/.cache/cocode/supervisor-build-manifest.json
+            cocode-gui/.cache/cocode/release-runtime/runtime-manifest.json
+            cocode-gui/.cache/cocode/tui/manifest.json
+            cocode-host-supervisor/runtime/plugins.json

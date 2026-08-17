@@ -1,22 +1,28 @@
 import assert from "node:assert/strict"
-import { readFileSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import * as path from "pathe"
 import test from "node:test"
 
-const workflowPath = path.resolve("..", ".github/workflows/cocode-gui-release.yml")
+const repoRoot = path.resolve("..")
+const releaseWorkflowPath = path.join(repoRoot, ".github/workflows/cocode-gui-release.yml")
+const checkWorkflowPath = path.join(repoRoot, ".github/workflows/cocode-gui-check.yml")
 
-test("publishes both Windows MSIX architectures from the main repository", () => {
-	const workflow = readFileSync(workflowPath, "utf8")
-	assert.match(workflow, /arch: arm64[\s\S]+runner: \[self-hosted, windows, ARM64\]/)
-	assert.match(workflow, /-name '\*\.msix'/)
-	assert.match(workflow, /win32-arm64[\s\S]+-name '\*\.msix'/)
-	assert.doesNotMatch(workflow, /COCODE_GUI_ARM64_UPDATE_REPOSITORY/)
-	assert.doesNotMatch(workflow, /COCODE_GUI_ARM64_RELEASE_TOKEN/)
-	assert.doesNotMatch(workflow, /ELECTRON_UPDATE_REPOSITORY_WIN32_ARM64/)
+test("does not expose a public Desktop release workflow", () => {
+	assert.equal(existsSync(releaseWorkflowPath), false)
 })
 
-test("keeps x64 Squirrel metadata but excludes ARM64 Squirrel feed metadata", () => {
-	const workflow = readFileSync(workflowPath, "utf8")
-	assert.match(workflow, /win32-x64[\s\S]+-name 'RELEASES'[\s\S]+-name '\*\.nupkg'/)
-	assert.match(workflow, /win32-arm64[\s\S]+-name '\*\.msix'[\s\S]+-name 'SHA256SUMS\*\.txt'/)
+test("keeps the public GUI workflow limited to checks and rebuildability", () => {
+	const workflow = readFileSync(checkWorkflowPath, "utf8")
+
+	assert.match(workflow, /pull_request:/)
+	assert.match(workflow, /push:[\s\S]+branches:\s+- main/)
+	assert.match(workflow, /typecheck:ci/)
+	assert.match(workflow, /build:cocode-plugins/)
+	assert.match(workflow, /build:supervisor/)
+	assert.match(workflow, /build:runtime/)
+	assert.doesNotMatch(workflow, /RELEASE_REQUIRE_SIGNING/)
+	assert.doesNotMatch(workflow, /MAC_SIGNING_IDENTITY/)
+	assert.doesNotMatch(workflow, /CSC_LINK|WIN_CSC_LINK|AZURE_KEY_VAULT/)
+	assert.doesNotMatch(workflow, /electron-forge (make|publish)|pnpm run (make|publish)/)
+	assert.doesNotMatch(workflow, /create-release|upload-release-asset|softprops\/action-gh-release/)
 })
