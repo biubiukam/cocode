@@ -25,6 +25,7 @@ export type SessionHeader = {
   cwd?: string
   parentSession?: string
   seedLength?: number
+  agentPreset?: string
 }
 
 export type Agent = {
