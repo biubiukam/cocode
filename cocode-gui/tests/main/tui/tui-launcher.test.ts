@@ -109,7 +109,8 @@ function createFixture(): {
 	const root = mkdtempSync(path.join(os.tmpdir(), "cocode-tui-launcher-"))
 	const resources = path.join(root, "resources")
 	const bin = path.join(root, "bin")
-	const entry = path.join(resources, "tui", "cocode-tui.mjs")
+	const entry = path.join(resources, "tui", "cocode-cli.mjs")
+	const runtimeEntry = path.join(resources, "tui", "cocode-tui.mjs")
 	const node = path.join(resources, "cocode-node")
 	const supervisor = path.join(
 		resources,
@@ -123,6 +124,7 @@ function createFixture(): {
 	mkdirSync(path.dirname(supervisor), { recursive: true })
 	mkdirSync(bin, { recursive: true })
 	writeFileSync(entry, "export {}\n")
+	writeFileSync(runtimeEntry, "export {}\n")
 	writeFileSync(node, "")
 	writeFileSync(supervisor, "export {}\n")
 	chmodSync(node, 0o755)

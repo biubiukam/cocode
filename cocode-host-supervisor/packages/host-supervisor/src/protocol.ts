@@ -64,6 +64,7 @@ export interface HostLease {
 export interface HostSupervisorClient {
   acquire(request: AcquireHostRequest): Promise<HostLease>
   status(scope: HostScope): Promise<HostDescriptor | null>
+  stop(scope: HostScope, options?: { force?: boolean }): Promise<{ stopped: boolean; descriptor: HostDescriptor | null }>
   release(leaseId: string): Promise<void>
 }
 

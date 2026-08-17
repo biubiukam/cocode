@@ -40,7 +40,7 @@ export class TuiLauncher {
 		const resourcesRoot = resolveResourcesRoot()
 		const executable =
 			process.env.COCODE_NODE_EXECUTABLE?.trim() || path.join(resourcesRoot, "cocode-node")
-		const entry = path.join(resourcesRoot, "tui", "cocode-tui.mjs")
+		const entry = path.join(resourcesRoot, "tui", "cocode-cli.mjs")
 		const supervisorEntry = path.join(
 			resourcesRoot,
 			"dsh-runtime",
@@ -135,14 +135,19 @@ export class TuiLauncher {
 		let runtimeValid = true
 		if (manifest !== null) {
 			const resourcesRoot = resolveResourcesRoot()
-			const entry = path.join(resourcesRoot, "tui", "cocode-tui.mjs")
-			const entryHash = createHash("sha256")
-				.update(await readFile(entry))
+			const cliEntry = path.join(resourcesRoot, "tui", "cocode-cli.mjs")
+			const runtimeEntry = path.join(resourcesRoot, "tui", "cocode-tui.mjs")
+			const cliHash = createHash("sha256")
+				.update(await readFile(cliEntry))
+				.digest("hex")
+			const runtimeHash = createHash("sha256")
+				.update(await readFile(runtimeEntry))
 				.digest("hex")
 			runtimeValid =
 				manifest.schemaVersion === 1 &&
-				manifest.entry === "tui/cocode-tui.mjs" &&
-				manifest.sha256 === entryHash
+				manifest.entry === "tui/cocode-cli.mjs" &&
+				manifest.sha256 === cliHash &&
+				manifest.runtimeSha256 === runtimeHash
 		}
 		return {
 			runtimeValid,
