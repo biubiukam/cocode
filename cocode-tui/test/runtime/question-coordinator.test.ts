@@ -8,6 +8,15 @@ const request = (sessionId: string, ...ids: string[]): TuiQuestionRequest => ({
 })
 
 describe('question coordinator', () => {
+  it('omits tabs for a single-question request', async () => {
+    const coordinator = createQuestionCoordinator({ emit: () => undefined })
+    const result = coordinator.ask(request('s1', 'only'))
+
+    expect(coordinator.snapshot()).not.toHaveProperty('tabs')
+    coordinator.answer(['ok'])
+    await expect(result).resolves.toEqual({ answers: [{ id: 'only', selected: ['ok'] }] })
+  })
+
   it('serializes requests and resolves every answer in order', async () => {
     const emit = vi.fn()
     const coordinator = createQuestionCoordinator({ emit })

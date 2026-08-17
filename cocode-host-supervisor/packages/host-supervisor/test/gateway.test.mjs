@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { realpath } from 'node:fs/promises'
 import { TuiCompanionGateway } from '../lib/host-jsonrpc-plugin.js'
 
 function createContext(options = {}) {
@@ -82,6 +83,7 @@ function createContext(options = {}) {
           },
         }
       }
+      if (name === 'workspaceRegistry') return options.workspaceRegistry
       return undefined
     },
     on() {
@@ -124,6 +126,114 @@ test('rejects unsupported images before they enter the session', async () => {
     /does not support image content/i,
   )
   assert.equal(followed.length, 0)
+})
+
+test('asks for workspace authorization before creating a session', async () => {
+  let createdWorkspaces = 0
+  const { ctx, created } = createContext({
+    workspaceRegistry: {
+      async resolveByPath() {
+        return undefined
+      },
+      async create() {
+        createdWorkspaces += 1
+        throw new Error('workspace should not be created before approval')
+      },
+    },
+  })
+  const gateway = createGateway(ctx)
+  await initialize(gateway)
+
+  await assert.deepEqual(
+    await gateway.handleRequest('cocode/workspace/ensure', { sessionId: 's1' }),
+    {
+      status: 'authorization-required',
+      path: await realpath('/tmp'),
+      title: 'tmp',
+    },
+  )
+  assert.equal(created.length, 0)
+  assert.equal(createdWorkspaces, 0)
+})
+
+test('creates and attaches a workspace only after approval', async () => {
+  const attached = []
+  const workspace = {
+    id: 'workspace-1',
+    path: '/tmp',
+    title: 'tmp',
+    async attachSession(sessionId) {
+      attached.push(sessionId)
+    },
+  }
+  let createdWorkspaces = 0
+  const { ctx, created } = createContext({
+    workspaceRegistry: {
+      async resolveByPath() {
+        return undefined
+      },
+      async create() {
+        createdWorkspaces += 1
+        return workspace
+      },
+    },
+  })
+  const gateway = createGateway(ctx)
+  await initialize(gateway)
+
+  assert.deepEqual(
+    await gateway.ensureWorkspace({ sessionId: 's1', approved: true }),
+    {
+      status: 'ready',
+      workspaceId: 'workspace-1',
+      path: '/tmp',
+      title: 'tmp',
+      created: true,
+    },
+  )
+  assert.equal(created.length, 1)
+  assert.equal(createdWorkspaces, 1)
+  assert.deepEqual(attached, ['s1'])
+})
+
+test('reuses an existing workspace without asking for authorization', async () => {
+  const attached = []
+  const workspace = {
+    id: 'workspace-1',
+    path: '/tmp',
+    title: 'tmp',
+    async attachSession(sessionId) {
+      attached.push(sessionId)
+    },
+  }
+  let createdWorkspaces = 0
+  const { ctx, created } = createContext({
+    workspaceRegistry: {
+      async resolveByPath() {
+        return workspace
+      },
+      async create() {
+        createdWorkspaces += 1
+        return workspace
+      },
+    },
+  })
+  const gateway = createGateway(ctx)
+  await initialize(gateway)
+
+  assert.deepEqual(
+    await gateway.ensureWorkspace({ sessionId: 's1' }),
+    {
+      status: 'ready',
+      workspaceId: 'workspace-1',
+      path: '/tmp',
+      title: 'tmp',
+      created: false,
+    },
+  )
+  assert.equal(created.length, 1)
+  assert.equal(createdWorkspaces, 0)
+  assert.deepEqual(attached, ['s1'])
 })
 
 test('uses vision evidence without retaining images for text-only models', async () => {

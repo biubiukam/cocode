@@ -2635,7 +2635,7 @@ function questionPanelRows(
     (rows, option) => rows + 1 + Number(option.description !== undefined),
     0,
   )
-  return 11 + Number(state.question.detail !== undefined) + optionRows
+  return 7 + Number(state.total > 1) + Number(state.question.customInput !== false ? 3 : 0) + Number(state.question.detail !== undefined) + optionRows
 }
 
 function overlayWindowSize(

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { resolve } from "node:path";
+import { basename, resolve } from "node:path";
+import { realpath } from "node:fs/promises";
 import { CompanionTransport } from "./transport.js";
 import type {
   Agent,
@@ -37,6 +38,7 @@ export type UserQuestion = {
   header?: string;
   options?: { label: string; description?: string }[];
   multiSelect?: boolean;
+  customInput?: boolean;
   intent?: { kind: "plan-review"; approve: string };
 };
 
@@ -198,6 +200,18 @@ type PersistenceService = {
     };
     events: SessionEvent[];
   }>;
+};
+
+type Workspace = {
+  id: string;
+  path: string;
+  title: string;
+  attachSession(sessionId: string): Promise<void>;
+};
+
+type WorkspaceRegistryService = {
+  resolveByPath(path: string): Promise<Workspace | undefined>;
+  create(path: string): Promise<Workspace>;
 };
 
 type PendingQuestion = {
@@ -521,6 +535,49 @@ export class TuiCompanionGateway {
       }),
     );
     return { sessions };
+  }
+
+  async ensureWorkspace(params: {
+    sessionId: string;
+    approved?: boolean;
+  }): Promise<Record<string, unknown>> {
+    this.assertInitialized();
+    if (params.sessionId.trim() === "")
+      throw new Error("workspace/ensure requires a session id");
+    const registry = this.ctx.get("workspaceRegistry") as
+      | WorkspaceRegistryService
+      | undefined;
+    const path = resolve(this.cwd);
+    if (registry === undefined) {
+      return {
+        status: "unsupported",
+        path,
+        reason: "workspace registry is not configured",
+      };
+    }
+
+    const canonicalPath = await realpath(path);
+    let workspace = await registry.resolveByPath(canonicalPath);
+    if (workspace === undefined && params.approved !== true) {
+      return {
+        status: "authorization-required",
+        path: canonicalPath,
+        title: basename(canonicalPath),
+      };
+    }
+
+    const record = await this.getOrCreateSession(params.sessionId);
+    this.assertLive(params.sessionId, record);
+    const created = workspace === undefined;
+    workspace ??= await registry.create(canonicalPath);
+    await workspace.attachSession(params.sessionId);
+    return {
+      status: "ready",
+      workspaceId: String(workspace.id),
+      path: workspace.path,
+      title: workspace.title,
+      created,
+    };
   }
 
   async permissionMode(params: { sessionId: string; mode?: string }): Promise<{
@@ -959,6 +1016,11 @@ export class TuiCompanionGateway {
       case "cocode/session/list":
       case "session/list":
         return this.listSessions(params as { cwd?: string });
+      case "cocode/workspace/ensure":
+      case "workspace/ensure":
+        return this.ensureWorkspace(
+          params as { sessionId: string; approved?: boolean },
+        );
       case "cocode/session/cancel":
       case "session/cancel":
         return this.cancel(
@@ -1486,6 +1548,8 @@ function validateQuestionAnswer(
       throw new Error(
         "question response selected multiple options for a single-select question",
       );
+    if (question.customInput === false && item.custom !== undefined)
+      throw new Error("question response included a custom answer when custom input is disabled");
     if (
       question.multiSelect !== true &&
       item.custom !== undefined &&

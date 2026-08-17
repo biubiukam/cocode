@@ -137,12 +137,22 @@ export type UiTextKey =
   | 'pluginsToggling'
   | 'questionTitle'
   | 'questionHint'
+  | 'questionSingleHint'
   | 'questionCustom'
   | 'questionMultiHint'
   | 'questionSelectHint'
+  | 'questionOptionHint'
   | 'questionStreaming'
   | 'questionReady'
   | 'questionUnavailable'
+  | 'workspaceAuthorizationTitle'
+  | 'workspaceAuthorizationQuestion'
+  | 'workspaceAuthorizationAllow'
+  | 'workspaceAuthorizationAllowDescription'
+  | 'workspaceAuthorizationCancel'
+  | 'workspaceAuthorizationCancelDescription'
+  | 'workspaceAuthorizationCancelled'
+  | 'workspaceAuthorizationUnavailable'
   | 'rewindTitle'
   | 'rewindHint'
   | 'rewindArm'
@@ -433,12 +443,22 @@ const TEXT: Record<UiLocale, Record<UiTextKey, string>> = {
     pluginsToggling: 'updating…',
     questionTitle: 'Question',
     questionHint: '↑↓ move · ←→ switch',
+    questionSingleHint: '↑↓ choose',
     questionCustom: 'Type another answer',
     questionMultiHint: 'space toggles · tab custom',
     questionSelectHint: 'tab custom',
+    questionOptionHint: '↑↓ choose',
     questionStreaming: 'question is streaming…',
     questionReady: 'question ready for interaction',
     questionUnavailable: 'Question text unavailable',
+    workspaceAuthorizationTitle: 'Workspace access',
+    workspaceAuthorizationQuestion: 'Allow Cocode to register the current directory as a workspace?',
+    workspaceAuthorizationAllow: 'Allow',
+    workspaceAuthorizationAllowDescription: 'Create the workspace and attach this session.',
+    workspaceAuthorizationCancel: 'Cancel',
+    workspaceAuthorizationCancelDescription: 'Cancel without creating a workspace or session.',
+    workspaceAuthorizationCancelled: 'Workspace authorization was cancelled.',
+    workspaceAuthorizationUnavailable: 'Workspace authorization could not be completed.',
     rewindTitle: 'Rewind conversation',
     rewindHint: '↑↓ select · enter review · esc close',
     rewindArm: 'Press Esc again to choose a rewind point.',
@@ -728,12 +748,22 @@ const TEXT: Record<UiLocale, Record<UiTextKey, string>> = {
     pluginsToggling: '正在更新…',
     questionTitle: '需要确认',
     questionHint: '↑↓ 移动 · ←→ 切换问题',
+    questionSingleHint: '↑↓ 选择',
     questionCustom: '输入其他答案',
     questionMultiHint: '空格勾选 · Tab 输入其他答案',
     questionSelectHint: 'Tab 输入其他答案',
+    questionOptionHint: '↑↓ 选择',
     questionStreaming: '问题生成中…',
     questionReady: '问题已生成，等待交互',
     questionUnavailable: '问题内容暂不可用',
+    workspaceAuthorizationTitle: '工作区授权',
+    workspaceAuthorizationQuestion: '是否允许 Cocode 将当前目录注册为工作区？',
+    workspaceAuthorizationAllow: '允许',
+    workspaceAuthorizationAllowDescription: '创建工作区并绑定当前会话。',
+    workspaceAuthorizationCancel: '取消',
+    workspaceAuthorizationCancelDescription: '取消操作，不创建工作区或会话。',
+    workspaceAuthorizationCancelled: '已取消工作区授权。',
+    workspaceAuthorizationUnavailable: '工作区授权未完成。',
     rewindTitle: '回滚会话',
     rewindHint: '↑↓ 选择 · 回车预览 · Esc 关闭',
     rewindArm: '再次按 Esc 选择回滚位置。',

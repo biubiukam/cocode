@@ -21,6 +21,7 @@ export function QuestionPanel(props: {
   dispatch: (action: TuiAction) => void
 }) {
   const options = props.state.question.options ?? []
+  const allowCustom = props.state.question.customInput !== false
   const inputIndex = options.length
   const multiSelect = props.state.question.multiSelect === true
   const savedAnswer = props.state.answer
@@ -32,36 +33,36 @@ export function QuestionPanel(props: {
   const [focus, setFocus] = useState(() => {
     const selectedIndex = [...savedSelected][0]
     if (selectedIndex !== undefined) return selectedIndex
-    return savedAnswer?.custom === undefined ? 0 : inputIndex
+    return allowCustom && savedAnswer?.custom !== undefined ? inputIndex : 0
   })
   const [selected, setSelected] = useState<ReadonlySet<number>>(() => savedSelected)
   const [custom, setCustom] = useState(() => savedAnswer?.custom ?? '')
   const [dirty, setDirty] = useState(false)
-  const inputFocused = focus === inputIndex
+  const inputFocused = allowCustom && focus === inputIndex
+  const focusCount = options.length + Number(allowCustom)
   const lastOptionFocus = useRef(0)
   if (focus < options.length) lastOptionFocus.current = focus
   const customLines = custom.split('\n')
   const visibleCustomLines = customLines.slice(-3)
   const lastPointerId = useRef(props.mousePointer?.id)
-  const tabs = props.state.tabs ?? [fallbackTab(props.state)]
+  const tabs = props.state.total > 1 ? props.state.tabs ?? [fallbackTab(props.state)] : []
+  const firstOptionRow = props.panelStartRow + 6 + Number(tabs.length > 0) + Number(props.state.question.detail !== undefined)
   const prompt = questionPrompt(props.state.question, text(props.locale, 'questionUnavailable'))
 
   useEffect(() => {
     const selectedIndex = [...savedSelected][0]
-    setFocus(selectedIndex ?? (savedAnswer?.custom === undefined ? 0 : inputIndex))
+    setFocus(selectedIndex ?? (allowCustom && savedAnswer?.custom !== undefined ? inputIndex : 0))
     setSelected(savedSelected)
     setCustom(savedAnswer?.custom ?? '')
     setDirty(false)
     lastOptionFocus.current = selectedIndex ?? 0
-  }, [inputIndex, props.state.key])
+  }, [allowCustom, inputIndex, props.state.key])
 
   useEffect(() => {
     const pointer = props.mousePointer
     if (pointer === undefined || pointer.id === lastPointerId.current) return
     lastPointerId.current = pointer.id
     const optionHasDescription = options.map((option) => option.description !== undefined)
-    const firstOptionRow =
-      props.panelStartRow + 7 + Number(props.state.question.detail !== undefined)
     const optionIndex = questionOptionIndexAtRow({
       row: pointer.row,
       firstOptionRow,
@@ -86,11 +87,13 @@ export function QuestionPanel(props: {
       }
       return
     }
-    const customRow = questionCustomRow({ firstOptionRow, optionHasDescription })
-    if (pointer.row >= customRow && pointer.row <= customRow + 2) {
-      setFocus(inputIndex)
+    if (allowCustom) {
+      const customRow = questionCustomRow({ firstOptionRow, optionHasDescription })
+      if (pointer.row >= customRow && pointer.row <= customRow + 2) {
+        setFocus(inputIndex)
+      }
     }
-  }, [inputIndex, multiSelect, options, props])
+  }, [allowCustom, firstOptionRow, inputIndex, multiSelect, options, props])
 
   useInput((input, key) => {
     if (isMouseInput(input)) return
@@ -98,7 +101,7 @@ export function QuestionPanel(props: {
       props.dispatch({ type: 'question.cancel' })
       return
     }
-    if (key.leftArrow || key.rightArrow) {
+    if (props.state.total > 1 && (key.leftArrow || key.rightArrow)) {
       props.dispatch({
         type: 'question.navigate',
         direction: key.leftArrow ? 'previous' : 'next',
@@ -112,11 +115,13 @@ export function QuestionPanel(props: {
       return
     }
     if (key.upArrow) {
-      setFocus((current) => (current - 1 + options.length + 1) % (options.length + 1))
+      if (focusCount === 0) return
+      setFocus((current) => (current - 1 + focusCount) % focusCount)
       return
     }
     if (key.downArrow || key.tab) {
-      setFocus((current) => (current + 1) % (options.length + 1))
+      if (focusCount === 0) return
+      setFocus((current) => (current + 1) % focusCount)
       return
     }
     if (!inputFocused && multiSelect && input === ' ') {
@@ -141,7 +146,7 @@ export function QuestionPanel(props: {
     }
     if (key.return) {
       const trimmedCustom = custom.trim()
-      if (trimmedCustom !== '') {
+      if (allowCustom && trimmedCustom !== '') {
         props.dispatch({
           type: 'question.answer',
           selected: multiSelect
@@ -170,7 +175,7 @@ export function QuestionPanel(props: {
       props.dispatch({ type: 'question.answer', selected: [option.label] })
       return
     }
-    if (inputFocused && input !== '' && !key.ctrl && !key.meta && !key.super) {
+    if (allowCustom && inputFocused && input !== '' && !key.ctrl && !key.meta && !key.super) {
       setCustom((value) => value + input)
       setDirty(true)
     }
@@ -179,40 +184,44 @@ export function QuestionPanel(props: {
   return (
     <PanelFrame
       title={text(props.locale, 'questionTitle')}
-      hint={`${props.state.position}/${props.state.total} · ${text(props.locale, 'questionHint')}`}
+      hint={`${props.state.total > 1 ? `${props.state.position}/${props.state.total} · ` : ''}${text(props.locale, props.state.total > 1 ? 'questionHint' : 'questionSingleHint')}`}
       borderColor={theme.border}
       footer={
         [
           text(props.locale, 'questionSubmit'),
-          text(props.locale, 'questionNewline'),
+          ...(allowCustom ? [text(props.locale, 'questionNewline')] : []),
           text(props.locale, 'questionExit'),
           multiSelect
             ? text(props.locale, 'questionMultiHint')
-            : text(props.locale, 'questionSelectHint'),
+            : allowCustom
+              ? text(props.locale, 'questionSelectHint')
+              : text(props.locale, 'questionOptionHint'),
         ].join(' · ')
       }
     >
-      <Box flexDirection="row" gap={1}>
-        {tabs.map((tab) => {
-          const active = tab.position === props.state.position
-          return (
-            <Text
-              key={`${tab.position}-${tab.label}`}
-              color={active ? theme.accent : tab.answered ? theme.dim : theme.mute}
-              backgroundColor={active ? theme.accentSoft : undefined}
-              bold={active}
-              wrap="truncate-end"
-            >
-              {active
-                ? glyphs.optionActive
-                : tab.answered
-                ? glyphs.checkDone
-                : glyphs.optionInactive}{' '}
-              {tab.position}. {tab.label}
-            </Text>
-          )
-        })}
-      </Box>
+      {tabs.length > 0 ? (
+        <Box flexDirection="row" gap={1}>
+          {tabs.map((tab) => {
+            const active = tab.position === props.state.position
+            return (
+              <Text
+                key={`${tab.position}-${tab.label}`}
+                color={active ? theme.accent : tab.answered ? theme.dim : theme.mute}
+                backgroundColor={active ? theme.accentSoft : undefined}
+                bold={active}
+                wrap="truncate-end"
+              >
+                {active
+                  ? glyphs.optionActive
+                  : tab.answered
+                  ? glyphs.checkDone
+                  : glyphs.optionInactive}{' '}
+                {tab.position}. {tab.label}
+              </Text>
+            )
+          })}
+        </Box>
+      ) : null}
       <Box flexDirection="row" marginTop={1}>
         <Text color={theme.accent} bold>
           {glyphs.railSelected}
@@ -246,23 +255,25 @@ export function QuestionPanel(props: {
           </Box>
         )
       })}
-      <Box flexDirection="column" marginTop={1}>
-        <Text color={inputFocused ? theme.accent : theme.dim}>
-          {inputFocused ? glyphs.rail : ' '} {glyphs.editMark}{' '}
-          {text(props.locale, 'questionCustom')}
-        </Text>
-        {visibleCustomLines.map((line, index) => (
-          <Text
-            key={`${index}-${line}`}
-            color={inputFocused ? theme.text : theme.mute}
-            inverse={inputFocused && index === visibleCustomLines.length - 1}
-            wrap="truncate-end"
-          >
-            {inputFocused ? `${glyphs.rail} ` : '  '}
-            {line === '' && custom === '' ? text(props.locale, 'questionCustom') : line}
+      {allowCustom ? (
+        <Box flexDirection="column" marginTop={1}>
+          <Text color={inputFocused ? theme.accent : theme.dim}>
+            {inputFocused ? glyphs.rail : ' '} {glyphs.editMark}{' '}
+            {text(props.locale, 'questionCustom')}
           </Text>
-        ))}
-      </Box>
+          {visibleCustomLines.map((line, index) => (
+            <Text
+              key={`${index}-${line}`}
+              color={inputFocused ? theme.text : theme.mute}
+              inverse={inputFocused && index === visibleCustomLines.length - 1}
+              wrap="truncate-end"
+            >
+              {inputFocused ? `${glyphs.rail} ` : '  '}
+              {line === '' && custom === '' ? text(props.locale, 'questionCustom') : line}
+            </Text>
+          ))}
+        </Box>
+      ) : null}
     </PanelFrame>
   )
 }

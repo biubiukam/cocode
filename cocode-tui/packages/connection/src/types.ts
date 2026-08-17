@@ -89,6 +89,7 @@ export type TuiQuestionItem = {
   header?: string
   options?: TuiQuestionOption[]
   multiSelect?: boolean
+  customInput?: boolean
   intent?: TuiQuestionIntent
 }
 
@@ -145,6 +146,25 @@ export type TuiSessionOpenResult = {
   seedLength?: number
   seed?: SessionEvent[]
 }
+
+export type TuiWorkspaceEnsureResult =
+  | {
+      status: 'ready'
+      workspaceId: string
+      path: string
+      title: string
+      created: boolean
+    }
+  | {
+      status: 'authorization-required'
+      path: string
+      title: string
+    }
+  | {
+      status: 'unsupported'
+      path: string
+      reason: string
+    }
 
 export type TuiModel = {
   id: string
@@ -286,6 +306,7 @@ export type TuiRuntime = {
   listPlugins?(): Promise<TuiPluginEntry[]>
   setPluginEnabled?(entryId: string, enabled: boolean): Promise<TuiPluginEntry>
   listSessions?(cwd?: string): Promise<TuiSessionSummary[]>
+  ensureWorkspace?(sessionId: string, approved?: boolean): Promise<TuiWorkspaceEnsureResult>
   listModels?(): Promise<TuiModelCatalog>
   saveImages?(images: readonly TuiImageInput[]): Promise<TuiImageAttachmentRef[]>
   permissionMode?(
