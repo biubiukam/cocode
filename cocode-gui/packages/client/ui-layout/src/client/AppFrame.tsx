@@ -10,7 +10,7 @@
  * through the three framework shares — zero cordis or framework imports,
  * zero self-made hooks.
  */
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import type { PropsRenderSlots, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import {
@@ -32,10 +32,30 @@ type LayoutLocale = { subscribe(listener: () => void): () => void; getSnapshot()
 
 const EMPTY_LOCALE = { active: 'zh' }
 const EMPTY_SUBSCRIBE = (): (() => void) => () => {}
+const EMPTY_GET_SNAPSHOT = (): { active: string } => EMPTY_LOCALE
 
 function RuntimeRecoveryBanner({ locale }: { locale?: LayoutLocale }) {
   const [detail, setDetail] = useState<RuntimeRecoveryDetail | null>(null)
-  const localeSnapshot = useSyncExternalStore(locale?.subscribe ?? EMPTY_SUBSCRIBE, locale?.getSnapshot ?? (() => EMPTY_LOCALE), locale?.getSnapshot ?? (() => EMPTY_LOCALE))
+  // LocaleRuntime exposes methods that read its private state through `this`.
+  // Passing those methods directly to React loses the receiver and crashes the
+  // whole root slot during startup. Bind once per locale instance instead.
+  const localeStore = useMemo(() => {
+    if (locale === undefined) {
+      return {
+        subscribe: EMPTY_SUBSCRIBE,
+        getSnapshot: EMPTY_GET_SNAPSHOT,
+      }
+    }
+    return {
+      subscribe: locale.subscribe.bind(locale),
+      getSnapshot: locale.getSnapshot.bind(locale),
+    }
+  }, [locale])
+  const localeSnapshot = useSyncExternalStore(
+    localeStore.subscribe,
+    localeStore.getSnapshot,
+    localeStore.getSnapshot,
+  )
 
   useEffect(() => {
     const root = document.documentElement

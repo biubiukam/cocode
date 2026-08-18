@@ -1,4 +1,4 @@
-import { createElement, Fragment, useEffect, useRef, useState, useSyncExternalStore } from "react"
+import { createElement, Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
 import type { MouseEvent as ReactMouseEvent, ReactNode } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import type { ClientContext } from "@deepseek-ai/dsh-client-runtime/client"
@@ -633,7 +633,23 @@ function AccountErrorModal({ snapshot, onClose, onRetry }: {
 function AccountAction({ wide, store, providers, locale }: AccountProps): ReturnType<typeof createElement> {
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
   const provider = useSyncExternalStore(providers.subscribe, providers.getSnapshot, providers.getSnapshot)
-  const localeSnapshot = useSyncExternalStore(locale?.subscribe ?? EMPTY_LOCALE_SUBSCRIBE, locale?.getSnapshot ?? (() => EMPTY_LOCALE_SNAPSHOT), locale?.getSnapshot ?? (() => EMPTY_LOCALE_SNAPSHOT))
+  const localeStore = useMemo(() => {
+    if (locale === undefined) {
+      return {
+        subscribe: EMPTY_LOCALE_SUBSCRIBE,
+        getSnapshot: () => EMPTY_LOCALE_SNAPSHOT,
+      }
+    }
+    return {
+      subscribe: locale.subscribe.bind(locale),
+      getSnapshot: locale.getSnapshot.bind(locale),
+    }
+  }, [locale])
+  const localeSnapshot = useSyncExternalStore(
+    localeStore.subscribe,
+    localeStore.getSnapshot,
+    localeStore.getSnapshot,
+  )
   activeLocale = localeSnapshot.active === "en" ? "en" : "zh"
   const [open, setOpen] = useState(false)
   const [panel, setPanel] = useState<AccountPanelKind | null>(null)
