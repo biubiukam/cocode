@@ -12,6 +12,7 @@ import {
   Menu,
   type MenuEntry,
 } from "@deepseek-ai/dsh-client-ui-primitives"
+import { createAccountLocaleStore, type AccountLocale } from "./account-locale-store.ts"
 import css from "./account.module.css"
 
 type AccountSnapshot = {
@@ -42,14 +43,12 @@ type AccountProps = {
   readonly wide: boolean
   readonly store: AccountStore
   readonly providers: ProviderStore
-  readonly locale?: { subscribe(listener: () => void): () => void; getSnapshot(): { active: string } }
+  readonly locale?: AccountLocale
 }
 
 type AccountPanelKind = "usage" | "help"
 
 const FEEDBACK_TO = "support@cocode.agency"
-const EMPTY_LOCALE_SNAPSHOT = { active: "zh" }
-const EMPTY_LOCALE_SUBSCRIBE = (): (() => void) => () => {}
 let activeLocale: "zh" | "en" = "zh"
 
 type OnboardingProps = {
@@ -633,18 +632,7 @@ function AccountErrorModal({ snapshot, onClose, onRetry }: {
 function AccountAction({ wide, store, providers, locale }: AccountProps): ReturnType<typeof createElement> {
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
   const provider = useSyncExternalStore(providers.subscribe, providers.getSnapshot, providers.getSnapshot)
-  const localeStore = useMemo(() => {
-    if (locale === undefined) {
-      return {
-        subscribe: EMPTY_LOCALE_SUBSCRIBE,
-        getSnapshot: () => EMPTY_LOCALE_SNAPSHOT,
-      }
-    }
-    return {
-      subscribe: locale.subscribe.bind(locale),
-      getSnapshot: locale.getSnapshot.bind(locale),
-    }
-  }, [locale])
+  const localeStore = useMemo(() => createAccountLocaleStore(locale), [locale])
   const localeSnapshot = useSyncExternalStore(
     localeStore.subscribe,
     localeStore.getSnapshot,
