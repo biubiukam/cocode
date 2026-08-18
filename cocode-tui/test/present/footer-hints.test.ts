@@ -93,6 +93,31 @@ describe('resolveFooterHints', () => {
     expect(resolveFooterHints({ agent: 'idle', draft: '', messageSelection: false, paneFocus: 'inspector' }, keymap, 'en', 160).hints.map((hint) => hint.id)).toContain('pane-scroll')
     expect(resolveFooterHints({ activeOverlay: 'rewind', overlayConfirming: true, agent: 'idle', draft: '', messageSelection: false }, keymap, 'en', 160).hints.map((hint) => hint.id)).toEqual(['confirm', 'cancel'])
   })
+
+  it('shows transcript controls instead of an Esc quit hint for read-only sessions', () => {
+    const footer = resolveFooterHints(
+      {
+        agent: 'idle',
+        draft: '',
+        readOnly: true,
+        messageSelection: false,
+        detailsAvailable: true,
+      },
+      resolveKeymap({}),
+      'en',
+      160,
+    )
+    expect(footer.hints.map((hint) => hint.id)).toEqual([
+      'message-scroll',
+      'message-select',
+      'details',
+      'read-only-back',
+      'read-only-quit',
+    ])
+    expect(renderFooter(footer)).not.toContain('Esc interrupt')
+    expect(renderFooter(footer)).toContain('Ctrl+C quit')
+    expect(renderFooter(footer)).toContain('Esc back')
+  })
 })
 
 function renderFooter(footer: ReturnType<typeof resolveFooterHints>): string {

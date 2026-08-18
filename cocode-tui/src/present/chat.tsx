@@ -681,6 +681,7 @@ export function Chat(props: {
           activeOverlay: activeFooterOverlay,
           agent: snap.agent,
           draft: snap.composer.text,
+          readOnly: snap.header.readOnly,
           messageSelection: messageSelectionActive,
           paneFocus: 'conversation',
           overlayConfirming:
@@ -708,6 +709,7 @@ export function Chat(props: {
       selectedMessageSupportsDetails,
       snap.agent,
       snap.composer.text,
+      snap.header.readOnly,
       snap.locale,
       wideInspector,
     ],
@@ -866,7 +868,7 @@ export function Chat(props: {
           checklistOpen ||
           historySearchOpen ||
           modelOverlayOpen ||
-          snap.composer.disabled
+          (snap.composer.disabled && !snap.header.readOnly)
         ) {
           return
         }
@@ -1690,7 +1692,7 @@ export function Chat(props: {
     const scrollUp = key.pageUp || (key.ctrl && key.upArrow)
     const scrollDown = key.pageDown || (key.ctrl && key.downArrow)
     const endKey = input === '\u001b[F' || input === '\u001b[4~'
-    if (key.ctrl && endKey && !layout.tooSmall && !snap.composer.disabled) {
+    if (key.ctrl && endKey && !layout.tooSmall) {
       setMessageScrollOffset(0)
       setFollowTranscript(true)
       return
@@ -1698,7 +1700,6 @@ export function Chat(props: {
     if (
       (scrollUp || scrollDown) &&
       !layout.tooSmall &&
-      !snap.composer.disabled &&
       !rewindOpen &&
       !forkOpen &&
       !skillsOpen &&
@@ -1784,7 +1785,13 @@ export function Chat(props: {
       }
       return
     }
-    if (snap.composer.disabled && !key.ctrl && !key.super && input !== 'c') {
+    if (
+      snap.composer.disabled &&
+      !snap.header.readOnly &&
+      !key.ctrl &&
+      !key.super &&
+      input !== 'c'
+    ) {
       if (key.escape || (key.ctrl && input === 'c')) {
         app.dispatch({ type: 'quit' })
       }
@@ -2037,6 +2044,23 @@ export function Chat(props: {
         return
       }
       return
+    }
+
+    if (snap.header.readOnly) {
+      if (key.escape) {
+        app.dispatch({ type: 'session.back' })
+        return
+      }
+      if (key.ctrl && input === 'c') {
+        app.dispatch({ type: 'quit' })
+        return
+      }
+      if (
+        matched?.id !== 'messages.select' &&
+        matched?.id !== 'transcript.toggleVerbose'
+      ) {
+        return
+      }
     }
 
     if (slashOpen) {

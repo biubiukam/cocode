@@ -219,4 +219,291 @@ describe('TUI shared DSH sessions', () => {
     expect(app.snapshot().header.canMutate).toBe(false)
     await app.close()
   })
+
+  it('returns to the previous session from a read-only shared session', async () => {
+    const host = runtime()
+    host.open = async (sessionId) => {
+      host.opens.push(sessionId)
+      return { opened: sessionId === 'cocode-session' }
+    }
+    const reader = externalReader({
+      source: 'shared-dsh',
+      canMutate: true,
+      concurrency: 'no-concurrent-writes',
+      id: 'readonly-id',
+      createdAt: 1,
+      path: '/tmp/official-dsh/session.jsonl',
+    })
+    const app = createTuiApp({
+      runtime: host,
+      externalDsh: reader,
+      cwd: '/cocode/project',
+      provider: 'p',
+      model: 'm',
+      sessionId: 'cocode-session',
+      capabilities: { ...P0_CAPABILITIES, sessionList: 'jsonl' },
+      diagnostics: { tty: true, launchConfigured: true, argsConfigured: true, sessionRoot: '/missing' },
+    })
+
+    await app.start()
+    app.dispatch({ type: 'session.open' })
+    await vi.waitFor(() => expect(app.snapshot().sessionTreePicker?.open).toBe(true))
+    app.dispatch({ type: 'sessionTree.confirm' })
+    await vi.waitFor(() => expect(app.snapshot().header.readOnly).toBe(true))
+
+    app.dispatch({ type: 'session.back' })
+    await vi.waitFor(() => expect(app.snapshot().header.sessionId).toBe('cocode-session'))
+    expect(app.snapshot().header.source).toBe('cocode')
+    expect(app.snapshot().header.readOnly).toBe(false)
+    expect(host.opens).toEqual(['readonly-id', 'cocode-session'])
+    await app.close()
+  })
+
+  it('returns correctly after entering the same read-only session twice', async () => {
+    const host = runtime()
+    host.open = async (sessionId) => {
+      host.opens.push(sessionId)
+      return { opened: sessionId === 'cocode-session' }
+    }
+    const reader = externalReader({
+      source: 'shared-dsh',
+      canMutate: true,
+      concurrency: 'no-concurrent-writes',
+      id: 'readonly-twice',
+      createdAt: 1,
+      path: '/tmp/official-dsh/session.jsonl',
+    })
+    const app = createTuiApp({
+      runtime: host,
+      externalDsh: reader,
+      cwd: '/cocode/project',
+      provider: 'p',
+      model: 'm',
+      sessionId: 'cocode-session',
+      capabilities: { ...P0_CAPABILITIES, sessionList: 'jsonl' },
+      diagnostics: { tty: true, launchConfigured: true, argsConfigured: true, sessionRoot: '/missing' },
+    })
+
+    await app.start()
+    for (let cycle = 0; cycle < 2; cycle += 1) {
+      app.dispatch({ type: 'session.open' })
+      await vi.waitFor(() => expect(app.snapshot().sessionTreePicker?.open).toBe(true))
+      app.dispatch({ type: 'sessionTree.confirm' })
+      await vi.waitFor(() => expect(app.snapshot().header.readOnly).toBe(true))
+      app.dispatch({ type: 'session.back' })
+      await vi.waitFor(() => expect(app.snapshot().header.sessionId).toBe('cocode-session'))
+      expect(app.snapshot().header.readOnly).toBe(false)
+    }
+    expect(host.opens).toEqual([
+      'readonly-twice',
+      'cocode-session',
+      'readonly-twice',
+      'cocode-session',
+    ])
+    await app.close()
+  })
+
+  it('falls back to the session picker when the previous session cannot reopen', async () => {
+    const host = runtime()
+    host.open = async (sessionId) => {
+      host.opens.push(sessionId)
+      throw new Error('previous session is unavailable')
+    }
+    const reader = externalReader({
+      source: 'shared-dsh',
+      canMutate: true,
+      concurrency: 'no-concurrent-writes',
+      id: 'readonly-fallback',
+      createdAt: 1,
+      path: '/tmp/official-dsh/session.jsonl',
+    })
+    const app = createTuiApp({
+      runtime: host,
+      externalDsh: reader,
+      cwd: '/cocode/project',
+      provider: 'p',
+      model: 'm',
+      sessionId: 'cocode-session',
+      capabilities: { ...P0_CAPABILITIES, sessionList: 'jsonl' },
+      diagnostics: { tty: true, launchConfigured: true, argsConfigured: true, sessionRoot: '/missing' },
+    })
+
+    await app.start()
+    app.dispatch({ type: 'session.open' })
+    await vi.waitFor(() => expect(app.snapshot().sessionTreePicker?.open).toBe(true))
+    app.dispatch({ type: 'sessionTree.confirm' })
+    await vi.waitFor(() => expect(app.snapshot().header.readOnly).toBe(true))
+
+    app.dispatch({ type: 'session.back' })
+    await vi.waitFor(() => expect(app.snapshot().sessionTreePicker?.open).toBe(true))
+    expect(app.snapshot().notice?.tone).not.toBe('error')
+    await app.close()
+  })
+
+  it('keeps the previous session when the runtime reports it is already open', async () => {
+    const host = runtime()
+    let previousOpenCount = 0
+    host.open = async (sessionId) => {
+      host.opens.push(sessionId)
+      if (sessionId === 'cocode-session') {
+        previousOpenCount += 1
+        return { opened: previousOpenCount === 1 }
+      }
+      return { opened: false }
+    }
+    const reader = externalReader({
+      source: 'shared-dsh',
+      canMutate: true,
+      concurrency: 'no-concurrent-writes',
+      id: 'readonly-already-open',
+      createdAt: 1,
+      path: '/tmp/official-dsh/session.jsonl',
+    })
+    const app = createTuiApp({
+      runtime: host,
+      externalDsh: reader,
+      cwd: '/cocode/project',
+      provider: 'p',
+      model: 'm',
+      sessionId: 'cocode-session',
+      capabilities: { ...P0_CAPABILITIES, sessionList: 'jsonl' },
+      diagnostics: { tty: true, launchConfigured: true, argsConfigured: true, sessionRoot: '/missing' },
+    })
+
+    await app.start()
+    for (let cycle = 0; cycle < 2; cycle += 1) {
+      app.dispatch({ type: 'session.open' })
+      await vi.waitFor(() => expect(app.snapshot().sessionTreePicker?.open).toBe(true))
+      app.dispatch({ type: 'sessionTree.confirm' })
+      await vi.waitFor(() => expect(app.snapshot().header.readOnly).toBe(true))
+      app.dispatch({ type: 'session.back' })
+      await vi.waitFor(() => expect(app.snapshot().header.sessionId).toBe('cocode-session'))
+      expect(app.snapshot().header.readOnly).toBe(false)
+    }
+    await app.close()
+  })
+
+  it('opens a different Cocode session after a read-only return falls back', async () => {
+    const host = runtime()
+    host.listSessions = async () => [
+      {
+        sessionId: 'other-session',
+        createdAt: 2,
+        cwd: '/cocode/project',
+        title: 'Other session',
+      },
+    ]
+    host.open = async (sessionId, replaceSessionId) => {
+      host.opens.push(sessionId)
+      if (sessionId === 'cocode-session') {
+        throw new Error('previous session is unavailable')
+      }
+      return {
+        opened:
+          sessionId === 'other-session' && replaceSessionId === undefined,
+      }
+    }
+    const reader = externalReader({
+      source: 'shared-dsh',
+      canMutate: true,
+      concurrency: 'no-concurrent-writes',
+      id: 'readonly-switch',
+      createdAt: 1,
+      path: '/tmp/official-dsh/session.jsonl',
+    })
+    const app = createTuiApp({
+      runtime: host,
+      externalDsh: reader,
+      cwd: '/cocode/project',
+      provider: 'p',
+      model: 'm',
+      sessionId: 'cocode-session',
+      capabilities: { ...P0_CAPABILITIES, sessionList: 'rpc' },
+      diagnostics: { tty: true, launchConfigured: true, argsConfigured: true },
+    })
+
+    await app.start()
+    app.dispatch({ type: 'session.open' })
+    await vi.waitFor(() => expect(app.snapshot().sessionTreePicker?.open).toBe(true))
+    const externalIndex = app
+      .snapshot()
+      .sessionTreePicker?.items.findIndex((candidate) => candidate.source === 'external')
+    expect(externalIndex).toBe(1)
+    app.dispatch({ type: 'sessionTree.move', delta: externalIndex ?? 0 })
+    app.dispatch({ type: 'sessionTree.confirm' })
+    await vi.waitFor(() => expect(app.snapshot().header.readOnly).toBe(true))
+
+    app.dispatch({ type: 'session.back' })
+    await vi.waitFor(() => expect(app.snapshot().sessionTreePicker?.open).toBe(true))
+    app.dispatch({ type: 'sessionTree.confirm' })
+    await vi.waitFor(() => expect(app.snapshot().header.sessionId).toBe('other-session'))
+    expect(app.snapshot().header.source).toBe('cocode')
+    expect(app.snapshot().notice?.tone).not.toBe('error')
+    expect(host.opens).toEqual(['readonly-switch', 'cocode-session', 'other-session'])
+    await app.close()
+  })
+
+  it('returns to the latest Cocode session after switching sessions between visits', async () => {
+    const host = runtime()
+    host.listSessions = async () => [
+      {
+        sessionId: 'other-session',
+        createdAt: 2,
+        cwd: '/cocode/project',
+        title: 'Other session',
+      },
+    ]
+    host.open = async (sessionId, replaceSessionId) => {
+      host.opens.push(sessionId)
+      return {
+        opened:
+          sessionId === 'cocode-session'
+            ? replaceSessionId === undefined
+            : sessionId === 'other-session' &&
+              (replaceSessionId === 'cocode-session' || replaceSessionId === undefined),
+      }
+    }
+    const reader = externalReader({
+      source: 'shared-dsh',
+      canMutate: true,
+      concurrency: 'no-concurrent-writes',
+      id: 'readonly-latest',
+      createdAt: 1,
+      path: '/tmp/official-dsh/session.jsonl',
+    })
+    const app = createTuiApp({
+      runtime: host,
+      externalDsh: reader,
+      cwd: '/cocode/project',
+      provider: 'p',
+      model: 'm',
+      sessionId: 'cocode-session',
+      capabilities: { ...P0_CAPABILITIES, sessionList: 'rpc' },
+      diagnostics: { tty: true, launchConfigured: true, argsConfigured: true },
+    })
+
+    await app.start()
+    app.dispatch({ type: 'session.open' })
+    await vi.waitFor(() => expect(app.snapshot().sessionTreePicker?.open).toBe(true))
+    app.dispatch({ type: 'sessionTree.move', delta: 1 })
+    app.dispatch({ type: 'sessionTree.confirm' })
+    await vi.waitFor(() => expect(app.snapshot().header.readOnly).toBe(true))
+    app.dispatch({ type: 'session.back' })
+    await vi.waitFor(() => expect(app.snapshot().header.sessionId).toBe('cocode-session'))
+
+    app.dispatch({ type: 'session.open' })
+    await vi.waitFor(() => expect(app.snapshot().sessionTreePicker?.open).toBe(true))
+    app.dispatch({ type: 'sessionTree.confirm' })
+    await vi.waitFor(() => expect(app.snapshot().header.sessionId).toBe('other-session'))
+
+    app.dispatch({ type: 'session.open' })
+    await vi.waitFor(() => expect(app.snapshot().sessionTreePicker?.open).toBe(true))
+    app.dispatch({ type: 'sessionTree.move', delta: 1 })
+    app.dispatch({ type: 'sessionTree.confirm' })
+    await vi.waitFor(() => expect(app.snapshot().header.readOnly).toBe(true))
+    app.dispatch({ type: 'session.back' })
+    await vi.waitFor(() => expect(app.snapshot().header.sessionId).toBe('other-session'))
+    expect(app.snapshot().header.readOnly).toBe(false)
+    await app.close()
+  })
 })

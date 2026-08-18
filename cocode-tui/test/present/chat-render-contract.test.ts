@@ -262,6 +262,57 @@ describe.sequential('Chat multi-viewport render contract', () => {
     }
   })
 
+  it('keeps a read-only transcript open on Esc and scrollable with PageUp', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval', 'setTimeout', 'clearTimeout'] })
+    vi.setSystemTime(new Date('2026-08-16T00:00:00.000Z'))
+    const nodes = Array.from({ length: 24 }, (_, index) => ({
+      kind: 'user' as const,
+      id: `readonly-${String(index)}`,
+      seq: index + 1,
+      time: index + 1,
+      text: `readonly-message-${String(index)}`,
+    }))
+    const chat = await renderChatContract(
+      renderCase('read-only transcript', 80, 24, {
+        mouseSupported: true,
+        header: { source: 'shared-dsh', readOnly: true, canMutate: false },
+        composer: { disabled: true },
+        nodes,
+      }),
+    )
+    try {
+      expect(chat.frame).toContain('readonly-message-23')
+      expect(chat.frame).not.toContain('readonly-message-0')
+
+      await chat.write('\u001b[1;2A')
+      expect(chat.frame).toContain('↑↓ move')
+      await chat.write('\u001b')
+      await vi.advanceTimersByTimeAsync(500)
+      await chat.write('')
+      expect(chat.frame).not.toContain('↑↓ move')
+      expect(chat.dispatches).not.toContainEqual({ type: 'quit' })
+
+      await chat.write('\u001b')
+      await vi.advanceTimersByTimeAsync(500)
+      expect(chat.dispatches).toContainEqual({ type: 'session.back' })
+      expect(chat.dispatches).not.toContainEqual({ type: 'interruptOrQuit' })
+
+      for (let index = 0; index < 8; index += 1) await chat.write('\u001b[5~')
+      expect(chat.frame).toContain('readonly-message-0')
+
+      for (let index = 0; index < 8; index += 1) await chat.write('\u001b[6~')
+      expect(chat.frame).toContain('readonly-message-23')
+      for (let index = 0; index < 8; index += 1) {
+        await chat.write('\u001b[<64;10;10M')
+      }
+      expect(chat.frame).toContain('readonly-message-0')
+    } finally {
+      await chat.close()
+      expect(vi.getTimerCount()).toBe(0)
+      vi.useRealTimers()
+    }
+  })
+
   it.each([
     ['80x24 compact idle', '80x24-compact-idle.txt'],
     ['120x30 wide running', '120x30-wide-running.txt'],
@@ -300,7 +351,12 @@ function renderCase(
     keymap?: typeof DEFAULT_BINDINGS
   },
 ): ChatRenderCase {
-  const { theme = 'dark', keymap = DEFAULT_BINDINGS, ...snapshotOverrides } = overrides
+  const {
+    theme = 'dark',
+    keymap = DEFAULT_BINDINGS,
+    mouseSupported,
+    ...snapshotOverrides
+  } = overrides
   const locale = snapshotOverrides.locale ?? 'en'
   return {
     name,
@@ -308,6 +364,7 @@ function renderCase(
     locale,
     theme,
     keymap,
+    mouseSupported,
     snapshot: createFixtureSnapshot({ ...snapshotOverrides, locale }),
   }
 }

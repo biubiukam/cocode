@@ -55,6 +55,8 @@ export type UiTextKey =
   | 'footerDetails'
   | 'footerHelp'
   | 'footerQuit'
+  | 'footerReadOnlyQuit'
+  | 'footerReadOnlyBack'
   | 'footerRunning'
   | 'footerQueueDraft'
   | 'footerRedraw'
@@ -307,6 +309,8 @@ export type UiTextKey =
   | 'sessionTreeQuery'
   | 'sessionTreeLoading'
   | 'sessionTreeOpenFailed'
+  | 'returningPreviousSession'
+  | 'returnedToPreviousSession'
 
 const TEXT: Record<UiLocale, Record<UiTextKey, string>> = {
   en: {
@@ -361,6 +365,8 @@ const TEXT: Record<UiLocale, Record<UiTextKey, string>> = {
     footerDetails: 'ctrl+o details',
     footerHelp: '? help',
     footerQuit: 'esc interrupt / quit',
+    footerReadOnlyQuit: 'Ctrl+C quit',
+    footerReadOnlyBack: 'Esc back',
     footerRunning: 'esc interrupt',
     footerQueueDraft: 'tab queue draft',
     footerRedraw: 'redraw: /redraw',
@@ -613,6 +619,8 @@ const TEXT: Record<UiLocale, Record<UiTextKey, string>> = {
     sessionTreeQuery: 'filter: {query}',
     sessionTreeLoading: 'Loading sessions…',
     sessionTreeOpenFailed: 'The runtime could not open this session.',
+    returningPreviousSession: 'Returning to the previous session…',
+    returnedToPreviousSession: 'Returned to the previous session.',
   },
   zh: {
     session: '会话',
@@ -666,6 +674,8 @@ const TEXT: Record<UiLocale, Record<UiTextKey, string>> = {
     footerDetails: 'Ctrl+O 详情',
     footerHelp: '? 帮助',
     footerQuit: 'Esc 中断 / 退出',
+    footerReadOnlyQuit: 'Ctrl+C 退出',
+    footerReadOnlyBack: 'Esc 返回',
     footerRunning: '按 Esc 终止',
     footerQueueDraft: '按 Tab 加入队列',
     footerRedraw: '重绘：/redraw',
@@ -918,6 +928,8 @@ const TEXT: Record<UiLocale, Record<UiTextKey, string>> = {
     sessionTreeQuery: '筛选：{query}',
     sessionTreeLoading: '正在加载会话列表……',
     sessionTreeOpenFailed: '运行时无法打开该会话。',
+    returningPreviousSession: '正在返回上一个会话……',
+    returnedToPreviousSession: '已返回上一个会话。',
   },
 }
 
