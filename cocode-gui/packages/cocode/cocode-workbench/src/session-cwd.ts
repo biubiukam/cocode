@@ -1,6 +1,15 @@
 import { isAbsolute, resolve } from "pathe"
 import type { WorkbenchContext } from "./host-types.ts"
 
+/** The session exists in navigation, but its Host workspace has not arrived yet. */
+export class SessionWorkspaceNotReadyError extends Error {
+  override readonly name = "SessionWorkspaceNotReadyError"
+
+  constructor() {
+    super("session workspace is not ready")
+  }
+}
+
 /**
  * Authoritative working directory of a workbench operation.
  *
@@ -14,7 +23,7 @@ export function resolveSessionCwd(ctx: WorkbenchContext, sessionId?: string, sup
   const attached = sessionId === undefined ? undefined : ctx.sessions.get(sessionId)?.header?.cwd
   const listed = supplied !== undefined && supplied.trim() !== "" ? supplied : undefined
   const cwd = attached ?? listed ?? (sessionId === undefined ? process.cwd() : undefined)
-  if (cwd === undefined) throw new Error("session workspace is not ready")
+  if (cwd === undefined) throw new SessionWorkspaceNotReadyError()
   if (!isAbsolute(cwd)) throw new Error("invalid working directory")
   return resolve(cwd)
 }

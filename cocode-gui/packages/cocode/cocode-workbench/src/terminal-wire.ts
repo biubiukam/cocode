@@ -13,6 +13,9 @@ export const TERMINAL_SOCKET_PATH = "/cocode/workbench/terminal"
 /** Close code for a refusal: the reason is final, so retrying cannot help. */
 export const TERMINAL_REFUSED_CODE = 1011
 
+/** Close code for a transient handshake failure; the panel reconnects with backoff. */
+export const TERMINAL_RETRYABLE_CODE = 1013
+
 /** Close code telling the panel a newer socket took the terminal over. */
 export const TERMINAL_SUPERSEDED_CODE = 4001
 

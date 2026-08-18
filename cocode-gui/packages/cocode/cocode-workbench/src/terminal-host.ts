@@ -13,12 +13,13 @@
 import type { IncomingMessage } from "node:http"
 import { WebSocketServer, type WebSocket } from "ws"
 import type { WorkbenchContext } from "./host-types.ts"
-import { resolveSessionCwd } from "./session-cwd.ts"
+import { resolveSessionCwd, SessionWorkspaceNotReadyError } from "./session-cwd.ts"
 import { clampGeometry, TerminalRegistry, terminalKey, type TerminalGeometry, type TerminalProcess } from "./terminal-registry.ts"
 import { isTrustedUpgrade } from "./upgrade-trust.ts"
 import {
   parseTerminalMessage,
   TERMINAL_REFUSED_CODE,
+  TERMINAL_RETRYABLE_CODE,
   TERMINAL_SOCKET_PATH,
   TERMINAL_SUPERSEDED_CODE,
   type TerminalClientMessage,
@@ -121,7 +122,10 @@ export function applyTerminalHost(ctx: WorkbenchContext): void {
           const entry = registry.open(sessionId, terminalId, cwd, geometryOf(url))
           attach(registry, attachments, connection, entry, existing === entry)
         } catch (error) {
-          connection.close(TERMINAL_REFUSED_CODE, error instanceof Error ? error.message : String(error))
+          connection.close(
+            error instanceof SessionWorkspaceNotReadyError ? TERMINAL_RETRYABLE_CODE : TERMINAL_REFUSED_CODE,
+            error instanceof Error ? error.message : String(error),
+          )
         }
       })
     },

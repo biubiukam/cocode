@@ -74,6 +74,8 @@ export function TerminalPanel(props: WorkbenchPanelProps) {
   const terminalId = props.instance.id
   const containerRef = useRef<HTMLDivElement>(null)
   const handlesRef = useRef<TerminalHandles>()
+  const cwdRef = useRef(props.scope.cwd)
+  cwdRef.current = props.scope.cwd
   const [status, setStatus] = useState<TerminalStatus>({ kind: "connecting" })
 
   useEffect(() => {
@@ -95,6 +97,7 @@ export function TerminalPanel(props: WorkbenchPanelProps) {
       sessionId,
       terminalId,
       geometry: () => ({ cols: terminal.cols, rows: terminal.rows }),
+      cwd: () => cwdRef.current,
       onOutput: text => { terminal.write(text) },
       onStatus: setStatus,
     })

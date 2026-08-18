@@ -8,12 +8,13 @@
 import {
   parseTerminalMessage,
   TERMINAL_REFUSED_CODE,
+  TERMINAL_RETRYABLE_CODE,
   TERMINAL_SOCKET_PATH,
   TERMINAL_SUPERSEDED_CODE,
   type TerminalClientMessage,
   type TerminalHostMessage,
 } from "../terminal-wire.ts"
-import { workbenchCwd, workbenchSocket } from "./runtime-api.ts"
+import { workbenchSocket } from "./runtime-api.ts"
 
 /** Backoff schedule; the last entry repeats for as long as the host is down. */
 const RECONNECT_DELAYS = [400, 800, 1600, 3200, 5000] as const
@@ -33,6 +34,8 @@ export interface TerminalConnectionOptions {
   readonly terminalId: string
   /** Geometry to spawn with, sampled at every (re)connect. */
   geometry(): { cols: number; rows: number }
+  /** Latest listed workspace, sampled at every (re)connect. */
+  cwd(): string | undefined
   onOutput(text: string): void
   onStatus(status: TerminalStatus): void
 }
@@ -101,7 +104,7 @@ export class TerminalConnection {
       rows: String(size.rows),
     })
     if (restart) query.set("restart", "1")
-    const cwd = workbenchCwd()
+    const cwd = this.#options.cwd()
     if (cwd !== undefined) query.set("cwd", cwd)
     return workbenchSocket(`${TERMINAL_SOCKET_PATH}?${query.toString()}`)
   }
@@ -131,6 +134,10 @@ export class TerminalConnection {
     this.#socket = undefined
     if (this.#disposed) return
     if (event.code === TERMINAL_SUPERSEDED_CODE) return
+    if (event.code === TERMINAL_RETRYABLE_CODE) {
+      this.#scheduleReconnect()
+      return
+    }
     // Only a refusal is final. Every other close — a host restart, a dropped
     // network, a reloaded page — leaves a shell the reconnect can pick up.
     if (event.code === TERMINAL_REFUSED_CODE) {
@@ -139,6 +146,10 @@ export class TerminalConnection {
       return
     }
     if (this.#settled) return
+    this.#scheduleReconnect()
+  }
+
+  #scheduleReconnect(): void {
     this.#options.onStatus({ kind: "reconnecting" })
     const delay = RECONNECT_DELAYS[Math.min(this.#attempt, RECONNECT_DELAYS.length - 1)] ?? 5000
     this.#attempt += 1
