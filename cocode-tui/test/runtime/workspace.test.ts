@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolveWorkspaceInfo, workspaceName } from '../../src/runtime/workspace.ts'
+import { resolveWorkspaceInfo, workspaceName, workspacePath } from '../../src/runtime/workspace.ts'
 
 describe('workspace info', () => {
   it('uses the cwd basename and injected branch query', async () => {
@@ -22,5 +22,13 @@ describe('workspace info', () => {
 
   it('keeps a useful name for the filesystem root', () => {
     expect(workspaceName('/')).toBe('/')
+  })
+
+  it('shortens paths inside the home directory and keeps external paths absolute', () => {
+    expect(workspacePath('/Users/coder/Documents/cocode-tui', '/Users/coder')).toBe(
+      '~/Documents/cocode-tui',
+    )
+    expect(workspacePath('/tmp/cocode-tui', '/Users/coder')).toBe('/tmp/cocode-tui')
+    expect(workspacePath('/Users/coder', '/Users/coder')).toBe('~')
   })
 })

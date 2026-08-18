@@ -9,7 +9,7 @@ vi.mock('ink', () => ({
 import { Header } from '../../src/present/components/Header.tsx'
 
 describe('Header', () => {
-  it('shows the workspace and branch without redundant product chrome', () => {
+  it('shows the full workspace path and branch on wide terminals', () => {
     const tree = Header({
       header: {
         sessionId: 'session-1234',
@@ -22,10 +22,26 @@ describe('Header', () => {
     }) as ReactElement
 
     const rendered = textContent(tree)
-    expect(rendered).toContain('project')
+    expect(rendered).toContain('/tmp/project')
     expect(rendered).toContain('#main')
     expect(rendered).not.toContain('cocode')
-    expect(rendered).not.toContain('/')
+  })
+
+  it('keeps the compact workspace name on narrower terminals', () => {
+    const tree = Header({
+      header: {
+        sessionId: 'session-1234',
+        cwd: '/tmp/project',
+        provider: 'test',
+        branch: 'main',
+      },
+      locale: 'en',
+      columns: 80,
+    }) as ReactElement
+
+    const rendered = textContent(tree)
+    expect(rendered).toContain('project')
+    expect(rendered).not.toContain('/tmp/project')
   })
 })
 
