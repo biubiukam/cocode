@@ -17,24 +17,35 @@ function main() {
 	checkNodeVersion()
 	ensureDirectory(hostRoot, 'cocode-host-supervisor')
 
-	const tuiHostLink = join(tuiRoot, 'node_modules', '@cocode', 'host-supervisor')
+	const hostSupervisorLink = (root) =>
+		join(root, 'node_modules', '@cocode-agency', 'host-supervisor')
+	const tuiHostLink = hostSupervisorLink(tuiRoot)
+	const guiHostLink = hostSupervisorLink(guiRoot)
 	const tuiInstallNeeded = needsInstall(tuiRoot, [
 		join(tuiRoot, 'node_modules', '.bin', 'tsx'),
 		join(tuiHostLink, 'package.json'),
+	])
+	const guiInstallNeeded = needsInstall(guiRoot, [
+		join(guiRoot, 'node_modules', '.bin', 'tsdown'),
+		join(guiHostLink, 'package.json'),
 	])
 	const hostInstallNeeded = needsInstall(hostRoot, [
 		join(hostRoot, 'node_modules', '.bin', 'tsc'),
 		join(hostRoot, 'node_modules', '@deepseek-ai', 'dsh', 'package.json'),
 	])
 
-	const hostLinkNeedsRepair = !pointsTo(tuiHostLink, hostRoot)
+	const tuiHostLinkNeedsRepair = !pointsTo(tuiHostLink, hostRoot)
+	const guiHostLinkNeedsRepair = !pointsTo(guiHostLink, hostRoot)
 	if (checkOnly) {
 		if (tuiInstallNeeded) fail('TUI 依赖不完整，请运行 `make install-tui`。')
-		if (hostLinkNeedsRepair) fail('TUI 未链接当前仓库的 Host Supervisor，请运行 `make install-tui`。')
+		if (tuiHostLinkNeedsRepair) fail('TUI 未链接当前仓库的 Host Supervisor，请运行 `make install-tui`。')
+		if (guiInstallNeeded) fail('GUI 依赖不完整，请运行 `make install-gui`。')
+		if (guiHostLinkNeedsRepair) fail('GUI 未链接当前仓库的 Host Supervisor，请运行 `make install-gui`。')
 		if (hostInstallNeeded) fail('Host Supervisor 依赖不完整，请运行 `pnpm --dir cocode-host-supervisor install`。')
 	} else {
 		if (hostInstallNeeded) runPnpm(hostRoot, ['install'], '安装 Host Supervisor 依赖')
-		if (tuiInstallNeeded || hostLinkNeedsRepair) runPnpm(tuiRoot, ['install'], '安装 TUI 依赖')
+		if (tuiInstallNeeded || tuiHostLinkNeedsRepair) runPnpm(tuiRoot, ['install'], '安装 TUI 依赖')
+		if (guiInstallNeeded || guiHostLinkNeedsRepair) runPnpm(guiRoot, ['install'], '安装 GUI 依赖')
 	}
 
 	const hostBuildOutput = join(hostRoot, 'packages', 'host-supervisor', 'lib', 'index.js')
