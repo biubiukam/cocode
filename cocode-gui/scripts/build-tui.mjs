@@ -14,7 +14,11 @@ export function buildTui({ output = defaultOutput() } = {}) {
 	ensureWorkspaceDependencies({
 		root: tuiRoot,
 		label: "@cocode/tui",
-		requiredPaths: [path.join(tuiRoot, "node_modules", "esbuild", "package.json")],
+		requiredPaths: [
+			path.join(tuiRoot, "node_modules", ".modules.yaml"),
+			path.join(tuiRoot, "node_modules", "esbuild", "package.json"),
+			esbuildPlatformPackagePath(tuiRoot),
+		],
 	})
 
 	const corepack = process.platform === "win32" ? "corepack.cmd" : "corepack"
@@ -69,6 +73,14 @@ export function buildTui({ output = defaultOutput() } = {}) {
 	writeFileSync(path.join(output, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`)
 	console.log(`[tui-build] staged ${output}`)
 	return { output, manifest }
+}
+
+export function esbuildPlatformPackagePath(
+	root,
+	platform = process.platform,
+	arch = process.arch,
+) {
+	return path.join(root, "node_modules", "@esbuild", `${platform}-${arch}`, "package.json")
 }
 
 function defaultOutput() {
