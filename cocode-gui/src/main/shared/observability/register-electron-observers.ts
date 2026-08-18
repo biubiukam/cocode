@@ -55,11 +55,15 @@ export function registerElectronObservers(logger: DesktopLogger): () => void {
 				error,
 			})
 		})
-		contents.on("console-message", (_messageEvent, level, message, line, sourceId) => {
-			if (level < 2) return
-			logger.log(level >= 3 ? "error" : "warn", "renderer.console-message", {
-				message,
-				attributes: { contentsId, line, sourceId: redactUrl(sourceId) },
+		contents.on("console-message", (details) => {
+			if (details.level !== "warning" && details.level !== "error") return
+			logger.log(details.level === "error" ? "error" : "warn", "renderer.console-message", {
+				message: details.message,
+				attributes: {
+					contentsId,
+					line: details.lineNumber,
+					sourceId: redactUrl(details.sourceId),
+				},
 			})
 		})
 	}
