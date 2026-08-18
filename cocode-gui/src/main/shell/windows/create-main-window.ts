@@ -71,7 +71,7 @@ export const createMainWindow = (
 			audit: true,
 			attributes: { url: safeUrl(url) },
 		})
-		if (url.startsWith("https://") || url.startsWith("http://")) void shell.openExternal(url)
+		if (isAllowedExternalUrl(url)) void shell.openExternal(url)
 		return { action: "deny" }
 	})
 	mainWindow.webContents.on("will-navigate", (event, url) => {
@@ -81,7 +81,7 @@ export const createMainWindow = (
 			audit: true,
 			attributes: { url: safeUrl(url) },
 		})
-		if (url.startsWith("https://") || url.startsWith("http://")) void shell.openExternal(url)
+		if (isAllowedExternalUrl(url)) void shell.openExternal(url)
 	})
 	mainWindow.once("closed", unregisterDshWebSocketTransport.dispose)
 	mainWindow.once("ready-to-show", () => {
@@ -98,6 +98,18 @@ export const createMainWindow = (
 			.catch((error) => logger?.log("error", "window.load.failed", { error }))
 	}
 	return mainWindow
+}
+
+/** Only route links the product intentionally exposes to the user's system. */
+function isAllowedExternalUrl(value: string): boolean {
+	if (value.startsWith("https://") || value.startsWith("http://")) return true
+	if (!value.toLowerCase().startsWith("mailto:")) return false
+	try {
+		const url = new URL(value)
+		return url.protocol === "mailto:" && url.pathname.toLowerCase() === "support@cocode.agency"
+	} catch {
+		return false
+	}
 }
 
 function safeUrl(value: string): string {

@@ -1,5 +1,5 @@
 import { createElement, Fragment, useEffect, useRef, useState, useSyncExternalStore } from "react"
-import type { MouseEvent as ReactMouseEvent, ReactNode } from "react"
+import type { ChangeEvent, MouseEvent as ReactMouseEvent, ReactNode } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import type { ClientContext } from "@deepseek-ai/dsh-client-runtime/client"
 import type { ConfigurableProviderView, ConnectionHandle } from "@deepseek-ai/dsh-api-remotes/client"
@@ -44,6 +44,10 @@ type AccountProps = {
 }
 
 type AccountPanelKind = "usage" | "help"
+
+const FEEDBACK_TO = "support@cocode.agency"
+const FEEDBACK_SUBJECT = "Cocode 反馈"
+const FEEDBACK_BODY = "你好，\n\n我想反馈：\n\n\n---\nProvider："
 
 type OnboardingProps = {
   readonly complete: () => void
@@ -90,6 +94,13 @@ const COPY = {
     help: "帮助与反馈",
     signOut: "退出登录",
     providerId: "Provider ID：",
+    feedbackTo: "收件人",
+    feedbackSubject: "主题",
+    feedbackBody: "正文",
+    feedbackHint: "点击发送会尝试打开系统邮件客户端。若当前环境无法唤起邮件客户端，可以直接复制下面的内容，手动发送到 support@cocode.agency。",
+    openMail: "打开邮件客户端",
+    copyMail: "复制邮件内容",
+    copiedMail: "已复制",
   },
   en: {
     signIn: "Sign in to Cocode",
@@ -123,6 +134,13 @@ const COPY = {
     help: "Help & feedback",
     signOut: "Sign out",
     providerId: "Provider ID: ",
+    feedbackTo: "To",
+    feedbackSubject: "Subject",
+    feedbackBody: "Message",
+    feedbackHint: "Send tries to open your system mail client. If this environment cannot open one, copy the draft below and send it manually to support@cocode.agency.",
+    openMail: "Open mail client",
+    copyMail: "Copy email",
+    copiedMail: "Copied",
   },
 } as const
 
@@ -471,6 +489,9 @@ function AccountPanel({ kind, snapshot, provider, onClose }: {
   readonly onClose: () => void
 }): ReturnType<typeof createElement> {
   const t = copy()
+  const [feedbackSubject, setFeedbackSubject] = useState(FEEDBACK_SUBJECT)
+  const [feedbackBody, setFeedbackBody] = useState(`${FEEDBACK_BODY} ${provider?.name ?? "未知"}`)
+  const [copiedMail, setCopiedMail] = useState(false)
   const title = kind === "usage" ? t.planUsage : t.help
   const isCloud = provider?.id === "cocode-nut"
     || (provider === null && (snapshot.cloud.status === "ready" || snapshot.cloud.status === "conflict"))
@@ -510,8 +531,36 @@ function AccountPanel({ kind, snapshot, provider, onClose }: {
             ? "Cocode Nut 的账号、套餐和云模型问题，可以先打开个人中心；模型选择和本地配置仍在模型设置中管理。"
             : "当前使用的是本地 Provider。连接、模型不可用或凭证问题，可以从 Provider 设置开始排查。"),
           isCloud ? createElement("a", { className: css.panelAction, href: ACCOUNT_CENTER_URL, target: "_blank", rel: "noreferrer" }, "打开 Cocode 个人中心") : null,
-          createElement("a", { className: css.panelAction, href: "https://cocode.agency", target: "_blank", rel: "noreferrer" }, "访问 Cocode 文档"),
-          createElement("a", { className: css.panelAction, href: "mailto:support@cocode.agency?subject=Cocode%20反馈" }, "发送反馈邮件"),
+          createElement("a", { className: css.panelAction, href: "https://doc.cocode.agency", target: "_blank", rel: "noreferrer" }, "访问 Cocode 文档"),
+          createElement("div", { className: css.feedbackDraft },
+            createElement("div", { className: css.feedbackDraftHeader },
+              createElement("strong", null, "反馈邮件"),
+              createElement("span", { className: css.panelSecondary }, FEEDBACK_TO),
+            ),
+            createElement("label", { className: css.feedbackField },
+              createElement("span", null, t.feedbackTo),
+              createElement("input", { value: FEEDBACK_TO, readOnly: true }),
+            ),
+            createElement("label", { className: css.feedbackField },
+              createElement("span", null, t.feedbackSubject),
+              createElement("input", { value: feedbackSubject, onChange: (event: ChangeEvent<HTMLInputElement>) => setFeedbackSubject(event.target.value) }),
+            ),
+            createElement("label", { className: css.feedbackField },
+              createElement("span", null, t.feedbackBody),
+              createElement("textarea", { value: feedbackBody, onChange: (event: ChangeEvent<HTMLTextAreaElement>) => setFeedbackBody(event.target.value), rows: 6 }),
+            ),
+            createElement("p", { className: css.panelHint }, t.feedbackHint),
+            createElement("div", { className: css.feedbackActions },
+              createElement("a", { className: css.panelAction, href: `mailto:${FEEDBACK_TO}?subject=${encodeURIComponent(feedbackSubject)}&body=${encodeURIComponent(feedbackBody)}` }, t.openMail),
+              createElement("button", { type: "button", className: css.panelAction, onClick: () => {
+                const copyPromise = navigator.clipboard?.writeText(`To: ${FEEDBACK_TO}\nSubject: ${feedbackSubject}\n\n${feedbackBody}`)
+                if (copyPromise !== undefined) void copyPromise.then(() => {
+                    setCopiedMail(true)
+                    window.setTimeout(() => setCopiedMail(false), 1500)
+                  })
+              } }, copiedMail ? t.copiedMail : t.copyMail),
+            ),
+          ),
         )
   return createElement("div", { className: css.panelOverlay, role: "presentation", onMouseDown: (event: ReactMouseEvent<HTMLDivElement>) => { if (event.target === event.currentTarget) onClose() } },
     createElement("section", { className: css.panel, role: "dialog", "aria-modal": "true", "aria-label": title },
