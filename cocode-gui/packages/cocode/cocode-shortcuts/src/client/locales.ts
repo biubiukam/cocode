@@ -1,5 +1,5 @@
 export const en = {
-  nav: "Keyboard Shortcuts",
+  nav: "Shortcuts",
   title: "Keyboard Shortcuts",
   intro: "Configure in-app and desktop global shortcuts.",
   search: "Search shortcuts",
