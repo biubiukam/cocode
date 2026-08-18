@@ -361,6 +361,7 @@ export function apply(ctx: Context): void {
       if (sessionId === undefined) {
         return {
           keyboard: undefined,
+          bindDraftInsertion: undefined,
           addImages: undefined,
           removeImage: undefined,
           draftImages: undefined,
@@ -378,6 +379,7 @@ export function apply(ctx: Context): void {
       const inputTriggers = inputHub.inputTriggers(sessionId)
       return {
         keyboard: shell,
+        bindDraftInsertion: insert => shell.bindInsertion(insert),
         addImages: (files) => {
           try {
             const images = conversation.createDraftImages(files)

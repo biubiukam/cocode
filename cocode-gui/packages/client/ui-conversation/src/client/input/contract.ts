@@ -33,6 +33,8 @@ export interface InputTarget {
 export interface SessionInput extends InputTarget {
   /** Single write path for draft text (all mutation rides machine events). */
   setDraft(text: string): void
+  /** Insert text at the composer's remembered selection, or at the draft head when none exists. */
+  insertDraftText(text: string): boolean
   /** Append ordered browser-owned image ids; busy admission phases refuse. */
   addImages(ids: readonly DraftAttachmentId[]): boolean
   /** Remove one browser-owned image id. */

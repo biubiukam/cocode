@@ -25,6 +25,8 @@ import {
 import type { ShortcutsLocaleKey } from "./locales.ts"
 import css from "./ShortcutsSection.module.css"
 
+const FILE_COMMAND = (name: string) => `cocode.files.${name}`
+
 export type ShortcutsSectionInjected = { readonly registry: ShortcutRegistry }
 export type ShortcutsSectionProps =
   PropsRuntime<"settings.section">
@@ -34,6 +36,19 @@ export type ShortcutsSectionProps =
 const COMMAND_COPY: Record<string, { title: ShortcutsLocaleKey; hint: ShortcutsLocaleKey }> = {
   [SIDEBAR_TOGGLE_COMMAND]: { title: "sidebarToggle", hint: "sidebarToggleHint" },
   [NEW_SESSION_COMMAND]: { title: "newSession", hint: "newSessionHint" },
+  [FILE_COMMAND("open")]: { title: "fileOpen", hint: "fileOpenHint" },
+  [FILE_COMMAND("addToChat")]: { title: "fileAddToChat", hint: "fileAddToChatHint" },
+  [FILE_COMMAND("rename")]: { title: "fileRename", hint: "fileRenameHint" },
+  [FILE_COMMAND("delete")]: { title: "fileDelete", hint: "fileDeleteHint" },
+  [FILE_COMMAND("copy")]: { title: "fileCopy", hint: "fileCopyHint" },
+  [FILE_COMMAND("cut")]: { title: "fileCut", hint: "fileCutHint" },
+  [FILE_COMMAND("paste")]: { title: "filePaste", hint: "filePasteHint" },
+  [FILE_COMMAND("selectPrevious")]: { title: "filePrevious", hint: "filePreviousHint" },
+  [FILE_COMMAND("selectNext")]: { title: "fileNext", hint: "fileNextHint" },
+  [FILE_COMMAND("expand")]: { title: "fileExpand", hint: "fileExpandHint" },
+  [FILE_COMMAND("collapse")]: { title: "fileCollapse", hint: "fileCollapseHint" },
+  [FILE_COMMAND("contextMenu")]: { title: "fileContextMenu", hint: "fileContextMenuHint" },
+  [FILE_COMMAND("cancel")]: { title: "fileCancel", hint: "fileCancelHint" },
 }
 
 function commandTitle(command: ShortcutCommand, t: ShortcutsSectionProps["t"]): string {

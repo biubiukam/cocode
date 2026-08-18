@@ -3,14 +3,14 @@ import { revealLabel } from "./locales.ts"
 
 /** Every command the file tree context menu can emit. */
 export type FileCommand =
-  | "open" | "openBottom"
+  | "open" | "addToChat"
   | "newFile" | "newFolder" | "refresh"
   | "copy" | "cut" | "paste"
   | "rename" | "delete"
   | "copyPath" | "copyRelativePath" | "reveal"
 
 export function isFileCommand(id: string): id is FileCommand {
-  return ["open", "openBottom", "newFile", "newFolder", "refresh", "copy", "cut", "paste", "rename", "delete", "copyPath", "copyRelativePath", "reveal"].includes(id)
+  return ["open", "addToChat", "newFile", "newFolder", "refresh", "copy", "cut", "paste", "rename", "delete", "copyPath", "copyRelativePath", "reveal"].includes(id)
 }
 
 /**
@@ -20,7 +20,11 @@ export function isFileCommand(id: string): id is FileCommand {
 export function fileMenuEntries(target: { readonly isDir: boolean; readonly isRoot: boolean; readonly canPaste: boolean }): readonly MenuEntry[] {
   const entries: MenuEntry[] = []
   if (!target.isDir) {
-    entries.push({ id: "open", label: "打开" }, { id: "openBottom", label: "在下方打开" }, { type: "separator", id: "sep-open" })
+    entries.push(
+      { id: "open", label: "打开" },
+      { id: "addToChat", label: "添加到聊天" },
+      { type: "separator", id: "sep-open" },
+    )
   }
   entries.push({ id: "newFile", label: "新建文件" }, { id: "newFolder", label: "新建文件夹" })
   if (target.isDir) entries.push({ id: "refresh", label: "刷新" })

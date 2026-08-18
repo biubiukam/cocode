@@ -1,4 +1,4 @@
-import type { ClientContext } from "@deepseek-ai/dsh-client-runtime/client"
+import type { ClientContext, ISessions, SessionId } from "@deepseek-ai/dsh-client-runtime/client"
 // Type-only: pulls in the locale plugin's Context merge (ctx.locale).
 import type {} from "@deepseek-ai/dsh-client-locale/client"
 import { DockSurface } from "./DockSurface.tsx"
@@ -10,7 +10,8 @@ import { CommitModelRow } from "./settings-row.tsx"
 import { CommandLineSection } from "./command-line-section.tsx"
 import { DiagnosticsSection } from "./diagnostics-section.tsx"
 import type { WorkbenchPanelProps } from "./model.ts"
-import { registerFileMention } from "./file-mention.ts"
+import { fileMentionText, registerFileMention } from "./file-mention.ts"
+import { fileShortcutCommands } from "./file-shortcuts.ts"
 
 export type * from "./model.ts"
 export { WorkbenchController } from "./controller.ts"
@@ -18,6 +19,21 @@ export { WorkbenchController } from "./controller.ts"
 declare module "@deepseek-ai/cordis" {
   interface Context {
     workbench: import("./model.ts").WorkbenchService
+    shortcuts: {
+      register(command: {
+        readonly id: string
+        readonly title: string
+        readonly description?: string
+        readonly defaultCombo?: {
+          readonly key: string
+          readonly primary?: boolean
+          readonly alt?: boolean
+          readonly shift?: boolean
+          readonly control?: boolean
+        }
+        readonly run: (event?: KeyboardEvent) => void | boolean
+      }): () => void
+    }
   }
 }
 
@@ -28,7 +44,24 @@ declare module "@deepseek-ai/dsh-client-ui-slots" {
   }
 }
 
-export const inject = ["slots", "layout", "sessions", "locale"]
+export const inject = ["slots", "layout", "sessions", "locale", "shortcuts"]
+
+interface ConversationInputInsertion {
+  readonly input: {
+    for(scope: ClientContext): {
+      insertDraftText(text: string): boolean
+    }
+  }
+}
+
+/** Route a file-tree action through the resident session composer input. */
+function addFileToChat(ctx: ClientContext, sessionId: string, path: string): boolean {
+  const sessions = ctx.get("sessions") as ISessions | undefined
+  const scope = sessions?.scope(sessionId as SessionId)
+  if (scope === undefined) return false
+  const conversation = scope.get("conversation") as ConversationInputInsertion | undefined
+  return conversation?.input.for(scope).insertDraftText(fileMentionText(path)) ?? false
+}
 
 export function apply(ctx: ClientContext): void {
   const layout = ctx.get("layout") as WorkbenchLayoutFace
@@ -38,6 +71,13 @@ export function apply(ctx: ClientContext): void {
   attachLocale(ctx.locale)
   ctx.effect(() => ctx.locale.register(LOCALE_NS, { zh, en }), "cocode-workbench: dictionaries")
   ctx.inject(["inputTriggers"], (scope: ClientContext) => { registerFileMention(scope) })
+  ctx.inject(["shortcuts"], (shortcutCtx: ClientContext) => {
+    const shortcuts = shortcutCtx.get("shortcuts")
+    if (shortcuts === undefined) return
+    for (const command of fileShortcutCommands()) {
+      ctx.effect(() => shortcuts.register(command), `cocode-workbench: ${command.id}`)
+    }
+  })
   const controller = new WorkbenchController(layout, window.localStorage)
   const disposeService = ctx.reflect.provide("workbench", controller)
   for (const descriptor of builtInPanels()) {
@@ -49,7 +89,7 @@ export function apply(ctx: ClientContext): void {
   }
   slots.inject("workbench.right", () => slots.register({
     name: "workbench.right",
-    inject: (sessionId?: string) => ({ controller, sessionId, sessions }),
+    inject: (sessionId?: string) => ({ controller, sessionId, sessions, addFileToChat: (id: string, path: string) => addFileToChat(ctx, id, path) }),
   }, DockSurface))
   slots.inject("workbench.bottom", () => slots.register({
     name: "workbench.bottom",

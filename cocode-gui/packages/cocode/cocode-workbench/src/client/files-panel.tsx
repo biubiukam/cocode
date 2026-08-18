@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react"
+import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react"
 import { Button, Menu, Modal, writeClipboard } from "@deepseek-ai/dsh-client-ui-primitives"
 import type { WorkbenchPanelProps } from "./model.ts"
 import { workbenchRequest } from "./runtime-api.ts"
@@ -8,6 +8,13 @@ import {
   moveEntry, renameEntry, revealEntry, type TreeEntry,
 } from "./files-actions.ts"
 import { fileMenuEntries, isFileCommand, type FileCommand } from "./files-menu.ts"
+import {
+  activeFileShortcutTarget, FILE_ADD_TO_CHAT_COMMAND, FILE_CANCEL_COMMAND,
+  FILE_COLLAPSE_COMMAND, FILE_CONTEXT_MENU_COMMAND, FILE_COPY_COMMAND,
+  FILE_CUT_COMMAND, FILE_DELETE_COMMAND, FILE_EXPAND_COMMAND, FILE_OPEN_COMMAND,
+  FILE_PASTE_COMMAND, FILE_RENAME_COMMAND, FILE_SELECT_NEXT_COMMAND,
+  FILE_SELECT_PREVIOUS_COMMAND, setActiveFileShortcutTarget,
+} from "./file-shortcuts.ts"
 import { ChevronIcon, FileGlyph, FolderGlyph, SearchIcon } from "./icons.tsx"
 import css from "./panels.module.css"
 
@@ -84,6 +91,8 @@ export function FilesPanel(props: WorkbenchPanelProps) {
   const [removal, setRemoval] = useState<TreeEntry>()
   const [menu, setMenu] = useState<ContextTarget>()
   const [newOpen, setNewOpen] = useState(false)
+  const [treeFocused, setTreeFocused] = useState(false)
+  const treeRef = useRef<HTMLDivElement>(null)
 
   const loadDir = async (dir: string, signal?: AbortSignal) => {
     if (sessionId === undefined) return
@@ -225,7 +234,7 @@ export function FilesPanel(props: WorkbenchPanelProps) {
     const dir = entry.isDir ? entry.path : parentOf(entry.path)
     switch (command) {
       case "open": openEntry(entry); return
-      case "openBottom": openEntry(entry, "bottom"); return
+      case "addToChat": props.addFileToChat?.(relativeTo(cwd, entry.path)); return
       case "newFile": startCreate(dir, "file"); return
       case "newFolder": startCreate(dir, "folder"); return
       case "refresh": void refresh(dir); return
@@ -241,9 +250,100 @@ export function FilesPanel(props: WorkbenchPanelProps) {
     }
   }
 
+  const visibleEntries = (): TreeEntry[] => {
+    const result: TreeEntry[] = []
+    const visit = (dir: string) => {
+      for (const entry of children[dir] ?? []) {
+        result.push(entry)
+        if (entry.isDir && expanded.has(entry.path)) visit(entry.path)
+      }
+    }
+    visit(cwd)
+    return result
+  }
+
+  const selectedEntry = (): TreeEntry | undefined => {
+    if (selected === undefined) return undefined
+    const visit = (dir: string): TreeEntry | undefined => {
+      for (const entry of children[dir] ?? []) {
+        if (entry.path === selected) return entry
+        if (entry.isDir && expanded.has(entry.path)) {
+          const found = visit(entry.path)
+          if (found !== undefined) return found
+        }
+      }
+      return undefined
+    }
+    return visit(cwd)
+  }
+
+  const runShortcut = (commandId: string): boolean => {
+    const entry = selectedEntry()
+    if (commandId === FILE_CANCEL_COMMAND) {
+      if (menu !== undefined) { setMenu(undefined); return true }
+      if (draft !== undefined) { setDraft(undefined); return true }
+      if (removal !== undefined) { setRemoval(undefined); return true }
+      return false
+    }
+    if (entry === undefined) return false
+    switch (commandId) {
+      case FILE_OPEN_COMMAND: runCommand("open", entry); return true
+      case FILE_ADD_TO_CHAT_COMMAND:
+        if (entry.isDir) return false
+        return props.addFileToChat?.(relativeTo(cwd, entry.path)) ?? false
+      case FILE_RENAME_COMMAND:
+        runCommand("rename", entry); return true
+      case FILE_DELETE_COMMAND:
+        runCommand("delete", entry); return true
+      case FILE_COPY_COMMAND:
+        runCommand("copy", entry); return true
+      case FILE_CUT_COMMAND:
+        runCommand("cut", entry); return true
+      case FILE_PASTE_COMMAND:
+        runCommand("paste", entry); return true
+      case FILE_SELECT_PREVIOUS_COMMAND:
+      case FILE_SELECT_NEXT_COMMAND: {
+        const entries = visibleEntries()
+        const index = entries.findIndex(candidate => candidate.path === entry.path)
+        if (index < 0 || entries.length === 0) return false
+        const next = commandId === FILE_SELECT_NEXT_COMMAND
+          ? entries[Math.min(index + 1, entries.length - 1)]
+          : entries[Math.max(index - 1, 0)]
+        if (next === undefined || next.path === entry.path) return false
+        setSelected(next.path)
+        return true
+      }
+      case FILE_EXPAND_COMMAND:
+        if (!entry.isDir) return false
+        if (!expanded.has(entry.path)) { toggleDir(entry.path); return true }
+        return false
+      case FILE_COLLAPSE_COMMAND:
+        if (entry.isDir && expanded.has(entry.path)) { toggleDir(entry.path); return true }
+        setSelected(parentOf(entry.path))
+        return true
+      case FILE_CONTEXT_MENU_COMMAND:
+        setMenu({ entry, x: treeRef.current?.getBoundingClientRect().left ?? 0, y: treeRef.current?.getBoundingClientRect().top ?? 0 })
+        return true
+      default: return false
+    }
+  }
+
+  useEffect(() => {
+    const target = {
+      isActive: () => treeFocused && treeRef.current?.contains(document.activeElement) === true,
+      run: runShortcut,
+    }
+    setActiveFileShortcutTarget(target)
+    return () => {
+      if (activeFileShortcutTarget() === target) setActiveFileShortcutTarget(undefined)
+    }
+  })
+
   const openMenu = (event: ReactMouseEvent, entry: TreeEntry) => {
     event.preventDefault()
     event.stopPropagation()
+    setTreeFocused(true)
+    treeRef.current?.focus()
     setSelected(entry.path)
     setMenu({ entry, x: event.clientX, y: event.clientY })
   }
@@ -301,7 +401,7 @@ export function FilesPanel(props: WorkbenchPanelProps) {
           role="treeitem"
           aria-expanded={entry.isDir ? open : undefined}
           aria-selected={selected === entry.path}
-          onClick={() => openEntry(entry)}
+          onClick={() => { setTreeFocused(true); treeRef.current?.focus(); openEntry(entry) }}
           onContextMenu={event => openMenu(event, entry)}
         >
           {entry.isDir
@@ -349,9 +449,13 @@ export function FilesPanel(props: WorkbenchPanelProps) {
     </div>
     {error !== undefined && <div className={css.treeError}>{error}</div>}
     <div
+      ref={treeRef}
+      tabIndex={0}
       className={css.tree}
       role="tree"
       aria-label="工作区文件"
+      onFocus={() => setTreeFocused(true)}
+      onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setTreeFocused(false) }}
       onContextMenu={event => { if (cwd !== "") openMenu(event, root) }}
     >
       {pending[cwd] && roots.length === 0

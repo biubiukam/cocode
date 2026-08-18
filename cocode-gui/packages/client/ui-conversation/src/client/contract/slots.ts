@@ -482,6 +482,8 @@ export interface ComposerBarOwnerProps {
 export interface ComposerBarInjected {
   /** The InputBar-exclusive keyboard/DOM command face (private plane); absent with the session. */
   keyboard: ComposerKeyboard | undefined
+  /** Bind an external text insertion to the mounted textarea and its remembered selection. */
+  bindDraftInsertion: ((insert: (text: string) => boolean) => () => void) | undefined
   /** Create previews and append image ids to the session input. */
   addImages: ((files: readonly File[]) => string | null) | undefined
   /** Release one preview and remove its id from session input. */

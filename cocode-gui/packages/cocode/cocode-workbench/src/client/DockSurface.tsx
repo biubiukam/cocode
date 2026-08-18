@@ -17,6 +17,7 @@ interface DockSurfaceProps {
   readonly visible: boolean
   readonly sessionId?: string
   readonly sessions?: WorkbenchPanelProps["sessions"]
+  readonly addFileToChat?: (sessionId: string, path: string) => boolean
   readonly useSessions?: (select: (state: SessionListSlice) => string | undefined) => string | undefined
 }
 
@@ -171,6 +172,7 @@ function Pane(props: {
   sessionId?: string
   cwd?: string
   sessions?: WorkbenchPanelProps["sessions"]
+  addFileToChat?: WorkbenchPanelProps["addFileToChat"]
   toggleDock?: (dock: WorkbenchDock) => void
   root: boolean
 }) {
@@ -284,7 +286,7 @@ function Pane(props: {
           return <div key={instance.id} className={css.panelView} data-active={isActive || undefined}>
             {descriptor === undefined
               ? <div className={css.empty}><span>This panel is unavailable.</span><button type="button" onClick={() => props.controller.close(instance.id)}>Close</button></div>
-              : descriptor.render({ instance, scope: { sessionId: props.sessionId, cwd: props.cwd }, visible: props.visible && isActive, sessions: props.sessions, open: (type, options) => props.controller.open(type, options), close: instanceId => props.controller.close(instanceId) })}
+              : descriptor.render({ instance, scope: { sessionId: props.sessionId, cwd: props.cwd }, visible: props.visible && isActive, sessions: props.sessions, addFileToChat: props.addFileToChat, open: (type, options) => props.controller.open(type, options), close: instanceId => props.controller.close(instanceId) })}
           </div>
         })}
     </div>
@@ -307,7 +309,7 @@ function SplitDivider(props: { node: Extract<WorkbenchSplitNode, { kind: "split"
   }} onPointerUp={() => { start.current = undefined }} />
 }
 
-export function DockSurface({ controller, dock, visible, sessionId, sessions, useSessions }: DockSurfaceProps) {
+export function DockSurface({ controller, dock, visible, sessionId, sessions, useSessions, addFileToChat }: DockSurfaceProps) {
   const snapshot = useSyncExternalStore(controller.subscribe, controller.snapshot, controller.snapshot)
   const cwd = useSessions?.(state => sessionId === undefined ? undefined : state.byId[sessionId]?.cwd)
   // Bound during render so the first child fetch (useEffect) already carries
@@ -336,6 +338,9 @@ export function DockSurface({ controller, dock, visible, sessionId, sessions, us
         sessionId={sessionId}
         cwd={cwd}
         sessions={sessions}
+        addFileToChat={sessionId === undefined || addFileToChat === undefined
+          ? undefined
+          : path => addFileToChat(sessionId, path)}
         toggleDock={target => controller.toggleDock(target)}
         root
       />

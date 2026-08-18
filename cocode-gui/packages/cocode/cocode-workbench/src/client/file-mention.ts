@@ -104,7 +104,7 @@ export function registerFileMention(ctx: ClientContext): void {
         }
       },
       onPick({ candidate }) {
-        return { text: `${formatFileMention(insertPath(candidate))} ` }
+        return { text: fileMentionText(insertPath(candidate)) }
       },
     })
     return () => {
@@ -162,9 +162,12 @@ function workspaceLabel(cwd: string | undefined): string {
   return name === "" ? "." : name
 }
 
-function formatFileMention(path: string): string {
-  if (PLAIN_PATH.test(path)) return `@${path}`
-  return `@"${path.replaceAll("\\", "\\\\").replaceAll("\"", "\\\"")}"`
+/** Exact plain-text projection used by both the `@` picker and file-tree insertion. */
+export function fileMentionText(path: string): string {
+  const mention = PLAIN_PATH.test(path)
+    ? `@${path}`
+    : `@"${path.replaceAll("\\", "\\\\").replaceAll("\"", "\\\"")}"`
+  return `${mention} `
 }
 
 function rankPaths(paths: readonly string[], query: string, limit: number): string[] {

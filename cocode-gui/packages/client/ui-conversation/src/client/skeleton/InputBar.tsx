@@ -59,7 +59,7 @@ interface ComposerRailItem extends AttachmentRailItem {
 export type InputBarProps = ComposerBarProps
 
 export function InputBar({
-  useSession, useInput, inputActions, keyboard, addImages, removeImage, draftImages,
+  useSession, useInput, inputActions, keyboard, bindDraftInsertion, addImages, removeImage, draftImages,
   resolveSubmitMode, toggleCommandMenu, stop, command, openFile, t,
   renderSlot, useNotices, useLexicon, useMenuLauncher,
   useProjection, sessionId, variant, disabled: inert = false, blocked,
@@ -121,6 +121,7 @@ export function InputBar({
       : `${promptError.error.message} (${promptError.error.code})`)
   }, [promptError, showToast, t, imageLimits])
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
+  const rememberedSelectionRef = useRef<{ start: number; end: number }>()
   const cardRef = useRef<HTMLDivElement | null>(null)
   const dragDepthRef = useRef(0)
   const scrollRef = useRef<HTMLDivElement | null>(null)
@@ -272,6 +273,10 @@ export function InputBar({
       revealCaret(caret)
     })
   }
+
+  useEffect(() => {
+    rememberedSelectionRef.current = undefined
+  }, [sessionId])
 
   // Wheel chaining on the draft scrollport, one lifetime (it is never
   // unmounted — the inert state renders the same element disabled). While the
@@ -431,6 +436,22 @@ export function InputBar({
     end: el.selectionEnd ?? el.selectionStart ?? 0,
   })
   /* oxlint-enable typescript/no-unnecessary-condition */
+
+  useEffect(() => bindDraftInsertion?.((text) => {
+    if (keyboard === undefined || locked || machineBusy || text === '') return false
+    const el = inputRef.current
+    const selection = rememberedSelectionRef.current ?? (el === null ? { start: 0, end: 0 } : selectionOf(el))
+    const next = draft.slice(0, selection.start) + text + draft.slice(selection.end)
+    keyboard.setDraft(next, { ...selection, insertedLength: text.length })
+    const caret = selection.start + text.length
+    rememberedSelectionRef.current = { start: caret, end: caret }
+    if (el !== null) {
+      el.focus({ preventScroll: true })
+      restoreCaret(el, caret)
+    }
+    keyboard.track(keyboard.snapshot.draft, caret)
+    return true
+  }), [bindDraftInsertion, draft, keyboard, locked, machineBusy])
 
   const onCopyOrCut = (e: React.ClipboardEvent<HTMLTextAreaElement>, cut: boolean): void => {
     if (input === undefined || keyboard === undefined) return // absent machine: no draft can be copied or cut
@@ -606,7 +627,7 @@ export function InputBar({
     // Any caret/selection gesture ends a live paste attempt (the machine
     // cannot observe DOM selection). Cheap no-op when none is live.
     if (keyboard !== undefined && keyboard.snapshot.paste !== undefined) keyboard.invalidatePaste()
-    void e
+    rememberedSelectionRef.current = selectionOf(e.currentTarget)
   }
 
   // Button presses steal focus from the textarea; suppress at mousedown so
@@ -814,6 +835,7 @@ export function InputBar({
               onMouseMove={onMouseMove}
               onMouseLeave={onMouseLeave}
               onSelect={onSelect}
+              onBlur={event => { rememberedSelectionRef.current = selectionOf(event.currentTarget) }}
               onCopy={(e) => { onCopyOrCut(e, false) }}
               onCut={(e) => { onCopyOrCut(e, true) }}
               onPaste={onPaste}

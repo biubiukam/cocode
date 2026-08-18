@@ -38,6 +38,8 @@ export interface WorkbenchPanelProps {
   readonly instance: WorkbenchPanelInstance
   readonly scope: WorkbenchScope
   readonly visible: boolean
+  /** Insert one workspace-relative file mention into this session's composer. */
+  readonly addFileToChat?: (path: string) => boolean
   readonly open: (type: string, options?: OpenPanelOptions) => string | undefined
   readonly close: (instanceId: string) => void
   readonly sessions?: {

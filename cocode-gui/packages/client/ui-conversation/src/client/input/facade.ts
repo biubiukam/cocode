@@ -89,6 +89,8 @@ export class SessionInputShell implements SessionInput {
   private disposed = false
   /** Draft persistence mirror (chat store write; receives the clipboard projection, never raw placeholders). */
   private mirrorFn: ((text: string) => void) | undefined
+  /** Mounted composer DOM insertion face; absent falls back to draft-head insertion. */
+  private insertionFn: ((text: string) => boolean) | undefined
 
   constructor(private readonly deps: SessionInputDeps) {
     this.state = createSnapshotStore<InputState>(this.compose())
@@ -105,6 +107,14 @@ export class SessionInputShell implements SessionInput {
    */
   setDraft(text: string, editRange?: EditRange): void {
     this.run(this.core.dispatch({ type: 'draft-changed', draft: text, ...(editRange !== undefined ? { editRange } : {}) }))
+  }
+
+  /** Insert text through the mounted composer so its DOM selection remains authoritative. */
+  insertDraftText(text: string): boolean {
+    if (text === '' || this.disposed || this.snapshot.phase === 'adjudicating' || this.snapshot.phase === 'submitting') return false
+    if (this.insertionFn !== undefined) return this.insertionFn(text)
+    this.setDraft(text + this.snapshot.draft, { start: 0, end: 0, insertedLength: text.length })
+    return true
   }
 
   /** Append ordered image ids unless an admission transaction is locked. */
@@ -372,6 +382,14 @@ export class SessionInputShell implements SessionInput {
     this.mirrorFn = write
     return () => {
       if (this.mirrorFn === write) this.mirrorFn = undefined
+    }
+  }
+
+  /** Bind the mounted textarea insertion face for file-tree and other external composer actions. */
+  bindInsertion(insert: (text: string) => boolean): () => void {
+    this.insertionFn = insert
+    return () => {
+      if (this.insertionFn === insert) this.insertionFn = undefined
     }
   }
 
