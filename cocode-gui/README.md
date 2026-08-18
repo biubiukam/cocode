@@ -59,8 +59,8 @@ corepack pnpm@10.34.5 make         # Build distributables for the current platfo
 ```
 
 During development, the GUI stages the Cocode runtime through the sibling
-`cocode-host-supervisor` workspace. It does not require a nested
-`cocode-harness` checkout. The repository-level shortcuts are also available:
+`cocode-host-supervisor` workspace. The repository-level shortcuts are also
+available:
 
 ```sh
 cd ..
