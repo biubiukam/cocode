@@ -4,6 +4,7 @@ import { BLOCK_GAP, MESSAGE_CHROME } from '../../src/present/layout.ts'
 import { estimateNodeRows } from '../../src/present/visible-tail.ts'
 import { glyphs } from '../../src/present/glyphs.ts'
 import { formatToolSummaryLine } from '../../src/present/tool-display.ts'
+import { renderTable } from '../../src/present/components/Markdown.tsx'
 import stringWidth from 'string-width'
 import { contentColumnFromMouseX, selectableNodeText, selectedMessageText, textPointAtViewportRow, textRangeForMessage, localTextRange, type MessageTextSelection } from '../../src/present/message-text-selection.ts'
 
@@ -241,5 +242,82 @@ describe('message text selection', () => {
         cellColumn,
       }),
     ).toEqual({ nodeKey: 'assistant:list', offset: changes })
+  })
+
+  it('maps visible markdown text after inline syntax to its source text', () => {
+    const text = '**bold** tail'
+    const assistant: ConversationNode = {
+      kind: 'assistant',
+      id: 'inline',
+      seq: 1,
+      time: 1,
+      turn: 1,
+      step: 0,
+      text,
+      reasoning: '',
+      streaming: false,
+    }
+
+    expect(
+      textPointAtViewportRow({
+        nodes: [assistant],
+        maxRows: 8,
+        maxColumns: 80,
+        viewportRow: BLOCK_GAP,
+        cellColumn: 5,
+      }),
+    ).toEqual({ nodeKey: 'assistant:inline', offset: text.indexOf('tail') })
+  })
+
+  it('ignores a hidden markdown link target when mapping the next word', () => {
+    const text = '[rpc.ts](packages/core/src/rpc.ts) 后续内容'
+    const assistant: ConversationNode = {
+      kind: 'assistant',
+      id: 'link',
+      seq: 1,
+      time: 1,
+      turn: 1,
+      step: 0,
+      text,
+      reasoning: '',
+      streaming: false,
+    }
+
+    expect(
+      textPointAtViewportRow({
+        nodes: [assistant],
+        maxRows: 8,
+        maxColumns: 80,
+        viewportRow: BLOCK_GAP,
+        cellColumn: stringWidth('rpc.ts '),
+      }),
+    ).toEqual({ nodeKey: 'assistant:link', offset: text.indexOf('后续内容') })
+  })
+
+  it('maps a markdown table row to the cell source instead of the header', () => {
+    const text = ['| Name | Description |', '| --- | --- |', '| alpha | beta |'].join('\n')
+    const assistant: ConversationNode = {
+      kind: 'assistant',
+      id: 'table',
+      seq: 1,
+      time: 1,
+      turn: 1,
+      step: 0,
+      text,
+      reasoning: '',
+      streaming: false,
+    }
+    const rendered = renderTable(['Name', 'Description'], [['alpha', 'beta']], 80)
+    const betaColumn = rendered.split('\n').at(-1)?.indexOf('beta') ?? -1
+
+    expect(
+      textPointAtViewportRow({
+        nodes: [assistant],
+        maxRows: 8,
+        maxColumns: 80,
+        viewportRow: BLOCK_GAP + 2,
+        cellColumn: betaColumn,
+      }),
+    ).toEqual({ nodeKey: 'assistant:table', offset: text.indexOf('beta') })
   })
 })

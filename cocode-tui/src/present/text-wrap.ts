@@ -5,6 +5,12 @@ export type WrappedLine = {
   end: number
   /** Visual cells before this slice, e.g. a list bullet. */
   indent?: number
+  /** Rendered text for projections that do not have a 1:1 source string. */
+  visual?: string
+  /** UTF-16 source offset for each code unit in `visual`. */
+  sourceMap?: readonly number[]
+  /** Source offset returned when the pointer lands after the visual text. */
+  sourceEnd?: number
 }
 
 /** Wrap like Ink Text wrap="wrap": wrap-ansi hard, keep spaces. */

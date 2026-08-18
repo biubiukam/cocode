@@ -61,20 +61,25 @@ export function StreamingMarkdown(props: {
     [props.text],
   )
   stablePrefix.current = split.stablePrefix
+  const stableLength = split.stablePrefix.length
   return (
     <Box flexDirection="column">
       {split.stablePrefix !== '' ? (
         <Markdown
           text={split.stablePrefix}
           maxColumns={props.maxColumns}
-          selection={props.selection}
+          selection={localSelection(props.selection, 0, stableLength)}
         />
       ) : null}
       {split.unstableSuffix !== '' ? (
         <Markdown
           text={split.unstableSuffix}
           maxColumns={props.maxColumns}
-          selection={props.selection}
+          selection={localSelection(
+            props.selection,
+            stableLength,
+            split.unstableSuffix.length,
+          )}
         />
       ) : null}
     </Box>

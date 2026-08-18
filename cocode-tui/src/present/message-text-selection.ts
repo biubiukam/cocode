@@ -37,6 +37,9 @@ type TextLine = {
   start: number
   end: number
   indent?: number
+  visual?: string
+  sourceMap?: readonly number[]
+  sourceEnd?: number
 }
 
 /** Convert a 1-based SGR column to the message body cell. */
@@ -190,6 +193,9 @@ function layoutNodeText(node: ConversationNode, view: MessageTextView, columns: 
         start: line.start + bodyStart,
         end: line.end + bodyStart,
         ...(line.indent !== undefined ? { indent: line.indent } : {}),
+        ...(line.visual !== undefined ? { visual: line.visual } : {}),
+        ...(line.sourceMap !== undefined ? { sourceMap: line.sourceMap.map((value) => value + bodyStart) } : {}),
+        ...(line.sourceEnd !== undefined ? { sourceEnd: line.sourceEnd + bodyStart } : {}),
       })
     }
   }
@@ -237,6 +243,17 @@ function orderedSelection(
 
 function offsetAtCell(text: string, line: TextLine, cellColumn: number): number {
   const target = Math.max(0, Math.trunc(cellColumn) - (line.indent ?? 0))
+  if (line.visual !== undefined && line.sourceMap !== undefined) {
+    let width = 0
+    for (const entry of graphemeSegments(line.visual)) {
+      const entryWidth = stringWidth(entry.segment)
+      if (target < width + Math.max(1, entryWidth) / 2) {
+        return line.sourceMap[entry.index] ?? line.start
+      }
+      width += entryWidth
+    }
+    return line.sourceEnd ?? line.end
+  }
   let width = 0
   for (const entry of graphemeSegments(text.slice(line.start, line.end))) {
     const entryWidth = stringWidth(entry.segment)
