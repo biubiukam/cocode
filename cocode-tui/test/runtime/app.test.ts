@@ -894,6 +894,34 @@ describe('TuiApp', () => {
     })
   })
 
+  it('keeps a namespaced skill selection editable before invoking it', async () => {
+    const runtime = fakeRuntime() as TuiRuntime & {
+      listSkills(sessionId: string): Promise<{ name: string; description: string; source: string }[]>
+    }
+    runtime.listSkills = async () => [
+      { name: 'review', description: 'Review a change', source: 'project-agents' },
+    ]
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p',
+      model: 'm',
+      sessionId: 's1',
+    })
+    await app.start()
+
+    app.dispatch({ type: 'command.select', line: '/project:review' })
+
+    expect(app.snapshot().composer.text).toBe('/project:review ')
+    expect(runtime.prompts).toEqual([])
+
+    app.dispatch({ type: 'submit', text: '/project:review security' })
+    await expect.poll(() => runtime.prompts).toContainEqual({
+      sessionId: 's1',
+      text: '/review security',
+    })
+  })
+
   it('keeps pasted images in the draft until send and then sends attachment blocks', async () => {
     const runtime = fakeRuntime()
     const cwd = join(tmpdir(), 'cocode-image-only-prompt-missing-workspace')

@@ -188,6 +188,7 @@ export type TuiAction =
   | { type: 'submit'; text: string }
   | { type: 'compact' }
   | { type: 'command'; line: string }
+  | { type: 'command.select'; line: string }
   | { type: 'setDraft'; text: string }
   | { type: 'insertDraft'; text: string }
   | { type: 'insertPastedInput'; text: string }
@@ -894,6 +895,9 @@ class TuiAppImpl implements TuiApp {
         return
       case 'command':
         this.runCommand(action.line)
+        return
+      case 'command.select':
+        this.selectCommand(action.line)
         return
       case 'historyPrev': {
         const next = this.history.prev(this.draft.text)
@@ -3067,11 +3071,7 @@ class TuiAppImpl implements TuiApp {
       command.run(this.commandCtx(), parsed.args)
       return
     }
-    const skill = this.skills.find((entry) => entry.name === parsed.name)
-    const namespacedSkill = this.skills.find(
-      (entry) => skillCommandName(entry) === parsed.name,
-    )
-    const selectedSkill = skill ?? namespacedSkill
+    const selectedSkill = this.findSkillCommand(parsed.name)
     const remoteName = parsed.name.toLowerCase()
     const remoteCommand = this.remoteCommands.find((entry) => entry.name === remoteName)
     if (this.capabilities.commands && remoteCommand !== undefined) {
@@ -3095,7 +3095,7 @@ class TuiAppImpl implements TuiApp {
     }
     if (this.capabilities.skills && selectedSkill !== undefined) {
       const invocation =
-        selectedSkill === skill ? line : formatSkillInvocation(selectedSkill, parsed.args)
+        selectedSkill.name === parsed.name ? line : formatSkillInvocation(selectedSkill, parsed.args)
       this.sendSkill(invocation)
       return
     }
@@ -3104,6 +3104,30 @@ class TuiAppImpl implements TuiApp {
       this.emit()
       return
     }
+  }
+
+  private selectCommand(line: string): void {
+    const parsed = parseSlash(line)
+    const skill = parsed === null ? undefined : this.findSkillCommand(parsed.name)
+    if (skill === undefined) {
+      this.runCommand(line)
+      return
+    }
+    this.pendingSkillInvocation = undefined
+    this.draft = replaceDraft(this.draft, `/${parsed.name} `)
+    this.attachments = []
+    this.images = []
+    this.notice = {
+      tone: 'info',
+      message: text(this.locale, 'skillReady', { name: skill.name }),
+    }
+    this.emit()
+  }
+
+  private findSkillCommand(name: string): SkillEntry | undefined {
+    return this.skills.find(
+      (skill) => skill.name === name || skillCommandName(skill) === name,
+    )
   }
 
   private executeRemoteCommand(line: string): void {

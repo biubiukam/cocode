@@ -88,6 +88,32 @@ describe('Chat', () => {
     }
   })
 
+  it('keeps a namespaced skill selected from the slash menu in the composer', async () => {
+    const runtime = createTestRuntime()
+    runtime.value.listSkills = async () => [
+      {
+        name: 'dws',
+        description: 'Manage DingTalk product capabilities',
+        source: 'user-skills',
+      },
+    ]
+    const prompt = vi.spyOn(runtime.value, 'prompt')
+    const chat = await renderChat(runtime.value, { startBeforeRender: true })
+
+    try {
+      chat.stdin.write('/user:dw')
+      await renderFlush()
+      expect(plainOutput(chat.stdout.output)).toContain('/user:dws')
+      chat.stdin.write('\r')
+      await renderFlush()
+
+      expect(chat.app.snapshot().composer.text).toBe('/user:dws ')
+      expect(prompt).not.toHaveBeenCalled()
+    } finally {
+      await closeChat(chat)
+    }
+  })
+
   it('scrolls a plan review preview with the mouse wheel', async () => {
     const runtime = createTestRuntime()
     const chat = await renderChat(runtime.value, {

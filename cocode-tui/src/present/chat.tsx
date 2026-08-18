@@ -1036,7 +1036,7 @@ export function Chat(props: {
         })
         const item = index === undefined ? undefined : slashItems[index]
         if (index !== undefined && isPress && item !== undefined) {
-          app.dispatch({ type: 'command', line: `/${item.name}` })
+          app.dispatch({ type: 'command.select', line: `/${item.name}` })
         } else if (index !== undefined) {
           setSlashIndex(index)
         }
@@ -2071,7 +2071,7 @@ export function Chat(props: {
         const selected =
           slashItems[moveSlashSelection(slashIndex, 0, slashItems.length)]
         if (selected !== undefined) {
-          app.dispatch({ type: 'command', line: `/${selected.name}` })
+          app.dispatch({ type: 'command.select', line: `/${selected.name}` })
         }
         return
       }
