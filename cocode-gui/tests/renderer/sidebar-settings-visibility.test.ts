@@ -7,8 +7,12 @@ const css = readFileSync(
 	resolve(process.cwd(), "packages/client/ui-sidebar/src/client/SidebarRoot.module.css"),
 	"utf8",
 )
+const settingsRoot = readFileSync(
+	resolve(process.cwd(), "packages/client/ui-settings-general/src/client/SettingsRoot.tsx"),
+	"utf8",
+)
 
-test("Settings remains an independent footer trigger", () => {
-	assert.doesNotMatch(css, /\.settingsArea \[data-dsh-settings-trigger\]\s*\{\s*display: none;/)
-	assert.doesNotMatch(css, /\.footArea:has\([^)]*\) \.settingsArea/)
+test("Settings is no longer rendered as an independent footer trigger", () => {
+	assert.match(css, /\.settingsArea/)
+	assert.doesNotMatch(settingsRoot, /data-dsh-settings-trigger/)
 })

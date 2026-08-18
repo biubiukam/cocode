@@ -104,7 +104,7 @@ function SettingsPanel({ rows, renderSlot, activeId, onSelect, onClose }: PanelP
  * @returns the settings shell element tree.
  */
 export function SettingsRoot(props: SettingsRootComponentProps) {
-  const { wide, useSections, useOnboardingSteps, useSessions, renderSlot } = props
+  const { useSections, useOnboardingSteps, useSessions, renderSlot } = props
   const [open, setOpen] = useState(false)
   const [activeId, setActiveId] = useState<string | undefined>(undefined)
   const [completedOnboarding, setCompletedOnboarding] = useState<ReadonlySet<string>>(() => new Set())
@@ -115,6 +115,19 @@ export function SettingsRoot(props: SettingsRootComponentProps) {
   const openSection = useCallback((id: string) => {
     setActiveId(id)
     setOpen(true)
+  }, [])
+
+  // The account footer owns the visible Settings entry. Keep this shell
+  // triggerless and open it through a product event so there is only one
+  // visible entry while all existing settings sections remain available.
+  useEffect(() => {
+    const onOpenSettings = (event: Event) => {
+      const detail = (event as CustomEvent<{ sectionId?: string }>).detail
+      setActiveId(detail?.sectionId)
+      setOpen(true)
+    }
+    window.addEventListener('cocode:open-settings', onOpenSettings)
+    return () => { window.removeEventListener('cocode:open-settings', onOpenSettings) }
   }, [])
 
   // The ledger tick keeps the nav rows fresh: registrants re-register with
@@ -143,21 +156,6 @@ export function SettingsRoot(props: SettingsRootComponentProps) {
 
   return (
     <>
-      <button
-        type="button"
-        data-dsh-settings-trigger
-        className={clsx(css.trigger, !wide && css.rail)}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        onClick={(event) => {
-          const requested = event.currentTarget.dataset.dshSettingsSectionRequest
-          delete event.currentTarget.dataset.dshSettingsSectionRequest
-          setActiveId(requested)
-          setOpen(true)
-        }}
-      >
-        {renderSlot('settings.trigger', { wide })}
-      </button>
       {open && (
         <SettingsPanel
           rows={rows}

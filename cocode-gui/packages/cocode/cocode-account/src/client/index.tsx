@@ -115,9 +115,6 @@ const COPY = {
   },
 } as const
 
-/** Stable DOM hook owned by the settings shell's trigger. */
-const SETTINGS_TRIGGER = "[data-dsh-settings-trigger]"
-
 function copy(): typeof COPY.zh | typeof COPY.en {
   return document.documentElement.lang.toLowerCase().startsWith("zh") || navigator.language.toLowerCase().startsWith("zh")
     ? COPY.zh
@@ -380,11 +377,9 @@ function AccountOnboarding({ complete, openSection, store }: OnboardingProps): R
 }
 
 function requestSettings(sectionId?: string): void {
-  const trigger = document.querySelector<HTMLButtonElement>(SETTINGS_TRIGGER)
-  if (trigger === null) return
-  if (sectionId === undefined) delete trigger.dataset.dshSettingsSectionRequest
-  else trigger.dataset.dshSettingsSectionRequest = sectionId
-  trigger.click()
+  window.dispatchEvent(new CustomEvent("cocode:open-settings", {
+    detail: sectionId === undefined ? {} : { sectionId },
+  }))
 }
 
 function initialOf(value: string): string {
