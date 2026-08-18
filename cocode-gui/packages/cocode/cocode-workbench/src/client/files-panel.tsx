@@ -160,7 +160,7 @@ export function FilesPanel(props: WorkbenchPanelProps) {
   const openEntry = (entry: TreeEntry, dock: "right" | "bottom" = "right") => {
     setSelected(entry.path)
     if (entry.isDir) {
-      if (!expanded.has(entry.path)) toggleDir(entry.path)
+      toggleDir(entry.path)
       return
     }
     props.open("preview", { title: entry.name, target: { path: entry.path }, dock })
