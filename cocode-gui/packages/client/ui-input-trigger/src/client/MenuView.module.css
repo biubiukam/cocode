@@ -149,26 +149,27 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
-/* File mentions: icon + name + parent path, path uses leading ellipsis. */
+/* File mentions: icon | name | parent path. The path column is reserved so
+   a long name cannot collapse it, and leading ellipsis keeps the leaf dirs. */
+.fileItem {
+  display: grid;
+  grid-template-columns: 16px minmax(0, max-content) minmax(7em, 1fr);
+  align-items: center;
+  column-gap: 8px;
+}
+
 .fileItem .itemName {
-  flex: 0 1 auto;
-  max-width: 55%;
+  max-width: none;
+  min-width: 0;
 }
 
 .fileItem .itemDescription {
-  flex: 1 1 0;
   min-width: 0;
   font-size: 12px;
   line-height: 16px;
-  color: var(--dsw-alias-label-caption);
+  color: var(--dsw-alias-label-tertiary);
   direction: rtl;
   text-align: left;
-  text-overflow: ellipsis;
-}
-
-.fileItem .itemDescription > span {
-  direction: ltr;
-  unicode-bidi: isolate;
 }
 
 /* Heading row above a source group: non-interactive small grey text,

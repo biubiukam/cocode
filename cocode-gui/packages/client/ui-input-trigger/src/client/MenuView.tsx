@@ -107,9 +107,9 @@ export function MenuView({ menu, onPick, onDismiss, t }: MenuViewProps) {
                         ? <FileKindMark name={item.name} />
                         : item.icon !== undefined && <span className={css.itemIcon} aria-hidden>{item.icon}</span>}
                       <span className={css.itemName}>{item.name}</span>
-                      {item.description !== undefined && (
+                      {item.description !== undefined && item.description !== '' && (
                         <span className={css.itemDescription}>
-                          {group.source === 'file' ? <span>{item.description}</span> : item.description}
+                          {group.source === 'file' ? <bdi>{item.description}</bdi> : item.description}
                         </span>
                       )}
                     </button>
