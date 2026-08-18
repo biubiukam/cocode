@@ -5,12 +5,8 @@ import { memo, useMemo, useRef } from 'react'
 import stringWidth from 'string-width'
 import { glyphs } from '../glyphs.ts'
 import { theme } from '../theme.ts'
-import {
-  localTextRange,
-  type MessageTextRange,
-} from '../message-text-selection.ts'
-import { wrapPlainText } from '../text-wrap.ts'
-import { SelectableText, WrappedSelectableText } from './SelectableText.tsx'
+import type { MessageTextRange } from '../message-text-selection.ts'
+import { SelectableText } from './SelectableText.tsx'
 
 export type MarkdownBlock =
   | { kind: 'heading'; depth: number; text: string }
@@ -186,7 +182,7 @@ function MarkdownBlockView(props: {
   const { block } = props
   if (block.kind === 'heading') {
     return (
-      <Text color={theme.text} bold>
+      <Text color={theme.text} bold wrap="wrap">
         <Text color={theme.mute}>{'#'.repeat(Math.min(block.depth, 3))}</Text>{' '}
         {renderInline(block.text, props.selection, props.sourceOffset)}
       </Text>
@@ -236,6 +232,7 @@ function MarkdownBlockView(props: {
       <RailedLines
         text={block.text}
         color={theme.dim}
+        markdown
         selection={props.selection}
         sourceOffset={props.sourceOffset}
       />
@@ -251,16 +248,11 @@ function MarkdownBlockView(props: {
   if (block.kind === 'rule')
     return <Text color={theme.border}>{glyphs.rule.repeat(24)}</Text>
   return (
-    <WrappedSelectableText
-      color={theme.text}
-      columns={props.maxColumns ?? 80}
-      text={block.text}
-      selection={localTextRange(
-        props.selection,
-        props.sourceOffset,
-        block.text.length,
-      )}
-    />
+    <Box width={Math.max(1, props.maxColumns ?? 80)} minWidth={0}>
+      <Text color={theme.text} wrap="wrap">
+        {renderInline(block.text, props.selection, props.sourceOffset)}
+      </Text>
+    </Box>
   )
 }
 
@@ -272,36 +264,12 @@ function ListItemLines(props: {
   selection?: MessageTextRange
   sourceOffset: number
 }) {
-  const visual = `${props.prefix}${props.item}`
   return (
-    <Box flexDirection="column" flexShrink={0}>
-      {wrapPlainText(visual, props.columns).map((line, index) => {
-        const bodyStart = Math.max(0, line.start - props.prefix.length)
-        const bodyEnd = Math.max(0, line.end - props.prefix.length)
-        const prefixSlice =
-          line.start < props.prefix.length
-            ? props.prefix.slice(line.start)
-            : ''
-        const body = props.item.slice(bodyStart, bodyEnd)
-        return (
-          <Text key={`${line.start}:${index}`} wrap="truncate-end">
-            {prefixSlice === '' ? null : (
-              <Text color={theme.mute}>{prefixSlice}</Text>
-            )}
-            {body === '' ? null : (
-              <SelectableText
-                wrap="truncate-end"
-                text={body}
-                selection={localTextRange(
-                  props.selection,
-                  props.sourceOffset + bodyStart,
-                  body.length,
-                )}
-              />
-            )}
-          </Text>
-        )
-      })}
+    <Box width={props.columns} minWidth={0} flexShrink={0}>
+      <Text wrap="wrap">
+        <Text color={theme.mute}>{props.prefix}</Text>
+        {renderInline(props.item, props.selection, props.sourceOffset)}
+      </Text>
     </Box>
   )
 }
@@ -310,6 +278,7 @@ function ListItemLines(props: {
 function RailedLines(props: {
   text: string
   color: string
+  markdown?: boolean
   selection?: MessageTextRange
   sourceOffset: number
 }) {
@@ -323,17 +292,22 @@ function RailedLines(props: {
           const lineOffset = offset
           offset += line.length + 1
           return (
-            <Text key={`${index}:${line}`}>
+            <Text key={`${index}:${line}`} wrap="wrap">
               <Text color={theme.border}>{glyphs.quoteRail} </Text>
-              <SelectableText
-                color={props.color}
-                text={line}
-                selection={localSelection(
-                  props.selection,
-                  lineOffset,
-                  line.length,
+              <Text color={props.color}>
+                {props.markdown === true ? (
+                  renderInline(line, props.selection, lineOffset)
+                ) : (
+                  <SelectableText
+                    text={line}
+                    selection={localSelection(
+                      props.selection,
+                      lineOffset,
+                      line.length,
+                    )}
+                  />
                 )}
-              />
+              </Text>
             </Text>
           )
         })}
@@ -346,98 +320,127 @@ function renderInline(
   selection?: MessageTextRange,
   sourceOffset = 0,
 ): ReactNode {
+  try {
+    return renderInlineTokens(
+      marked.Lexer.lexInline(text),
+      text,
+      selection,
+      sourceOffset,
+    )
+  } catch {
+    return (
+      <SelectableText
+        text={text}
+        selection={localSelection(selection, sourceOffset, text.length)}
+      />
+    )
+  }
+}
+
+function renderInlineTokens(
+  tokens: readonly Token[],
+  source: string,
+  selection: MessageTextRange | undefined,
+  sourceOffset: number,
+): ReactNode[] {
   const nodes: ReactNode[] = []
-  const pattern =
-    /(\*\*[^*]+\*\*|__[^_]+__|`[^`]+`|\[[^\]]+\]\([^)]+\)|\*[^*]+\*|_[^_]+_)/g
   let cursor = 0
-  for (const match of text.matchAll(pattern)) {
-    const value = match[0]
-    const index = match.index ?? 0
-    if (index > cursor) {
-      const plain = text.slice(cursor, index)
+  for (const [index, token] of tokens.entries()) {
+    const raw = token.raw ?? ''
+    const relativeStart = sourceIndexOf(source, raw, cursor)
+    const tokenOffset = sourceOffset + relativeStart
+    const nested = 'tokens' in token && Array.isArray(token.tokens)
+      ? token.tokens
+      : undefined
+    const key = `${relativeStart}:${token.type}:${index}`
+
+    if (token.type === 'strong' && nested !== undefined) {
       nodes.push(
-        <SelectableText
-          key={`${index}:plain`}
-          text={plain}
-          selection={localSelection(
-            selection,
-            sourceOffset + cursor,
-            plain.length,
-          )}
-        />,
-      )
-    }
-    if (value.startsWith('**') || value.startsWith('__')) {
-      nodes.push(
-        <Text key={`${index}:strong`} bold>
-          <SelectableText
-            text={value.slice(2, -2)}
-            selection={localSelection(
-              selection,
-              sourceOffset + index + 2,
-              value.length - 4,
-            )}
-          />
+        <Text key={key} bold>
+          {renderInlineTokens(nested, raw, selection, tokenOffset)}
         </Text>,
       )
-    } else if (value.startsWith('`')) {
+    } else if (token.type === 'em' && nested !== undefined) {
       nodes.push(
-        <Text key={`${index}:code`} color={theme.accent}>
-          <SelectableText
-            text={value.slice(1, -1)}
-            selection={localSelection(
-              selection,
-              sourceOffset + index + 1,
-              value.length - 2,
-            )}
-          />
+        <Text key={key} italic>
+          {renderInlineTokens(nested, raw, selection, tokenOffset)}
         </Text>,
       )
-    } else if (value.startsWith('[')) {
-      const labelEnd = value.indexOf('](')
+    } else if (token.type === 'del' && nested !== undefined) {
       nodes.push(
-        <Text key={`${index}:link`} color={theme.accent}>
-          <SelectableText
-            text={value.slice(1, labelEnd)}
-            selection={localSelection(
-              selection,
-              sourceOffset + index + 1,
-              Math.max(0, labelEnd - 1),
-            )}
-          />
+        <Text key={key} strikethrough>
+          {renderInlineTokens(nested, raw, selection, tokenOffset)}
+        </Text>,
+      )
+    } else if (token.type === 'link' && nested !== undefined) {
+      nodes.push(
+        <Text key={key} color={theme.accent} underline>
+          {renderInlineTokens(nested, raw, selection, tokenOffset)}
+        </Text>,
+      )
+    } else if (token.type === 'codespan') {
+      nodes.push(
+        <Text key={key} color={theme.accent}>
+          {selectableTokenText(token.text, raw, selection, tokenOffset)}
+        </Text>,
+      )
+    } else if (token.type === 'image') {
+      nodes.push(
+        <Text key={key} color={theme.accent}>
+          {selectableTokenText(token.text, raw, selection, tokenOffset)}
+        </Text>,
+      )
+    } else if (token.type === 'br') {
+      nodes.push('\n')
+    } else if (nested !== undefined) {
+      nodes.push(
+        <Text key={key}>
+          {renderInlineTokens(nested, raw, selection, tokenOffset)}
         </Text>,
       )
     } else {
+      const value = 'text' in token && typeof token.text === 'string'
+        ? token.text
+        : raw
       nodes.push(
-        <Text key={`${index}:em`} italic>
-          <SelectableText
-            text={value.slice(1, -1)}
-            selection={localSelection(
-              selection,
-              sourceOffset + index + 1,
-              value.length - 2,
-            )}
-          />
-        </Text>,
+        <SelectableText
+          key={key}
+          text={value}
+          selection={tokenSelection(value, raw, selection, tokenOffset)}
+        />,
       )
     }
-    cursor = index + value.length
-  }
-  if (cursor < text.length) {
-    const plain = text.slice(cursor)
-    nodes.push(
-      <SelectableText
-        key={`${cursor}:plain-tail`}
-        text={plain}
-        selection={localSelection(
-          selection,
-          sourceOffset + cursor,
-          plain.length,
-        )}
-      />,
-    )
+    cursor = relativeStart + raw.length
   }
   return nodes
+}
+
+function selectableTokenText(
+  text: string,
+  raw: string,
+  selection: MessageTextRange | undefined,
+  sourceOffset: number,
+): ReactNode {
+  return (
+    <SelectableText
+      text={text}
+      selection={tokenSelection(text, raw, selection, sourceOffset)}
+    />
+  )
+}
+
+function tokenSelection(
+  text: string,
+  raw: string,
+  selection: MessageTextRange | undefined,
+  sourceOffset: number,
+): MessageTextRange | undefined {
+  const inner = raw.indexOf(text)
+  return localSelection(
+    selection,
+    sourceOffset + (inner < 0 ? 0 : inner),
+    text.length,
+  )
 }
 
 function blockSourceText(block: MarkdownBlock): string {
@@ -496,12 +499,14 @@ export function renderTable(
   rows: readonly (readonly string[])[],
   maxColumns = 80,
 ): string {
+  const renderedHeader = header.map(inlineMarkdownText)
+  const renderedRows = rows.map((row) => row.map(inlineMarkdownText))
   const columnCount = Math.max(
-    header.length,
-    ...rows.map((row) => row.length),
+    renderedHeader.length,
+    ...renderedRows.map((row) => row.length),
     1,
   )
-  const allRows = [header, ...rows]
+  const allRows = [renderedHeader, ...renderedRows]
   const widths = tableColumnWidths(allRows, columnCount, maxColumns)
   const line = (row: readonly string[]) =>
     rowLines(row, widths).map((lineCells) =>
@@ -513,7 +518,30 @@ export function renderTable(
   const divider = widths
     .map((width) => glyphs.rule.repeat(width))
     .join(TABLE_COLUMN_GAP)
-  return [...line(header), divider, ...rows.flatMap(line)].join('\n')
+  return [...line(renderedHeader), divider, ...renderedRows.flatMap(line)].join('\n')
+}
+
+/** Plain terminal projection used where a block cannot carry nested Ink styles. */
+export function inlineMarkdownText(text: string): string {
+  try {
+    return inlineTokensText(marked.Lexer.lexInline(text))
+  } catch {
+    return text
+  }
+}
+
+function inlineTokensText(tokens: readonly Token[]): string {
+  return tokens.map((token) => {
+    if (token.type === 'br') return '\n'
+    if (token.type === 'image') return token.text
+    const nested = 'tokens' in token && Array.isArray(token.tokens)
+      ? token.tokens
+      : undefined
+    if (nested !== undefined) return inlineTokensText(nested)
+    return 'text' in token && typeof token.text === 'string'
+      ? token.text
+      : token.raw ?? ''
+  }).join('')
 }
 
 const TABLE_CELL_CAP = 48

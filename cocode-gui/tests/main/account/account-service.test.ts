@@ -67,9 +67,11 @@ function agency(overrides: Record<string, unknown> = {}): {
 	client: never
 	createdKeys: string[]
 	revoked: string[]
+	revokedApiKeys: string[]
 } {
 	const createdKeys: string[] = []
 	const revoked: string[] = []
+	const revokedApiKeys: string[] = []
 	return {
 		client: {
 			getOrigin: () => "https://cocode.agency",
@@ -97,6 +99,9 @@ function agency(overrides: Record<string, unknown> = {}): {
 				month: 30,
 				syncedAt: "2026-08-15T00:00:00.000Z",
 			}),
+			revokeApiKey: async (_accessToken: string, keyId: string) => {
+				revokedApiKeys.push(keyId)
+			},
 			revoke: async (token: string) => {
 				revoked.push(token)
 			},
@@ -104,6 +109,7 @@ function agency(overrides: Record<string, unknown> = {}): {
 		} as never,
 		createdKeys,
 		revoked,
+		revokedApiKeys,
 	}
 }
 
@@ -587,6 +593,7 @@ test("sign out restores a cloud default before removing only the managed provide
 	const previous: DefaultSelection = { provider: "deepseek-official", model: "deepseek-v4-flash" }
 	const identity = new MemoryVault(
 		validIdentity({
+			personalKeyId: "key-test",
 			preLoginDefault: previous,
 			managedRoute: {
 				baseURL: "https://cocode.agency/v1",
@@ -594,7 +601,7 @@ test("sign out restores a cloud default before removing only the managed provide
 			},
 		}),
 	)
-	const { client, revoked } = agency()
+	const { client, revoked, revokedApiKeys } = agency()
 	let current: DefaultSelection = { provider: "cocode-nut", model: "cloud-model" }
 	let route: Record<string, unknown> | undefined = {
 		displayName: "Cocode Nut",
@@ -663,6 +670,7 @@ test("sign out restores a cloud default before removing only the managed provide
 	assert.equal(cloudKey.value, undefined)
 	assert.equal(pending.value, undefined)
 	assert.deepEqual(revoked, ["identity-refresh"])
+	assert.deepEqual(revokedApiKeys, ["key-test"])
 	assert.equal((await service.snapshot()).phase, "signed-out")
 })
 

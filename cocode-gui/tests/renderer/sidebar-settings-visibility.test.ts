@@ -8,14 +8,7 @@ const css = readFileSync(
 	"utf8",
 )
 
-test("slot errors do not hide the Settings fallback trigger", () => {
-	assert.match(
-		css,
-		/\.footArea:has\(\.footerActions > :not\(\[data-slot-error\]\)\) \.settingsArea \[data-dsh-settings-trigger\]\s*\{\s*display: none;/,
-	)
-	assert.doesNotMatch(
-		css,
-		/\.footArea:has\(\.footerActions > :not\(\[data-slot-error\]\)\) \.settingsArea\s*\{\s*display: none;/,
-	)
-	assert.doesNotMatch(css, /\.footArea:has\(\.footerActions > \*\) \.settingsArea/)
+test("Settings remains an independent footer trigger", () => {
+	assert.doesNotMatch(css, /\.settingsArea \[data-dsh-settings-trigger\]\s*\{\s*display: none;/)
+	assert.doesNotMatch(css, /\.footArea:has\([^)]*\) \.settingsArea/)
 })

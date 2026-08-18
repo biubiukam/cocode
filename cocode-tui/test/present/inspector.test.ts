@@ -39,6 +39,48 @@ describe('Inspector', () => {
     expect(output).not.toContain('Skills')
     expect(output).not.toContain('Capabilities')
   })
+
+  it('capitalizes Inspector item titles and field labels', async () => {
+    const snapshot = createSnapshot(0)
+
+    const stdin = new InputStream()
+    const stdout = new CaptureStream(30, 40)
+    const screen = render(
+      React.createElement(Inspector, {
+        snapshot,
+        locale: 'en',
+        maxRows: 40,
+      }),
+      {
+        stdin: stdin as unknown as NodeJS.ReadStream,
+        stdout: stdout as unknown as NodeJS.WriteStream,
+        debug: true,
+        patchConsole: false,
+        exitOnCtrlC: false,
+      },
+    )
+
+    await flush()
+    await flush()
+    screen.unmount()
+    await flush()
+    screen.cleanup()
+
+    const output = stdout.output.replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, '')
+    expect(output).toContain('Inspector')
+    expect(output).toContain('Activity')
+    expect(output).toContain('Context')
+    expect(output).toContain('Files')
+    expect(output).toContain('Session')
+    expect(output).toContain('Runtime / MCP')
+    expect(output).toContain('Shortcuts')
+    expect(output).toContain('Model:')
+    expect(output).toContain('Id:')
+    expect(output).not.toMatch(/│ activity\n/)
+    expect(output).not.toMatch(/│ context\n/)
+    expect(output).not.toMatch(/│ files\n/)
+    expect(output).not.toMatch(/│ session\n/)
+  })
 })
 
 function createSnapshot(skillCount: number): TuiSnapshot {

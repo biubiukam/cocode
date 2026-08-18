@@ -313,3 +313,27 @@ test("Agency client revokes the refresh token using the native token contract", 
 		globalThis.fetch = originalFetch
 	}
 })
+
+test("Agency client revokes the machine API key with the account token", async () => {
+	const originalFetch = globalThis.fetch
+	let request: { input: string; method: string | undefined; token: string | undefined }
+	globalThis.fetch = (async (input, init) => {
+		const headers = init?.headers as Record<string, string> | undefined
+		request = {
+			input: String(input),
+			method: init?.method,
+			token: headers?.authorization,
+		}
+		return new Response(null, { status: 204 })
+	}) as typeof fetch
+	try {
+		await new AgencyClient("https://cocode.agency").revokeApiKey("access-token", "key/test")
+		assert.deepEqual(request, {
+			input: "https://cocode.agency/v1/me/api-keys/key%2Ftest",
+			method: "DELETE",
+			token: "Bearer access-token",
+		})
+	} finally {
+		globalThis.fetch = originalFetch
+	}
+})

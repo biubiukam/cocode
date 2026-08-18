@@ -89,6 +89,7 @@ type AccountAgency = {
 		readonly month: number
 		readonly syncedAt: string
 	}>
+	revokeApiKey(accessToken: string, keyId: string): Promise<void>
 	revoke(refreshToken: string): Promise<void>
 }
 
@@ -407,8 +408,27 @@ export class AccountService {
 		// Never send a token to a different Agency origin after a development
 		// environment switch. Local cleanup remains authoritative in that case.
 		if (state !== undefined && state.origin === this.agency.getOrigin()) {
+			let revocationState = state
 			try {
-				await this.agency.revoke(state.refreshToken)
+				// The device key is the machine-level authorization used by Cocode Nut.
+				// Refresh first when possible so deleting it still works after an access
+				// token expiry; local logout must not be blocked by a remote failure.
+				revocationState = await this.ensureIdentityAccess(state)
+			} catch {
+				// Best effort: revoke the refresh token and clear local state below.
+			}
+			if (revocationState.personalKeyId !== undefined) {
+				try {
+					await this.agency.revokeApiKey(
+						revocationState.accessToken,
+						revocationState.personalKeyId,
+					)
+				} catch {
+					// Local cleanup remains authoritative if the Agency is unavailable.
+				}
+			}
+			try {
+				await this.agency.revoke(revocationState.refreshToken)
 			} catch {
 				// Remote revocation is best effort; local secret cleanup must continue.
 			}

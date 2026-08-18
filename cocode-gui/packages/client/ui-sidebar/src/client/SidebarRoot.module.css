@@ -339,14 +339,6 @@
   display: flex;
 }
 
-/* Product footer actions may own the unified account/provider menu. When one
-   is present, keep the Settings shell mounted so its full-viewport panel can
-   still render, but hide only the duplicate trigger. A slot-error placeholder
-   is not a real action and must not hide Settings. */
-.footArea:has(.footerActions > :not([data-slot-error])) .settingsArea [data-dsh-settings-trigger] {
-	display: none;
-}
-
 .collapsed .footArea {
   align-items: center;
 }

@@ -13,12 +13,12 @@ describe('empty state copy', () => {
   })
 
   it('keeps the horizontal wordmark and title on separate rows', async () => {
-    const stdout = new CaptureStream(73, 9)
+    const stdout = new CaptureStream(80, 9)
     const app = render(
       React.createElement(
         Box,
-        { width: 73, height: 9 },
-        React.createElement(EmptyState, { maxRows: 9, maxColumns: 73, locale: 'en' }),
+        { width: 80, height: 9 },
+        React.createElement(EmptyState, { maxRows: 9, maxColumns: 80, locale: 'en' }),
       ),
       {
         stdout: stdout as unknown as NodeJS.WriteStream,

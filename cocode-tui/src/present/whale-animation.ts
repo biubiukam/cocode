@@ -42,14 +42,19 @@ const SPOUT_STAGES = [
 
 const SPOUT_SEQUENCE = [0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 8, 7, 6, 5, 3, 1]
 
-const LARGE_GLYPHS = {
-  C: ['█████', '█    ', '█    ', '█    ', '█████'],
-  O: ['█████', '█   █', '█   █', '█   █', '█████'],
-  D: ['████ ', '█   █', '█   █', '█   █', '████ '],
-  E: ['█████', '█    ', '███  ', '█    ', '█████'],
-} as const
-
-const LARGE_WORDMARK = createWordmark(LARGE_GLYPHS, ' ')
+/** Pixel-built wordmark shared with the GUI sidebar's CocodeLogo. */
+const COCODE_WORDMARK_LINES = [
+  ' ▄█████ ▄████▄ ▄█████ ▄████▄ █████▄ ▄█████',
+  ' ██     ██  ██ ██     ██  ██ ██  ██ ██▄▄',
+  ' ██     ██  ██ ██     ██  ██ ██  ██ ██▀▀',
+  ' ▀█████ ▀████▀ ▀█████ ▀████▀ █████▀ ▀█████',
+] as const
+const COCODE_WORDMARK_WIDTH = COCODE_WORDMARK_LINES.reduce(
+  (width, line) => Math.max(width, line.length),
+  0,
+)
+const COCODE_WORDMARK = COCODE_WORDMARK_LINES.map(line => line.padEnd(COCODE_WORDMARK_WIDTH))
+const HORIZONTAL_WORDMARK = [...COCODE_WORDMARK, ' '.repeat(COCODE_WORDMARK_WIDTH)]
 
 const HORIZONTAL_WHALE_WIDTH = 34
 const HORIZONTAL_WORDMARK_COLUMN = HORIZONTAL_WHALE_WIDTH + 2
@@ -70,7 +75,7 @@ const HORIZONTAL_BODY_MASK = [
   '       ###################        ',
 ] as const
 export const HORIZONTAL_WHALE_COLUMNS =
-  HORIZONTAL_WORDMARK_COLUMN + (LARGE_WORDMARK[0]?.length ?? 0)
+  HORIZONTAL_WORDMARK_COLUMN + COCODE_WORDMARK_WIDTH
 export const HORIZONTAL_WHALE_MIN_COLUMNS = HORIZONTAL_WHALE_COLUMNS + 2
 
 const LARGE_SPEC: WhaleSpec = {
@@ -88,7 +93,7 @@ const LARGE_SPEC: WhaleSpec = {
     '                              ########                              ',
   ],
   eye: { row: 3, column: 7 },
-  brand: { row: 1, column: 17, lines: LARGE_WORDMARK },
+  brand: { row: 1, column: 17, lines: COCODE_WORDMARK },
 }
 
 export const LARGE_WHALE_ANIMATION = createWhaleAnimation(LARGE_SPEC)
@@ -134,7 +139,7 @@ function createHorizontalWhaleAnimation(): CharacterAnimation {
     ),
   )
   const accentRows = spoutMasks[0]?.length ?? 0
-  const blankWordmark = ' '.repeat(LARGE_WORDMARK[0]?.length ?? 0)
+  const blankWordmark = ' '.repeat(COCODE_WORDMARK_WIDTH)
   return {
     interval: 180,
     accentRows,
@@ -144,7 +149,7 @@ function createHorizontalWhaleAnimation(): CharacterAnimation {
       body[2] = replaceAt(body[2] ?? '', 4, '●')
       return [...spout, ...body]
         .map((line, row) => {
-          const wordmark = row < accentRows ? blankWordmark : (LARGE_WORDMARK[row - accentRows] ?? '')
+          const wordmark = row < accentRows ? blankWordmark : (HORIZONTAL_WORDMARK[row - accentRows] ?? '')
           return `${normalizeLine(line, HORIZONTAL_WHALE_WIDTH)}  ${wordmark}`
         })
         .join('\n')
@@ -183,14 +188,6 @@ function replaceAt(line: string, index: number, value: string): string {
 
 function normalizeLine(line: string, width: number): string {
   return line.slice(0, width).padEnd(width)
-}
-
-function createWordmark(glyphs: Record<string, readonly string[]>, gap: string): readonly string[] {
-  const letters = 'COCODE'.split('')
-  const rows = glyphs.C?.length ?? 0
-  return Array.from({ length: rows }, (_, row) =>
-    letters.map((letter) => glyphs[letter]?.[row] ?? '').join(gap),
-  )
 }
 
 function centerLine(line: string, width: number): string {
