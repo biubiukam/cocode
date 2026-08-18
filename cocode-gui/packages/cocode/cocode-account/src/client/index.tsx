@@ -434,7 +434,11 @@ function snapshotUsage(snapshot: AccountSnapshot, key: "fiveHour" | "week" | "mo
 
 function remainingUsagePercent(used: number | undefined): number | undefined {
   if (typeof used !== "number" || !Number.isFinite(used)) return undefined
-  return 100 - Math.max(0, Math.min(100, Math.round(used)))
+  return Math.max(0, Math.min(100, 100 - used))
+}
+
+function formatRemainingPercent(value: number): string {
+  return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}%`
 }
 
 function usageSyncLabel(snapshot: AccountSnapshot): string {
@@ -476,7 +480,7 @@ function AccountPanel({ kind, snapshot, provider, onClose }: {
     return createElement("div", { className: css.usageMetric },
       createElement("div", { className: css.usageMetricHeader },
         createElement("span", { className: css.usageMetricLabel }, label),
-        createElement("strong", { className: css.usageMetricPercent }, percentage === undefined ? "—" : `${percentage}%`),
+        createElement("strong", { className: css.usageMetricPercent }, percentage === undefined ? "—" : formatRemainingPercent(percentage)),
       ),
       createElement("div", { className: css.usageTrack }, createElement("span", { className: css.usageFill, style: { width: `${percentage ?? 0}%` } })),
       createElement("span", { className: css.panelSecondary }, percentage === undefined ? (snapshot.usage?.error === undefined ? "正在同步" : "同步失败") : "剩余"),

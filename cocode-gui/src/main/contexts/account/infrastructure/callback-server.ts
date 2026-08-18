@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http"
+import { renderCallbackPage } from "./callback-page"
 import { SignInCancelledError } from "./sign-in-cancelled-error"
 
 /**
@@ -31,16 +32,15 @@ export async function listenForCallback(
 			server.on("request", (request: IncomingMessage, response: ServerResponse) => {
 				const host = request.headers.host ?? "127.0.0.1"
 				const arrived = new URL(request.url ?? "/", `http://${host}`)
+				const acceptLanguage = request.headers["accept-language"]
 				if (arrived.pathname !== pathname || arrived.hostname !== "127.0.0.1") {
-					response.writeHead(404)
-					response.end()
+					response.writeHead(404, { "content-type": "text/html; charset=utf-8" })
+					response.end(renderCallbackPage("unknown", acceptLanguage))
 					return
 				}
 				if (timer !== undefined) clearTimeout(timer)
 				response.writeHead(200, { "content-type": "text/html; charset=utf-8" })
-				response.end(
-					'<!doctype html><meta charset="utf-8"><title>Cocode</title><p>可以回到 Cocode 了。</p>',
-				)
+				response.end(renderCallbackPage("done", acceptLanguage))
 				resolveWait(arrived)
 				server.close()
 			})

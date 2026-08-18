@@ -299,6 +299,44 @@ test("Agency client calculates rolling account usage from credit and usage windo
 	}
 })
 
+test("Agency client keeps sub-percent usage so remaining can match the account site", async () => {
+	const originalFetch = globalThis.fetch
+	globalThis.fetch = (async (input) => {
+		const url = String(input)
+		if (url.includes("/v1/me/model-credit")) {
+			return new Response(
+				JSON.stringify({
+					plan: "pro",
+					granted_microusd: 60_000_000,
+					settled_microusd: 15_945,
+					reserved_microusd: 0,
+				}),
+				{ status: 200 },
+			)
+		}
+		if (url.includes("/v1/me/model-usage")) {
+			return new Response(
+				JSON.stringify({
+					fresh_at: "2026-08-18T13:15:52.000Z",
+					totals: { billable_microusd: 15_945 },
+				}),
+				{ status: 200 },
+			)
+		}
+		return new Response("{}", { status: 404 })
+	}) as typeof fetch
+	try {
+		const usage = await new AgencyClient("https://cocode.agency").accountUsage("identity-token")
+		assert.equal(usage.plan, "pro")
+		assert.ok(usage.fiveHour > 0 && usage.fiveHour < 1)
+		assert.ok(usage.week > 0 && usage.week < 1)
+		assert.ok(usage.month > 0 && usage.month < 1)
+		assert.equal((100 - usage.month).toLocaleString("en-US", { maximumFractionDigits: 2 }), "99.97")
+	} finally {
+		globalThis.fetch = originalFetch
+	}
+})
+
 test("Agency client revokes the refresh token using the native token contract", async () => {
 	const originalFetch = globalThis.fetch
 	let body: unknown

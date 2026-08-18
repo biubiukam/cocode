@@ -309,11 +309,11 @@ export class AgencyClient {
 			plan: credit.value.plan?.trim() || "unknown",
 			fiveHour: usagePercent(
 				finiteNumber(fiveHourUsage.value.totals?.billable_microusd),
-				granted / 5,
+				Math.round(granted / 5),
 			),
 			week: usagePercent(
 				finiteNumber(weekUsage.value.totals?.billable_microusd),
-				granted / 2,
+				Math.round(granted / 2),
 			),
 			month: usagePercent(settled + reserved, granted),
 			syncedAt: latestTimestamp(fiveHourUsage.value.fresh_at, weekUsage.value.fresh_at) ?? to,
@@ -378,7 +378,7 @@ function finiteNumber(value: number | undefined): number {
 
 function usagePercent(used: number, limit: number): number {
 	if (limit <= 0) return 0
-	return Math.max(0, Math.min(100, Math.round((used / limit) * 100)))
+	return Math.max(0, Math.min(100, (used / limit) * 100))
 }
 
 function latestTimestamp(...values: (string | undefined)[]): string | undefined {
