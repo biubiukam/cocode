@@ -981,7 +981,6 @@ export function Chat(props: {
         return
       const isPress = event.action === 'press'
       const headerRows = CHAT_HEADER_ROWS
-      const messageStart = messageStartRow
       if (commandPaletteOpen) {
         const index = actionMenuItemIndexAtRow({
           row: hitRow,
@@ -1377,11 +1376,7 @@ export function Chat(props: {
         openModelSwitch()
         return
       }
-      if (
-        event.y <= headerRows ||
-        (event.y >= messageStart + messageMaxRows &&
-          event.y < contentOverlayStartRow)
-      ) {
+      if (event.y <= headerRows) {
         openCommandPalette()
         return
       }

@@ -35,6 +35,7 @@ function fakeRuntime(): TuiRuntime & {
   cancelError?: Error
   failRestartModels: Set<string>
   modelCatalog: TuiModelCatalog
+  selectModel?: (sessionId: string, provider: string, model: string) => Promise<{ provider: string; model: string } | undefined>
   modelListError?: Error
   commands: TuiCommandDescriptor[]
   executedCommands: { sessionId: string; line: string }[]
@@ -61,6 +62,7 @@ function fakeRuntime(): TuiRuntime & {
     rewinds: [],
     failRestartModels: new Set(),
     modelCatalog: { groups: [], failures: [] },
+    selectModel: undefined,
     commands: [],
     executedCommands: [],
     plugins: [],
@@ -1043,7 +1045,9 @@ describe('TuiApp', () => {
     await expect.poll(() => app.snapshot().header.model).toBe('m2')
     expect(runtime.restarts).toEqual([{ provider: 'deepseek-official', model: 'm2' }])
     expect(app.snapshot().header.sessionId).not.toBe('s1')
-    expect(app.snapshot().notice?.message).toContain('persistence is unavailable')
+    expect(app.snapshot().notice?.message).toContain(
+      'This runtime cannot switch models in the current session',
+    )
     expect(app.snapshot().agent).toBe('idle')
   })
 
@@ -1109,11 +1113,12 @@ describe('TuiApp', () => {
     expect(app.snapshot().header.model).toBe('m1')
     expect(app.snapshot().header.sessionId).not.toBe('s1')
     expect(app.snapshot().nodes).toHaveLength(0)
-    expect(app.snapshot().notice?.message).toContain('持久化不可用')
+    expect(app.snapshot().notice?.message).toContain('已在新会话中恢复为 m1')
   })
 
   it('opens a model picker from /model and switches provider and model', async () => {
     const runtime = fakeRuntime()
+    const persistedModels: { provider: string; model: string }[] = []
     runtime.modelCatalog = {
       groups: [
         {
@@ -1131,6 +1136,14 @@ describe('TuiApp', () => {
       model: 'm1',
       sessionId: 's1',
       capabilities: { ...P0_CAPABILITIES, modelList: true },
+      auth: {
+        mode: 'byok',
+        envLocked: false,
+        logout: async () => {},
+        persistModel: async (provider, model) => {
+          persistedModels.push({ provider, model })
+        },
+      },
     })
     await app.start()
     app.dispatch({ type: 'command', line: '/model' })
@@ -1142,6 +1155,66 @@ describe('TuiApp', () => {
     expect(app.snapshot().header.model).toBe('m2')
     expect(app.snapshot().header.sessionId).not.toBe('s1')
     expect(runtime.opens).toEqual([])
+    expect(persistedModels).toEqual([{ provider: 'p2', model: 'm2' }])
+  })
+
+  it('selects a model in the current session when the runtime supports it', async () => {
+    const runtime = fakeRuntime()
+    const selections: { sessionId: string; provider: string; model: string }[] = []
+    runtime.selectModel = async (sessionId, provider, model) => {
+      selections.push({ sessionId, provider, model })
+      return { provider, model }
+    }
+    const persistedModels: { provider: string; model: string }[] = []
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p1',
+      model: 'm1',
+      sessionId: 's1',
+      auth: {
+        mode: 'byok',
+        envLocked: false,
+        logout: async () => {},
+        persistModel: async (provider, model) => {
+          persistedModels.push({ provider, model })
+        },
+      },
+    })
+    await app.start()
+    app.dispatch({ type: 'command', line: '/model m2' })
+
+    await expect.poll(() => app.snapshot().agent).toBe('idle')
+    expect(selections).toEqual([{ sessionId: 's1', provider: 'p1', model: 'm2' }])
+    expect(persistedModels).toEqual([])
+    expect(runtime.restarts).toEqual([])
+    expect(app.snapshot().header.sessionId).toBe('s1')
+    expect(app.snapshot().notice?.message).toContain('current session continued')
+  })
+
+  it('keeps the switched model when default persistence fails', async () => {
+    const runtime = fakeRuntime()
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p1',
+      model: 'm1',
+      sessionId: 's1',
+      auth: {
+        mode: 'byok',
+        envLocked: false,
+        logout: async () => {},
+        persistModel: async () => {
+          throw new Error('settings write failed')
+        },
+      },
+    })
+    await app.start()
+    app.dispatch({ type: 'command', line: '/model m2' })
+
+    await expect.poll(() => app.snapshot().agent).toBe('idle')
+    expect(runtime.restarts).toEqual([{ provider: 'p1', model: 'm2' }])
+    expect(app.snapshot().header.model).toBe('m2')
   })
 
   it('opens the manual model input for /models when the runtime has no catalog', async () => {

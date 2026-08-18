@@ -28,6 +28,7 @@ import {
   type AuthStore,
 } from './runtime/auth/index.ts'
 import { defaultHomeContext, sharedDshHome } from './runtime/auth/paths.ts'
+import { patchAgentDefaultModel } from './runtime/auth/settings.ts'
 import { AuthGate } from './present/auth-gate.tsx'
 import { Chat } from './present/chat.tsx'
 import { clearViewport, enterScreen, parseScreenMode } from './present/clear-screen.ts'
@@ -129,6 +130,8 @@ async function main(output: NodeJS.WriteStream, logger: TuiLogger): Promise<void
       envLocked: auth.snapshot().envLocked,
       accountLabel: auth.snapshot().profile?.displayName,
       logout: () => auth.logout(),
+      persistModel: (provider, model) =>
+        patchAgentDefaultModel(resolved.dshHome, provider, model),
       exclusiveHome: async () => (await otherLiveCount(liveInstanceHome)) === 0,
       selectMode: (mode) => auth.selectMode(mode),
       login: () => auth.dispatch({ type: 'chooseCocode' }),
