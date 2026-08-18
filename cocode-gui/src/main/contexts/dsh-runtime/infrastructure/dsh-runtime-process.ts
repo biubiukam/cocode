@@ -82,9 +82,7 @@ export class DshRuntimeProcess {
 			COCODE_DSH_HOME: cocodeDshHome,
 		})
 		// Derive the runtime environment from the same explicit shared DSH home
-		// used for the scope. Without this, a clean process with no ambient
-		// COCODE_DSH_HOME would fingerprint a vision path in the scope but omit
-		// it from the newly spawned Host environment.
+		// used for the scope so the newly spawned Host receives the same route.
 		const runtimeEnv = resolveHostRuntimeEnv({
 			...process.env,
 			COCODE_HOME: cocodeHome,

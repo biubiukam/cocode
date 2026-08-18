@@ -31,42 +31,6 @@ describe('Assembler', () => {
     })
   })
 
-  it('uses the original user content when model content contains internal evidence', () => {
-    const a = assembler()
-    a.ingest(
-      ev('user/message', 1, {
-        id: 'm1',
-        role: 'user',
-        content: [{ type: 'text', text: '[Image evidence]\na diagram' }],
-        source: {
-          kind: 'user',
-          displayContent: [{ type: 'text', text: 'What is in this image?' }, { type: 'image', attachment: 'image-1' }],
-        },
-      }),
-    )
-    expect(a.snapshot()).toMatchObject([
-      { kind: 'user', text: 'What is in this image?' },
-    ])
-  })
-
-  it('hides legacy image evidence when original display content is absent', () => {
-    const a = assembler()
-    a.ingest(
-      ev('user/message', 1, {
-        id: 'm1',
-        role: 'user',
-        content: [
-          { type: 'text', text: 'What is in this image?' },
-          { type: 'text', text: '[Image evidence]\na diagram' },
-        ],
-        source: { kind: 'user' },
-      }),
-    )
-    expect(a.snapshot()).toMatchObject([
-      { kind: 'user', text: 'What is in this image?' },
-    ])
-  })
-
   it('projects plugin-authored user/message into a context node', () => {
     const a = assembler()
     a.ingest(

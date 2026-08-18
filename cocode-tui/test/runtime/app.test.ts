@@ -586,8 +586,8 @@ describe('TuiApp', () => {
     const runtime = fakeRuntime()
     runtime.plugins = [
       {
-        entryId: 'vision',
-        moduleName: '@cocode/vision',
+        entryId: 'sample',
+        moduleName: '@cocode/sample-plugin',
         enabled: true,
         fiberPhase: 'active',
       },
@@ -626,8 +626,8 @@ describe('TuiApp', () => {
     const runtime = fakeRuntime()
     runtime.plugins = [
       {
-        entryId: 'VisionPlugin',
-        moduleName: '@cocode/vision',
+        entryId: 'SamplePlugin',
+        moduleName: '@cocode/sample-plugin',
         enabled: true,
         fiberPhase: 'active',
       },
@@ -643,8 +643,8 @@ describe('TuiApp', () => {
     })
     await app.start()
 
-    app.dispatch({ type: 'command', line: '/plugins disable VisionPlugin' })
-    await expect.poll(() => app.snapshot().notice?.message).toContain('@cocode/vision（VisionPlugin）已禁用（未加载）')
+    app.dispatch({ type: 'command', line: '/plugins disable SamplePlugin' })
+    await expect.poll(() => app.snapshot().notice?.message).toContain('@cocode/sample-plugin（SamplePlugin）已禁用（未加载）')
     expect(runtime.plugins[0]?.enabled).toBe(false)
   })
 

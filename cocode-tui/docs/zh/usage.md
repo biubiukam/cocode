@@ -86,7 +86,6 @@ TUI 仍然要求真实 TTY；管道、重定向和 CI 环境不会进入交互�
 - `Ctrl+R` 打开历史搜索；输入文字过滤最近消息，使用 `↑` `↓` 选择，回车回填到输入区，`Esc` 关闭。
 - `Ctrl+G` 使用 `$VISUAL` 或 `$EDITOR` 打开临时 Markdown 草稿；退出编辑器后内容回填到输入区。编辑器退出码非 0、草稿不是 UTF-8 或超过 256 KiB 时会显示错误。
 - `Ctrl+V` 从系统剪贴板读取 PNG、JPEG、WebP 或 GIF 图片，也可以执行 `/paste-image`。图片先保留在本地草稿中，发送时才写入 Host attachment store；删除输入区中的 `[Image: ...]` 标记会移除对应草稿图片。单张图片上限为 5 MiB，一条输入最多 20 张。部分终端会占用 `Ctrl+V`，此时使用 `/paste-image`。
-- `/vision` 查看或修改视觉理解配置；支持 `/vision provider cocode|user`、`/vision model <model-id>`、`/vision endpoint <url>`、`/vision credential <ref>`、`/vision enable` 和 `/vision disable`。配置会写入 `vision.yaml` 并立即对后续图片生效，真实 API Key 不会写入文件。
 - `Shift+↑` 进入消息选择模式；使用 `↑` `↓` 移动，回车展开或收起当前消息，`Esc` 退出。
 - 普通会话中始终关闭鼠标追踪，包括宽屏 Inspector 显示时，以保留 Terminal/iTerm 的原生拖动选字。弹窗控件可能临时启用鼠标追踪；模型、命令、问题和消息操作仍可使用键盘。命令菜单使用 `Ctrl+P` 打开，消息操作可通过 `Shift+↑` 进入消息选择模式后按 `m` 打开。
 - 在消息选择模式按 `c` 可复制当前消息；也可以使用 `/copy` 复制最近一条 assistant 回复。复制依次尝试 macOS `pbcopy`、Windows `clip.exe`，以及 Linux 的 `wl-copy`、`xclip`、`xsel`；命令不可用时只显示提示，不影响会话。
@@ -150,7 +149,6 @@ TUI 仍然要求真实 TTY；管道、重定向和 CI 环境不会进入交互�
 | `/lang zh` / `/lang en`        | 切换中英文界面                                                       |
 | `/model`                      | 打开模型选择器                                                         |
 | `/models`                     | 打开模型选择器                                                         |
-| `/vision`                     | 查看或修改视觉 provider、模型和配置                                   |
 | `/redraw`                     | 在不清除会话内容的情况下重绘界面                                     |
 | `/model <model-id>`            | 直接切换当前 provider 下的模型；支持持久会话时保留当前 session        |
 | `/thinking`                    | 切换 thinking 和完整工具详情显示                                     |
@@ -196,8 +194,6 @@ TUI 仍然要求真实 TTY；管道、重定向和 CI 环境不会进入交互�
 Host 的 `commands` 能力由 `cocode/capabilities` 广告。TUI 只展示 Host 返回的命令描述，并把完整命令行交给 `commands/execute`；命令不存在或执行失败时显示错误，不会改走普通 prompt。
 
 Host 的 `plugins` 能力由 `cocode/capabilities` 广告。TUI 通过 `cocode/plugins/list` 读取 Loader 的实时条目，通过 `cocode/plugins/set-enabled` 修改当前 Loader 条目；没有对应能力时，相关命令不会伪装成成功。插件菜单支持搜索和连续切换，当前修改只作用于运行中的 Loader，不写入 profile 文件；安装和卸载需要后续的 profile 管理 wire。
-
-Host 默认挂载 Cocode 自己的 `cocode-vision` 插件，并启用 `autoRead`。文本模型不支持图片时，`image` block 会转换为仅供模型使用的视觉证据，TUI 和会话预览仍显示用户原始内容；原生视觉模型则直接读取原始附件引用。视觉 provider 有两种：`cocode` 使用 Cocode 服务，默认视觉模型为 `gpt-luna`；`user` 使用用户配置的 OpenAI-compatible endpoint。用户配置写入 `$COCODE_DSH_HOME/vision.yaml`（默认 `~/.dsh/vision.yaml`），可参考 [vision.yaml.example](./vision.yaml.example)。使用 `/vision` 命令修改 provider、model、endpoint 或 credential reference。账号切换到 Cocode 后，插件会自动复用账号生成的 `COCODE_LLM_PROVIDERS.cocode-nut` endpoint 和 credential reference，不使用 cloud model 列表的首项。凭证只填写引用名，实际值由 Host credentials service 管理，不进入 session log 或 TUI 设置。
 
 `/doctor` 中的 `caps-configured` 表示 TUI 根据配置和本地实现预期的能力，`caps-runtime` 表示初始化后对真实 JSON-RPC runtime 的探测结果。两者不一致时，以运行时结果为准；`caps-errors` 会列出被禁用能力的原因。探测使用随机、不存在的 session id，不会创建或修改用户会话。
 
