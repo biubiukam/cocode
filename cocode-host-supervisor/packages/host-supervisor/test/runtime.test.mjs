@@ -1,7 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { spawnSync } from 'node:child_process'
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -9,42 +8,8 @@ import { fileURLToPath } from 'node:url'
 import YAML from 'yaml'
 import { addRuntimePluginDependencies, createRuntimePatch, hostKey, mergeHostRuntimeEnv, prepareRuntimeSlot } from '../lib/index.js'
 
-const runtimeRoot = fileURLToPath(new URL('../../../runtime/', import.meta.url))
 const hostRequire = createRequire(fileURLToPath(new URL('../../../package.json', import.meta.url)))
 const dshRoot = dirname(dirname(hostRequire.resolve('@deepseek-ai/dsh/lib/bin.js')))
-
-test('the shared Host bundle includes the Cocode vision bridge', () => {
-  const manifest = JSON.parse(readFileSync(new URL('../../../runtime/plugins.json', import.meta.url), 'utf8'))
-
-  assert.ok(manifest.plugins.includes('cocode-vision'))
-  assert.equal(manifest.plugins.includes('cocode-external-dsh'), false)
-  assert.equal(existsSync(`${runtimeRoot}plugins/cocode-vision/lib/index.js`), true)
-  assert.equal(existsSync(`${runtimeRoot}plugins/cocode-external-dsh`), false)
-})
-
-test('the Cocode vision bridge loads in the same pure ESM mode as DSH', () => {
-  const runtimeHome = mkdtempSync(join(tmpdir(), 'cocode-runtime-test-'))
-  const previousRuntimeHome = process.env.COCODE_HOST_RUNTIME_HOME
-  process.env.COCODE_HOST_RUNTIME_HOME = runtimeHome
-  try {
-    const pluginPath = fileURLToPath(new URL('../lib/host-jsonrpc-plugin.js', import.meta.url))
-    const slot = prepareRuntimeSlot({
-      dshHome: '/tmp/cocode-test-dsh',
-      profile: 'web',
-      hostConfigFingerprint: 'test',
-      runtimeChannel: 'stable',
-    }, '/tmp/cocode-test-jsonrpc.sock', pluginPath)
-    const plugin = join(slot.root, 'node_modules', 'cocode-vision', 'lib', 'index.js')
-    const result = spawnSync(process.execPath, ['--input-type=module', '--eval', `await import(${JSON.stringify(plugin)})`], {
-      encoding: 'utf8',
-    })
-    assert.equal(result.status, 0, result.stderr)
-  } finally {
-    if (previousRuntimeHome === undefined) delete process.env.COCODE_HOST_RUNTIME_HOME
-    else process.env.COCODE_HOST_RUNTIME_HOME = previousRuntimeHome
-    rmSync(runtimeHome, { recursive: true, force: true })
-  }
-})
 
 test('repairs an incomplete DSH runtime slot before booting it', () => {
   const runtimeHome = mkdtempSync(join(tmpdir(), 'cocode-runtime-slot-test-'))
@@ -76,8 +41,9 @@ test('repairs an incomplete DSH runtime slot before booting it', () => {
   }
 })
 
-test('repairs a complete slot when a plugin runtime dependency is missing', () => {
+test('repairs a complete slot when a registered plugin package is missing', () => {
   const runtimeHome = mkdtempSync(join(tmpdir(), 'cocode-runtime-dependency-slot-test-'))
+  const pluginSource = fileURLToPath(new URL('../../../runtime/plugins/cocode-runtime-test-plugin', import.meta.url))
   const previousRuntimeHome = process.env.COCODE_HOST_RUNTIME_HOME
   process.env.COCODE_HOST_RUNTIME_HOME = runtimeHome
   const scope = {
@@ -87,19 +53,27 @@ test('repairs a complete slot when a plugin runtime dependency is missing', () =
     runtimeChannel: 'stable',
   }
   try {
+    mkdirSync(join(pluginSource, 'lib'), { recursive: true })
+    writeFileSync(join(pluginSource, 'package.json'), `${JSON.stringify({
+      name: 'cocode-runtime-test-plugin',
+      version: '0.0.0',
+      type: 'module',
+    })}\n`)
+    writeFileSync(join(pluginSource, 'lib', 'index.js'), 'export default {}\n')
     const pluginPath = fileURLToPath(new URL('../lib/host-jsonrpc-plugin.js', import.meta.url))
     const slot = prepareRuntimeSlot(scope, '/tmp/cocode-missing-plugin-dependency-jsonrpc.sock', pluginPath)
-    const dependencyManifest = join(slot.root, 'node_modules', 'yaml', 'package.json')
+    const dependencyManifest = join(slot.root, 'node_modules', 'cocode-runtime-test-plugin', 'package.json')
     assert.equal(existsSync(dependencyManifest), true)
 
-    rmSync(join(slot.root, 'node_modules', 'yaml'), { recursive: true, force: true })
+    rmSync(join(slot.root, 'node_modules', 'cocode-runtime-test-plugin'), { recursive: true, force: true })
     assert.equal(existsSync(dependencyManifest), false)
 
     const repaired = prepareRuntimeSlot(scope, '/tmp/cocode-missing-plugin-dependency-jsonrpc.sock', pluginPath)
-    assert.equal(existsSync(join(repaired.root, 'node_modules', 'yaml', 'package.json')), true)
+    assert.equal(existsSync(join(repaired.root, 'node_modules', 'cocode-runtime-test-plugin', 'package.json')), true)
   } finally {
     if (previousRuntimeHome === undefined) delete process.env.COCODE_HOST_RUNTIME_HOME
     else process.env.COCODE_HOST_RUNTIME_HOME = previousRuntimeHome
+    rmSync(pluginSource, { recursive: true, force: true })
     rmSync(runtimeHome, { recursive: true, force: true })
   }
 })

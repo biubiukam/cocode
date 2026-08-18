@@ -95,14 +95,12 @@ function hasNewerSource(root, output) {
 	const sourceRoots = [
 		join(root, 'packages', 'host-supervisor', 'src'),
 		join(root, 'packages', 'host-supervisor', 'scripts'),
-		join(root, 'packages', 'vision', 'src'),
 		join(repoRoot, 'cocode-gui', 'packages', 'cocode'),
 	]
 	const sourceFiles = [
 		join(root, 'package.json'),
 		join(root, 'packages', 'host-supervisor', 'tsconfig.json'),
 		join(root, 'packages', 'host-supervisor', 'tsconfig.build.json'),
-		join(root, 'packages', 'vision', 'package.json'),
 		...sourceRoots.flatMap((sourceRoot) => listFiles(sourceRoot)),
 	]
 	return sourceFiles.some((path) => existsSync(path) && statSync(path).mtimeMs > outputMtime)

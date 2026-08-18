@@ -793,8 +793,8 @@ describe('Chat', () => {
     const runtime = createTestRuntime({
       plugins: [
         {
-          entryId: 'vision',
-          moduleName: '@cocode/vision',
+          entryId: 'sample',
+          moduleName: '@cocode/sample-plugin',
           enabled: true,
           fiberPhase: 'active',
         },

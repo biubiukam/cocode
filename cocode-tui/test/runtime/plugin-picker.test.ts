@@ -12,8 +12,8 @@ import {
 
 const plugins = [
   {
-    entryId: 'include:vision',
-    moduleName: '@cocode/vision',
+    entryId: 'include:sample',
+    moduleName: '@cocode/sample-plugin',
     enabled: true,
     fiberPhase: 'active' as const,
   },
@@ -28,10 +28,10 @@ const plugins = [
 describe('plugin picker', () => {
   it('searches module names, entry ids, and enablement', () => {
     expect(
-      visiblePlugins(setPluginQuery(createPluginPicker(plugins), 'vision')).map(
+      visiblePlugins(setPluginQuery(createPluginPicker(plugins), 'sample')).map(
         (plugin) => plugin.entryId,
       ),
-    ).toEqual(['include:vision'])
+    ).toEqual(['include:sample'])
     expect(
       visiblePlugins(setPluginQuery(createPluginPicker(plugins), '禁用')).map(
         (plugin) => plugin.entryId,
@@ -45,8 +45,8 @@ describe('plugin picker', () => {
   })
 
   it('keeps the picker open while updating one plugin', () => {
-    const pending = beginPluginMutation(createPluginPicker(plugins), 'include:vision')
-    expect(pending.pendingEntryId).toBe('include:vision')
+    const pending = beginPluginMutation(createPluginPicker(plugins), 'include:sample')
+    expect(pending.pendingEntryId).toBe('include:sample')
 
     const updated = completePluginMutation(
       pending,

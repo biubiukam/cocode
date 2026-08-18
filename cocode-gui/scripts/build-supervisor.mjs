@@ -30,9 +30,6 @@ export function buildSupervisor({ clean = false, manifestPath = defaultManifestP
 			path.join(supervisorRoot, "packages", "host-supervisor", "src"),
 			"packages/host-supervisor/src",
 		),
-		...listFiles(path.join(supervisorRoot, "packages", "vision", "src"), "packages/vision/src"),
-		"packages/vision/package.json",
-		"packages/vision/tsconfig.json",
 		...guiPlugins.flatMap(({ directory }) => [
 			path.relative(supervisorRoot, path.join(directory, "package.json")),
 			...listFiles(
@@ -44,8 +41,6 @@ export function buildSupervisor({ clean = false, manifestPath = defaultManifestP
 	const inputHash = hashFiles(supervisorRoot, inputFiles)
 	const requiredRuntimeArtifacts = [
 		"runtime/plugins.json",
-		"runtime/plugins/cocode-vision/package.json",
-		"runtime/plugins/cocode-vision/lib/index.js",
 		...guiPlugins.flatMap(({ name, hasClient }) => [
 			`runtime/plugins/${name}/package.json`,
 			`runtime/plugins/${name}/lib/index.js`,
@@ -113,7 +108,7 @@ export function buildSupervisor({ clean = false, manifestPath = defaultManifestP
 	const runtimePluginManifest = JSON.parse(
 		readFileSync(path.join(supervisorRoot, "runtime", "plugins.json"), "utf8"),
 	)
-	const expectedPluginNames = [...guiPlugins.map(({ name }) => name), "cocode-vision"].sort()
+	const expectedPluginNames = guiPlugins.map(({ name }) => name).sort()
 	const actualPluginNames = [...(runtimePluginManifest.plugins ?? [])].sort()
 	if (JSON.stringify(actualPluginNames) !== JSON.stringify(expectedPluginNames)) {
 		throw new Error(

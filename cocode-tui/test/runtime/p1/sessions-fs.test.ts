@@ -126,62 +126,6 @@ describe('listSessionSummaries', () => {
     }
   })
 
-  it('uses original user content for the session preview', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'cocode-session-display-content-'))
-    const cwd = '/work/project'
-    try {
-      await writeSession(
-        root,
-        'project',
-        's1',
-        `${JSON.stringify({ type: 'session', id: 's1', createdAt: 1, cwd })}\n${JSON.stringify({
-          type: 'user/message',
-          seq: 1,
-          time: 2,
-          data: {
-            content: [{ type: 'text', text: '[Image evidence]\na diagram' }],
-            source: {
-              kind: 'user',
-              displayContent: [{ type: 'text', text: 'What is in this image?' }, { type: 'image' }],
-            },
-          },
-        })}\n`,
-      )
-      const result = await listSessionSummaries({ root, cwd })
-      expect(result.sessions[0]?.preview).toBe('What is in this image?')
-    } finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  })
-
-  it('removes legacy image evidence from the session preview', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'cocode-session-legacy-evidence-'))
-    const cwd = '/work/project'
-    try {
-      await writeSession(
-        root,
-        'project',
-        's1',
-        `${JSON.stringify({ type: 'session', id: 's1', createdAt: 1, cwd })}\n${JSON.stringify({
-          type: 'user/message',
-          seq: 1,
-          time: 2,
-          data: {
-            content: [
-              { type: 'text', text: 'What is in this image?' },
-              { type: 'text', text: '[Image evidence]\na diagram' },
-            ],
-            source: { kind: 'user' },
-          },
-        })}\n`,
-      )
-      const result = await listSessionSummaries({ root, cwd })
-      expect(result.sessions[0]?.preview).toBe('What is in this image?')
-    } finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  })
-
   it('uses the latest sanitized session title for display metadata', async () => {
     const root = await mkdtemp(join(tmpdir(), 'cocode-session-title-'))
     const cwd = '/work/project'

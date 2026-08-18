@@ -386,7 +386,7 @@ export class TuiCompanionGateway {
     const contentBlocks = await this.preparePromptBlocks(params.contentBlocks);
     const record = await this.getOrCreateSession(params.sessionId);
     this.assertLive(params.sessionId, record);
-    const message = createUserMessage(contentBlocks, params.contentBlocks);
+    const message = createUserMessage(contentBlocks);
     switch (params.mode ?? "normal") {
       case "normal":
       case "queue":
@@ -409,28 +409,7 @@ export class TuiCompanionGateway {
     if (!blocks.some((block) => block.type === "image")) return [...blocks];
     if (await this.modelSupportsImages()) return [...blocks];
 
-    const vision = this.ctx.get("cocodeVision") as
-      | {
-          prepareBlocks(
-            blocks: readonly ContentBlock[],
-            options?: { preserveImages?: boolean },
-          ): Promise<ContentBlock[]>;
-        }
-      | undefined;
-    if (vision === undefined) {
-      throw new Error(
-        "The selected model does not support image content, and the Cocode vision bridge is unavailable.",
-      );
-    }
-    const prepared = await vision.prepareBlocks(blocks, {
-      preserveImages: false,
-    });
-    if (prepared.some((block) => block.type === "image")) {
-      throw new Error(
-        "The selected model does not support image content, and the Cocode vision bridge is not configured.",
-      );
-    }
-    return prepared;
+    throw new Error("The selected model does not support image content.");
   }
 
   private async modelSupportsImages(): Promise<boolean> {
@@ -1375,13 +1354,12 @@ function safeModelCatalogError(error: unknown): string {
 
 function createUserMessage(
   content: ContentBlock[],
-  displayContent: ContentBlock[],
 ): UserMessage {
   const message = {
     id: randomUUID(),
     role: "user" as const,
     content,
-    source: { kind: "user" as const, displayContent },
+    source: { kind: "user" as const },
   };
   return deepFreeze(message);
 }

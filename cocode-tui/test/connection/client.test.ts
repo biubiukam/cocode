@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 import { probeRuntimeCapabilities } from '../../packages/connection/src/capability.ts'
 import {
   createTuiRuntime,
@@ -24,20 +24,6 @@ describe('runtime capability negotiation', () => {
 
     expect(resolveHostRuntimeEnv(env)).toEqual({
       COCODE_LLM_PROVIDERS: env.COCODE_LLM_PROVIDERS,
-      COCODE_VISION_CONFIG: join(resolve('/tmp/cocode-dsh-home'), 'vision.yaml'),
-    })
-  })
-
-  it('passes only the vision config path to the Host', () => {
-    const env = {
-      COCODE_HOME: '/tmp/cocode-account',
-      COCODE_DSH_HOME: '/tmp/cocode-dsh-home',
-      COCODE_VISION_PROVIDER: 'user',
-      COCODE_VISION_USER_MODEL: 'vision-model',
-    }
-
-    expect(resolveHostRuntimeEnv(env)).toEqual({
-      COCODE_VISION_CONFIG: join(resolve('/tmp/cocode-dsh-home'), 'vision.yaml'),
     })
   })
 
@@ -71,7 +57,7 @@ describe('runtime capability negotiation', () => {
       env: { DSH_HOME: '/tmp/cocode-home' },
     })
 
-    expect(scope.hostConfigFingerprint).toMatch(/^cocode-web-jsonrpc-v3:[0-9a-f]{32}$/)
+    expect(scope.hostConfigFingerprint).toBe('cocode-web-jsonrpc-v3')
   })
 
   it('changes the plugin fingerprint when a bundled plugin changes', () => {
