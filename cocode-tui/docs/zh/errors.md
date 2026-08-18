@@ -28,6 +28,7 @@ TUI 自己产生的失败会显示为 `CODE · 解释`。语言由 `COCODE_LANG`
 | `AUTH_ACCOUNT_LOAD_FAILED`    | 无法读取账号资料                    | 无法加载账号信息。                                           |
 | `AUTH_ACCOUNT_INVALID`        | 账号资料格式无效                    | 服务返回了无效的账号信息。                                   |
 | `AUTH_KEY_CREATE_FAILED`      | 无法 mint 个人 Key                  | 无法创建 API Key。                                           |
+| `AUTH_KEY_REJECTED`           | 本地密钥过期或已被撤销              | 本地保存的 API Key 已过期或已被撤销。                        |
 | `AUTH_MODELS_LIST_FAILED`     | 无法列出托管模型                    | 无法获取托管模型列表。                                       |
 | `AUTH_MODELS_INVALID`         | 模型目录格式无效                    | 服务返回了无效的模型目录。                                   |
 | `AUTH_NO_HOSTED_MODELS`       | 账号没有可用托管模型                | 这个账号还没有可用的托管模型。                               |

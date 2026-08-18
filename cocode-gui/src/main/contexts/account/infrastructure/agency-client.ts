@@ -1,4 +1,4 @@
-import { deviceKeyName } from "./device-name"
+import { deviceKeyExpiry, deviceKeyName } from "./device-name"
 
 type AgencyResponse<T> = { readonly status: number; readonly value: T }
 
@@ -235,7 +235,11 @@ export class AgencyClient {
 		const response = await this.request<{ secret?: string; id?: string }>("/v1/me/api-keys", {
 			method: "POST",
 			token: accessToken,
-			body: { name, scopes: ["models:read", "inference:write"] },
+			body: {
+				name,
+				scopes: ["models:read", "inference:write"],
+				expires_at: deviceKeyExpiry(),
+			},
 		})
 		const secret = response.value.secret?.trim()
 		const id = response.value.id?.trim()

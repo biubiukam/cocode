@@ -28,6 +28,7 @@ Sign-in, device authorization, credentials, and the agency origin.
 | `AUTH_ACCOUNT_LOAD_FAILED`    | Account profile could not be loaded                | Could not load account.                                                          |
 | `AUTH_ACCOUNT_INVALID`        | Account payload was malformed                      | Agency returned an invalid account.                                              |
 | `AUTH_KEY_CREATE_FAILED`      | A personal API key could not be minted             | Could not create an API key.                                                     |
+| `AUTH_KEY_REJECTED`           | The stored key expired or was revoked              | The stored API key was expired or revoked.                                       |
 | `AUTH_MODELS_LIST_FAILED`     | Hosted models could not be listed                  | Could not list hosted models.                                                    |
 | `AUTH_MODELS_INVALID`         | The model catalog was malformed                    | Agency returned an invalid model catalog.                                        |
 | `AUTH_NO_HOSTED_MODELS`       | The account has no hosted models                   | This account has no hosted models.                                               |

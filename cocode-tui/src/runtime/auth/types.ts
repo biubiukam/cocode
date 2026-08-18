@@ -15,6 +15,13 @@ export const DEEPSEEK_KEY_REF = 'DEEPSEEK_API_KEY'
 export { deviceKeyName } from './device-name.ts'
 export const KEY_NAME = deviceKeyName()
 
+/**
+ * 设备密钥的兜底有效期。密钥与登录会话没有任何关联，客户端崩溃、换机器或直接删掉
+ * 本地配置都会跳过登出，只有到期才能让这类密钥自行消失。登录时会验证并按需续领，
+ * 且远长于 refresh token 的 30 天，正常使用感知不到。
+ */
+export const KEY_TTL_DAYS = 90
+
 export const DEVICE_SCOPES = [
   'profile:read',
   'organizations:read',

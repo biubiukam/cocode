@@ -5,7 +5,7 @@
 import { jsonRequest, problemCode } from './agency.ts'
 import { TuiError } from '../errors/index.ts'
 import { normalizeAgencyOrigin, validateVerificationUrl } from './origin.ts'
-import { DEVICE_SCOPES, KEY_NAME, type CloudModel, type MeProfile } from './types.ts'
+import { DEVICE_SCOPES, KEY_NAME, KEY_TTL_DAYS, type CloudModel, type MeProfile } from './types.ts'
 
 export type DeviceAuthorization = {
   device_code: string
@@ -166,7 +166,11 @@ export async function mintPersonalKey(
     {
       method: 'POST',
       token: accessToken,
-      body: { name: KEY_NAME, scopes: ['models:read', 'inference:write'] },
+      body: {
+        name: KEY_NAME,
+        scopes: ['models:read', 'inference:write'],
+        expires_at: new Date(Date.now() + KEY_TTL_DAYS * 86_400_000).toISOString(),
+      },
       fetch: client.fetch,
       signal,
     },
