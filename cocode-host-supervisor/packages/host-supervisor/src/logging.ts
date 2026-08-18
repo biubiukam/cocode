@@ -5,6 +5,8 @@ import { pipeline } from 'node:stream/promises'
 import { join } from 'node:path'
 import pino, { type Logger as PinoLogger } from 'pino'
 import { Writable } from 'node:stream'
+import { hostKey, type HostScope } from './protocol.js'
+import { resolveCocodeLogLayout } from './observability.js'
 
 const MAX_BYTES = 20 * 1024 * 1024
 const MAX_FILES = 5
@@ -121,6 +123,8 @@ class HostFileSink extends Writable {
 
 export interface HostLoggerOptions {
   readonly stateDirectory: string
+  readonly scope?: HostScope
+  readonly logDirectory?: string
   readonly runtimeVersion?: string
 }
 
@@ -129,9 +133,16 @@ export class HostLogger {
   private readonly sink: HostFileSink
   private readonly logger: PinoLogger
   private readonly appRunId = randomUUID()
+  private readonly supervisorRunId = randomUUID()
+  private readonly hostKeyValue: string | undefined
+  private sequence = 0
 
   constructor(options: HostLoggerOptions) {
-    this.logDirectory = join(options.stateDirectory, 'logs', 'host')
+    this.hostKeyValue = options.scope === undefined ? undefined : hostKey(options.scope)
+    this.logDirectory = options.logDirectory
+      ?? (this.hostKeyValue === undefined
+        ? join(options.stateDirectory, 'logs', 'host')
+        : join(resolveCocodeLogLayout().host, this.hostKeyValue))
     this.sink = new HostFileSink(this.logDirectory)
     this.logger = pino({
       base: null,
@@ -150,9 +161,14 @@ export class HostLogger {
   log(level: 'debug' | 'info' | 'warn' | 'error' | 'fatal', eventName: string, attributes?: Record<string, string | number | boolean | null>): void {
     const method = this.logger[level] as (value: unknown, message?: string) => void
     method.call(this.logger, {
+      eventId: randomUUID(),
+      sequence: ++this.sequence,
+      source: 'host',
       eventName: safeText(eventName, 128),
       processType: 'supervisor',
       component: 'host-supervisor',
+      supervisorRunId: this.supervisorRunId,
+      ...(this.hostKeyValue === undefined ? {} : { hostKey: this.hostKeyValue }),
       ...(attributes === undefined ? {} : { attributes: sanitizeAttributes(attributes) }),
     })
   }
@@ -160,9 +176,14 @@ export class HostLogger {
   hostLine(stream: 'stdout' | 'stderr', line: string): void {
     const safe = sanitizeHostLine(line)
     this.logger.info({
+      eventId: randomUUID(),
+      sequence: ++this.sequence,
+      source: 'host',
       eventName: stream === 'stderr' ? 'dsh.host.stderr' : 'dsh.host.stdout',
       processType: 'dsh-host',
       component: 'dsh-host',
+      supervisorRunId: this.supervisorRunId,
+      ...(this.hostKeyValue === undefined ? {} : { hostKey: this.hostKeyValue }),
       attributes: { stream, line: safe.text, truncated: safe.truncated },
     })
   }
@@ -212,7 +233,9 @@ function sanitizeHostLine(value: string): { text: string; truncated: boolean } {
 }
 
 function redactText(value: string): string {
-  return safeText(value, 65_536)
+  const safe = safeText(value, 65_536)
+  if (/\b(?:prompt|completion|assistant\s+(?:message|response)|model\s+(?:response|output)|tool\s+(?:input|output|arguments?)|clipboard\s+contents?|password|token|api[-_]?key)\b/i.test(safe)) return '[REDACTED]'
+  return safe
     .replace(/((?:https?|wss?):\/\/[^\s?#]+)(?:\?[^\s#]*)?(?:#[^\s]*)?/gi, '$1')
     .replace(/("(?:prompt|content|arguments|tool(?:_name)?|output|token|secret|password|api[-_]?key)"\s*:\s*)"[^"]*"/gi, '$1"[REDACTED]"')
     .replace(/\b(?:prompt|content|arguments|tool(?:_name)?|output|token|secret|password|api[-_]?key)\s*[:=]\s*[^\s,;]+/gi, '[REDACTED]')

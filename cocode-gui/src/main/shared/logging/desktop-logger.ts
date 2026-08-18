@@ -7,6 +7,7 @@ import type {
 	LogLevel,
 	LogOutcome,
 	LogProcessType,
+	LogSource,
 	RendererLogRecordDto,
 } from "./log-types"
 import { serializeError } from "./error-serializer"
@@ -37,12 +38,13 @@ export interface LoggerBindings {
 
 export interface LoggerOptions {
 	readonly directory: string
-	readonly serviceName?: "cocode-desktop" | "cocode-host-supervisor"
+	readonly serviceName?: "cocode-desktop" | "cocode-host-supervisor" | "cocode-tui"
 	readonly serviceVersion?: string
 	readonly buildId?: string
 	readonly processType?: LogProcessType
 	readonly appRunId?: string
 	readonly defaultLevel?: LogLevel
+	readonly layout?: "legacy" | "unified"
 }
 
 export interface LogValues {
@@ -60,13 +62,15 @@ export class DesktopLogger {
 	private readonly appLogger: PinoLogger
 	private readonly auditLogger: PinoLogger
 	private readonly appDirectory: string
+	private readonly auditDirectory: string
 	private readonly emergencyPath: string
-	private readonly serviceName: "cocode-desktop" | "cocode-host-supervisor"
+	private readonly serviceName: "cocode-desktop" | "cocode-host-supervisor" | "cocode-tui"
 	private readonly serviceVersion: string
 	private readonly buildId: string | undefined
 	private readonly appRunId: string
 	private readonly processType: LogProcessType
 	private droppedRecordCount = 0
+	private sequence = 0
 	private temporaryDebugUntil: number | undefined
 	private temporaryDebugTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -76,7 +80,11 @@ export class DesktopLogger {
 		this.buildId = options.buildId
 		this.appRunId = options.appRunId ?? randomUUID()
 		this.processType = options.processType ?? "main"
-		this.appDirectory = path.join(options.directory, "app")
+		const layout = options.layout ?? "legacy"
+		const desktopDirectory =
+			layout === "unified" ? path.join(options.directory, "desktop") : options.directory
+		this.appDirectory = path.join(desktopDirectory, "app")
+		this.auditDirectory = path.join(desktopDirectory, "audit")
 		this.emergencyPath = path.join(this.appDirectory, "emergency.jsonl")
 		const errorSink = (error: unknown) => {
 			this.droppedRecordCount += 1
@@ -93,7 +101,7 @@ export class DesktopLogger {
 			onError: errorSink,
 		})
 		this.auditSink = new RotatingFileSink({
-			directory: path.join(options.directory, "audit"),
+			directory: this.auditDirectory,
 			filename: "current.jsonl",
 			policy: AUDIT_POLICY,
 			onError: errorSink,
@@ -136,6 +144,9 @@ export class DesktopLogger {
 		})
 		const record = {
 			timestamp: new Date().toISOString(),
+			eventId: randomUUID(),
+			sequence: ++this.sequence,
+			source: (safe.audit === true ? "audit" : "desktop") as LogSource,
 			eventName: safeText(eventName, 128),
 			serviceName: this.serviceName,
 			serviceVersion: this.serviceVersion,
@@ -157,6 +168,38 @@ export class DesktopLogger {
 		if (level === "fatal") this.writeEmergency(record)
 		const method = target[level] as (value: unknown, message?: string) => void
 		method.call(target, record, record.message)
+	}
+
+	public trace(eventName: string, attributes?: Readonly<Record<string, LogAttribute>>): void {
+		this.log("trace", eventName, { attributes })
+	}
+
+	public debug(eventName: string, attributes?: Readonly<Record<string, LogAttribute>>): void {
+		this.log("debug", eventName, { attributes })
+	}
+
+	public info(eventName: string, attributes?: Readonly<Record<string, LogAttribute>>): void {
+		this.log("info", eventName, { attributes })
+	}
+
+	public warn(eventName: string, attributes?: Readonly<Record<string, LogAttribute>>): void {
+		this.log("warn", eventName, { attributes })
+	}
+
+	public error(
+		eventName: string,
+		error?: unknown,
+		attributes?: Readonly<Record<string, LogAttribute>>,
+	): void {
+		this.log("error", eventName, { error, attributes })
+	}
+
+	public fatal(
+		eventName: string,
+		error?: unknown,
+		attributes?: Readonly<Record<string, LogAttribute>>,
+	): void {
+		this.log("fatal", eventName, { error, attributes })
 	}
 
 	public operation<T>(
@@ -244,7 +287,9 @@ export class DesktopLogger {
 		}
 		return {
 			appLogBytes: readLogDirectoryBytes(this.appDirectory),
+			auditLogBytes: readLogDirectoryBytes(this.auditDirectory),
 			hostLogBytes,
+			tuiLogBytes: 0,
 			crashCount,
 			...(this.temporaryDebugUntil === undefined
 				? {}

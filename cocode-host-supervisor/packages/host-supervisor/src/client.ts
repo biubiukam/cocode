@@ -3,7 +3,8 @@ import { spawn } from 'node:child_process'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { descriptorPath, endpointFor, leaseDirectory, scopeDirectory, scopePath, supervisorHome } from './paths.js'
-import { canonicalizeScope, isHostDescriptorCompatible, LEASE_TTL_MS, SUPERVISOR_BUILD_REVISION, type AcquireHostRequest, type HostDescriptor, type HostLease, type HostScope, type HostSupervisorClient } from './protocol.js'
+import { resolveCocodeLogLayout } from './observability.js'
+import { canonicalizeScope, hostKey, isHostDescriptorCompatible, LEASE_TTL_MS, SUPERVISOR_BUILD_REVISION, type AcquireHostRequest, type HostDescriptor, type HostLease, type HostScope, type HostSupervisorClient } from './protocol.js'
 import { openLineConnection, type LinePeer } from './ipc.js'
 
 export type SupervisorClientOptions = {
@@ -70,7 +71,7 @@ export class LocalHostSupervisorClient implements HostSupervisorClient {
     return {
       leaseId: result.leaseId,
       expiresAt: result.expiresAt,
-      logDirectory: join(directory, 'logs', 'host'),
+      logDirectory: join(resolveCocodeLogLayout().host, hostKey(scope)),
       descriptor: result.descriptor,
       renew,
       release: async () => {

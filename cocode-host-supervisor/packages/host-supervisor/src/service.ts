@@ -4,6 +4,7 @@ import { spawn, spawnSync } from 'node:child_process'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { endpointFor, descriptorPath, leaseDirectory, lockPath, scopePath } from './paths.js'
+import { resolveCocodeLogLayout } from './observability.js'
 import { listenLineServer } from './ipc.js'
 import { isLeaseActive, type LeaseRecord } from './lifecycle.js'
 import { canonicalizeScope, HOST_PROTOCOL_REVISION, hostKey, isHostDescriptorCompatible, leaseId as makeLeaseId, LEASE_TTL_MS, SUPERVISOR_BUILD_REVISION, SUPERVISOR_PROTOCOL_REVISION, type AcquireHostRequest, type HostDescriptor, type HostScope } from './protocol.js'
@@ -25,7 +26,11 @@ const HOST_KILL_GRACE_MS = 2_000
 export async function runSupervisorService(stateDirectory: string): Promise<void> {
   mkdirSync(stateDirectory, { recursive: true, mode: 0o700 })
   const scope = JSON.parse(readFileSync(scopePath(stateDirectory), 'utf8')) as HostScope
-  const logger = new HostLogger({ stateDirectory })
+  const logger = new HostLogger({
+    stateDirectory,
+    scope,
+    logDirectory: join(resolveCocodeLogLayout().host, hostKey(scope)),
+  })
   const service = new SupervisorService(stateDirectory, scope, logger)
   const signals = installShutdownSignals(service, logger)
   try {

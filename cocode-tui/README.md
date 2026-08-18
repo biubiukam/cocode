@@ -66,8 +66,8 @@ Scope options can be used before a command:
 ```sh
 cocode --dsh-home ~/.dsh --profile cocode
 cocode --runtime-channel preview doctor
-cocode plugin --profile web add dshmarket
-cocode --profile web --dump-config
+cocode plugin --profile cocode add dshmarket
+cocode --profile cocode --dump-config
 ```
 
 DSH-compatible commands and options are passed to the bundled DSH CLI unchanged,

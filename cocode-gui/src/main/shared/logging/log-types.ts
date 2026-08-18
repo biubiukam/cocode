@@ -2,7 +2,9 @@ export const LOG_LEVELS = ["trace", "debug", "info", "warn", "error", "fatal"] a
 
 export type LogLevel = (typeof LOG_LEVELS)[number]
 
-export type LogProcessType = "main" | "preload" | "renderer" | "supervisor" | "dsh-host"
+export type LogProcessType = "main" | "preload" | "renderer" | "supervisor" | "dsh-host" | "tui"
+
+export type LogSource = "desktop" | "audit" | "host" | "tui"
 
 export type LogOutcome = "started" | "success" | "failure" | "cancelled" | "degraded"
 
@@ -21,10 +23,13 @@ export interface LogRecord {
 	readonly severityText: Uppercase<LogLevel>
 	readonly eventName: string
 	readonly message?: string
-	readonly serviceName: "cocode-desktop" | "cocode-host-supervisor"
+	readonly serviceName: "cocode-desktop" | "cocode-host-supervisor" | "cocode-tui"
 	readonly serviceVersion: string
 	readonly buildId?: string
 	readonly appRunId: string
+	readonly eventId: string
+	readonly sequence: number
+	readonly source: LogSource
 	readonly processType: LogProcessType
 	readonly component: string
 	readonly operation?: string
@@ -41,7 +46,9 @@ export type { RendererLogRecordDto } from "../../../contracts/ipc/diagnostics.co
 
 export interface LogStatus {
 	readonly appLogBytes: number
+	readonly auditLogBytes: number
 	readonly hostLogBytes: number
+	readonly tuiLogBytes: number
 	readonly crashCount: number
 	readonly temporaryDebugUntil?: string
 	readonly droppedRecordCount: number

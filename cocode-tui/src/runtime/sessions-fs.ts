@@ -6,7 +6,7 @@ import { createInterface } from 'node:readline'
 import { createZstdDecompress } from 'node:zlib'
 import { join, resolve } from 'node:path'
 import type { SessionEvent } from '@cocode/tui-connection'
-import { blocksToText, blocksToUserDisplayText, isRecord } from './text.ts'
+import { blocksToText, isRecord } from './text.ts'
 import { pathForPlatform } from './platform.ts'
 
 export const SESSION_PREVIEW_MAX_LENGTH = 72
@@ -192,10 +192,7 @@ function userMessageText(data: unknown): string {
 }
 
 function userDisplayText(data: Record<string, unknown>): string {
-  const source = isRecord(data.source) ? data.source : undefined
-  return source?.displayContent === undefined
-    ? blocksToUserDisplayText(data.content)
-    : blocksToText(source.displayContent)
+  return blocksToText(data.content)
 }
 
 function isUserAuthoredMessage(data: unknown): boolean {

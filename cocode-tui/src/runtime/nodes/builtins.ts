@@ -3,7 +3,7 @@
  */
 
 import type { SessionEvent } from '@cocode/tui-connection'
-import { asNumber, asString, blocksToText, blocksToUserDisplayText, isRecord, reasoningToText } from '../text.ts'
+import { asNumber, asString, blocksToText, isRecord, reasoningToText } from '../text.ts'
 import type {
   AssistantNode,
   ContextNode,
@@ -59,10 +59,7 @@ const userDefinition: NodeDefinition<UserNode> = {
 }
 
 function userDisplayText(data: Record<string, unknown>): string {
-  const source = isRecord(data.source) ? data.source : undefined
-  return source?.displayContent === undefined
-    ? blocksToUserDisplayText(data.content)
-    : blocksToText(source.displayContent)
+  return blocksToText(data.content)
 }
 
 const contextDefinition: NodeDefinition<ContextNode> = {

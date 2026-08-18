@@ -11,18 +11,26 @@ import {
 } from "node:fs"
 import * as path from "pathe"
 import { create as createTar } from "tar"
+import { homedir } from "node:os"
+import { resolveCocodeLogLayout, type CocodeLogLayout } from "@cocode/host-supervisor"
 import type {
 	DiagnosticsBundleDto,
+	DiagnosticsLogQueryDto,
+	DiagnosticsLogQueryResultDto,
+	DiagnosticsLogSourceDto,
 	DiagnosticsStatusDto,
 	TemporaryDebugRequestDto,
 } from "../../../contracts/ipc/diagnostics.contract"
 import { DesktopLogger } from "../logging/desktop-logger"
 import { sanitizePath } from "../logging/redaction"
 import type { ResourceMonitor } from "./resource-monitor"
+import { LogQueryService } from "./log-query-service"
 
 export interface DiagnosticsServiceOptions {
 	readonly logger: DesktopLogger
 	readonly hostLogDirectory?: string
+	readonly logRoot?: string
+	readonly logLayout?: CocodeLogLayout
 	readonly buildId?: string
 	readonly resources?: ResourceMonitor
 }
@@ -30,19 +38,32 @@ export interface DiagnosticsServiceOptions {
 export class DiagnosticsService {
 	private readonly logger: DesktopLogger
 	private readonly logDirectory: string
+	private readonly logLayout: CocodeLogLayout
 	private readonly diagnosticsDirectory: string
 	private hostLogDirectory: string | undefined
 	private readonly buildId: string | undefined
 	private readonly resources: ResourceMonitor | undefined
+	private readonly logQuery: LogQueryService
 
 	public constructor(options: DiagnosticsServiceOptions) {
 		this.logger = options.logger
-		this.logDirectory = app.getPath("logs")
-		this.diagnosticsDirectory = path.join(this.logDirectory, "diagnostics")
+		this.logLayout =
+			options.logLayout ??
+			resolveCocodeLogLayout(
+				options.logRoot === undefined
+					? process.env
+					: { ...process.env, COCODE_LOG_ROOT: options.logRoot },
+			)
+		this.logDirectory = options.logRoot ?? this.logLayout.root ?? app.getPath("logs")
+		this.diagnosticsDirectory = this.logLayout.diagnostics
 		this.hostLogDirectory = options.hostLogDirectory
 		this.buildId = options.buildId
 		this.resources = options.resources
 		mkdirSync(this.diagnosticsDirectory, { recursive: true, mode: 0o700 })
+		this.logQuery = new LogQueryService({
+			layout: this.logLayout,
+			legacyDirectories: this.legacyLogDirectories(),
+		})
 	}
 
 	public setHostLogDirectory(directory: string | undefined): void {
@@ -55,14 +76,28 @@ export class DiagnosticsService {
 	}
 
 	public getStatus(): DiagnosticsStatusDto {
-		const status = this.logger.getStatus(
-			countCrashDumps(),
-			directoryBytes(this.hostLogDirectory),
-		)
+		const status = this.logger.getStatus(countCrashDumps(), directoryBytes(this.logLayout.host))
 		return {
 			...status,
+			tuiLogBytes: directoryBytes(this.logLayout.tui),
 			...(this.resources === undefined ? {} : { resources: this.resources.getSummary() }),
 		}
+	}
+
+	public queryLogs(query: DiagnosticsLogQueryDto): DiagnosticsLogQueryResultDto {
+		const result = this.logQuery.query(query)
+		this.logger.log("debug", "diagnostics.logs.queried", {
+			attributes: { returned: result.items.length, scannedFiles: result.scannedFiles },
+		})
+		return result
+	}
+
+	public listLogSources(): readonly DiagnosticsLogSourceDto[] {
+		const sources = this.logQuery.listSources()
+		this.logger.log("debug", "diagnostics.log-sources.listed", {
+			attributes: { sourceCount: sources.length },
+		})
+		return sources
 	}
 
 	public async exportBundle(): Promise<DiagnosticsBundleDto> {
@@ -83,13 +118,19 @@ export class DiagnosticsService {
 		const stagingDirectory = path.join(this.diagnosticsDirectory, `bundle-${randomUUID()}`)
 		mkdirSync(stagingDirectory, { recursive: true, mode: 0o700 })
 		try {
-			copyDirectory(path.join(this.logDirectory, "app"), path.join(stagingDirectory, "app"))
 			copyDirectory(
-				path.join(this.logDirectory, "audit"),
+				path.join(this.logDirectory, "desktop", "app"),
+				path.join(stagingDirectory, "desktop", "app"),
+			)
+			copyDirectory(
+				path.join(this.logDirectory, "desktop", "audit"),
 				path.join(stagingDirectory, "audit"),
 			)
-			if (this.hostLogDirectory !== undefined)
-				copyDirectory(this.hostLogDirectory, path.join(stagingDirectory, "host"))
+			copyDirectory(this.logLayout.host, path.join(stagingDirectory, "host"))
+			copyDirectory(this.logLayout.tui, path.join(stagingDirectory, "tui"))
+			for (const legacy of this.legacyLogDirectories()) {
+				copyDirectory(legacy, path.join(stagingDirectory, "legacy", path.basename(legacy)))
+			}
 			if (includeCrashDumps) copyCrashDumps(path.join(stagingDirectory, "crashDumps"))
 			this.writeResourceTelemetry(stagingDirectory)
 			this.writeEnvironment(stagingDirectory)
@@ -116,11 +157,29 @@ export class DiagnosticsService {
 		} catch (error) {
 			this.logger.log("warn", "diagnostics.logs.clear-current-failed", { error, audit: true })
 		}
-		clearRotatedFiles(path.join(this.logDirectory, "app"), this.logger)
-		clearRotatedFiles(path.join(this.logDirectory, "audit"), this.logger)
-		if (this.hostLogDirectory !== undefined)
-			clearRotatedFiles(this.hostLogDirectory, this.logger)
+		clearRotatedFiles(path.join(this.logDirectory, "desktop", "app"), this.logger)
+		clearRotatedFiles(path.join(this.logDirectory, "desktop", "audit"), this.logger)
+		clearRotatedFiles(this.logLayout.host, this.logger)
+		clearRotatedFiles(this.logLayout.tui, this.logger)
+		for (const legacy of this.legacyLogDirectories()) clearDirectory(legacy, this.logger)
 		this.logger.log("info", "diagnostics.logs.cleared", { audit: true })
+	}
+
+	private legacyLogDirectories(): string[] {
+		const candidates = [
+			path.join(homedir(), "Library", "Logs", "Cocode", "cocode"),
+			path.join(homedir(), "Library", "Logs", "Cocode Desktop", "cocode"),
+		]
+		const supervisorRoot = path.join(homedir(), ".cocode", "host-supervisor")
+		if (existsSync(supervisorRoot)) {
+			for (const entry of readdirSync(supervisorRoot, { withFileTypes: true })) {
+				if (!entry.isDirectory()) continue
+				candidates.push(path.join(supervisorRoot, entry.name, "logs", "host"))
+			}
+		}
+		return candidates.filter(
+			(candidate) => candidate !== this.logDirectory && existsSync(candidate),
+		)
 	}
 
 	public enableTemporaryDebug(request: TemporaryDebugRequestDto): { enabledUntil: string } {
@@ -277,6 +336,10 @@ function countCrashDumps(): number {
 function clearRotatedFiles(directory: string, logger: DesktopLogger): void {
 	if (!existsSync(directory)) return
 	for (const entry of readdirSync(directory, { withFileTypes: true })) {
+		if (entry.isDirectory()) {
+			clearRotatedFiles(path.join(directory, entry.name), logger)
+			continue
+		}
 		if (!entry.isFile() || entry.name === "current.jsonl") continue
 		try {
 			rmSync(path.join(directory, entry.name), { force: true })
@@ -286,6 +349,23 @@ function clearRotatedFiles(directory: string, logger: DesktopLogger): void {
 				attributes: { fileType: entry.name.endsWith(".gz") ? "compressed" : "jsonl" },
 				audit: true,
 			})
+		}
+	}
+}
+
+function clearDirectory(directory: string, logger: DesktopLogger): void {
+	if (!existsSync(directory)) return
+	for (const entry of readdirSync(directory, { withFileTypes: true })) {
+		const fullPath = path.join(directory, entry.name)
+		if (entry.isDirectory()) {
+			clearDirectory(fullPath, logger)
+			continue
+		}
+		if (!entry.name.endsWith(".jsonl") && !entry.name.endsWith(".jsonl.gz")) continue
+		try {
+			rmSync(fullPath, { force: true })
+		} catch (error) {
+			logger.log("warn", "diagnostics.logs.clear-legacy-failed", { error, audit: true })
 		}
 	}
 }

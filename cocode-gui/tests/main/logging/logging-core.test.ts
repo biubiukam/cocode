@@ -19,6 +19,7 @@ test("redaction removes sensitive attributes and URL query strings", () => {
 	assert.equal(result?.promptText, "[REDACTED]")
 	assert.equal(result?.endpoint, "https://example.test/api")
 	assert.equal(result?.count, 3)
+	assert.equal(sanitizeAttributes({ details: "sample prompt" })?.details, "[REDACTED]")
 })
 
 test("redaction replaces home, DSH home, and workspace paths", () => {

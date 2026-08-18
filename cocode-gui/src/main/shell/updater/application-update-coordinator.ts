@@ -1,0 +1,130 @@
+export type ApplicationUpdateState = "idle" | "checking" | "downloading"
+
+type ApplicationUpdateEventName =
+	| "checking-for-update"
+	| "update-not-available"
+	| "update-available"
+	| "update-downloaded"
+	| "error"
+
+export interface ApplicationUpdateEventSource {
+	on: (event: ApplicationUpdateEventName, listener: (...args: unknown[]) => void) => unknown
+	removeListener: (
+		event: ApplicationUpdateEventName,
+		listener: (...args: unknown[]) => void,
+	) => unknown
+	checkForUpdates: () => void
+}
+
+export interface ApplicationUpdateCoordinatorOptions {
+	readonly enabled: boolean
+	readonly version: string
+	readonly updater: ApplicationUpdateEventSource
+	readonly onStateChange: (state: ApplicationUpdateState) => void
+	readonly onLatest: (version: string) => void
+	readonly onError: (error: Error) => void
+	readonly onDownloaded: (releaseName?: string) => void
+}
+
+export interface ApplicationUpdateCoordinator {
+	readonly enabled: boolean
+	readonly checkNow: () => void
+	readonly subscribe: (listener: (state: ApplicationUpdateState) => void) => () => void
+	readonly dispose: () => void
+}
+
+export function createApplicationUpdateCoordinator({
+	enabled,
+	version,
+	updater,
+	onStateChange,
+	onLatest,
+	onError,
+	onDownloaded,
+}: ApplicationUpdateCoordinatorOptions): ApplicationUpdateCoordinator {
+	let state: ApplicationUpdateState = "idle"
+	let manualCheckPending = false
+	let disposed = false
+	const subscribers = new Set<(state: ApplicationUpdateState) => void>()
+
+	const setState = (next: ApplicationUpdateState): void => {
+		if (state === next) return
+		state = next
+		onStateChange(next)
+		for (const listener of subscribers) listener(next)
+	}
+
+	const onCheckingForUpdate = (): void => {
+		if (disposed) return
+		setState("checking")
+	}
+	const onUpdateNotAvailable = (): void => {
+		if (disposed) return
+		const showLatest = manualCheckPending
+		manualCheckPending = false
+		setState("idle")
+		if (showLatest) onLatest(version)
+	}
+	const onUpdateAvailable = (): void => {
+		if (disposed) return
+		manualCheckPending = false
+		setState("downloading")
+	}
+	const onUpdateDownloaded = (...args: unknown[]): void => {
+		if (disposed) return
+		manualCheckPending = false
+		setState("idle")
+		const releaseName = typeof args[2] === "string" ? args[2] : undefined
+		onDownloaded(releaseName)
+	}
+	const onUpdaterError = (value: unknown): void => {
+		if (disposed) return
+		const showError = manualCheckPending
+		manualCheckPending = false
+		setState("idle")
+		if (showError) onError(toError(value))
+	}
+
+	const listeners: readonly [ApplicationUpdateEventName, (...args: unknown[]) => void][] = [
+		["checking-for-update", onCheckingForUpdate],
+		["update-not-available", onUpdateNotAvailable],
+		["update-available", onUpdateAvailable],
+		["update-downloaded", onUpdateDownloaded],
+		["error", onUpdaterError],
+	]
+	for (const [event, listener] of listeners) updater.on(event, listener)
+
+	const checkNow = (): void => {
+		if (!enabled || disposed || state !== "idle") return
+		manualCheckPending = true
+		setState("checking")
+		try {
+			updater.checkForUpdates()
+		} catch (error) {
+			onUpdaterError(error)
+		}
+	}
+
+	const dispose = (): void => {
+		if (disposed) return
+		disposed = true
+		manualCheckPending = false
+		subscribers.clear()
+		for (const [event, listener] of listeners) updater.removeListener(event, listener)
+	}
+
+	const subscribe = (listener: (next: ApplicationUpdateState) => void): (() => void) => {
+		if (disposed) return () => undefined
+		subscribers.add(listener)
+		listener(state)
+		return () => {
+			subscribers.delete(listener)
+		}
+	}
+
+	return { enabled, checkNow, subscribe, dispose }
+}
+
+function toError(value: unknown): Error {
+	return value instanceof Error ? value : new Error(String(value))
+}

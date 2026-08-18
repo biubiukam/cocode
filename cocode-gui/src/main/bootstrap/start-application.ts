@@ -19,6 +19,10 @@ import {
 } from "../shell/updater/register-application-updates"
 import { applyDockIcon } from "../shell/windows/app-icon"
 import { createMainWindow } from "../shell/windows/create-main-window"
+import {
+	registerApplicationMenu,
+	type ApplicationMenuRegistration,
+} from "../shell/menu/register-application-menu"
 import { createDatabaseModule, type DatabaseModule } from "./create-database-module"
 import { ShortcutService } from "../contexts/shortcuts/application/shortcut-service"
 import {
@@ -64,6 +68,7 @@ export const startApplication = (): void => {
 	let dshUrl: string | null = null
 	let rebindDshRuntimeOrigin: ((origin: string) => void) | null = null
 	let applicationUpdates: ApplicationUpdateRegistration | null = null
+	let applicationMenu: ApplicationMenuRegistration | null = null
 	let tuiLauncher: TuiLauncher | null = null
 	let sharedDsh: SharedDshCatalog | null = null
 
@@ -145,10 +150,13 @@ export const startApplication = (): void => {
 			shortcuts = new ShortcutService(() => mainWindow)
 			registerShortcutsIpc(shortcuts, observability.logger)
 			applicationUpdates = registerApplicationUpdates(lifecycle)
+			applicationMenu = registerApplicationMenu(applicationUpdates)
 			observability.logger.log("info", "app.ready.completed")
 		},
 		onBeforeQuit: async () => {
 			observability.logger.log("info", "app.shutdown.started")
+			applicationMenu?.dispose()
+			applicationMenu = null
 			applicationUpdates?.dispose()
 			applicationUpdates = null
 			try {

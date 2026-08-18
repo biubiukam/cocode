@@ -73,7 +73,6 @@ function createContext(options = {}) {
           },
         }
       }
-      if (name === 'cocodeVision') return options.vision
       if (name === 'skills') return options.skills
       if (name === 'agentPresets') return options.agentPresets
       if (name === 'loader') {
@@ -234,50 +233,6 @@ test('reuses an existing workspace without asking for authorization', async () =
   assert.equal(created.length, 1)
   assert.equal(createdWorkspaces, 0)
   assert.deepEqual(attached, ['s1'])
-})
-
-test('uses vision evidence without retaining images for text-only models', async () => {
-  const visionCalls = []
-  const { ctx, followed } = createContext({
-    vision: {
-      async prepareBlocks(blocks, options) {
-        visionCalls.push({ blocks, options })
-        return [{ type: 'text', text: '[Image evidence]\na diagram' }]
-      },
-    },
-  })
-  const gateway = createGateway(ctx)
-  await initialize(gateway)
-
-  await gateway.prompt({
-    sessionId: 's1',
-    contentBlocks: [{ type: 'text', text: 'Read this image' }, imageBlock],
-  })
-
-  assert.deepEqual(visionCalls[0]?.options, { preserveImages: false })
-  assert.deepEqual(followed[0]?.content, [{ type: 'text', text: '[Image evidence]\na diagram' }])
-  assert.deepEqual(followed[0]?.source, {
-    kind: 'user',
-    displayContent: [{ type: 'text', text: 'Read this image' }, imageBlock],
-  })
-})
-
-test('rejects an unconfigured vision bridge before persisting the image', async () => {
-  const { ctx, followed } = createContext({
-    vision: {
-      async prepareBlocks(blocks) {
-        return [...blocks]
-      },
-    },
-  })
-  const gateway = createGateway(ctx)
-  await initialize(gateway)
-
-  await assert.rejects(
-    gateway.prompt({ sessionId: 's1', contentBlocks: [imageBlock] }),
-    /vision bridge is not configured/i,
-  )
-  assert.equal(followed.length, 0)
 })
 
 test('passes images directly to models that declare native image input', async () => {

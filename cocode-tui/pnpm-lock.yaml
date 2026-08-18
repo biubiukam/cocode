@@ -74,12 +74,6 @@ importers:
         specifier: ^22.20.1
         version: 22.20.1
 
-  packages/vision:
-    dependencies:
-      '@cocode/host-vision':
-        specifier: link:../../../cocode-host-supervisor/packages/vision
-        version: link:../../../cocode-host-supervisor/packages/vision
-
 packages:
 
   '@alcalzone/ansi-tokenize@0.3.0':

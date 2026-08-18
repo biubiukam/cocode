@@ -49,7 +49,7 @@ export type UserMessage = {
   id: string;
   role: "user";
   content: ContentBlock[];
-  source: { kind: "user"; displayContent?: ContentBlock[] };
+  source: { kind: "user" };
 };
 
 export type RuntimeContext = {

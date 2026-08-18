@@ -93,6 +93,11 @@ if (options.command === 'host-status' || options.command === 'host-stop' || opti
 
 if (options.command !== 'tui') process.exit(0)
 
+// Normalize the default Cocode client launch before the TUI module is loaded.
+// The generic DSH resolver intentionally defaults to `web` for the official
+// product, but Cocode's own client must always enter its `cocode` profile.
+await configureRuntimeEnvironment(paths, options)
+
 const entry = paths.tuiEntry
 if (!existsSync(entry)) {
   process.stderr.write('Cocode TUI is missing its build output. Run `pnpm run build` first.\n')

@@ -1,6 +1,7 @@
 /** Shared Host JSON-RPC transport for Cocode TUI. */
 
 export { createTuiRuntime } from './client.ts'
+export type { TuiRuntimeLogSink } from './client.ts'
 export { parseInitFromEnv, parseLaunchFromEnv } from './env.ts'
 export type { EnvError } from './env.ts'
 export type {

@@ -34,26 +34,41 @@ import { clearViewport, enterScreen, parseScreenMode } from './present/clear-scr
 import { resolveUiLocale, text } from './runtime/ui-locale.ts'
 import { detectTerminalEnvironment } from './runtime/platform.ts'
 import { createTerminalOutput } from './present/terminal-output.ts'
+import { TuiLogger } from './runtime/logging.ts'
 
 loadDotenv(resolve(process.cwd(), '.env'))
 
+const tuiLogger = new TuiLogger({ version: process.env.COCODE_BUILD_ID?.trim() || 'dev' })
+process.once('uncaughtException', (_error: Error) => {
+  tuiLogger.fatal('process.uncaught-exception')
+  tuiLogger.flush()
+})
+process.once('unhandledRejection', () => {
+  tuiLogger.error('process.unhandled-rejection')
+})
+process.once('exit', () => tuiLogger.close())
+
 if (process.stdin.isTTY !== true || process.stdout.isTTY !== true) {
+  tuiLogger.warn('tui.start.rejected', { reason: 'tty-required' })
   process.stderr.write('Cocode TUI requires a TTY.\n')
   process.exitCode = 1
 } else {
-  void main(createTerminalOutput(process.stdout)).catch((error: unknown) => {
+  void main(createTerminalOutput(process.stdout), tuiLogger).catch((error: unknown) => {
+    tuiLogger.error('tui.start.failed')
     process.stderr.write(`Cocode TUI failed to start: ${startErrorMessage(error)}\n`)
     process.exitCode = 1
   })
 }
 
-async function main(output: NodeJS.WriteStream): Promise<void> {
+async function main(output: NodeJS.WriteStream, logger: TuiLogger): Promise<void> {
+  logger.info('tui.start')
   // Color depth and glyph coverage are fixed for the life of the session, so
   // they are resolved once here rather than probed at every render.
   setGlyphs(supportsUnicode())
   setTheme(resolveStartupTheme())
 
   const launch = parseLaunchFromEnv()
+  logger.debug('tui.launch.parsed')
 
   const leaveScreen = enterScreen(parseScreenMode(process.env.COCODE_TUI_SCREEN), output)
   const terminal = detectTerminalEnvironment({
@@ -65,6 +80,7 @@ async function main(output: NodeJS.WriteStream): Promise<void> {
   process.once('exit', () => leaveScreen())
 
   const auth = await createAuthStore()
+  logger.debug('account.hydrate.completed', { phase: auth.snapshot().phase })
   if (auth.snapshot().phase !== 'ready') {
     const gated = await runAuthGate(auth, output)
     if (!gated) {
@@ -100,7 +116,7 @@ async function main(output: NodeJS.WriteStream): Promise<void> {
       ...resolved.env,
       DSH_SESSION_ROOT: sessionRoot.path,
     },
-  })
+  }, logger)
   const externalDsh = createExternalDshCatalog()
   const app = createTuiApp({
     runtime,
@@ -132,6 +148,7 @@ async function main(output: NodeJS.WriteStream): Promise<void> {
     },
     locale: resolveUiLocale(process.env),
     setTheme,
+    logger,
   })
 
   clearViewport(output)
@@ -162,8 +179,10 @@ async function main(output: NodeJS.WriteStream): Promise<void> {
     try {
       await releaseLiveInstance(liveInstanceHome)
       await app.close()
+      logger.info('tui.shutdown.completed')
       process.exit(0)
     } catch (error) {
+      logger.error('tui.shutdown.failed')
       await releaseLiveInstance(liveInstanceHome).catch(() => undefined)
       process.stderr.write(`Cocode TUI shutdown failed: ${displayError(error)}\n`)
       process.exit(1)

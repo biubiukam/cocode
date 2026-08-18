@@ -1,6 +1,7 @@
 import { ipcMain, type WebContents } from "electron"
 import { diagnosticsChannels } from "../../../../../contracts/ipc/diagnostics.contract"
 import {
+	parseDiagnosticsLogQuery,
 	parseRendererLogBatch,
 	parseTemporaryDebugRequest,
 } from "../../../../../contracts/schemas/diagnostics.schema"
@@ -25,6 +26,10 @@ export function registerDiagnosticsIpc(
 	ipcMain.handle(diagnosticsChannels.enableTemporaryDebug, (_event, value: unknown) => {
 		return diagnostics.enableTemporaryDebug(parseTemporaryDebugRequest(value))
 	})
+	ipcMain.handle(diagnosticsChannels.queryLogs, (_event, value: unknown) => {
+		return diagnostics.queryLogs(parseDiagnosticsLogQuery(value))
+	})
+	ipcMain.handle(diagnosticsChannels.listLogSources, () => diagnostics.listLogSources())
 }
 
 export function unregisterDiagnosticsIpc(): void {
@@ -35,6 +40,8 @@ export function unregisterDiagnosticsIpc(): void {
 		diagnosticsChannels.exportBundle,
 		diagnosticsChannels.clearLogs,
 		diagnosticsChannels.enableTemporaryDebug,
+		diagnosticsChannels.queryLogs,
+		diagnosticsChannels.listLogSources,
 	])
 		ipcMain.removeHandler(channel)
 }
