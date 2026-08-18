@@ -102,6 +102,10 @@ test('resolveCocodeHostScope ignores ambient official DSH_HOME and fixes cocode 
   assert.equal(scope.runtimeChannel, 'stable')
 })
 
+test('resolveCocodeHostScope defaults to cocode when no profile is provided', () => {
+  assert.equal(resolveCocodeHostScope({}).profile, 'cocode')
+})
+
 test('resolveHostRuntimeEnv expands tilde-prefixed vision paths', () => {
   assert.deepEqual(
     resolveHostRuntimeEnv({ COCODE_DSH_HOME: '~/.dsh' }),
