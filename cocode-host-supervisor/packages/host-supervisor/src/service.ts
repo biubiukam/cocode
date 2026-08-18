@@ -186,7 +186,7 @@ class SupervisorService {
   private async startHost(request: AcquireHostRequest): Promise<void> {
     const jsonRpcEndpoint = process.platform === 'win32' ? `\\\\.\\pipe\\cocode-dsh-jsonrpc-${hostKey(this.scope)}` : join(this.directory, 'dsh-jsonrpc.sock')
     const pluginPath = fileURLToPath(new URL('./host-jsonrpc-plugin.js', import.meta.url))
-    const slot = prepareRuntimeSlot(this.scope, jsonRpcEndpoint, pluginPath)
+    const slot = prepareRuntimeSlot(this.scope, jsonRpcEndpoint, pluginPath, request.runtimeEnv)
     const workspace = join(this.scope.dshHome, 'workspaces', 'default')
     mkdirSync(workspace, { recursive: true })
     const args = this.scope.profile === 'web' ? ['web'] : ['--profile', this.scope.profile]

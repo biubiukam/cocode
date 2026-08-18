@@ -130,7 +130,12 @@ export function resolveDshPackage(): { root: string; entry: string; version: str
   return { root, entry, version: String(manifest.version), ...(buildId === undefined ? {} : { buildId }) }
 }
 
-export function prepareRuntimeSlot(scope: HostScope, jsonRpcEndpoint: string, pluginPath: string): RuntimeSlot {
+export function prepareRuntimeSlot(
+  scope: HostScope,
+  jsonRpcEndpoint: string,
+  pluginPath: string,
+  runtimeEnv?: HostRuntimeEnv,
+): RuntimeSlot {
   if (scope.profile === 'cocode') ensureCocodeProfile(scope.dshHome, resolveCocodeHome())
   const dsh = resolveDshPackage()
   const slot = runtimeSlotDirectory(scope, dsh.version)
@@ -165,7 +170,7 @@ export function prepareRuntimeSlot(scope: HostScope, jsonRpcEndpoint: string, pl
   registerRuntimePluginsInDshManifest(slot, pluginEntries)
   restoreNodePtyHelper(slot)
   const patch = join(slot, 'cocode-host.patch.yml')
-  const rows = createRuntimePatch(pathToFileURL(pluginTarget).href, jsonRpcEndpoint, pluginEntries)
+  const rows = createRuntimePatch(pathToFileURL(pluginTarget).href, jsonRpcEndpoint, pluginEntries, runtimeEnv)
   writeFileSync(patch, rows)
   writeFileSync(join(slot, 'active.json'), `${JSON.stringify({
     schemaVersion: 1,
@@ -249,7 +254,9 @@ export function createRuntimePatch(
   jsonRpcPluginUrl: string,
   jsonRpcEndpoint: string,
   pluginEntries: readonly RuntimePluginEntry[],
+  runtimeEnv?: HostRuntimeEnv,
 ): string {
+  const providers = parseRuntimeProviders(runtimeEnv?.COCODE_LLM_PROVIDERS)
   return [
     '# Align transient model-request recovery with Codex (5 bounded backoff retries).',
     '- id: llm-deepseek',
@@ -258,6 +265,7 @@ export function createRuntimePatch(
     '    retryPolicy:',
     '      mode: normal',
     '      maxRetries: 5',
+    ...(providers === undefined ? [] : llmPiAiPatchLines(providers)),
     '- insert:',
     '    - id: cocode-host-jsonrpc',
     `      name: ${JSON.stringify(jsonRpcPluginUrl)}`,
@@ -270,6 +278,31 @@ export function createRuntimePatch(
     ]),
     '',
   ].join('\n')
+}
+
+function parseRuntimeProviders(value: string | undefined): Record<string, unknown> | undefined {
+  const trimmed = value?.trim()
+  if (trimmed === undefined || trimmed === '') return undefined
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(trimmed)
+  } catch {
+    throw new Error('COCODE_LLM_PROVIDERS must be a JSON object of provider routes')
+  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('COCODE_LLM_PROVIDERS must be a JSON object of provider routes')
+  }
+  const record = parsed as Record<string, unknown>
+  return Object.keys(record).length === 0 ? undefined : record
+}
+
+function llmPiAiPatchLines(providers: Record<string, unknown>): string[] {
+  return [
+    '- id: llm-pi-ai',
+    "  name: '@deepseek-ai/dsh-llm-pi-ai'",
+    '  config:',
+    `    providers: ${JSON.stringify(providers)}`,
+  ]
 }
 
 function restoreNodePtyHelper(root: string): void {

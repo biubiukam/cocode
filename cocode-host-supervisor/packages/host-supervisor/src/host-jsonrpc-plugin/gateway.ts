@@ -32,6 +32,14 @@ type AgentPresetsService = {
   mount(agentCtx: unknown, id?: string): Promise<unknown>;
 };
 
+type LlmDirectory = {
+  listProviders?: () => readonly { id: string }[];
+};
+
+/** Settings-backed routes such as cocode-nut register after jsonrpc starts listening. */
+const PROVIDER_READY_DEADLINE_MS = 2_000;
+const PROVIDER_READY_RETRY_MS = 50;
+
 export type UserQuestion = {
   id: string;
   question: string;
@@ -373,20 +381,32 @@ export class TuiCompanionGateway {
     this.provider = params.provider;
     this.model = params.model;
     this.maxTokens = params.maxTokens;
+    await this.ensureProviderRegistered(this.provider);
     this.initialized = true;
-    const llm = this.ctx.get("llm") as
-      | { listProviders?: () => readonly { id: string }[] }
-      | undefined;
-    if (
-      llm?.listProviders !== undefined &&
-      !llm.listProviders().some((entry) => entry.id === this.provider)
-    ) {
-      throw new Error(`no adapter registered for provider "${this.provider}"`);
-    }
     return {
       serverInfo: { name: "cocode-tui-companion", version: "0.1.0" },
       capabilities: this.capabilities(),
     };
+  }
+
+  /**
+   * llm-pi-ai mounts dormant and only registers settings-backed routes after
+   * the settings document is applied. jsonrpc listens as soon as `agents` is
+   * up, so /login can initialize against cocode-nut before that adapter exists.
+   */
+  private async ensureProviderRegistered(provider: string): Promise<void> {
+    const deadline = Date.now() + PROVIDER_READY_DEADLINE_MS;
+    for (;;) {
+      const llm = this.ctx.get("llm") as LlmDirectory | undefined;
+      if (llm?.listProviders === undefined) return;
+      if (llm.listProviders().some((entry) => entry.id === provider)) return;
+      if (Date.now() >= deadline) {
+        throw new Error(`no adapter registered for provider "${provider}"`);
+      }
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, PROVIDER_READY_RETRY_MS);
+      });
+    }
   }
 
   async prompt(params: PromptParams): Promise<{ messageId: string }> {

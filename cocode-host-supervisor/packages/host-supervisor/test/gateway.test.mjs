@@ -7,6 +7,7 @@ function createContext(options = {}) {
   const followed = []
   const created = []
   let activeAgent
+  const providers = options.providers ?? [{ id: 'deepseek-official', name: 'DeepSeek' }]
   const ctx = {
     agents: {
       get(id) {
@@ -67,7 +68,7 @@ function createContext(options = {}) {
       if (name === 'llm') {
         return {
           listProviders() {
-            return [{ id: 'deepseek-official', name: 'DeepSeek' }]
+            return typeof options.listProviders === 'function' ? options.listProviders() : providers
           },
           async listModels() {
             return options.listed === false ? [] : [{
@@ -126,6 +127,24 @@ async function initialize(gateway) {
     model: 'deepseek-v4-flash',
   })
 }
+
+test('waits for a settings-backed provider that registers after initialize starts', async () => {
+  const providers = []
+  const { ctx } = createContext({
+    listProviders() {
+      return providers
+    },
+  })
+  const gateway = createGateway(ctx)
+  const pending = gateway.initialize({
+    cwd: '/tmp',
+    provider: 'cocode-nut',
+    model: 'deepseek-v4-flash',
+  })
+  await new Promise((resolve) => setTimeout(resolve, 80))
+  providers.push({ id: 'cocode-nut', name: 'Cocode Nut' })
+  await pending
+})
 
 const imageBlock = {
   type: 'image',

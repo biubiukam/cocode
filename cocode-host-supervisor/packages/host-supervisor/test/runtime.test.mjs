@@ -127,6 +127,33 @@ test('createRuntimePatch leaves shared DSH settings and credentials at their def
   assert.equal(parsed[1].insert[1].id, 'cocode-workbench')
   assert.equal(parsed.some((entry) => entry?.id === 'settings'), false)
   assert.equal(parsed.some((entry) => entry?.id === 'credentials'), false)
+  assert.equal(parsed.some((entry) => entry?.id === 'llm-pi-ai'), false)
+})
+
+test('createRuntimePatch mounts COCODE_LLM_PROVIDERS on llm-pi-ai', () => {
+  const patch = createRuntimePatch(
+    'file:///tmp/cocode-host-jsonrpc-plugin.mjs',
+    'http://127.0.0.1:43123',
+    [{ name: 'cocode-workbench', entry: '/tmp/cocode-workbench/lib/index.js' }],
+    {
+      COCODE_LLM_PROVIDERS: JSON.stringify({
+        'cocode-nut': {
+          displayName: 'Cocode Nut',
+          api: 'openai-responses',
+          baseURL: 'https://cocode.agency/v1',
+          apiKeyEnv: 'COCODE_NUT_API_KEY',
+          retryPolicy: { mode: 'normal', maxRetries: 5 },
+          models: [{ id: 'deepseek-v4-flash', name: 'deepseek-v4-flash' }],
+        },
+      }),
+    },
+  )
+  const parsed = YAML.parse(patch)
+  const piAi = parsed.find((entry) => entry?.id === 'llm-pi-ai')
+  assert.equal(piAi.name, '@deepseek-ai/dsh-llm-pi-ai')
+  assert.equal(piAi.config.providers['cocode-nut'].api, 'openai-responses')
+  assert.equal(piAi.config.providers['cocode-nut'].apiKeyEnv, 'COCODE_NUT_API_KEY')
+  assert.equal(parsed.find((entry) => entry?.insert !== undefined).insert[1].id, 'cocode-workbench')
 })
 
 test('mergeHostRuntimeEnv preserves base credentials while overlaying the route', () => {
