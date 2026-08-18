@@ -17,6 +17,7 @@ interface PathIndex {
 interface FileCandidate {
   readonly name: string
   readonly description?: string
+  readonly path?: string
 }
 
 interface InputTriggers {
@@ -83,7 +84,8 @@ export function registerFileMention(ctx: ClientContext): void {
       async candidates(session, { query, signal }) {
         const paths = await load(session.sessionId)
         if (signal.aborted) return []
-        return rankPaths(paths, normalizeQuery(query), CANDIDATE_LIMIT).map(toCandidate)
+        return rankPaths(paths, normalizeQuery(query), CANDIDATE_LIMIT)
+          .map((path) => toCandidate(path, workspaceLabel(sessionCwd(ctx, session.sessionId))))
       },
       warm(session) {
         load(session.sessionId).catch(() => {})
@@ -138,18 +140,26 @@ function readInputTriggers(ctx: ClientContext): InputTriggers | undefined {
   return ctx.get("inputTriggers") as InputTriggers | undefined
 }
 
-function toCandidate(path: string): FileCandidate {
+function toCandidate(path: string, rootLabel: string): FileCandidate {
   const folder = path.endsWith("/")
   const trimmed = folder ? path.slice(0, -1) : path
   const label = folder ? `${baseName(trimmed)}/` : baseName(trimmed)
   const slash = trimmed.lastIndexOf("/")
-  if (slash < 0) return { name: label }
-  return { name: label, description: trimmed.slice(0, slash) }
+  return {
+    name: label,
+    description: slash < 0 ? rootLabel : trimmed.slice(0, slash),
+    path,
+  }
 }
 
 function insertPath(candidate: FileCandidate): string {
-  if (candidate.description === undefined) return candidate.name
-  return `${candidate.description}/${candidate.name}`
+  return candidate.path ?? candidate.name
+}
+
+function workspaceLabel(cwd: string | undefined): string {
+  if (cwd === undefined) return "."
+  const name = baseName(cwd.replace(/[/\\]+$/, ""))
+  return name === "" ? "." : name
 }
 
 function formatFileMention(path: string): string {
