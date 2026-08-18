@@ -74,6 +74,7 @@ const COPY = {
     conflict: "本机已有同名 Provider 或凭证，请先在模型设置中处理冲突。",
     cleanupPending: "本地账号已退出，Cocode Nut 配置将在运行时恢复后继续清理。",
     reauthentication: "请在浏览器中重新认证 Cocode 账号（十分钟内完成），然后点击重试。",
+    accountUnavailable: "当前运行环境未连接 Cocode 账号服务，请重启桌面客户端后重试。",
     account: "Cocode 账号",
     accountPlan: "账户与计划",
     planUsage: "套餐用量",
@@ -102,6 +103,7 @@ const COPY = {
     conflict: "A provider or credential with the reserved Cocode name already exists. Resolve it in Models settings first.",
     cleanupPending: "The local account is signed out. Cloud configuration cleanup will resume when the runtime is available.",
     reauthentication: "Reauthenticate your Cocode account in the browser within ten minutes, then retry.",
+    accountUnavailable: "The Cocode account service is unavailable in this window. Restart the desktop client and try again.",
     account: "Cocode account",
     accountPlan: "Account & plan",
     planUsage: "Plan usage",
@@ -138,8 +140,23 @@ class AccountStore {
   async activate(): Promise<void> {
     if (this.busy) return
     const account = window.desktopApi?.account
-    if (account === undefined) return
+    if (account === undefined) {
+      this.set({
+        ...this.snapshot,
+        phase: "error",
+        error: {
+          code: "account-unavailable",
+          message: copy().accountUnavailable,
+        },
+      })
+      return
+    }
     this.busy = true
+    this.set({
+      phase: "signing-in",
+      profile: null,
+      cloud: { status: "absent", providerId: "cocode-nut" },
+    })
     try {
       this.set(await account.signIn())
     } catch (error) {
