@@ -287,7 +287,7 @@ export class AccountService {
 		if (await this.retryPendingCleanup()) return
 		let state = await this.identity.read()
 		if (state === undefined) {
-			this.publish(emptySnapshot())
+			await this.discardOrphanedCloud()
 			return
 		}
 		try {
@@ -888,6 +888,59 @@ export class AccountService {
 	private async finishPendingCleanup(pending: CleanupPendingState): Promise<void> {
 		const failure = await this.cleanupManagedConfig(pending)
 		if (failure !== undefined) throw failure
+	}
+
+	/** Whether the runtime still holds the reserved Cocode route or credential. */
+	private async hasManagedConfig(): Promise<boolean> {
+		const settings = await this.dsh.describeSettings()
+		const namespace = settings.namespaces.find((item) => item.ns === CLOUD_NAMESPACE)
+		const providers = recordOf(valueAt(namespace?.value, ["providers"]))
+		if (
+			providers?.[CLOUD_PROVIDER] !== undefined ||
+			providers?.[LEGACY_CLOUD_PROVIDER] !== undefined
+		)
+			return true
+		const refs = [CLOUD_CREDENTIAL, LEGACY_CLOUD_CREDENTIAL]
+		const credentials = await this.dsh.describeCredentials(refs)
+		return refs.some((ref) => credentials[ref]?.configured === true)
+	}
+
+	/**
+	 * Drop a managed route whose owner vanished without signing out — a moved
+	 * userData directory, a deleted identity file, a wiped keychain entry. The
+	 * shared identity file is the single source of truth for every Cocode
+	 * client, so its absence means nobody is signed in and a surviving route is
+	 * an orphan. Left alone it keeps presenting itself as the active provider
+	 * and default model underneath a signed-out account, backed by a key no one
+	 * can rotate.
+	 */
+	private async discardOrphanedCloud(): Promise<void> {
+		let orphaned = false
+		try {
+			orphaned = await this.hasManagedConfig()
+		} catch (error) {
+			// The runtime need not expose its configuration this early. A later
+			// hydrate repeats the probe, so a failed look-up stays silent rather
+			// than presenting a signed-out account with an error it cannot act on.
+			this.logFailure("orphan probe", error)
+		}
+		if (!orphaned) {
+			this.publish(emptySnapshot())
+			return
+		}
+		const failure = await this.cleanupManagedConfig({ pending: true })
+		await this.cloudKey.clear()
+		if (failure === undefined) {
+			this.publish(emptySnapshot())
+			return
+		}
+		this.logFailure("orphan cleanup", failure)
+		this.publish({
+			phase: "error",
+			profile: null,
+			cloud: { status: "error", providerId: CLOUD_PROVIDER },
+			error: safeError(failure, "cleanup-pending"),
+		})
 	}
 
 	private async handleInvalidIdentity(
