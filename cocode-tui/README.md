@@ -57,7 +57,7 @@ cocode [options] [command]
 | `cocode host stop --force` | Stop it even when leases are still held |
 | `cocode gui` | Open the installed Cocode desktop client |
 | `cocode web [args...]` | Run the bundled DSH web profile |
-| `cocode plugin [args...]` | Manage bundled DSH profile plugins |
+| `cocode plugin [args...]` | Manage bundled DSH plugins; defaults to the `cocode` profile |
 | `cocode --version` | Print the installed version |
 | `cocode --help` | Print the complete CLI help |
 
@@ -73,7 +73,8 @@ cocode web --help
 
 DSH-compatible commands and options are passed to the bundled DSH CLI unchanged,
 so a separate `dsh` installation is not required. Cocode owns `--help` and
-`--version`; use `cocode web --help` for the web profile help.
+`--version`. When `cocode plugin` does not specify `--profile`, it uses the
+`cocode` profile by default. Use `cocode web --help` for the web profile help.
 
 The same values can be supplied through `DSH_HOME`, `DSH_PROFILE`, and
 `COCODE_RUNTIME_CHANNEL`.

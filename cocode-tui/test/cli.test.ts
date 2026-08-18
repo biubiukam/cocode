@@ -40,6 +40,14 @@ describe('cocode CLI', () => {
       command: 'dsh',
       commandArgs: ['plugin', '--profile', 'web', 'add', 'dshmarket'],
     })
+    expect(parseCliArgs(['plugin', 'add', 'dshmarket'])).toMatchObject({
+      command: 'dsh',
+      commandArgs: ['plugin', '--profile', 'cocode', 'add', 'dshmarket'],
+    })
+    expect(parseCliArgs(['plugin', '--profile=web', 'list'])).toMatchObject({
+      command: 'dsh',
+      commandArgs: ['plugin', '--profile=web', 'list'],
+    })
     expect(parseCliArgs(['--profile', 'web', 'plugin', 'add', 'dshmarket'])).toMatchObject({
       command: 'dsh',
       profile: 'web',

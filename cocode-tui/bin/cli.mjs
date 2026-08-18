@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url'
 const require = createRequire(import.meta.url)
 const DSH_COMMANDS = new Set(['web', 'plugin'])
 const DSH_ROOT_OPTIONS = new Set(['--patch', '--dump-config', '--dump-default-config'])
+const DEFAULT_PLUGIN_PROFILE = 'cocode'
 
 export function parseCliArgs(args) {
   const options = { command: 'tui', commandArgs: [], force: false, json: false, help: false, version: false }
@@ -28,8 +29,11 @@ export function parseCliArgs(args) {
     }
     if (DSH_COMMANDS.has(value) || DSH_ROOT_OPTIONS.has(value)) {
       options.command = 'dsh'
-      const sharedProfile = options.profile && !remaining.includes('--profile')
+      const hasDshProfile = hasProfileOption(remaining)
+      const sharedProfile = options.profile && !hasDshProfile
         ? ['--profile', options.profile]
+        : value === 'plugin' && !hasDshProfile
+          ? ['--profile', DEFAULT_PLUGIN_PROFILE]
         : []
       options.commandArgs = value === 'plugin'
         ? [value, ...sharedProfile, ...remaining]
@@ -79,6 +83,10 @@ export function parseCliArgs(args) {
   options.commandArgs = scopedArgs
   options.commandArgs = options.commandArgs.filter((value) => !['--force', '-f', '--json', '--help', '-h', '--version', '-v'].includes(value))
   return options
+}
+
+function hasProfileOption(args) {
+  return args.some((value) => value === '--profile' || value.startsWith('--profile='))
 }
 
 export function applyScopeOptions(options, env = process.env) {
