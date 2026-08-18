@@ -59,6 +59,7 @@ const EMPTY: AccountSnapshot = {
 const COPY = {
   zh: {
     signIn: "登录 Cocode",
+    settingsOrSignIn: "设置或登录 Cocode",
     signInTitle: "登录 Cocode 账号",
     signOutTitle: "退出 Cocode 账号",
     waiting: "等待授权…",
@@ -86,6 +87,7 @@ const COPY = {
   },
   en: {
     signIn: "Sign in to Cocode",
+    settingsOrSignIn: "Settings or sign in to Cocode",
     signInTitle: "Sign in to your Cocode account",
     signOutTitle: "Sign out of your Cocode account",
     waiting: "Waiting for authorization…",
@@ -112,9 +114,6 @@ const COPY = {
     providerId: "Provider ID: ",
   },
 } as const
-
-/** Stable DOM hook owned by the settings shell's trigger. */
-const SETTINGS_TRIGGER = "[data-dsh-settings-trigger]"
 
 function copy(): typeof COPY.zh | typeof COPY.en {
   return document.documentElement.lang.toLowerCase().startsWith("zh") || navigator.language.toLowerCase().startsWith("zh")
@@ -275,7 +274,7 @@ function labelOf(snapshot: AccountSnapshot, wide: boolean): string {
   if (snapshot.phase === "signing-in") return t.waiting
   if (snapshot.phase === "provisioning") return t.provisioning
   if (snapshot.phase === "error") return t.retry
-  return t.signIn
+  return t.settingsOrSignIn
 }
 
 /**
@@ -378,11 +377,9 @@ function AccountOnboarding({ complete, openSection, store }: OnboardingProps): R
 }
 
 function requestSettings(sectionId?: string): void {
-  const trigger = document.querySelector<HTMLButtonElement>(SETTINGS_TRIGGER)
-  if (trigger === null) return
-  if (sectionId === undefined) delete trigger.dataset.dshSettingsSectionRequest
-  else trigger.dataset.dshSettingsSectionRequest = sectionId
-  trigger.click()
+  window.dispatchEvent(new CustomEvent("cocode:open-settings", {
+    detail: sectionId === undefined ? {} : { sectionId },
+  }))
 }
 
 function initialOf(value: string): string {
@@ -497,8 +494,8 @@ function AccountAction({ wide, store, providers }: AccountProps): ReturnType<typ
   const busy = snapshot.phase === "signing-in" || snapshot.phase === "provisioning"
   const primary = signedIn
     ? snapshot.profile?.displayName ?? "Cocode"
-    : provider?.name ?? labelOf(snapshot, true)
-  const secondary = signedIn ? null : provider === null ? t.noProvider : t.customProvider
+    : provider?.name ?? labelOf(snapshot, wide)
+  const secondary = signedIn || provider === null ? null : t.customProvider
   const title = accountError(snapshot) ?? primary
   const entries: MenuEntry[] = signedIn
     ? [
@@ -568,12 +565,10 @@ function AccountAction({ wide, store, providers }: AccountProps): ReturnType<typ
           },
           createElement(
             "span",
-            { className: `${css.avatar} ${signedIn ? css.accountAvatar : provider === null ? css.guestAvatar : css.providerAvatar}` },
+            { className: `${css.avatar} ${signedIn ? css.accountAvatar : css.providerAvatar}` },
             signedIn
               ? initialOf(primary)
-              : provider === null
-                ? createElement(IconUserOutline16, { size: 18 })
-                : createElement(IconApiOutline14, { size: 18 }),
+              : createElement(IconApiOutline14, { size: 18 }),
           ),
           wide && createElement(
             "span",

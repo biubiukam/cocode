@@ -189,6 +189,11 @@ export type TuiModelCatalog = {
   failures: TuiModelCatalogFailure[]
 }
 
+export type TuiModelSelection = {
+  provider: string
+  model: string
+}
+
 export type TuiLaunch = {
   command?: string
   args?: string[]
@@ -308,6 +313,7 @@ export type TuiRuntime = {
   listSessions?(cwd?: string): Promise<TuiSessionSummary[]>
   ensureWorkspace?(sessionId: string, approved?: boolean): Promise<TuiWorkspaceEnsureResult>
   listModels?(): Promise<TuiModelCatalog>
+  selectModel?(sessionId: string, provider: string, model: string): Promise<TuiModelSelection | undefined>
   saveImages?(images: readonly TuiImageInput[]): Promise<TuiImageAttachmentRef[]>
   permissionMode?(
     sessionId: string,

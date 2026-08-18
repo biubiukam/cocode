@@ -320,6 +320,16 @@ export class AgencyClient {
 		}
 	}
 
+	async revokeApiKey(accessToken: string, keyId: string): Promise<void> {
+		if (keyId.trim() === "") return
+		const response = await this.request(`/v1/me/api-keys/${encodeURIComponent(keyId)}`, {
+			method: "DELETE",
+			token: accessToken,
+		})
+		if (response.status !== 200 && response.status !== 204 && response.status !== 404)
+			throw new AgencyHttpError("could not revoke Cocode device key", response.status)
+	}
+
 	async revoke(refreshToken: string): Promise<void> {
 		try {
 			await this.request("/v1/auth/token/revoke", {

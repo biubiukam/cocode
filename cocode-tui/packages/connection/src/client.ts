@@ -35,6 +35,7 @@ import type {
   TuiModelCatalog,
   TuiModelCatalogFailure,
   TuiModelProviderGroup,
+  TuiModelSelection,
   TuiImageAttachmentRef,
   TuiImageInput,
 } from './types.ts'
@@ -378,6 +379,28 @@ class SdkTuiRuntime implements TuiRuntime {
     this.requireCapability('modelList')
     const result = await client.request(this.wireMethod('cocode/model/list', 'model/list'))
     return parseModelCatalogResult(result)
+  }
+
+  async selectModel(
+    sessionId: string,
+    provider: string,
+    model: string,
+  ): Promise<TuiModelSelection | undefined> {
+    const client = this.requireClient()
+    try {
+      const result = await client.request('session.selectModel', { sessionId, provider, model })
+      if (!isRecord(result) || !isRecord(result.selected)) {
+        throw new Error(`session.selectModel returned an invalid result: ${JSON.stringify(result)}`)
+      }
+      const selected = result.selected
+      if (typeof selected.provider !== 'string' || typeof selected.model !== 'string') {
+        throw new Error(`session.selectModel returned an invalid selection: ${JSON.stringify(result)}`)
+      }
+      return { provider: selected.provider, model: selected.model }
+    } catch (error) {
+      if (isUnsupportedMethodError(error)) return undefined
+      throw error
+    }
   }
 
   async saveImages(images: readonly TuiImageInput[]): Promise<TuiImageAttachmentRef[]> {
@@ -1091,4 +1114,11 @@ function parseQuestionOptions(value: unknown): { label: string; description?: st
       ...(typeof option.description === 'string' ? { description: option.description } : {}),
     }
   })
+}
+
+function isUnsupportedMethodError(error: unknown): boolean {
+  if (isRecord(error) && (error.code === -32601 || error.code === 'METHOD_NOT_FOUND')) return true
+  return /unknown(?: [^\n]*)? method|method not found|unsupported method|not implemented/i.test(
+    error instanceof Error ? error.message : String(error),
+  )
 }

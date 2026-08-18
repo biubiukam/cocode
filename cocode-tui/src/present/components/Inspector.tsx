@@ -70,7 +70,7 @@ export function Inspector(props: {
     >
       <Text color={theme.text} bold>
         <Text color={resizing ? theme.accent : theme.mute}>{glyphs.resizeMark}</Text>{' '}
-        {text(locale, 'inspector')}
+        {capitalizeInitial(text(locale, 'inspector'))}
       </Text>
       <ScrollablePanel
         height={Math.max(1, maxRows - 1)}
@@ -209,7 +209,7 @@ function Section(props: { title: string; children: ReactNode }) {
   return (
     <Box flexDirection="column" marginTop={1} minHeight={0}>
       <Text color={theme.accent} bold>
-        {props.title}
+        {capitalizeInitial(props.title)}
       </Text>
       {props.children}
     </Box>
@@ -219,7 +219,7 @@ function Section(props: { title: string; children: ReactNode }) {
 function Line(props: { label: string; value: string; color?: string }) {
   return (
     <Text color={props.color ?? theme.dim} wrap="truncate-end">
-      {props.label}: {props.value}
+      {capitalizeInitial(props.label)}: {props.value}
     </Text>
   )
 }
@@ -230,6 +230,11 @@ function Shortcut(props: { text: string }) {
       {props.text}
     </Text>
   )
+}
+
+function capitalizeInitial(value: string): string {
+  if (value.length === 0) return value
+  return value[0].toUpperCase() + value.slice(1)
 }
 
 function formatMetric(value: number): string {

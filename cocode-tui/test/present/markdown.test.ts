@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  inlineMarkdownText,
   parseMarkdownBlocks,
   renderTable,
   splitStreamingMarkdown,
@@ -7,6 +8,12 @@ import {
 import stringWidth from 'string-width'
 
 describe('markdown presentation', () => {
+  it('projects nested inline Markdown to visible terminal text', () => {
+    expect(
+      inlineMarkdownText('**bold** *em* ~~del~~ `code` [link](https://example.com)'),
+    ).toBe('bold em del code link')
+  })
+
   it('projects common markdown blocks without losing plain text', () => {
     expect(parseMarkdownBlocks('# Title\n\n**answer**\n\n- one\n- two')).toEqual([
       { kind: 'heading', depth: 1, text: 'Title' },
@@ -35,6 +42,7 @@ describe('markdown presentation', () => {
     expect(table).toContain('文件')
     expect(table).toContain('改动')
     expect(table).toContain('platform')
+    expect(table).not.toContain('`')
   })
 
   it('accounts for double-width characters when sizing cells', () => {

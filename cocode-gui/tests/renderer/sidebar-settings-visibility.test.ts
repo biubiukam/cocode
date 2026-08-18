@@ -7,15 +7,12 @@ const css = readFileSync(
 	resolve(process.cwd(), "packages/client/ui-sidebar/src/client/SidebarRoot.module.css"),
 	"utf8",
 )
+const settingsRoot = readFileSync(
+	resolve(process.cwd(), "packages/client/ui-settings-general/src/client/SettingsRoot.tsx"),
+	"utf8",
+)
 
-test("slot errors do not hide the Settings fallback trigger", () => {
-	assert.match(
-		css,
-		/\.footArea:has\(\.footerActions > :not\(\[data-slot-error\]\)\) \.settingsArea \[data-dsh-settings-trigger\]\s*\{\s*display: none;/,
-	)
-	assert.doesNotMatch(
-		css,
-		/\.footArea:has\(\.footerActions > :not\(\[data-slot-error\]\)\) \.settingsArea\s*\{\s*display: none;/,
-	)
-	assert.doesNotMatch(css, /\.footArea:has\(\.footerActions > \*\) \.settingsArea/)
+test("Settings is no longer rendered as an independent footer trigger", () => {
+	assert.match(css, /\.settingsArea/)
+	assert.doesNotMatch(settingsRoot, /data-dsh-settings-trigger/)
 })

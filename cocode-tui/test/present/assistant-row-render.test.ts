@@ -16,6 +16,58 @@ describe('AssistantRow rendering', () => {
     expect(messageContentColumns(undefined)).toBeUndefined()
   })
 
+  it('renders inline Markdown in paragraphs, lists, and quotes', async () => {
+    const stdout = new CaptureStream(100, 20)
+    const node: AssistantNode = {
+      kind: 'assistant',
+      id: 'assistant-markdown',
+      seq: 1,
+      time: 1,
+      turn: 1,
+      step: 1,
+      text: [
+        '**加粗**、*斜体*、~~删除~~、`代码` 和 [链接](https://example.com)。',
+        '',
+        '- **列表加粗** 与 `列表代码`',
+        '',
+        '> *引用斜体* 与 **引用加粗**',
+      ].join('\n'),
+      reasoning: '',
+      streaming: false,
+    }
+    const app = render(
+      React.createElement(
+        Box,
+        { width: 100 },
+        React.createElement(AssistantRow, {
+          node,
+          verbose: false,
+          locale: 'zh',
+          maxColumns: 80,
+        }),
+      ),
+      {
+        stdout: stdout as unknown as NodeJS.WriteStream,
+        debug: true,
+        patchConsole: false,
+        exitOnCtrlC: false,
+      },
+    )
+
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    app.unmount()
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    app.cleanup()
+
+    const plain = stdout.output.replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, '')
+    expect(plain).toContain('加粗、斜体、删除、代码 和 链接')
+    expect(plain).toContain('• 列表加粗 与 列表代码')
+    expect(plain).toContain('│ │ 引用斜体 与 引用加粗')
+    expect(plain).not.toContain('**')
+    expect(plain).not.toContain('~~')
+    expect(plain).not.toContain('`')
+  })
+
   it('wraps expanded reasoning to the provided message width', async () => {
     const stdout = new CaptureStream(80, 20)
     const node: AssistantNode = {

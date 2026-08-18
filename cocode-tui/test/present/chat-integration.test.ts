@@ -56,6 +56,38 @@ describe('Chat', () => {
     }
   })
 
+  it('does not open the command menu below the ready status', async () => {
+    const runtime = createTestRuntime()
+    const chat = await renderChat(runtime.value, {
+      startBeforeRender: true,
+      mouseSupported: true,
+      columns: 100,
+      rows: 24,
+    })
+
+    try {
+      await expect
+        .poll(() =>
+          latestPlainLines(chat.stdout.output).findIndex((line) =>
+            line.includes('ready'),
+          ),
+        )
+        .toBeGreaterThanOrEqual(0)
+      const readyRow = latestPlainLines(chat.stdout.output).findIndex((line) =>
+        line.includes('ready'),
+      ) + 1
+
+      chat.stdin.write(`\u001b[<0;4;${readyRow + 1}M`)
+      await renderFlush()
+
+      expect(latestPlainLines(chat.stdout.output).join('\n')).not.toContain(
+        'Command menu',
+      )
+    } finally {
+      await closeChat(chat)
+    }
+  })
+
   it('scrolls a plan review preview with the mouse wheel', async () => {
     const runtime = createTestRuntime()
     const chat = await renderChat(runtime.value, {

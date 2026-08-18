@@ -32,7 +32,7 @@ export type FooterHint = {
 }
 
 export type ResolvedFooter = {
-  hints: readonly { id: string; text: string }[]
+  hints: readonly { id: string; text: string; shortcut?: string; label: string }[]
   hiddenCount: number
 }
 
@@ -59,14 +59,26 @@ export function resolveFooterHints(
   const candidates = footerCandidates(context)
   const resolved = candidates.flatMap((hint, order) => {
     const shortcut = hint.commandId === undefined
-      ? undefined
+      ? fixedShortcut(hint.id)
       : formatKeyBinding(keymap[hint.commandId]?.[0])
     if (hint.commandId !== undefined && shortcut === undefined) return []
+    const fullText = text(locale, hint.labelKey)
+    let label = shortcut === undefined
+      ? fullText
+      : stripShortcut(fullText, shortcut)
+    let displayShortcut = shortcut
+    if (hint.commandId === undefined && shortcut !== undefined) {
+      const extracted = extractFixedShortcut(fullText)
+      if (extracted !== undefined) {
+        displayShortcut = extracted.shortcut
+        label = extracted.label
+      }
+    }
     return [{
       id: hint.id,
-      text: shortcut === undefined
-        ? text(locale, hint.labelKey)
-        : `${shortcut} ${text(locale, hint.labelKey)}`,
+      text: hint.commandId === undefined ? fullText : `${shortcut} ${label}`,
+      shortcut: displayShortcut,
+      label,
       order,
       priority: hint.priority,
     }]
@@ -90,8 +102,50 @@ export function resolveFooterHints(
 
   const hints = resolved
     .filter((hint) => selected.has(hint.id))
-    .map(({ id, text: value }) => ({ id, text: value }))
+    .map(({ id, text: value, shortcut, label }) => ({ id, text: value, shortcut, label }))
   return { hints, hiddenCount: resolved.length - hints.length }
+}
+
+function stripShortcut(value: string, shortcut: string): string {
+  const prefix = new RegExp(`^${escapeRegExp(shortcut)}\\s+`, 'i')
+  return value.replace(prefix, '')
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\[\]\\]/g, '\\$&')
+}
+
+function extractFixedShortcut(value: string): { shortcut: string; label: string } | undefined {
+  const match = value.match(
+    /^((?:PageUp|PageDown|pgup|pgdn)(?:\s*\/\s*(?:PageUp|PageDown|pgup|pgdn))?|(?:Ctrl|Alt|Shift)\+\S+|[↑↓←→]+|Enter|Esc|Tab|Space|M|\/redraw)\s+(.+)$/i,
+  )
+  if (match === null || match[1] === undefined || match[2] === undefined) return undefined
+  return { shortcut: match[1], label: match[2] }
+}
+
+function fixedShortcut(id: string): string | undefined {
+  return {
+    'message-move': '↑↓',
+    'message-copy': 'Ctrl+C',
+    'message-actions': 'M',
+    'message-close': 'Esc',
+    'message-details': 'Ctrl+O',
+    'queue-draft': 'Tab',
+    'pane-scroll': 'PageUp / PageDown',
+    'message-scroll': 'pgup / pgdn',
+    'message-select': 'Shift+↑',
+    close: 'Esc',
+    move: '↑↓',
+    confirm: 'Enter',
+    cancel: 'Esc',
+    select: '↑↓',
+    search: undefined,
+    use: 'Enter',
+    toggle: 'Space',
+    run: 'Enter',
+    scroll: 'pgup / pgdn',
+    redraw: '/redraw',
+  }[id]
 }
 
 function footerCandidates(context: FooterProjectionContext): readonly FooterHint[] {

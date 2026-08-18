@@ -1,26 +1,26 @@
-[header] render-contract                                               session fixture-⌄ │ ⇄ inspector
+[header] render-contract                                               session fixture-⌄ │ ⇄ Inspector
                                                                                          │
-│ The render contract is streaming.                                                    │ │ activity
-│ ◌ read · running · 2s · /workspace/very/long/路径/README.md                          █ │ status: [status] waiting
+│ The render contract is streaming.                                                    │ │ Activity
+│ ◌ read · running · 2s · /workspace/very/long/路径/README.md                          █ │ Status: [status] waiting
                                                                                          │
-┌──────────────────────────────────────────────────────────────────────────────────────┐ │ context
+┌──────────────────────────────────────────────────────────────────────────────────────┐ │ Context
 │ Checklist · 1/3                                                                      │ │ no active details
 │ · ✓ [task] capture geometry                                                          │ │
-│ · ● verify wide characters                                                           │ │ files
-│ · ○ record PTY evidence                                                              │ │ cwd: /workspace/[header] r…
+│ · ● verify wide characters                                                           │ │ Files
+│ · ○ record PTY evidence                                                              │ │ Cwd: /workspace/[header] r…
 └──────────────────────────────────────────────────────────────────────────────────────┘ │ no attachments
 ◐ [status] waiting                                                                       │
-todos 1/3                                                                                │ session
-                                                                                         │ model: fixture-model
-                                                                                         │ id: fixture-
-┌──────────────────────────────────────────────────────────────────────────────────────┐ │ todos: 1/3
+todos 1/3                                                                                │ Session
+                                                                                         │ Model: fixture-model
+                                                                                         │ Id: fixture-
+┌──────────────────────────────────────────────────────────────────────────────────────┐ │ Todos: 1/3
 │ ◆ Approval required                                                                  │ │
-│ [overlay] write_file                                                                 │ │ runtime / MCP
-│ target: /workspace/render-contract.txt                                               │ │ runtime: unavailable
+│ [overlay] write_file                                                                 │ │ Runtime / MCP
+│ target: /workspace/render-contract.txt                                               │ │ Runtime: unavailable
 │ risk: writes a deterministic fixture                                                 │ │ MCP / companion: not repor…
-│ source: render-contract                                                              │ │ capability source: unknown
+│ source: render-contract                                                              │ │ Capability source: unknown
 │ ▸ Allow once a                                                                       │ │
-│ · Allow for turn t                                                                   │ │ shortcuts
+│ · Allow for turn t                                                                   │ │ Shortcuts
 │ · Deny d / n                                                                         │ │ pgup / pgdn scroll
 │ Please wait…                                                                         │ │ shift+↑ messages
 └──────────────────────────────────────────────────────────────────────────────────────┘ │ ctrl+p menu

@@ -30,6 +30,7 @@ export type {
   TuiModelProviderGroup,
   TuiModelCatalogFailure,
   TuiModelCatalog,
+  TuiModelSelection,
   TuiImageMediaType,
   TuiImageAttachmentRef,
   TuiImageInput,

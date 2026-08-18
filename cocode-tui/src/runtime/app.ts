@@ -374,6 +374,7 @@ export type TuiAuthInfo = {
   envLocked: boolean
   accountLabel?: string
   logout: () => Promise<void>
+  persistModel?: (provider: string, model: string) => Promise<void>
   selectMode?: (mode: 'byok' | 'cocode') => Promise<SelectModeResult>
   exclusiveHome?: () => Promise<boolean>
   login?: () => void
@@ -2417,7 +2418,26 @@ class TuiAppImpl implements TuiApp {
     }
     this.emit()
     try {
+      const selected = await this.runtime.selectModel?.(this.sessionId, provider, model)
+      if (selected !== undefined) {
+        // The Host's session.selectModel implementation saves the accepted
+        // selection as the deployment default. Do not write settings again here.
+        this.provider = selected.provider
+        this.model = selected.model
+        await this.refreshSessionControls()
+        await this.loadSkills()
+        await this.loadCommands()
+        this.resetSubagentActivity()
+        this.agent = 'idle'
+        this.notice = {
+          tone: 'info',
+          message: text(this.locale, 'modelChanged', { model: selected.model }),
+        }
+        this.emit()
+        return
+      }
       const info = await this.runtime.restart({ cwd: this.cwd, provider, model })
+      await this.persistModelBestEffort(provider, model)
       this.provider = provider
       this.model = model
       this.runtimeName = info.name
@@ -2469,6 +2489,15 @@ class TuiAppImpl implements TuiApp {
       }
     }
     this.emit()
+  }
+
+  private async persistModelBestEffort(provider: string, model: string): Promise<void> {
+    try {
+      await this.auth?.persistModel?.(provider, model)
+    } catch {
+      // The selected model is already active for this session. Match the GUI
+      // Host behavior and keep the switch when writing the default fails.
+    }
   }
 
   private async resumeSessionAfterRestart(sessionId: string): Promise<boolean> {
