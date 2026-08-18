@@ -1,0 +1,4 @@
+{
+	"applicationExtensions": [".exe"],
+	"packageExtensions": [".msi", ".msix"]
+}

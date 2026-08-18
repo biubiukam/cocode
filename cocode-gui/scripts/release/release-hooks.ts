@@ -15,6 +15,7 @@ import os from "node:os"
 import * as path from "pathe"
 import type { ForgeMakeResult } from "@electron-forge/shared-types"
 import { notarize } from "@electron/notarize"
+import windowsSigningService = require("./windows-sign-service.cjs")
 import {
 	createMacNotarizeOptions,
 	isReleaseSigningRequired,
@@ -24,7 +25,11 @@ import {
 	resolveWindowsSignMode,
 } from "./release-config"
 
-const WINDOWS_SIGNABLE_FILE = /\.(exe|dll|node|sys|efi|scr)$/i
+interface WindowsSigningPolicy {
+	isWindowsApplicationExecutable(filePath: string): boolean
+}
+
+const { isWindowsApplicationExecutable } = windowsSigningService as WindowsSigningPolicy
 
 export function normalizeArtifactNames(makeResults: readonly ForgeMakeResult[]): ForgeMakeResult[] {
 	return makeResults.map((result) => {
@@ -108,8 +113,9 @@ export async function verifyPackagedApplication(packageResult: {
 		run("codesign", ["--verify", "--deep", "--strict", "--verbose=2", appPath])
 		return
 	}
-	const files = collectFiles(packagePath).filter((file) => WINDOWS_SIGNABLE_FILE.test(file))
-	if (files.length === 0) throw new Error(`No Windows PE artifacts found under ${packagePath}.`)
+	const files = collectFiles(packagePath).filter(isWindowsApplicationExecutable)
+	if (files.length === 0)
+		throw new Error(`No Windows executable artifacts found under ${packagePath}.`)
 	verifyWindowsSigningLedger(files)
 	for (const file of files) verifyWindowsFile(file)
 }
@@ -395,10 +401,9 @@ function verifyWindowsNupkg(file: string): void {
 			],
 			{ env: { ...process.env, NUPKG_FILE: file, NUPKG_DIR: directory }, stdio: "inherit" },
 		)
-		const files = collectFiles(directory).filter((candidate) =>
-			WINDOWS_SIGNABLE_FILE.test(candidate),
-		)
-		if (files.length === 0) throw new Error(`No signed PE artifacts found inside ${file}.`)
+		const files = collectFiles(directory).filter(isWindowsApplicationExecutable)
+		if (files.length === 0)
+			throw new Error(`No signed Windows executables found inside ${file}.`)
 		for (const candidate of files) verifyWindowsFile(candidate)
 	} finally {
 		rmSync(directory, { recursive: true, force: true })

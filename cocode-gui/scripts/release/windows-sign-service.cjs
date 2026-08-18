@@ -2,8 +2,20 @@ const { execFileSync } = require("node:child_process")
 const { createHash, webcrypto } = require("node:crypto")
 const { mkdir, readFile, rename, rm, writeFile } = require("node:fs/promises")
 const path = require("pathe")
+const windowsSignPolicy = require("./windows-sign-policy.json")
 
 const KEYTAR_SERVICE = "cocode-windows-sign"
+const WINDOWS_APPLICATION_EXTENSIONS = new Set(windowsSignPolicy.applicationExtensions)
+const WINDOWS_PACKAGE_EXTENSIONS = new Set(windowsSignPolicy.packageExtensions)
+
+function isWindowsApplicationExecutable(filePath) {
+	return WINDOWS_APPLICATION_EXTENSIONS.has(path.extname(filePath).toLowerCase())
+}
+
+function shouldSubmitWindowsFileForSigning(filePath) {
+	const extension = path.extname(filePath).toLowerCase()
+	return WINDOWS_APPLICATION_EXTENSIONS.has(extension) || WINDOWS_PACKAGE_EXTENSIONS.has(extension)
+}
 
 function base64ToBuffer(value) {
 	return Buffer.from(String(value).replace(/-/g, "+").replace(/_/g, "/"), "base64")
@@ -373,11 +385,13 @@ module.exports = {
 	configFromEnvironment,
 	getCredential,
 	inspectAuthenticode,
+	isWindowsApplicationExecutable,
 	ledgerDirectory,
 	ledgerPath,
 	requestChallenge,
 	requestSignature,
 	readLedger,
 	replaceFileAtomically,
+	shouldSubmitWindowsFileForSigning,
 	signFile,
 }

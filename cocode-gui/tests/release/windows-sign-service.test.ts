@@ -19,6 +19,8 @@ interface SigningServiceResult {
 }
 
 interface SigningServiceModule {
+	isWindowsApplicationExecutable(filePath: string): boolean
+	shouldSubmitWindowsFileForSigning(filePath: string): boolean
 	getCredential(
 		target: string,
 		credentialProvider?: (target: string) => string | Promise<string>,
@@ -31,10 +33,49 @@ interface SigningServiceModule {
 	): Promise<SigningServiceResult>
 }
 
-const localRequire = createRequire(__filename)
-const { getCredential, requestSignature } = localRequire(
+const localRequire = createRequire(path.resolve("tests/release/windows-sign-service.test.ts"))
+const {
+	getCredential,
+	isWindowsApplicationExecutable,
+	requestSignature,
+	shouldSubmitWindowsFileForSigning,
+} = localRequire(
 	"../../scripts/release/windows-sign-service.cjs",
 ) as SigningServiceModule
+const windowsSignHook = localRequire("../../scripts/release/windows-sign-hook.cjs") as (
+	filePath: string,
+) => Promise<void>
+
+test("limits remote signing to Magic-compatible executables and required package containers", () => {
+	assert.equal(typeof isWindowsApplicationExecutable, "function")
+	assert.equal(typeof shouldSubmitWindowsFileForSigning, "function")
+
+	for (const file of ["Cocode.exe", "HELPER.EXE"]) {
+		assert.equal(isWindowsApplicationExecutable(file), true, file)
+		assert.equal(shouldSubmitWindowsFileForSigning(file), true, file)
+	}
+	for (const file of ["Cocode-Setup.msi", "Cocode.msix"]) {
+		assert.equal(isWindowsApplicationExecutable(file), false, file)
+		assert.equal(shouldSubmitWindowsFileForSigning(file), true, file)
+	}
+	for (const file of [
+		"native.dll",
+		"better-sqlite3.node",
+		"driver.sys",
+		"boot.efi",
+		"screen.scr",
+		"install.ps1",
+		"package.appx",
+		"archive.cab",
+	]) {
+		assert.equal(isWindowsApplicationExecutable(file), false, file)
+		assert.equal(shouldSubmitWindowsFileForSigning(file), false, file)
+	}
+})
+
+test("does not call the signing service for excluded application files", async () => {
+	await assert.doesNotReject(() => windowsSignHook("/tmp/native.node"))
+})
 
 test("uses SIGN_CERTIFICATE from the environment before Credential Manager", async () => {
 	await assert.doesNotReject(async () => {
