@@ -24,6 +24,7 @@ type AccountSnapshot = {
 type DesktopAccountApi = {
   snapshot(): Promise<AccountSnapshot>
   signIn(): Promise<AccountSnapshot>
+  cancelSignIn(): Promise<void>
   signOut(): Promise<void>
   onChanged(listener: (snapshot: AccountSnapshot) => void): () => void
 }
@@ -69,6 +70,7 @@ const COPY = {
     provisioningHint: "正在为你的账号配置 Cocode Nut 云模型，稍等片刻。",
     onboardingTitle: "登录 Cocode",
     onboardingAction: "立即登录",
+    cancelSignIn: "取消登录",
     signInErrorTitle: "登录 Cocode 失败",
     close: "关闭",
     retryLogin: "重试登录",
@@ -101,6 +103,7 @@ const COPY = {
     provisioningHint: "Setting up Cocode Nut cloud models for your account. This takes a moment.",
     onboardingTitle: "Sign in to Cocode",
     onboardingAction: "Sign in",
+    cancelSignIn: "Cancel sign-in",
     signInErrorTitle: "Cocode sign-in failed",
     close: "Close",
     retryLogin: "Retry sign-in",
@@ -170,6 +173,15 @@ class AccountStore {
     } finally {
       this.busy = false
     }
+  }
+
+  /**
+   * Abandon a sign-in that is waiting on the browser. This deliberately ignores
+   * `busy`: that flag is raised for the whole browser round trip, so honouring
+   * it here would make the only way out of the wait unreachable.
+   */
+  async cancel(): Promise<void> {
+    await window.desktopApi?.account?.cancelSignIn()
   }
 
   async retry(): Promise<void> {
@@ -349,6 +361,14 @@ function AccountOnboarding({ complete, openSection, store }: OnboardingProps): R
     return null
   }
   const busy = snapshot.phase === "signing-in" || snapshot.phase === "provisioning"
+  // Only the browser round trip is worth interrupting. Provisioning writes the
+  // cloud route and credential and needs no user input, so it is dismissed
+  // rather than aborted: tearing it down halfway would leave a partial route.
+  const cancellable = snapshot.phase === "signing-in"
+  const dismiss = (): void => {
+    if (!busy) openSection("models")
+    complete()
+  }
   const message = snapshot.phase === "signing-in"
     ? t.browserHint
     : snapshot.phase === "provisioning"
@@ -372,12 +392,15 @@ function AccountOnboarding({ complete, openSection, store }: OnboardingProps): R
       createElement(
         "div",
         { className: css.onboardingActions },
+        // This card is a full-screen modal, so the secondary action is the only
+        // way out of it and must never be disabled: an authorization wait lasts
+        // until the user finishes in the browser, and blocking the window for
+        // that whole time leaves no way to abandon the attempt.
         createElement("button", {
           type: "button",
           className: `${css.onboardingButton} ${css.onboardingGhost}`,
-          onClick: () => { openSection("models"); complete() },
-          disabled: busy,
-        }, t.later),
+          onClick: cancellable ? () => { void store.cancel() } : dismiss,
+        }, cancellable ? t.cancelSignIn : t.later),
         createElement("button", {
           type: "button",
           className: `${css.onboardingButton} ${css.onboardingPrimary}`,
@@ -532,14 +555,26 @@ function AccountAction({ wide, store, providers }: AccountProps): ReturnType<typ
   const previousPhase = useRef(snapshot.phase)
   const signedIn = snapshot.phase === "signed-in" || snapshot.phase === "provisioning"
   const t = copy()
-  const busy = snapshot.phase === "signing-in" || snapshot.phase === "provisioning"
+  // Waiting on the browser lasts as long as the user takes there, so the
+  // trigger stays open during it and the menu carries the way out. Provisioning
+  // is short, bounded and not interruptible, so it keeps the trigger disabled.
+  const cancellable = snapshot.phase === "signing-in"
   useEffect(() => {
     if (snapshot.phase === "error" && previousPhase.current !== "error") setErrorOpen(true)
     previousPhase.current = snapshot.phase
   }, [snapshot.phase])
-  const primary = signedIn ? snapshot.profile?.displayName ?? "Cocode" : t.settingsOrSignIn
+  const primary = signedIn
+    ? snapshot.profile?.displayName ?? "Cocode"
+    : cancellable
+      ? t.waiting
+      : t.settingsOrSignIn
   const title = accountError(snapshot) ?? primary
-  const entries: MenuEntry[] = signedIn
+  const entries: MenuEntry[] = cancellable
+    ? [
+        { type: "label", id: "signing-in", text: t.browserHint },
+        { id: "cancel-sign-in", label: t.cancelSignIn, icon: createElement(MenuGlyph, { kind: "logout" }) },
+      ]
+    : signedIn
     ? [
         { id: "account", label: t.accountPlan, icon: createElement(MenuGlyph, { kind: "account" }) },
         { id: "usage", label: t.planUsage, icon: createElement(MenuGlyph, { kind: "usage" }) },
@@ -570,6 +605,7 @@ function AccountAction({ wide, store, providers }: AccountProps): ReturnType<typ
   const select = (id: string): void => {
     setOpen(false)
     if (id === "sign-in") void store.activate()
+    else if (id === "cancel-sign-in") void store.cancel()
     else if (id === "sign-out") void store.deactivate()
     else if (id === "models") requestSettings("models")
     else if (id === "settings") requestSettings()
@@ -602,7 +638,7 @@ function AccountAction({ wide, store, providers }: AccountProps): ReturnType<typ
             className: wide ? css.trigger : `${css.trigger} ${css.rail}`,
             "aria-haspopup": "menu",
             "aria-expanded": open,
-            disabled: busy,
+            disabled: snapshot.phase === "provisioning",
             onClick: () => { setOpen(value => !value) },
           },
           createElement(

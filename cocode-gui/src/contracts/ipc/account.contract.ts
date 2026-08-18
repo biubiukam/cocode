@@ -1,6 +1,7 @@
 export const accountChannels = {
 	snapshot: "account:snapshot",
 	signIn: "account:sign-in",
+	cancelSignIn: "account:cancel-sign-in",
 	signOut: "account:sign-out",
 	changed: "account:changed",
 } as const
@@ -41,6 +42,8 @@ export type AccountSnapshot = {
 export type AccountApi = {
 	readonly snapshot: () => Promise<AccountSnapshot>
 	readonly signIn: () => Promise<AccountSnapshot>
+	/** Abandon a sign-in that is still waiting on the browser. */
+	readonly cancelSignIn: () => Promise<void>
 	readonly signOut: () => Promise<void>
 	readonly onChanged: (listener: (snapshot: AccountSnapshot) => void) => () => void
 }

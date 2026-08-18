@@ -1,5 +1,14 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http"
+import { SignInCancelledError } from "./sign-in-cancelled-error"
 
+/**
+ * Serve one loopback authorization callback.
+ *
+ * `close` doubles as the abort handle: a browser round trip can legitimately
+ * take minutes, so the only way to release a caller blocked in `wait` is to
+ * shut the listener down under it. On the success path `wait` has already
+ * settled and the rejection below is a no-op.
+ */
 export async function listenForCallback(
 	pathname: string,
 	timeoutMs = 600_000,
@@ -12,7 +21,9 @@ export async function listenForCallback(
 		const server = createServer()
 		let timer: NodeJS.Timeout | undefined
 		let settled = false
+		let abort: (error: Error) => void = () => undefined
 		const pending = new Promise<URL>((resolveWait, rejectWait) => {
+			abort = rejectWait
 			timer = setTimeout(() => {
 				rejectWait(new Error("login timed out"))
 				server.close()
@@ -34,6 +45,9 @@ export async function listenForCallback(
 				server.close()
 			})
 		})
+		// A caller that never reaches `wait` (authorization itself failed) still
+		// runs `close`, so the rejection needs an owner from the start.
+		void pending.catch(() => undefined)
 		server.on("error", (error) => {
 			if (!settled) reject(error)
 		})
@@ -49,6 +63,7 @@ export async function listenForCallback(
 				wait: () => pending,
 				close: () => {
 					if (timer !== undefined) clearTimeout(timer)
+					abort(new SignInCancelledError())
 					server.close()
 				},
 			})

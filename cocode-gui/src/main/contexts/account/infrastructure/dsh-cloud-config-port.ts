@@ -17,6 +17,14 @@ export type SettingsNamespace = {
 	readonly revision: number
 }
 
+/**
+ * Settings namespace holding the default model for new Agents. The Host only
+ * forwards an allow-list of namespaces over the configuration API, so this one
+ * is readable through `host.describe` but is not guaranteed to appear in
+ * `settings.describe` or to accept a `settings.mutate`.
+ */
+export const DEFAULT_MODEL_NAMESPACE = "agent-default-model"
+
 export type ProviderView = {
 	readonly provider: string
 	readonly displayName: string
@@ -101,7 +109,7 @@ export class DshCloudConfigPort {
 			if (fallback !== undefined) return fallback
 			throw new Error("default model selection is unavailable")
 		}
-		const namespace = settings.namespaces.find((item) => item.ns === "agent-default-model")
+		const namespace = settings.namespaces.find((item) => item.ns === DEFAULT_MODEL_NAMESPACE)
 		const value = namespace?.value
 		if (typeof value !== "object" || value === null || Array.isArray(value)) {
 			if (fallback !== undefined) return fallback

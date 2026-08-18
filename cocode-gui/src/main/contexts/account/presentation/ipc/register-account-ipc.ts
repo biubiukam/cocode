@@ -10,6 +10,9 @@ export function registerAccountIpc(account: AccountService, logger?: DesktopLogg
 	ipcMain.handle(accountChannels.signIn, () =>
 		invoke(logger, "account.sign-in", () => account.signIn(), true),
 	)
+	ipcMain.handle(accountChannels.cancelSignIn, () =>
+		invoke(logger, "account.cancel-sign-in", () => account.cancelSignIn(), true),
+	)
 	ipcMain.handle(accountChannels.signOut, () =>
 		invoke(logger, "account.sign-out", () => account.signOut(), true),
 	)
@@ -26,6 +29,7 @@ export function registerAccountIpc(account: AccountService, logger?: DesktopLogg
 export function unregisterAccountIpc(): void {
 	ipcMain.removeHandler(accountChannels.snapshot)
 	ipcMain.removeHandler(accountChannels.signIn)
+	ipcMain.removeHandler(accountChannels.cancelSignIn)
 	ipcMain.removeHandler(accountChannels.signOut)
 }
 

@@ -126,8 +126,15 @@ export class ModelsSettingsStore {
 
   /**
    * @param api - the wire face (settings/credentials/llm domains).
+   * @param hostedAllowed - whether account-managed rows belong on the page. The
+   * hosted Cocode Nut route exists only for a signed-in account, so a
+   * signed-out desktop drops it here rather than rendering leftover host state
+   * as a healthy provider.
    */
-  constructor(private readonly api: Pick<IApiClient, 'settings' | 'credentials' | 'llm'>) {}
+  constructor(
+    private readonly api: Pick<IApiClient, 'settings' | 'credentials' | 'llm'>,
+    private readonly hostedAllowed: () => boolean = () => true,
+  ) {}
 
   /**
    * Refresh the whole page snapshot: directory and namespaces in parallel,
@@ -160,11 +167,14 @@ export class ModelsSettingsStore {
       return
     }
     const namespaces = new Map(views.map(view => [view.ns, view]))
-    const hasNutProvider = providers.some(entry => entry.provider === COCODE_NUT_PROVIDER)
+    const listed = this.hostedAllowed()
+      ? providers
+      : providers.filter(entry => !isCocodeNutProvider(entry.provider))
+    const hasNutProvider = listed.some(entry => entry.provider === COCODE_NUT_PROVIDER)
     const visibleProviders = sortProvidersForDisplay(
       hasNutProvider
-        ? providers.filter(entry => entry.provider !== LEGACY_COCODE_NUT_PROVIDER)
-        : providers.map((entry) => (
+        ? listed.filter(entry => entry.provider !== LEGACY_COCODE_NUT_PROVIDER)
+        : listed.map((entry) => (
           entry.provider === LEGACY_COCODE_NUT_PROVIDER
             ? { ...entry, displayName: 'Cocode Nut' }
             : entry

@@ -67,6 +67,7 @@ export const startApplication = (): void => {
 	let mainWindow: BrowserWindow | null = null
 	let dshUrl: string | null = null
 	let rebindDshRuntimeOrigin: ((origin: string) => void) | null = null
+	let disposeAccountCleanupRetry: (() => void) | null = null
 	let applicationUpdates: ApplicationUpdateRegistration | null = null
 	let applicationMenu: ApplicationMenuRegistration | null = null
 	let tuiLauncher: TuiLauncher | null = null
@@ -147,6 +148,16 @@ export const startApplication = (): void => {
 				() => observability.logger.log("info", "account.hydrate.completed"),
 				(error) => observability.logger.log("warn", "account.hydrate.failed", { error }),
 			)
+			// A sign-out whose cloud cleanup failed leaves the managed route in the
+			// runtime while the account already reads as signed out. A rebind means
+			// the runtime is usable again, so finish that cleanup now instead of
+			// waiting for the next launch.
+			const accountService = account
+			disposeAccountCleanupRetry = dshRuntime.onRebound(() => {
+				void accountService.retryPendingCleanup().catch((error: unknown) => {
+					observability.logger.log("warn", "account.cleanup.retry.failed", { error })
+				})
+			})
 			shortcuts = new ShortcutService(() => mainWindow)
 			registerShortcutsIpc(shortcuts, observability.logger)
 			applicationUpdates = registerApplicationUpdates(lifecycle)
@@ -168,6 +179,8 @@ export const startApplication = (): void => {
 				shortcuts = null
 				mainWindow = null
 				unregisterAccountIpc()
+				disposeAccountCleanupRetry?.()
+				disposeAccountCleanupRetry = null
 				account?.dispose()
 				account = null
 				unregisterDshRuntimeIpc()

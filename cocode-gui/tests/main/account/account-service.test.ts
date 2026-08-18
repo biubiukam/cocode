@@ -7,6 +7,7 @@ import {
 } from "../../../src/main/contexts/account/application/account-service"
 import { AgencyHttpError } from "../../../src/main/contexts/account/infrastructure/agency-client"
 import type { CleanupPendingState } from "../../../src/main/contexts/account/infrastructure/cleanup-pending"
+import { SignInCancelledError } from "../../../src/main/contexts/account/infrastructure/sign-in-cancelled-error"
 import {
 	DshCloudConfigUnavailableError,
 	type DefaultSelection,
@@ -589,7 +590,7 @@ test("provider write failure before route creation still rolls back the credenti
 	assert.equal(credentialConfigured, false)
 })
 
-test("sign out restores a cloud default before removing only the managed provider", async () => {
+test("sign out removes the managed provider first, then restores the previous default", async () => {
 	const previous: DefaultSelection = { provider: "deepseek-official", model: "deepseek-v4-flash" }
 	const identity = new MemoryVault(
 		validIdentity({
@@ -665,7 +666,7 @@ test("sign out restores a cloud default before removing only the managed provide
 
 	await service.signOut()
 	assert.deepEqual(current, previous)
-	assert.deepEqual(mutations, ["default:restore", "route:unset", "credential:unset"])
+	assert.deepEqual(mutations, ["route:unset", "credential:unset", "default:restore"])
 	assert.equal(identity.value, undefined)
 	assert.equal(cloudKey.value, undefined)
 	assert.equal(pending.value, undefined)
@@ -736,7 +737,7 @@ test("sign out falls back to the deployment default when the previous model is g
 
 	await service.signOut()
 
-	assert.deepEqual(mutations[0], {
+	assert.deepEqual(mutations[1], {
 		ns: "agent-default-model",
 		expectedRevision: 7,
 		ops: [
@@ -750,7 +751,7 @@ test("sign out falls back to the deployment default when the previous model is g
 	assert.equal((await service.snapshot()).phase, "signed-out")
 })
 
-test("sign out clears local identity when default restoration fails", async () => {
+test("sign out drops the managed provider even when default restoration fails", async () => {
 	const identity = new MemoryVault(
 		validIdentity({
 			preLoginDefault: { provider: "deepseek-official", model: "deepseek-v4-flash" },
@@ -761,10 +762,45 @@ test("sign out clears local identity when default restoration fails", async () =
 		}),
 	)
 	const { client } = agency()
+	const mutations: string[] = []
+	let route: Record<string, unknown> | undefined = {
+		api: "openai-responses",
+		baseURL: "https://cocode.agency/v1",
+		apiKeyEnv: "COCODE_NUT_API_KEY",
+	}
 	const dsh = {
 		currentDefault: async () => ({ provider: "cocode-nut", model: "cloud-model" }),
+		// Restoring a default model is a preference, not the meaning of signing
+		// out: its failure must not leave a live managed route behind.
 		models: async () => {
 			throw new Error("model catalog unavailable")
+		},
+		describeSettings: async () => ({
+			writable: true,
+			namespaces: [
+				{
+					ns: "agent-default-model",
+					revision: 7,
+					value: { provider: "cocode-nut", model: "cloud-model" },
+				},
+				{
+					ns: "llm-pi-ai",
+					revision: 9,
+					value: route === undefined ? { providers: {} } : { providers: { "cocode-nut": route } },
+				},
+			],
+		}),
+		describeCredentials: async () => ({
+			COCODE_NUT_API_KEY: { configured: true, writable: true },
+		}),
+		providers: async (): Promise<ProviderView[]> => [],
+		setCredential: async (): Promise<void> => undefined,
+		unsetCredential: async () => {
+			mutations.push("credential:unset")
+		},
+		mutateSettings: async () => {
+			route = undefined
+			mutations.push("route:unset")
 		},
 	} as never
 	const { deps, cloudKey, pending } = dependencies(identity, new MemoryVault("ck_test"))
@@ -772,6 +808,8 @@ test("sign out clears local identity when default restoration fails", async () =
 
 	await service.signOut()
 
+	assert.deepEqual(mutations, ["route:unset", "credential:unset"])
+	assert.equal(route, undefined)
 	assert.equal(identity.value, undefined)
 	assert.equal(cloudKey.value, undefined)
 	assert.equal(pending.value?.pending, true)
@@ -993,6 +1031,138 @@ test("sign out does not send an identity token to a changed Agency origin", asyn
 	assert.equal(identity.value, undefined)
 })
 
+test("cancelling a browser wait returns the account to a resting signed-out state", async () => {
+	const identity = new MemoryVault<IdentityState>(undefined)
+	const { client } = agency()
+	let abortWait: ((error: Error) => void) | undefined
+	const waiting = new Promise<URL>((_resolve, reject) => {
+		abortWait = reject
+	})
+	let browserOpened: () => void = () => undefined
+	const opened = new Promise<void>((resolve) => {
+		browserOpened = resolve
+	})
+	const { deps } = dependencies(identity)
+	const service = new AccountService({} as never, client, {
+		...deps,
+		openExternal: async () => {
+			browserOpened()
+		},
+		listenForCallback: async () => ({
+			redirectUri: "http://127.0.0.1:43123/auth/callback",
+			wait: async () => waiting,
+			// Mirrors the loopback listener: closing it releases whoever waits.
+			close: () => {
+				abortWait?.(new SignInCancelledError())
+			},
+		}),
+	})
+
+	const task = service.signIn()
+	await opened
+	await service.cancelSignIn()
+	const snapshot = await task
+
+	assert.equal(snapshot.phase, "signed-out")
+	assert.equal(snapshot.error, undefined)
+	assert.equal(identity.value, undefined)
+	// The attempt is fully released, so the next one starts a new browser round
+	// trip instead of joining the abandoned task.
+	assert.equal((await service.snapshot()).phase, "signed-out")
+})
+
+test("a queued cleanup that keeps failing cannot strand the account", async () => {
+	const identity = new MemoryVault<IdentityState>(undefined)
+	const pending = new MemoryPending({
+		pending: true,
+		previousDefault: { provider: "deepseek-official", model: "deepseek-v4-flash" },
+	})
+	let authorizationState = ""
+	const { client } = agency({
+		startAuthorization: async (input: { state: string }) => {
+			authorizationState = input.state
+			return "https://cocode.agency/authorize"
+		},
+	})
+	let route: Record<string, unknown> | undefined
+	let credentialConfigured = false
+	let credentialProbes = 0
+	const dsh = {
+		currentDefault: async () => ({ provider: "deepseek-official", model: "deepseek-v4-flash" }),
+		describeSettings: async () => ({
+			writable: true,
+			namespaces: [
+				{
+					ns: "llm-pi-ai",
+					revision: route === undefined ? 1 : 2,
+					value: route === undefined ? { providers: {} } : { providers: { "cocode-nut": route } },
+				},
+			],
+		}),
+		describeCredentials: async () => {
+			credentialProbes += 1
+			// The queued cleanup hits a runtime that cannot serve the configuration
+			// API; the sign-in that follows it must still reach the browser.
+			if (credentialProbes === 1) throw new DshCloudConfigUnavailableError()
+			return { COCODE_NUT_API_KEY: { configured: credentialConfigured, writable: true } }
+		},
+		providers: async (): Promise<ProviderView[]> =>
+			route === undefined
+				? []
+				: [
+						{
+							provider: "cocode-nut",
+							displayName: "Cocode Nut",
+							settingsNs: "llm-pi-ai",
+							settingsPath: ["providers", "cocode-nut"],
+							active: credentialConfigured,
+						},
+				  ],
+		models: async (): Promise<ModelGroup[]> =>
+			route === undefined
+				? []
+				: [
+						{
+							id: "cocode-nut",
+							name: "Cocode Nut",
+							models: [{ id: "cloud-model", name: "Cloud Model" }],
+						},
+				  ],
+		setCredential: async () => {
+			credentialConfigured = true
+		},
+		unsetCredential: async () => {
+			credentialConfigured = false
+		},
+		mutateSettings: async (request: { ops: { op: "set" | "unset"; value?: unknown }[] }) => {
+			const op = request.ops[0]
+			route = op?.op === "set" ? (op.value as Record<string, unknown>) : undefined
+		},
+	} as never
+	const { deps } = dependencies(identity, new MemoryVault<string>(undefined), pending)
+	const opened: string[] = []
+	const service = new AccountService(dsh, client, {
+		...deps,
+		openExternal: async (url) => {
+			opened.push(url)
+		},
+		listenForCallback: async () => ({
+			redirectUri: "http://127.0.0.1:43123/auth/callback",
+			wait: async () =>
+				new URL(
+					`http://127.0.0.1:43123/auth/callback?code=fresh-code&state=${authorizationState}`,
+				),
+			close: () => undefined,
+		}),
+	})
+
+	const snapshot = await service.signIn()
+
+	assert.equal(snapshot.phase, "signed-in")
+	assert.deepEqual(opened, ["https://cocode.agency/authorize"])
+	assert.equal(pending.value, undefined)
+})
+
 test("DSH unavailability clears local secrets and leaves a non-secret cleanup marker", async () => {
 	const identity = new MemoryVault(
 		validIdentity({
@@ -1025,9 +1195,9 @@ test("DSH unavailability clears local secrets and leaves a non-secret cleanup ma
 	assert.equal(identity.value, undefined)
 	assert.equal(cloudKey.value, undefined)
 	assert.equal(pending.value?.pending, true)
-	assert.deepEqual(pending.value?.managedRoute, {
-		baseURL: "https://cocode.agency/v1",
-		apiKeyEnv: "COCODE_NUT_API_KEY",
+	assert.deepEqual(pending.value?.previousDefault, {
+		provider: "deepseek-official",
+		model: "deepseek-v4-flash",
 	})
 	const snapshot = await service.snapshot()
 	assert.equal(snapshot.phase, "error")

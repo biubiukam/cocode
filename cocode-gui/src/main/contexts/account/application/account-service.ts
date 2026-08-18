@@ -2,7 +2,7 @@ import { createHash, randomBytes } from "node:crypto"
 import { shell } from "electron"
 import type { AccountProfile, AccountSnapshot } from "../../../../contracts/ipc/account.contract"
 import {
-	DshCloudConfigUnavailableError,
+	DEFAULT_MODEL_NAMESPACE,
 	type DefaultSelection,
 	type DshCloudConfigPort,
 	type ModelGroup,
@@ -19,6 +19,7 @@ import {
 import { listenForCallback as createCallbackListener } from "../infrastructure/callback-server"
 import { CleanupPendingStore, type CleanupPendingState } from "../infrastructure/cleanup-pending"
 import { SecureVault } from "../infrastructure/secure-vault"
+import { SignInCancelledError } from "../infrastructure/sign-in-cancelled-error"
 import { SharedAccountStore } from "../infrastructure/shared-account-store"
 
 const CLOUD_PROVIDER = "cocode-nut"
@@ -27,6 +28,7 @@ const CLOUD_NAMESPACE = "llm-pi-ai"
 const CLOUD_PATH = ["providers", CLOUD_PROVIDER] as const
 const LEGACY_CLOUD_PATH = ["providers", LEGACY_CLOUD_PROVIDER] as const
 const CLOUD_CREDENTIAL = "COCODE_NUT_API_KEY"
+const LEGACY_CLOUD_CREDENTIAL = "COCODE_CLOUD_API_KEY"
 const CLOUD_API = "openai-responses"
 const CLOUD_MAX_RETRIES = 5
 const CLOUD_KEY_PATTERN = /^ck_[A-Za-z0-9_-]+$/
@@ -227,11 +229,15 @@ function modelExists(groups: readonly ModelGroup[], selection: DefaultSelection)
 	)
 }
 
+/** Whether a provider id names the account-managed route, current or legacy. */
+function isCloudProviderId(provider: string): boolean {
+	return provider === CLOUD_PROVIDER || provider === LEGACY_CLOUD_PROVIDER
+}
+
 function cleanupStateOf(state: IdentityState): CleanupPendingState {
 	return {
 		pending: true,
 		...(state.preLoginDefault === undefined ? {} : { previousDefault: state.preLoginDefault }),
-		...(state.managedRoute === undefined ? {} : { managedRoute: state.managedRoute }),
 	}
 }
 
@@ -246,6 +252,7 @@ export class AccountService {
 	private readonly agency: AccountAgency
 	private loaded = false
 	private signInTask: Promise<AccountSnapshot> | undefined
+	private signInCallback: { close(): void } | undefined
 	private refreshTask: Promise<void> | undefined
 	private stage: AccountStage | undefined
 
@@ -277,23 +284,7 @@ export class AccountService {
 		} catch {
 			// Best-effort rename; provision can still reconcile the managed route.
 		}
-		const pending = await this.cleanupPending.read()
-		if (pending !== undefined) {
-			try {
-				await this.finishPendingCleanup(pending)
-				await this.clearIdentity()
-				await this.cloudKey.clear()
-				this.publish(emptySnapshot())
-			} catch (error) {
-				this.publish({
-					phase: "error",
-					profile: null,
-					cloud: { status: "error", providerId: CLOUD_PROVIDER },
-					error: safeError(error, "cleanup-pending"),
-				})
-			}
-			return
-		}
+		if (await this.retryPendingCleanup()) return
 		let state = await this.identity.read()
 		if (state === undefined) {
 			this.publish(emptySnapshot())
@@ -369,8 +360,21 @@ export class AccountService {
 		if (this.signInTask !== undefined) return this.signInTask
 		this.signInTask = this.performSignIn().finally(() => {
 			this.signInTask = undefined
+			this.signInCallback = undefined
 		})
 		return this.signInTask
+	}
+
+	/**
+	 * Abandon a sign-in that is waiting on the browser. Waiting for an external
+	 * authorization can legitimately take minutes, so the desktop must be able to
+	 * take that decision back; the in-flight task settles on its own signed-out
+	 * snapshot once the loopback listener is gone.
+	 */
+	async cancelSignIn(): Promise<void> {
+		if (this.signInTask === undefined) return
+		this.signInCallback?.close()
+		await this.signInTask
 	}
 
 	async signOut(): Promise<void> {
@@ -383,6 +387,43 @@ export class AccountService {
 		await this.performSignOut()
 	}
 
+	/**
+	 * Finish the cloud cleanup a failed sign-out left queued. Signing out always
+	 * clears the local identity, so a queued marker means the runtime still holds
+	 * a managed route the user can see while the account reads as signed out.
+	 * Every moment the runtime becomes usable again — startup, a rebind, a
+	 * restart — is a chance to close that gap.
+	 * @returns whether a queued cleanup existed, regardless of its outcome.
+	 */
+	async retryPendingCleanup(): Promise<boolean> {
+		await this.ensureLoaded()
+		if ((await this.cleanupPending.read()) === undefined) return false
+		if (this.identity.withLock !== undefined)
+			return this.identity.withLock(() => this.performPendingCleanup())
+		return this.performPendingCleanup()
+	}
+
+	private async performPendingCleanup(): Promise<boolean> {
+		const pending = await this.cleanupPending.read()
+		if (pending === undefined) return false
+		this.stage = "cleanup"
+		try {
+			await this.finishPendingCleanup(pending)
+			await this.clearIdentity()
+			await this.cloudKey.clear()
+			this.publish(emptySnapshot())
+		} catch (error) {
+			this.logFailure("pending cleanup", error)
+			this.publish({
+				phase: "error",
+				profile: null,
+				cloud: { status: "error", providerId: CLOUD_PROVIDER },
+				error: safeError(error, "cleanup-pending"),
+			})
+		}
+		return true
+	}
+
 	private async performSignOut(): Promise<void> {
 		const state = await this.identity.read()
 		const existingPending = await this.cleanupPending.read()
@@ -390,29 +431,9 @@ export class AccountService {
 			state === undefined
 				? existingPending ?? { pending: true as const }
 				: cleanupStateOf(state)
-		let defaultReady = false
-		let cleanupError: unknown
-		try {
-			defaultReady = await this.restoreDefaultOrQueue(pending)
-		} catch (error) {
-			// A model/settings error must not keep the desktop identity alive. The
-			// non-secret pending marker lets the runtime retry cloud cleanup later.
-			cleanupError = error
-			await this.writePendingBestEffort(pending)
-		}
-		if (defaultReady) {
-			try {
-				this.stage = "cleanup"
-				await this.cleanupCloud(pending.managedRoute)
-				await this.cleanupPending.clear()
-			} catch (error) {
-				this.logFailure("sign-out cleanup", error)
-				cleanupError = error
-				await this.writePendingBestEffort(pending)
-			}
-		} else {
-			cleanupError = new DshCloudConfigUnavailableError()
-		}
+		this.stage = "cleanup"
+		const cleanupError = await this.cleanupManagedConfig(pending)
+		if (cleanupError !== undefined) this.logFailure("sign-out cleanup", cleanupError)
 		// Never send a token to a different Agency origin after a development
 		// environment switch. Local cleanup remains authoritative in that case.
 		if (state !== undefined && state.origin === this.agency.getOrigin()) {
@@ -470,7 +491,18 @@ export class AccountService {
 			const pending = await this.cleanupPending.read()
 			if (pending !== undefined) {
 				this.stage = "cleanup"
-				await this.finishPendingCleanup(pending)
+				try {
+					await this.finishPendingCleanup(pending)
+				} catch (error) {
+					// Draining the queue is opportunistic here: provisioning below
+					// rewrites the managed route and credential, so whatever the failed
+					// sign-out left behind is about to be overwritten anyway. Keeping
+					// the marker would instead strand the account, because every later
+					// sign-in starts by draining the same queue and failing the same way
+					// before it ever reaches the browser.
+					this.logFailure("sign-in cleanup", error)
+					await this.cleanupPending.clear()
+				}
 				await this.clearIdentity()
 				await this.cloudKey.clear()
 			}
@@ -492,6 +524,9 @@ export class AccountService {
 			if (state === undefined) {
 				this.stage = "callback-server"
 				const callback = await this.listenForCallback("/auth/callback")
+				// Closing the listener is what releases the wait below, so this is
+				// also the cancel handle for as long as the browser round trip runs.
+				this.signInCallback = callback
 				try {
 					const { verifier, challenge } = createPkce()
 					const stateValue = base64Url(randomBytes(24))
@@ -521,6 +556,7 @@ export class AccountService {
 					}
 					await this.identity.write(state)
 				} finally {
+					this.signInCallback = undefined
 					callback.close()
 				}
 			}
@@ -542,6 +578,14 @@ export class AccountService {
 			})
 			return await this.provision(state)
 		} catch (error) {
+			if (error instanceof SignInCancelledError) {
+				// Abandoning a sign-in leaves the account exactly where it started.
+				// Reporting it as a failure would strand the UI in an error state the
+				// user has to dismiss after deliberately backing out.
+				const snapshot = emptySnapshot()
+				this.publish(snapshot)
+				return snapshot
+			}
 			this.logFailure("sign-in", error)
 			if (isReauthenticationRequired(error)) {
 				const invalid = await this.identity.read()
@@ -784,40 +828,66 @@ export class AccountService {
 		return this.agency.createDesktopKey(state.accessToken)
 	}
 
-	private async cleanupCloud(
-		managedRoute: IdentityState["managedRoute"] = undefined,
-	): Promise<void> {
+	/**
+	 * Remove the account-managed provider route and credential. The Cocode route
+	 * ids and credential references are reserved product slots the Models page
+	 * refuses to hand out, so their mere presence proves ownership: cleanup must
+	 * not require a recorded route shape to match, or any drift in that shape
+	 * (a renamed provider, an upgraded protocol, a lost identity file) would
+	 * silently turn removal into a no-op and leave the route behind.
+	 */
+	private async cleanupCloud(): Promise<void> {
 		const settings = await this.dsh.describeSettings()
 		const namespace = settings.namespaces.find((item) => item.ns === CLOUD_NAMESPACE)
-		const route = routeOf(settings.namespaces)
-		if (isManagedCloudRoute(route, managedRoute)) {
+		const providers = recordOf(valueAt(namespace?.value, ["providers"]))
+		const routes = [CLOUD_PATH, LEGACY_CLOUD_PATH].filter(
+			(path) => providers?.[path[1]] !== undefined,
+		)
+		if (routes.length > 0) {
 			await this.dsh.mutateSettings({
 				ns: CLOUD_NAMESPACE,
 				expectedRevision: namespace?.revision,
-				ops: [{ op: "unset", path: CLOUD_PATH }],
+				ops: routes.map((path) => ({ op: "unset" as const, path: [...path] })),
 			})
-			await this.dsh.unsetCredential(CLOUD_CREDENTIAL)
-			return
 		}
-		if (managedRoute !== undefined && route === undefined)
-			await this.dsh.unsetCredential(CLOUD_CREDENTIAL)
+		const refs = [CLOUD_CREDENTIAL, LEGACY_CLOUD_CREDENTIAL]
+		const credentials = await this.dsh.describeCredentials(refs)
+		for (const ref of refs) {
+			if (credentials[ref]?.configured === true) await this.dsh.unsetCredential(ref)
+		}
 	}
 
-	private async restoreDefaultOrQueue(pending: CleanupPendingState): Promise<boolean> {
+	/**
+	 * Drop the managed configuration, then restore the pre-login default model.
+	 * The two steps are deliberately independent and ordered this way: removing
+	 * the route and credential IS the meaning of signing out, while restoring a
+	 * default model is a preference. Gating the former on the latter is what
+	 * used to leave a live Cocode Nut route behind a signed-out account.
+	 * @returns the first failure, or undefined once both steps landed.
+	 */
+	private async cleanupManagedConfig(pending: CleanupPendingState): Promise<unknown> {
+		let failure: unknown
+		try {
+			await this.cleanupCloud()
+		} catch (error) {
+			failure = error
+		}
 		try {
 			await this.restoreDefaultIfNeeded(pending.previousDefault)
-			return true
 		} catch (error) {
-			if (!isDshUnavailable(error)) throw error
-			await this.writePendingBestEffort(pending)
-			return false
+			failure ??= error
 		}
+		if (failure === undefined) {
+			await this.cleanupPending.clear()
+			return undefined
+		}
+		await this.writePendingBestEffort(pending)
+		return failure
 	}
 
 	private async finishPendingCleanup(pending: CleanupPendingState): Promise<void> {
-		await this.restoreDefaultIfNeeded(pending.previousDefault)
-		await this.cleanupCloud(pending.managedRoute)
-		await this.cleanupPending.clear()
+		const failure = await this.cleanupManagedConfig(pending)
+		if (failure !== undefined) throw failure
 	}
 
 	private async handleInvalidIdentity(
@@ -825,15 +895,8 @@ export class AccountService {
 		options: { readonly clearCloudKey?: boolean } = {},
 	): Promise<void> {
 		const pending = cleanupStateOf(state)
-		let cleanupError: unknown
-		try {
-			await this.restoreDefaultIfNeeded(pending.previousDefault)
-			await this.cleanupCloud(pending.managedRoute)
-			await this.cleanupPending.clear()
-		} catch (error) {
-			cleanupError = error
-			await this.writePendingBestEffort(pending)
-		}
+		this.stage = "cleanup"
+		const cleanupError = await this.cleanupManagedConfig(pending)
 		await this.clearIdentity()
 		if (options.clearCloudKey !== false) await this.cloudKey.clear()
 		if (cleanupError === undefined) {
@@ -886,14 +949,25 @@ export class AccountService {
 
 	private async restoreDefaultIfNeeded(previous: DefaultSelection | undefined): Promise<void> {
 		const current = await this.dsh.currentDefault()
-		if (current.provider !== CLOUD_PROVIDER) return
-		const restorePrevious =
-			previous !== undefined && modelExists(await this.dsh.models(), previous)
+		if (!isCloudProviderId(current.provider)) return
 		const settings = await this.dsh.describeSettings()
-		const namespace = settings.namespaces.find((item) => item.ns === "agent-default-model")
-		if (namespace === undefined) throw new Error("default model settings are unavailable")
+		const namespace = settings.namespaces.find((item) => item.ns === DEFAULT_MODEL_NAMESPACE)
+		// The Host decides which namespaces the configuration API exposes, and it
+		// need not include this one. Restoring a default model is a preference, so
+		// an unreachable namespace has to stay a no-op: failing here would abort
+		// sign-out and then every later sign-in, which begins by draining the
+		// cleanup queued by that failed sign-out.
+		if (namespace === undefined) return
+		// A pre-login default that itself named the account-managed route (its
+		// legacy id included) is not a local selection worth restoring: that route
+		// is being removed too. Clear the selection instead and let the runtime
+		// fall back to its own default.
+		const restorePrevious =
+			previous !== undefined &&
+			!isCloudProviderId(previous.provider) &&
+			modelExists(await this.dsh.models(), previous)
 		await this.dsh.mutateSettings({
-			ns: "agent-default-model",
+			ns: DEFAULT_MODEL_NAMESPACE,
 			expectedRevision: namespace.revision,
 			ops: restorePrevious
 				? [
@@ -1019,12 +1093,14 @@ export class AccountService {
 			ops,
 		})
 
-		const agentNamespace = settings.namespaces.find((item) => item.ns === "agent-default-model")
+		const agentNamespace = settings.namespaces.find(
+			(item) => item.ns === DEFAULT_MODEL_NAMESPACE,
+		)
 		if (agentNamespace === undefined) return
 		const agent = recordOf(agentNamespace.value)
 		if (agent?.provider !== LEGACY_CLOUD_PROVIDER) return
 		await this.dsh.mutateSettings({
-			ns: "agent-default-model",
+			ns: DEFAULT_MODEL_NAMESPACE,
 			expectedRevision: agentNamespace.revision,
 			ops: [{ op: "set", path: ["provider"], value: CLOUD_PROVIDER }],
 		})
@@ -1065,16 +1141,6 @@ function browserReauthenticationUrl(origin: string): string {
 	const url = new URL("/login", origin)
 	url.searchParams.set("return_to", "/account")
 	return url.href
-}
-
-function isDshUnavailable(error: unknown): boolean {
-	return (
-		error instanceof DshCloudConfigUnavailableError ||
-		(error instanceof Error &&
-			/DSH runtime is not ready|configuration service is unavailable|fetch failed|ECONNREFUSED|network/i.test(
-				error.message,
-			))
-	)
 }
 
 function safeError(error: unknown, code: string): { code: string; message: string } {

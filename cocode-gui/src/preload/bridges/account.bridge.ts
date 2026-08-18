@@ -21,6 +21,7 @@ function subscribe(listener: (snapshot: AccountSnapshot) => void): () => void {
 export const accountBridge: AccountApi = {
 	snapshot: async () => parseAccountSnapshot(await ipcRenderer.invoke(accountChannels.snapshot)),
 	signIn: async () => parseAccountSnapshot(await ipcRenderer.invoke(accountChannels.signIn)),
+	cancelSignIn: () => ipcRenderer.invoke(accountChannels.cancelSignIn) as Promise<void>,
 	signOut: () => ipcRenderer.invoke(accountChannels.signOut) as Promise<void>,
 	onChanged: subscribe,
 }

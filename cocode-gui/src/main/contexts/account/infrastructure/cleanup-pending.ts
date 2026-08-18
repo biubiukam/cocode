@@ -4,14 +4,15 @@ import { join } from "pathe"
 import type { DefaultSelection } from "./dsh-cloud-config-port"
 
 /**
- * Logout cleanup is deliberately recoverable. The marker contains only
- * routing metadata and a previous default selection; it never contains an
- * identity token or an API key.
+ * Logout cleanup is deliberately recoverable. The marker only records the
+ * default selection to restore; it never contains an identity token or an API
+ * key. Route ownership is not recorded here: the reserved Cocode route id and
+ * credential reference identify the managed configuration on their own, so a
+ * stale marker can never make cleanup skip a route it owns.
  */
 export type CleanupPendingState = {
 	readonly pending: true
 	readonly previousDefault?: DefaultSelection
-	readonly managedRoute?: { readonly baseURL: string; readonly apiKeyEnv: string }
 }
 
 const FILENAME = "cocode-account-cleanup-pending.json"
@@ -24,12 +25,10 @@ export class CleanupPendingStore {
 			const value: unknown = JSON.parse(await readFile(this.path, "utf8"))
 			if (!isRecord(value)) return undefined
 			const previousDefault = readDefault(value.previousDefault)
-			const managedRoute = readManagedRoute(value.managedRoute)
 			if (value.pending !== true) return undefined
 			return {
 				pending: true,
 				...(previousDefault === undefined ? {} : { previousDefault }),
-				...(managedRoute === undefined ? {} : { managedRoute }),
 			}
 		} catch {
 			return undefined
@@ -63,14 +62,4 @@ function readDefault(value: unknown): DefaultSelection | undefined {
 			? { reasoningEffort: value.reasoningEffort }
 			: {}),
 	}
-}
-
-function readManagedRoute(value: unknown): CleanupPendingState["managedRoute"] {
-	if (
-		!isRecord(value) ||
-		typeof value.baseURL !== "string" ||
-		typeof value.apiKeyEnv !== "string"
-	)
-		return undefined
-	return { baseURL: value.baseURL, apiKeyEnv: value.apiKeyEnv }
 }

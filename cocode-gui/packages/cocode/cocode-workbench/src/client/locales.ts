@@ -79,6 +79,7 @@ export const zh = {
   "git.ignore": "添加到 .gitignore",
   "git.copyPath": "复制路径",
   "git.reveal": "在文件管理器中显示",
+  "git.revealMac": "在 Finder 中显示",
 
   "git.empty": "没有更改",
   "git.emptyHint": "工作区与上一次提交一致。",
@@ -233,6 +234,7 @@ export const en: Record<WorkbenchKey, string> = {
   "git.ignore": "Add to .gitignore",
   "git.copyPath": "Copy Path",
   "git.reveal": "Reveal in File Manager",
+  "git.revealMac": "Reveal in Finder",
 
   "git.empty": "No changes",
   "git.emptyHint": "The working tree matches the last commit.",
@@ -357,4 +359,15 @@ function format(template: string, params?: Record<string, unknown>): string {
 export function t(key: WorkbenchKey, params?: Record<string, unknown>): string {
   if (bound !== undefined) return bound(key, params)
   return format(fallbackDict()[key], params)
+}
+
+/** Whether the current client is running on macOS. */
+export function isMacOS(): boolean {
+  if (typeof navigator === "undefined") return false
+  return /mac/i.test(navigator.platform || navigator.userAgent)
+}
+
+/** Platform-aware label for revealing a file in the native file browser. */
+export function revealLabel(): string {
+  return isMacOS() ? t("git.revealMac") : t("git.reveal")
 }

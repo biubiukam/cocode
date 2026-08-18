@@ -1,4 +1,5 @@
 import type { MenuEntry } from "@deepseek-ai/dsh-client-ui-primitives"
+import { revealLabel } from "./locales.ts"
 
 /** Every command the file tree context menu can emit. */
 export type FileCommand =
@@ -32,6 +33,6 @@ export function fileMenuEntries(target: { readonly isDir: boolean; readonly isRo
   }
   entries.push({ id: "copyPath", label: "复制路径" })
   if (!target.isRoot) entries.push({ id: "copyRelativePath", label: "复制相对路径" })
-  entries.push({ id: "reveal", label: "在文件管理器中显示" })
+  entries.push({ id: "reveal", label: revealLabel() })
   return entries
 }

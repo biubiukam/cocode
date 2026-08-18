@@ -4,7 +4,7 @@
  */
 import type { MenuEntry, MenuItem } from "@deepseek-ai/dsh-client-ui-primitives"
 import type { GitBranch, GitRepo, GitRow, GitStash } from "./git-client.ts"
-import { t } from "./locales.ts"
+import { revealLabel, t } from "./locales.ts"
 
 export type GitCommand =
   | "refresh" | "init"
@@ -112,7 +112,7 @@ export function rowMenuEntries(row: GitRow): readonly MenuEntry[] {
     ...(row.group === "untracked" ? [{ id: "ignore", label: t("git.ignore") } satisfies MenuEntry] : []),
     { type: "separator", id: "sep-actions" },
     { id: "copyPath", label: t("git.copyPath") },
-    { id: "reveal", label: t("git.reveal") },
+    { id: "reveal", label: revealLabel() },
   ]
 }
 
