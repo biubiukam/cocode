@@ -45,6 +45,12 @@ export type DefaultSelection = {
 	readonly reasoningEffort?: string
 }
 
+export type SessionModelTarget = {
+	readonly sessionId: string
+	readonly blank: boolean
+	readonly running: boolean
+}
+
 export class DshCloudConfigUnavailableError extends Error {
 	constructor(message = "DSH configuration service is unavailable") {
 		super(message)
@@ -147,6 +153,34 @@ export class DshCloudConfigPort {
 
 	async unsetCredential(ref: string): Promise<void> {
 		await this.call("credentials.unset", { ref })
+	}
+
+	async listSessions(): Promise<readonly SessionModelTarget[]> {
+		const result = await this.call<{ items?: unknown }>("session.list", {})
+		if (!Array.isArray(result.items)) return []
+		const sessions: SessionModelTarget[] = []
+		for (const item of result.items) {
+			if (typeof item !== "object" || item === null) continue
+			const row = item as Record<string, unknown>
+			if (typeof row.sessionId !== "string" || row.sessionId === "") continue
+			sessions.push({
+				sessionId: row.sessionId,
+				blank: row.blank === true,
+				running: row.running === true,
+			})
+		}
+		return sessions
+	}
+
+	async selectModel(sessionId: string, selection: DefaultSelection): Promise<void> {
+		await this.call("session.selectModel", {
+			sessionId,
+			provider: selection.provider,
+			model: selection.model,
+			...(selection.reasoningEffort === undefined
+				? {}
+				: { reasoningEffort: selection.reasoningEffort }),
+		})
 	}
 
 	private async call<T>(method: string, payload: unknown): Promise<T> {

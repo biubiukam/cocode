@@ -355,6 +355,180 @@ test("reuses a ready device cloud route without minting another API key", async 
 	})
 })
 
+test("paid sign-in switches a custom default and the open session onto Nut Flash", async () => {
+	const identity = new MemoryVault(
+		validIdentity({
+			personalKeyId: "key-from-tui",
+			personalKeyName: "Cocode Device — test-host",
+		}),
+	)
+	const { client } = agency()
+	let current: DefaultSelection = { provider: "deepseek-official", model: "deepseek-v4-flash" }
+	const selected: { sessionId: string; selection: DefaultSelection }[] = []
+	const defaultOps: { op: string; path: readonly string[]; value?: unknown }[] = []
+	const route = {
+		displayName: "Cocode Nut",
+		api: "openai-responses",
+		baseURL: "https://cocode.agency/v1",
+		apiKeyEnv: "COCODE_NUT_API_KEY",
+		retryPolicy: { mode: "normal", maxRetries: 5 },
+		models: [
+			{ id: "deepseek-v4-pro", name: "DeepSeek-V4-Pro" },
+			{ id: "deepseek-v4-flash", name: "DeepSeek-V4-Flash" },
+		],
+	}
+	const dsh = {
+		currentDefault: async () => current,
+		describeSettings: async () => ({
+			writable: true,
+			namespaces: [
+				{
+					ns: "llm-pi-ai",
+					revision: 3,
+					value: { providers: { "cocode-nut": route } },
+				},
+				{ ns: "agent-default-model", revision: 4, value: current },
+			],
+		}),
+		describeCredentials: async () => ({
+			COCODE_NUT_API_KEY: { configured: true, writable: true },
+		}),
+		providers: async (): Promise<ProviderView[]> => [
+			{
+				provider: "cocode-nut",
+				displayName: "Cocode Nut",
+				settingsNs: "llm-pi-ai",
+				settingsPath: ["providers", "cocode-nut"],
+				active: true,
+			},
+		],
+		models: async (): Promise<ModelGroup[]> => [
+			{
+				id: "deepseek-official",
+				name: "DeepSeek",
+				models: [{ id: "deepseek-v4-flash", name: "DeepSeek-V4-Flash" }],
+			},
+			{
+				id: "cocode-nut",
+				name: "Cocode Nut",
+				models: [
+					{ id: "deepseek-v4-pro", name: "DeepSeek-V4-Pro" },
+					{ id: "deepseek-v4-flash", name: "DeepSeek-V4-Flash" },
+				],
+			},
+		],
+		mutateSettings: async (request: {
+			ns: string
+			ops: { op: string; path: readonly string[]; value?: unknown }[]
+		}) => {
+			assert.equal(request.ns, "agent-default-model")
+			defaultOps.push(...request.ops)
+			current = { provider: "cocode-nut", model: "deepseek-v4-flash" }
+		},
+		setCredential: async (): Promise<void> => undefined,
+		unsetCredential: async (): Promise<void> => undefined,
+		listSessions: async () => [
+			{ sessionId: "blank-open", blank: true, running: false },
+			{ sessionId: "cold-history", blank: false, running: false },
+		],
+		selectModel: async (sessionId: string, selection: DefaultSelection) => {
+			selected.push({ sessionId, selection })
+		},
+	} as never
+
+	const snapshot = await new AccountService(dsh, client, dependencies(identity).deps).signIn()
+	assert.equal(snapshot.phase, "signed-in")
+	assert.deepEqual(current, { provider: "cocode-nut", model: "deepseek-v4-flash" })
+	assert.deepEqual(defaultOps, [
+		{ op: "set", path: ["provider"], value: "cocode-nut" },
+		{ op: "set", path: ["model"], value: "deepseek-v4-flash" },
+		{ op: "unset", path: ["reasoningEffort"] },
+	])
+	assert.deepEqual(selected, [
+		{ sessionId: "blank-open", selection: { provider: "cocode-nut", model: "deepseek-v4-flash" } },
+	])
+})
+
+test("free sign-in keeps a custom default model", async () => {
+	const identity = new MemoryVault(
+		validIdentity({
+			personalKeyId: "key-from-tui",
+			personalKeyName: "Cocode Device — test-host",
+		}),
+	)
+	const { client } = agency({
+		accountUsage: async () => ({
+			plan: "free",
+			fiveHour: 10,
+			week: 20,
+			month: 30,
+			syncedAt: "2026-08-15T00:00:00.000Z",
+		}),
+	})
+	let writes = 0
+	const route = {
+		displayName: "Cocode Nut",
+		api: "openai-responses",
+		baseURL: "https://cocode.agency/v1",
+		apiKeyEnv: "COCODE_NUT_API_KEY",
+		retryPolicy: { mode: "normal", maxRetries: 5 },
+		models: [{ id: "deepseek-v4-flash", name: "DeepSeek-V4-Flash" }],
+	}
+	const dsh = {
+		currentDefault: async () => ({ provider: "deepseek-official", model: "deepseek-v4-flash" }),
+		describeSettings: async () => ({
+			writable: true,
+			namespaces: [
+				{
+					ns: "llm-pi-ai",
+					revision: 3,
+					value: { providers: { "cocode-nut": route } },
+				},
+				{
+					ns: "agent-default-model",
+					revision: 4,
+					value: { provider: "deepseek-official", model: "deepseek-v4-flash" },
+				},
+			],
+		}),
+		describeCredentials: async () => ({
+			COCODE_NUT_API_KEY: { configured: true, writable: true },
+		}),
+		providers: async (): Promise<ProviderView[]> => [
+			{
+				provider: "cocode-nut",
+				displayName: "Cocode Nut",
+				settingsNs: "llm-pi-ai",
+				settingsPath: ["providers", "cocode-nut"],
+				active: true,
+			},
+		],
+		models: async (): Promise<ModelGroup[]> => [
+			{
+				id: "cocode-nut",
+				name: "Cocode Nut",
+				models: [{ id: "deepseek-v4-flash", name: "DeepSeek-V4-Flash" }],
+			},
+		],
+		mutateSettings: async () => {
+			writes += 1
+		},
+		setCredential: async () => {
+			writes += 1
+		},
+		unsetCredential: async () => {
+			writes += 1
+		},
+		selectModel: async () => {
+			writes += 1
+		},
+	} as never
+
+	const snapshot = await new AccountService(dsh, client, dependencies(identity).deps).signIn()
+	assert.equal(snapshot.phase, "signed-in")
+	assert.equal(writes, 0)
+})
+
 test("upgrades a ready cloud route to the Cocode five-retry default", async () => {
 	const identity = new MemoryVault(
 		validIdentity({

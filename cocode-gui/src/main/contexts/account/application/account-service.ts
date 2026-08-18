@@ -34,6 +34,7 @@ const CLOUD_MAX_RETRIES = 5
 const CLOUD_KEY_PATTERN = /^ck_[A-Za-z0-9_-]+$/
 const CLOUD_READY_ATTEMPTS = 6
 const CLOUD_READY_RETRY_MS = 100
+const PREFERRED_NUT_MODEL_ID = "deepseek-v4-flash"
 
 type AccountStage =
 	| "cleanup"
@@ -105,6 +106,8 @@ type AccountDshPort = Pick<
 	| "mutateSettings"
 	| "setCredential"
 	| "unsetCredential"
+	| "listSessions"
+	| "selectModel"
 >
 
 type CallbackListener = {
@@ -232,6 +235,42 @@ function modelExists(groups: readonly ModelGroup[], selection: DefaultSelection)
 /** Whether a provider id names the account-managed route, current or legacy. */
 function isCloudProviderId(provider: string): boolean {
 	return provider === CLOUD_PROVIDER || provider === LEGACY_CLOUD_PROVIDER
+}
+
+function isPaidPlan(plan: string): boolean {
+	const key = plan.trim().toLowerCase()
+	return key !== "" && key !== "free" && key !== "unknown"
+}
+
+function isFlashModel(model: { readonly id: string; readonly name: string }): boolean {
+	return /flash/i.test(model.id) || /flash/i.test(model.name)
+}
+
+function nutFlashSelection(groups: readonly ModelGroup[]): DefaultSelection | undefined {
+	const group =
+		groups.find((entry) => entry.id === CLOUD_PROVIDER && entry.models.length > 0) ??
+		groups.find((entry) => entry.id === LEGACY_CLOUD_PROVIDER && entry.models.length > 0)
+	if (group === undefined) return undefined
+	const model =
+		group.models.find((entry) => entry.id === PREFERRED_NUT_MODEL_ID) ??
+		group.models.find(isFlashModel) ??
+		group.models[0]
+	if (model === undefined) return undefined
+	return { provider: group.id, model: model.id }
+}
+
+function selectionSettingsOps(selection: DefaultSelection): {
+	readonly op: "set" | "unset"
+	readonly path: readonly string[]
+	readonly value?: unknown
+}[] {
+	return [
+		{ op: "set", path: ["provider"], value: selection.provider },
+		{ op: "set", path: ["model"], value: selection.model },
+		...(selection.reasoningEffort === undefined
+			? [{ op: "unset" as const, path: ["reasoningEffort"] }]
+			: [{ op: "set" as const, path: ["reasoningEffort"], value: selection.reasoningEffort }]),
+	]
 }
 
 function cleanupStateOf(state: IdentityState): CleanupPendingState {
@@ -576,7 +615,17 @@ export class AccountService {
 				profile,
 				cloud: { status: "absent", providerId: CLOUD_PROVIDER },
 			})
-			return await this.provision(state)
+			const snapshot = await this.provision(state)
+			if (snapshot.phase === "signed-in") {
+				try {
+					await this.switchToPaidNutFlash(state.accessToken)
+				} catch (error) {
+					// Sign-in already landed the managed route. Switching the picker
+					// is a preference and must not roll the account back to an error.
+					this.logFailure("paid-nut-default", error)
+				}
+			}
+			return snapshot
 		} catch (error) {
 			if (error instanceof SignInCancelledError) {
 				// Abandoning a sign-in leaves the account exactly where it started.
@@ -1000,6 +1049,48 @@ export class AccountService {
 		}
 	}
 
+	/**
+	 * Paid Nut login should take over the picker from a local/custom route.
+	 * Free and unknown plans keep the pre-login channel. Hydrate must not call
+	 * this: restarting a signed-in app must not undo a later manual switch.
+	 */
+	private async switchToPaidNutFlash(accessToken: string): Promise<void> {
+		const usage = await this.agency.accountUsage(accessToken)
+		if (!isPaidPlan(usage.plan)) return
+		const current = await this.dsh.currentDefault()
+		if (isCloudProviderId(current.provider)) return
+		const selection = nutFlashSelection(await this.dsh.models())
+		if (selection === undefined) return
+		const settings = await this.dsh.describeSettings()
+		const namespace = settings.namespaces.find((item) => item.ns === DEFAULT_MODEL_NAMESPACE)
+		if (namespace !== undefined) {
+			await this.dsh.mutateSettings({
+				ns: DEFAULT_MODEL_NAMESPACE,
+				expectedRevision: namespace.revision,
+				ops: selectionSettingsOps(selection),
+			})
+		}
+		await this.selectNutFlashOnOpenSessions(selection)
+	}
+
+	private async selectNutFlashOnOpenSessions(selection: DefaultSelection): Promise<void> {
+		let sessions: Awaited<ReturnType<AccountDshPort["listSessions"]>>
+		try {
+			sessions = await this.dsh.listSessions()
+		} catch {
+			return
+		}
+		const newest = sessions[0]?.sessionId
+		for (const session of sessions) {
+			if (!session.blank && !session.running && session.sessionId !== newest) continue
+			try {
+				await this.dsh.selectModel(session.sessionId, selection)
+			} catch {
+				// Cold sessions are not attached; selectModel is session-local.
+			}
+		}
+	}
+
 	private async restoreDefaultIfNeeded(previous: DefaultSelection | undefined): Promise<void> {
 		const current = await this.dsh.currentDefault()
 		if (!isCloudProviderId(current.provider)) return
@@ -1022,25 +1113,14 @@ export class AccountService {
 		await this.dsh.mutateSettings({
 			ns: DEFAULT_MODEL_NAMESPACE,
 			expectedRevision: namespace.revision,
-			ops: restorePrevious
-				? [
-						{ op: "set", path: ["provider"], value: previous.provider },
-						{ op: "set", path: ["model"], value: previous.model },
-						...(previous.reasoningEffort === undefined
-							? [{ op: "unset" as const, path: ["reasoningEffort"] }]
-							: [
-									{
-										op: "set" as const,
-										path: ["reasoningEffort"],
-										value: previous.reasoningEffort,
-									},
-							  ]),
-				  ]
-				: [
-						{ op: "unset", path: ["provider"] },
-						{ op: "unset", path: ["model"] },
-						{ op: "unset", path: ["reasoningEffort"] },
-				  ],
+			ops:
+				previous !== undefined && restorePrevious
+					? selectionSettingsOps(previous)
+					: [
+							{ op: "unset", path: ["provider"] },
+							{ op: "unset", path: ["model"] },
+							{ op: "unset", path: ["reasoningEffort"] },
+					  ],
 		})
 	}
 
