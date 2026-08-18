@@ -4,11 +4,20 @@ import { accountPath } from './paths.ts'
 const STALE_LOCK_MS = 120_000
 const LOCK_WAIT_MS = 10_000
 
+async function ensureDir(path: string): Promise<void> {
+  try {
+    await mkdir(path, { recursive: true, mode: 0o700 })
+  } catch (error) {
+    // recursive mkdir should be idempotent, but Windows can still throw EEXIST
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
+  }
+}
+
 export async function withAccountLock<T>(
   home: string,
   operation: () => Promise<T>,
 ): Promise<T> {
-  await mkdir(home, { recursive: true, mode: 0o700 })
+  await ensureDir(home)
   const lock = `${accountPath(home)}.lock`
   const deadline = Date.now() + LOCK_WAIT_MS
   for (;;) {

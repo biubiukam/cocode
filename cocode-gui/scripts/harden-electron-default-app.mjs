@@ -1,9 +1,9 @@
 import { spawn } from "node:child_process"
 import { createRequire } from "node:module"
 import { access, mkdtemp, readFile, readdir, rename, rm, writeFile } from "node:fs/promises"
-import os from "node:os"
 import * as path from "pathe"
 import { createPackage, extractAll } from "@electron/asar"
+import { electronDefaultAppTemporaryPrefix } from "./lib/electron-default-app-paths.mjs"
 
 const require = createRequire(import.meta.url)
 const electronPackageRoot = path.dirname(require.resolve("electron/package.json"))
@@ -36,7 +36,7 @@ async function hardenDefaultApp(resourcesRoot) {
 				"The Electron binary installation did not complete; remove node_modules/electron and reinstall.",
 		)
 	}
-	const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "cocode-electron-default-app-"))
+	const temporaryRoot = await mkdtemp(electronDefaultAppTemporaryPrefix(defaultAppArchive))
 	const extractedDefaultApp = path.join(temporaryRoot, "default-app")
 	const replacementArchive = path.join(temporaryRoot, "default_app.asar")
 	const backupArchive = path.join(temporaryRoot, "default_app.original.asar")

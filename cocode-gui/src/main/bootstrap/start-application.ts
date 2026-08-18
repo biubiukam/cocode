@@ -34,6 +34,12 @@ import { registerElectronObservers } from "../shared/observability/register-elec
 import { TuiLauncher } from "../contexts/tui/infrastructure/tui-launcher"
 import { registerTuiIpc, unregisterTuiIpc } from "../contexts/tui/presentation/ipc/register-tui-ipc"
 import { detectSquirrelEvent, handleSquirrelEvent } from "./squirrel-events"
+import type { SharedDshCatalog } from "../contexts/dsh-runtime/infrastructure/external-dsh-catalog"
+import { createSharedDshCatalog } from "../contexts/dsh-runtime/infrastructure/create-external-dsh-catalog"
+import {
+	registerSharedDshIpc,
+	unregisterSharedDshIpc,
+} from "../contexts/dsh-runtime/presentation/ipc/register-external-dsh-ipc"
 
 export const startApplication = (): void => {
 	const squirrelEvent = detectSquirrelEvent()
@@ -59,6 +65,7 @@ export const startApplication = (): void => {
 	let rebindDshRuntimeOrigin: ((origin: string) => void) | null = null
 	let applicationUpdates: ApplicationUpdateRegistration | null = null
 	let tuiLauncher: TuiLauncher | null = null
+	let sharedDsh: SharedDshCatalog | null = null
 
 	const lifecycle = registerApplicationLifecycle({
 		logger: observability.logger,
@@ -87,6 +94,7 @@ export const startApplication = (): void => {
 				throw error
 			}
 			dshRuntime = new DshRuntimeProcess(observability.logger)
+			sharedDsh = createSharedDshCatalog()
 			tuiLauncher = new TuiLauncher()
 			if (shouldAutoInstallCommandLineTool()) {
 				try {
@@ -114,6 +122,7 @@ export const startApplication = (): void => {
 			registerDshRuntimeIpc(dshRuntime, observability.logger, {
 				onRebound: (origin) => rebindDshRuntimeOrigin?.(origin),
 			})
+			registerSharedDshIpc(sharedDsh)
 			dshUrl = await dshRuntime.start()
 			observability.resources.setHostPid(dshRuntime.hostPid)
 			observability.diagnostics.setHostLogDirectory(dshRuntime.hostLogDirectory)
@@ -154,6 +163,9 @@ export const startApplication = (): void => {
 				account?.dispose()
 				account = null
 				unregisterDshRuntimeIpc()
+				unregisterSharedDshIpc()
+				await sharedDsh?.dispose()
+				sharedDsh = null
 				databaseModule?.dispose()
 				observability.logger.log("info", "database.closed")
 				databaseModule = null

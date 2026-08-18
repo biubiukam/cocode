@@ -63,6 +63,17 @@ describe('resolveSessionRoot', () => {
     ).toEqual({ path: join(homedir, '.dsh', 'sessions'), source: 'default' })
   })
 
+  it('allows the launcher to pin the DSH home explicitly', () => {
+    expect(
+      resolveSessionRoot({
+        env: {},
+        cwd,
+        homedir,
+        dshHome: resolve('dsh-home'),
+      }),
+    ).toEqual({ path: resolve('dsh-home', 'sessions'), source: 'DSH_HOME' })
+  })
+
   it('uses Windows path semantics when the platform is simulated', () => {
     expect(
       resolveSessionRoot({

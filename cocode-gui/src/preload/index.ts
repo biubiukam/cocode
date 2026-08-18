@@ -6,6 +6,7 @@ import { accountBridge } from "./bridges/account.bridge"
 import { shortcutsBridge } from "./bridges/shortcuts.bridge"
 import { diagnosticsBridge } from "./bridges/diagnostics.bridge"
 import { tuiBridge } from "./bridges/tui.bridge"
+import { sharedDshBridge } from "./bridges/external-dsh.bridge"
 
 const desktopApi: DesktopApi = {
 	database: databaseBridge,
@@ -14,6 +15,9 @@ const desktopApi: DesktopApi = {
 	shortcuts: shortcutsBridge,
 	diagnostics: diagnosticsBridge,
 	tui: tuiBridge,
+	sharedDsh: sharedDshBridge,
+	// Compatibility for an older Renderer bundle during a rolling desktop update.
+	externalDsh: sharedDshBridge,
 }
 
 contextBridge.exposeInMainWorld("desktopApi", desktopApi)

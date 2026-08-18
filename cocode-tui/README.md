@@ -56,35 +56,41 @@ cocode [options] [command]
 | `cocode host stop` | Stop the shared Host when no client is using it |
 | `cocode host stop --force` | Stop it even when leases are still held |
 | `cocode gui` | Open the installed Cocode desktop client |
-| `cocode dsh [args...]` | Run the bundled DSH CLI and forward all arguments |
-| `cocode --version` | Print the installed version |
+| `cocode plugin [args...]` | Manage bundled DSH plugins; defaults to the `cocode` profile |
+| `cocode version` | Show Cocode and bundled DSH versions |
+| `cocode --version` | Print the installed Cocode version |
 | `cocode --help` | Print the complete CLI help |
 
 Scope options can be used before a command:
 
 ```sh
-cocode --dsh-home ~/.dsh --profile web
+cocode --dsh-home ~/.dsh --profile cocode
 cocode --runtime-channel preview doctor
-cocode dsh plugin --profile web add dshmarket
-cocode dsh --version
+cocode plugin --profile web add dshmarket
+cocode --profile web --dump-config
 ```
 
-Arguments after `cocode dsh` are passed to the bundled DSH CLI unchanged, so a
-separate `dsh` installation is not required.
+DSH-compatible commands and options are passed to the bundled DSH CLI unchanged,
+so a separate `dsh` installation is not required. Cocode owns `--help` and
+`--version`. When `cocode plugin` does not specify `--profile`, it uses the
+`cocode` profile by default. The standalone `cocode web` command is disabled;
+use `cocode gui` or `cocode tui` for the Cocode clients.
 
-The same values can be supplied through `DSH_HOME`, `DSH_PROFILE`, and
-`COCODE_RUNTIME_CHANNEL`.
+The shared DSH home can also be supplied through `COCODE_DSH_HOME`; the
+launcher derives `DSH_HOME=COCODE_DSH_HOME` and uses the `cocode` profile for
+the Cocode Host. `COCODE_RUNTIME_CHANNEL` selects the embedded runtime channel.
 
 ## Configuration
 
-The CLI keeps Cocode account data and DSH runtime data in separate locations.
-This avoids mixing product authentication with the shared Harness settings.
+The CLI keeps Cocode account/runtime data separate from the shared DSH Home.
+Settings, credentials, profile plugins, and session data remain in the DSH Home.
 
 | Variable | Purpose | Default |
 | --- | --- | --- |
-| `COCODE_HOME` | Cocode account and vision configuration | `~/.cocode` |
-| `DSH_HOME` | Shared DSH settings and BYOK credentials | `~/.dsh` |
-| `DSH_PROFILE` | Shared Host profile | Host default |
+| `COCODE_HOME` | Cocode account and runtime data | `~/.cocode` |
+| `COCODE_DSH_HOME` | Shared DSH settings, credentials, profile plugins, and sessions | `~/.dsh` |
+| `DSH_HOME` | Child Host alias derived from `COCODE_DSH_HOME` | `~/.dsh` |
+| `DSH_PROFILE` | Child Host profile | `cocode` |
 | `COCODE_HOST_CONFIG_FINGERPRINT` | Select a custom Host composition | Unset |
 | `COCODE_RUNTIME_CHANNEL` | Select `stable`, `preview`, or `dev` runtime | `stable` |
 | `DSH_SESSION_ROOT` | Session JSONL directory | `$DSH_HOME/sessions` |
@@ -96,8 +102,8 @@ This avoids mixing product authentication with the shared Harness settings.
 | `COCODE_LANG` | `zh` or `en` UI language | Environment/default locale |
 
 For local development, copy `.env.example` to `.env`. Do not put API keys in
-`.env`; the TUI writes BYOK credentials to the DSH credentials file and keeps
-Cocode account tokens under `COCODE_HOME`.
+`.env`; the TUI writes BYOK credentials to `$DSH_HOME/.credentials.yaml` and
+keeps Cocode account tokens under `COCODE_HOME`.
 
 ## Authentication
 

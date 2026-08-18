@@ -16,6 +16,8 @@ export function resolveSessionRoot(options: {
   cwd?: string
   homedir?: string
   platform?: NodeJS.Platform
+  /** Explicit DSH home resolved by the Cocode launcher. */
+  dshHome?: string
 }): SessionRoot {
   const env = options.env ?? process.env
   const pathApi = pathForPlatform(options.platform)
@@ -23,13 +25,11 @@ export function resolveSessionRoot(options: {
   const homedir = options.homedir ?? osHomedir()
   const configuredRoot = nonempty(env.DSH_SESSION_ROOT)
   if (configuredRoot !== undefined) {
-    return {
-      path: resolveFromCwd(configuredRoot, cwd, homedir, pathApi),
-      source: 'DSH_SESSION_ROOT',
-    }
+    const candidate = resolveFromCwd(configuredRoot, cwd, homedir, pathApi)
+    return { path: candidate, source: 'DSH_SESSION_ROOT' }
   }
 
-  const configuredHome = nonempty(env.DSH_HOME)
+  const configuredHome = options.dshHome ?? nonempty(env.DSH_HOME)
   if (configuredHome !== undefined) {
     return {
       path: pathApi.resolve(expandTildePath(configuredHome, homedir), 'sessions'),

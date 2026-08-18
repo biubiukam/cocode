@@ -190,7 +190,8 @@ class SupervisorService {
     const child = spawn(process.execPath, [slot.entry, ...args], {
       cwd: workspace,
       env: {
-        ...mergeHostRuntimeEnv(process.env, request.runtimeEnv, this.scope.dshHome),
+        ...mergeHostRuntimeEnv(process.env, request.runtimeEnv, this.scope.dshHome, this.scope.profile),
+        DSH_PROFILE: this.scope.profile,
         COCODE_DSH_PROFILE: this.scope.profile,
       },
       stdio: ['ignore', 'pipe', 'pipe'],

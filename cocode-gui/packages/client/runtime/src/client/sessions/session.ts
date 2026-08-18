@@ -32,10 +32,10 @@ import { SessionQueueMirror } from './queue-mirror.ts'
 export const PAGE_MESSAGES = 50
 
 /**
- * Keep a bounded materialized transcript in the renderer.  The host remains
- * the source of truth; older pages can be fetched again by sequence when the
- * user scrolls back.  Hysteresis avoids rebuilding the assembler on every
- * live event once the limit is reached.
+ * Keep a bounded materialized tail in the renderer until the user explicitly
+ * pages backwards. Once paging starts, the oldest side is reader-visible and
+ * must not be trimmed away immediately after it is prepended; resync rebuilds
+ * the tail window and re-enables this bound.
  */
 export const MAX_MATERIALIZED_EVENTS = 2_000
 const TARGET_MATERIALIZED_EVENTS = 1_800
@@ -89,6 +89,8 @@ export class Session implements SessionFace {
    *  passes drop all writes once the generation moves on. */
   private openGeneration = 0
   private loadingOlder = false
+  /** Explicit paging owns the oldest edge until the next resync. */
+  private historyExpanded = false
   private pending = new Map<string, PendingInteraction>()
   private pendingRev = 0
   private pendingCache: { rev: number; value: PendingInteraction[] } | null = null
@@ -395,7 +397,10 @@ export class Session implements SessionFace {
     this.notifier.markDirty()
     try {
       const { result } = await this.history({ beforeSeq: this.baseSeq, maxMessages: PAGE_MESSAGES })
-      if (!result.ok) return // keep the window as-is; do not overwrite openError (open already succeeded)
+      if (!result.ok) {
+        console.error('[web-runtime] loadOlder rejected:', result.error)
+        return // keep the window as-is; do not overwrite openError (open already succeeded)
+      }
       const older = result.value.events
       if (older.length === 0) {
         this.hasMore = result.value.hasMore
@@ -410,13 +415,16 @@ export class Session implements SessionFace {
         this.conversation.prepend([], false)
         return
       }
+      // The explicit paging window is reader-owned. Trimming from the oldest
+      // side after prepend would remove the page we just fetched, especially
+      // when the tail was already reduced to TARGET_MATERIALIZED_EVENTS.
+      this.historyExpanded = true
       this.events = [...older.map(e => e.event), ...this.events]
       this.views = [...older.map(e => e.view), ...this.views]
       /* v8 ignore next -- the ?? arm needs older[0] undefined, but the empty-page branch above already returned. */
       this.baseSeq = older[0]?.event.seq ?? this.baseSeq
       this.hasMore = result.value.hasMore
       this.conversation.prepend(older.map(conversationInput), this.hasMore)
-      this.trimMaterializedWindowIfNeeded()
     } catch (error) {
       console.error('[web-runtime] loadOlder failed:', error)
     } finally {
@@ -440,6 +448,7 @@ export class Session implements SessionFace {
     this.openPromise = null
     this.openState = 'cold'
     this.openError = null
+    this.historyExpanded = false
     this.events = []
     this.views = []
     this.baseSeq = 0
@@ -711,6 +720,7 @@ export class Session implements SessionFace {
    * stale indexes, dependencies, and view snapshots alive.
    */
   private trimMaterializedWindowIfNeeded(): boolean {
+    if (this.historyExpanded) return false
     if (this.events.length <= MAX_MATERIALIZED_EVENTS) return false
     const start = this.events.length - TARGET_MATERIALIZED_EVENTS
     const retainedEvents = this.events.slice(start)
@@ -764,6 +774,9 @@ export class Session implements SessionFace {
       const { result } = await this.history({ maxMessages: PAGE_MESSAGES })
       // Failure or superseded by a full resync: drop — the resync path rebuilds and clears the buffer itself.
       if (result.ok && generation === this.openGeneration && this.openState === 'open') {
+        // Gap repair replaces the window with a fresh tail baseline, so the
+        // explicit paging preservation no longer applies to this instance.
+        this.historyExpanded = false
         this.installWindow(result.value.events, result.value.hasMore, result.value.projections)
       }
     } catch (error) {

@@ -306,12 +306,17 @@ export function posixShim(
 	source: TuiCommandLineToolRegistrationSource = "unknown",
 ): string {
 	const env = invocation.env
+	const configuredHome = env.COCODE_HOME?.trim()
 	return [
 		"#!/bin/sh",
 		DESKTOP_SHIM_MARKER,
 		`# ${SOURCE_MARKER}${source}`,
 		"set -eu",
-		'if [ -z "${DSH_HOME:-}" ]; then export DSH_HOME="$HOME/.dsh"; fi',
+		configuredHome === undefined
+			? 'export COCODE_HOME="${COCODE_HOME:-$HOME/.cocode}"'
+			: `export COCODE_HOME=${shellQuote(configuredHome)}`,
+		'export COCODE_DSH_HOME="${COCODE_DSH_HOME:-$HOME/.dsh}"',
+		'export DSH_HOME="$COCODE_DSH_HOME"',
 		`export COCODE_NODE_EXECUTABLE=${shellQuote(
 			env.COCODE_NODE_EXECUTABLE ?? invocation.executable,
 		)}`,
@@ -319,9 +324,9 @@ export function posixShim(
 			env.COCODE_SUPERVISOR_SERVICE_ENTRY ?? "",
 		)}`,
 		`export COCODE_TUI_CLIENT_KIND=${shellQuote(env.COCODE_TUI_CLIENT_KIND ?? "desktop-tui")}`,
-		`export DSH_PROFILE=${shellQuote(env.DSH_PROFILE ?? "web")}`,
+		`export DSH_PROFILE=${shellQuote("cocode")}`,
 		`export COCODE_HOST_CONFIG_FINGERPRINT=${shellQuote(
-			env.COCODE_HOST_CONFIG_FINGERPRINT ?? "cocode-web-jsonrpc-v1",
+			env.COCODE_HOST_CONFIG_FINGERPRINT ?? "cocode-web-jsonrpc-v3",
 		)}`,
 		`export COCODE_RUNTIME_CHANNEL=${shellQuote(env.COCODE_RUNTIME_CHANNEL ?? "stable")}`,
 		`exec ${shellQuote(invocation.executable)} ${shellQuote(invocation.args[0] ?? "")} "$@"`,
@@ -338,13 +343,19 @@ export function windowsShim(
 		"@echo off",
 		WINDOWS_DESKTOP_SHIM_MARKER,
 		`REM ${SOURCE_MARKER}${source}`,
-		'if not defined DSH_HOME set "DSH_HOME=%USERPROFILE%\\.dsh"',
+		env.COCODE_HOME?.trim() === undefined
+			? 'if not defined COCODE_HOME set "COCODE_HOME=%USERPROFILE%\\.cocode"'
+			: `set "COCODE_HOME=${env.COCODE_HOME.trim()}"`,
+		env.COCODE_DSH_HOME?.trim() === undefined
+			? 'if not defined COCODE_DSH_HOME set "COCODE_DSH_HOME=%USERPROFILE%\\.dsh"'
+			: `set "COCODE_DSH_HOME=${env.COCODE_DSH_HOME.trim()}"`,
+		'set "DSH_HOME=%COCODE_DSH_HOME%"',
 		`set "COCODE_NODE_EXECUTABLE=${env.COCODE_NODE_EXECUTABLE ?? invocation.executable}"`,
 		`set "COCODE_SUPERVISOR_SERVICE_ENTRY=${env.COCODE_SUPERVISOR_SERVICE_ENTRY ?? ""}"`,
 		`set "COCODE_TUI_CLIENT_KIND=${env.COCODE_TUI_CLIENT_KIND ?? "desktop-tui"}"`,
-		`set "DSH_PROFILE=${env.DSH_PROFILE ?? "web"}"`,
+		'set "DSH_PROFILE=cocode"',
 		`set "COCODE_HOST_CONFIG_FINGERPRINT=${
-			env.COCODE_HOST_CONFIG_FINGERPRINT ?? "cocode-web-jsonrpc-v1"
+			env.COCODE_HOST_CONFIG_FINGERPRINT ?? "cocode-web-jsonrpc-v3"
 		}"`,
 		`set "COCODE_RUNTIME_CHANNEL=${env.COCODE_RUNTIME_CHANNEL ?? "stable"}"`,
 		`"${invocation.executable}" "${invocation.args[0] ?? ""}" %*`,

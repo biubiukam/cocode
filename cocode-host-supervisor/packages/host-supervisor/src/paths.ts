@@ -3,11 +3,11 @@ import { join, resolve } from 'node:path'
 import { hostKey, type HostScope } from './protocol.js'
 
 export function supervisorHome(): string {
-  return resolve(process.env.COCODE_SUPERVISOR_HOME?.trim() || join(homedir(), '.cocode', 'host-supervisor'))
+  return resolve(process.env.COCODE_SUPERVISOR_HOME?.trim() || join(homedir(), '.cocode', 'runtime', 'host-supervisor'))
 }
 
 export function runtimeHome(): string {
-  return resolve(process.env.COCODE_HOST_RUNTIME_HOME?.trim() || join(homedir(), '.cocode', 'host-runtimes'))
+  return resolve(process.env.COCODE_HOST_RUNTIME_HOME?.trim() || join(homedir(), '.cocode', 'runtime', 'host-runtimes'))
 }
 
 export function scopeDirectory(scope: HostScope): string {

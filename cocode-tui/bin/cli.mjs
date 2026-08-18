@@ -6,14 +6,18 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const require = createRequire(import.meta.url)
+const DSH_COMMANDS = new Set(['plugin'])
+const DSH_ROOT_OPTIONS = new Set(['--patch', '--dump-config', '--dump-default-config'])
+const DEFAULT_PLUGIN_PROFILE = 'cocode'
 
 export function parseCliArgs(args) {
-  const options = { command: 'tui', commandArgs: [], force: false, json: false, help: false, version: false }
+  const options = { command: 'tui', commandArgs: [], force: false, json: false, help: false, version: false, versionCommand: false }
   const remaining = [...args]
   while (remaining.length > 0) {
     const value = remaining.shift()
     if (value === '--help' || value === '-h') { options.help = true; continue }
-    if (value === '--version' || value === '-v' || value === 'version') { options.version = true; continue }
+    if (value === '--version' || value === '-v') { options.version = true; continue }
+    if (value === 'version') { options.version = true; options.versionCommand = true; continue }
     if (value === '--force' || value === '-f') { options.force = true; continue }
     if (value === '--json') { options.json = true; continue }
     if (value === '--dsh-home' || value === '--profile' || value === '--runtime-channel') {
@@ -24,9 +28,23 @@ export function parseCliArgs(args) {
       if (value === '--runtime-channel') options.runtimeChannel = next
       continue
     }
+    if (DSH_COMMANDS.has(value) || DSH_ROOT_OPTIONS.has(value)) {
+      options.command = 'dsh'
+      const hasDshProfile = hasProfileOption(remaining)
+      const sharedProfile = options.profile && !hasDshProfile
+        ? ['--profile', options.profile]
+        : value === 'plugin' && !hasDshProfile
+          ? ['--profile', DEFAULT_PLUGIN_PROFILE]
+        : []
+      options.commandArgs = value === 'plugin'
+        ? [value, ...sharedProfile, ...remaining]
+        : [...sharedProfile, value, ...remaining]
+      break
+    }
     if (value === '--gui' || value === 'gui') { options.command = 'gui'; options.commandArgs = remaining; break }
     if (value === '--tui' || value === 'tui') { options.command = 'tui'; options.commandArgs = remaining; break }
-    if (value === 'dsh') { options.command = 'dsh'; options.commandArgs = remaining; break }
+    if (value === 'web') throw new Error('The `cocode web` command is disabled. Use `cocode gui` or `cocode tui`.')
+    if (value === 'dsh') throw new Error('The `cocode dsh ...` form is no longer supported. Use `cocode plugin ...`.')
     if (value === '--doctor' || value === 'doctor') { options.command = 'doctor'; options.commandArgs = remaining; break }
     if (value === '--stop-host' || value === 'stop-host') { options.command = 'host-stop'; options.commandArgs = remaining; break }
     if (value === 'status') { options.command = 'host-status'; options.commandArgs = remaining; break }
@@ -67,8 +85,15 @@ export function parseCliArgs(args) {
   return options
 }
 
+function hasProfileOption(args) {
+  return args.some((value) => value === '--profile' || value.startsWith('--profile='))
+}
+
 export function applyScopeOptions(options, env = process.env) {
-  if (options.dshHome) env.DSH_HOME = options.dshHome
+  if (options.dshHome) {
+    env.COCODE_DSH_HOME = options.dshHome
+    env.DSH_HOME = options.dshHome
+  }
   if (options.profile) env.DSH_PROFILE = options.profile
   if (options.runtimeChannel) {
     if (!['stable', 'preview', 'dev'].includes(options.runtimeChannel)) throw new Error('--runtime-channel must be stable, preview, or dev.')
@@ -134,6 +159,19 @@ export function resolveDshLaunch(runtimePaths, env = process.env, requireImpl = 
   return { executable: env.COCODE_NODE_EXECUTABLE?.trim() || process.execPath, entry }
 }
 
+export function resolveDshVersion(runtimePaths, env = process.env) {
+  let directory = dirname(resolveDshLaunch(runtimePaths, env).entry)
+  while (directory !== dirname(directory)) {
+    const manifestPath = join(directory, 'package.json')
+    if (existsSync(manifestPath)) {
+      const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+      if (manifest.name === '@deepseek-ai/dsh') return String(manifest.version || 'unknown')
+    }
+    directory = dirname(directory)
+  }
+  throw new Error('Bundled DSH package metadata is missing.')
+}
+
 function runtimeDshEntries(root) {
   return [
     join(root, 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js'),
@@ -185,5 +223,38 @@ export function stagedPaths(scriptUrl) {
 }
 
 export function usage(version) {
-  return `Cocode ${version}\n\nUsage: cocode <command> [options]\n\nCommands:\n  gui [args...]              Open Cocode GUI\n  tui [args...]              Open Cocode TUI (default)\n  dsh [args...]              Run the bundled DSH CLI\n  host status [--json]       Show the shared Host status\n  host stop [--force]        Stop the Host and Supervisor\n  doctor                     Check TUI and Host prerequisites\n  version                    Show the installed Cocode version\n\nOptions:\n  -h, --help                 Show this help\n  -v, --version              Show the installed version\n  -f, --force                Stop Host even when clients still hold leases\n      --json                 Print machine-readable status\n      --dsh-home <path>      Select the shared DSH home\n      --profile <name>       Select the DSH profile\n      --runtime-channel <c>  Select stable, preview, or dev runtime\n\nEnvironment:\n  COCODE_GUI_EXECUTABLE      Explicit GUI executable path\n  COCODE_GUI_PATH            Alias for COCODE_GUI_EXECUTABLE\n  COCODE_DSH_CLI_ENTRY       Explicit bundled DSH CLI entry path\n`
+  return [
+    `Cocode ${version}`,
+    '',
+    'Usage: cocode <command> [options]',
+    '',
+    'Commands:',
+    '  gui [args...]              Open Cocode GUI',
+    '  tui [args...]              Open Cocode TUI (default)',
+    '  plugin [args...]           Manage bundled DSH profile plugins',
+    '  host status [--json]       Show the shared Host status',
+    '  host stop [--force]        Stop the Host and Supervisor',
+    '  doctor                     Check TUI and Host prerequisites',
+    '  version                    Show Cocode and bundled DSH versions',
+    '',
+    'DSH-compatible options:',
+    '      --patch <path>         Apply an extra DSH patch overlay',
+    '      --dump-config          Print the composed DSH profile tree',
+    '      --dump-default-config  Print the default DSH profile tree',
+    '',
+    'Cocode options:',
+    '  -h, --help                 Show this help',
+    '  -v, --version              Show the installed Cocode version',
+    '  -f, --force                Stop Host even when clients still hold leases',
+    '      --json                 Print machine-readable status',
+    '      --dsh-home <path>      Select the shared DSH home',
+    '      --profile <name>       Select the DSH profile',
+    '      --runtime-channel <c>  Select stable, preview, or dev runtime',
+    '',
+    'Environment:',
+    '  COCODE_GUI_EXECUTABLE      Explicit GUI executable path',
+    '  COCODE_GUI_PATH            Alias for COCODE_GUI_EXECUTABLE',
+    '  COCODE_DSH_CLI_ENTRY       Explicit bundled DSH CLI entry path',
+    '',
+  ].join('\n')
 }

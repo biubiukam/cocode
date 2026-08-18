@@ -17,6 +17,45 @@ export interface HostScope {
   runtimeChannel: RuntimeChannel
 }
 
+/**
+ * Cocode's embedded product runtime deliberately does not inherit the
+ * ambient DSH_HOME/DSH_PROFILE pair.  The official launcher keeps using the
+ * generic resolver below (`~/.dsh` + `web`); Cocode callers must opt into this
+ * explicit scope so an exported DSH_HOME cannot collapse the two products.
+ */
+export function resolveCocodeHome(env: NodeJS.ProcessEnv = process.env): string {
+  const configured = nonemptyEnv(env.COCODE_HOME)
+  return resolveUserPath(configured ?? `${homedir()}/.cocode`)
+}
+
+export function resolveCocodeDshHome(env: NodeJS.ProcessEnv = process.env): string {
+  const configured = nonemptyEnv(env.COCODE_DSH_HOME) ?? nonemptyEnv(env.COCODE_DSH_SOURCE_HOME)
+  return resolveUserPath(configured ?? `${homedir()}/.dsh`)
+}
+
+/** Backward-compatible alias for the shared DSH data reader. */
+export const resolveOfficialDshSourceHome = resolveCocodeDshHome
+
+export function resolveCocodeHostScope(env: NodeJS.ProcessEnv = process.env): HostScope {
+  const dshHome = resolveCocodeDshHome(env)
+  const runtimeEnv = resolveHostRuntimeEnv({
+    ...env,
+    COCODE_DSH_HOME: dshHome,
+    DSH_HOME: dshHome,
+  })
+  const baseFingerprint = env.COCODE_HOST_CONFIG_FINGERPRINT?.trim() || 'cocode-web-jsonrpc-v3'
+  return canonicalizeScope({
+    dshHome,
+    profile: 'cocode',
+    hostConfigFingerprint: Object.keys(runtimeEnv).length === 0
+      ? baseFingerprint
+      : `${baseFingerprint}:${fingerprint(runtimeEnv)}`,
+    runtimeChannel: env.COCODE_RUNTIME_CHANNEL === 'preview' || env.COCODE_RUNTIME_CHANNEL === 'dev'
+      ? env.COCODE_RUNTIME_CHANNEL
+      : 'stable',
+  })
+}
+
 export interface AcquireHostRequest {
   scope: HostScope
   clientKind: HostClientKind
@@ -92,8 +131,8 @@ export function resolveHostRuntimeEnv(env: NodeJS.ProcessEnv): HostRuntimeEnv {
 function resolveVisionConfigPath(env: NodeJS.ProcessEnv): string | undefined {
   const configured = nonemptyEnv(env.COCODE_VISION_CONFIG)
   if (configured !== undefined) return resolveUserPath(configured)
-  const home = nonemptyEnv(env.COCODE_HOME)
-  return home === undefined ? undefined : join(resolveUserPath(home), 'vision.yaml')
+  const home = nonemptyEnv(env.COCODE_DSH_HOME) ?? nonemptyEnv(env.DSH_HOME)
+  return join(resolveUserPath(home ?? `${homedir()}/.dsh`), 'vision.yaml')
 }
 
 function nonemptyEnv(value: string | undefined): string | undefined {

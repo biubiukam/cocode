@@ -21,5 +21,6 @@ test("mounts Cocode plugins only through the Electron overlay", () => {
 	assert.match(patch, /name: "cocode-account"/)
 	assert.match(patch, /id: cocode-shortcuts/)
 	assert.match(patch, /name: "cocode-shortcuts"/)
+	assert.doesNotMatch(patch, /cocode-external-dsh/)
 	assert.doesNotMatch(patch, /profiles\/web|cordis\.patch\.yml/)
 })

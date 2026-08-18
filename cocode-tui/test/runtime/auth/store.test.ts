@@ -329,8 +329,22 @@ describe('AuthStore', () => {
       pid: 99,
       isAlive: (pid: number) => pid === 7 || pid === 99,
     }
-    await registerLiveInstance(home, { pid: 7, isAlive: live.isAlive })
+    await registerLiveInstance(join(home, 'runtime'), { pid: 7, isAlive: live.isAlive })
     const store = await createAuthStore({ home, env: {}, live })
+    expect(await store.selectMode('byok')).toEqual({ status: 'home-busy' })
+  })
+
+  it('keeps TUI live-instance markers in the Cocode account home', async () => {
+    const accountHome = await tempHome()
+    const dshHome = await tempHome()
+    await patchCredential(dshHome, 'DEEPSEEK_API_KEY', 'sk-keep')
+    const live = {
+      pid: 99,
+      isAlive: (pid: number) => pid === 7 || pid === 99,
+    }
+    await registerLiveInstance(join(accountHome, 'runtime'), { pid: 7, isAlive: live.isAlive })
+    const store = await createAuthStore({ accountHome, dshHome, env: {}, live })
+
     expect(await store.selectMode('byok')).toEqual({ status: 'home-busy' })
   })
 
@@ -343,7 +357,7 @@ describe('AuthStore', () => {
       pid: 99,
       isAlive: (pid: number) => pid === 7 || pid === 99,
     }
-    await registerLiveInstance(home, { pid: 7, isAlive: live.isAlive })
+    await registerLiveInstance(join(home, 'runtime'), { pid: 7, isAlive: live.isAlive })
     const store = await createAuthStore({
       home,
       env: {},

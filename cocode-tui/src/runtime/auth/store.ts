@@ -3,6 +3,7 @@
  */
 
 import { deleteAccount, readAccount, writeAccount } from './account.ts'
+import { join } from 'node:path'
 import { withAccountLock } from './account-lock.ts'
 import { patchCredential, readCredentials } from './credentials.ts'
 import {
@@ -24,7 +25,7 @@ import {
 } from './live-instances.ts'
 import { displayError, formatError, TuiError } from '../errors/index.ts'
 import { agencyOrigin } from './origin.ts'
-import { accountHome as defaultAccountHome, defaultHomeContext, dshHome as defaultDshHome } from './paths.ts'
+import { accountHome as defaultAccountHome, defaultHomeContext, dshHome as defaultDshHome, sharedDshHome as defaultSharedDshHome } from './paths.ts'
 import { apiKeyEnvFor, channelAvailability, resolveAuth, saveByokKey } from './resolve.ts'
 import {
   captureCloudSettings,
@@ -85,9 +86,11 @@ export async function createAuthStore(options: AuthStoreOptions = {}): Promise<A
   const context = defaultHomeContext(env)
   const accountHome = options.accountHome ?? options.home ?? defaultAccountHome(context)
   const dshHome = options.dshHome ?? options.home ?? defaultDshHome(context)
+  const sharedDshHome = defaultSharedDshHome(context)
   const store = new AuthStoreImpl(
     accountHome,
     dshHome,
+    sharedDshHome,
     env,
     options.cwd,
     options.client,
@@ -115,6 +118,7 @@ class AuthStoreImpl implements AuthStore {
   constructor(
     private readonly accountHome: string,
     private readonly dshHome: string,
+    private readonly sharedDshHome: string,
     private readonly env: NodeJS.ProcessEnv,
     private readonly cwd: string | undefined,
     private readonly client: AgencyClient | undefined,
@@ -123,7 +127,10 @@ class AuthStoreImpl implements AuthStore {
   ) {}
 
   private async homeIsBusy(): Promise<boolean> {
-    return (await otherLiveCount(this.dshHome, this.live)) > 0
+    // Live-instance markers belong to Cocode's account/runtime home. The DSH
+    // home is shared with the official product and must not become a Cocode
+    // process-lock directory.
+    return (await otherLiveCount(join(this.accountHome, 'runtime'), this.live)) > 0
   }
 
   async hydrate(signal?: AbortSignal): Promise<void> {
@@ -159,6 +166,7 @@ class AuthStoreImpl implements AuthStore {
       }
       const resolved = await resolveAuth({
         dshHome: this.dshHome,
+        sharedDshHome: this.sharedDshHome,
         accountHome: this.accountHome,
         env: this.env,
         cwd: this.cwd,

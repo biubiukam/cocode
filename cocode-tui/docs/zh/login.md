@@ -40,17 +40,18 @@
 
 ## 和桌面版的关系
 
-图形界面和终端共用官方 Harness 目录下的 settings 和 credentials，默认是
-`~/.dsh`。Cocode 账号 token 保存在 `~/.cocode/account.yaml`；TUI 只在当前
-进程中动态生成 Cocode provider，不会把它写进 `settings.yaml`。
+图形界面和终端共用 DSH 的 settings、credentials、会话和 Workspace 等业务
+数据（默认在 `~/.dsh`）。Cocode 账号 token 保存在
+`~/.cocode/account.yaml`；TUI 只在当前进程中动态生成 Cocode provider。
 
 ## 配置目录
 
-自己的 API Key 会写入官方 Harness 凭据文件 `$DSH_HOME/.credentials.yaml`，默认路径是
-`~/.dsh/.credentials.yaml`。TUI 不新增单独的 Cocode API Key 环境变量，也不会把文件中的
-Key 复制到进程环境中。
+自己的 API Key 会直接写入共享 DSH 凭据文件
+`~/.dsh/.credentials.yaml`。不会从旧的 `.cocode/credentials` 自动迁移，也不会
+把文件中的 Key 复制到进程环境中。
 
-需要隔离配置时，可以设置 `COCODE_HOME`（默认 `~/.cocode`）或 `DSH_HOME`（默认 `~/.dsh`）。
+需要指定账号/runtime 目录时，可以设置 `COCODE_HOME`（默认 `~/.cocode`）；需要
+指定共享 DSH Home 时设置 `COCODE_DSH_HOME`（默认 `~/.dsh`）。
 开发启动参数见 `.env.example`。
 
 登录或切换失败时，状态栏显示 `CODE · 解释`。完整目录见 [错误码](./errors.md)。

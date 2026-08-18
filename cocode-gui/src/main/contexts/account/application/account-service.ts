@@ -27,7 +27,6 @@ const CLOUD_NAMESPACE = "llm-pi-ai"
 const CLOUD_PATH = ["providers", CLOUD_PROVIDER] as const
 const LEGACY_CLOUD_PATH = ["providers", LEGACY_CLOUD_PROVIDER] as const
 const CLOUD_CREDENTIAL = "COCODE_NUT_API_KEY"
-const LEGACY_CLOUD_CREDENTIAL = "COCODE_CLOUD_API_KEY"
 const CLOUD_API = "openai-responses"
 const CLOUD_MAX_RETRIES = 5
 const CLOUD_KEY_PATTERN = /^ck_[A-Za-z0-9_-]+$/

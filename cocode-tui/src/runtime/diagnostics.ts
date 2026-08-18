@@ -17,6 +17,8 @@ export function formatDoctor(options: {
   configuredCapabilities: TuiCapabilities
   runtimeCapabilities?: TuiCapabilitySnapshot
   sessionRoot?: string
+  runtimeHome?: string
+  sharedDshHome?: string
 }): string {
   const init =
     options.initError === undefined
@@ -54,6 +56,9 @@ export function formatDoctor(options: {
     options.sessionRoot === undefined
       ? 'session-root unset'
       : `session-root ${options.sessionRoot}`,
+    options.runtimeHome === undefined ? undefined : `runtime-home ${options.runtimeHome}`,
+    options.sharedDshHome === undefined ? undefined : `dsh-home ${options.sharedDshHome}`,
+    'profile cocode · shared-write enabled · concurrent-mutation unsupported · home-patch shared · home-patch-isolation unavailable · profile-fallback shared',
     'secrets omitted; do not edit credentials concurrently with GUI',
   ]
     .filter((value): value is string => value !== undefined)

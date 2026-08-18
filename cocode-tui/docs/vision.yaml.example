@@ -1,4 +1,4 @@
-# Copy this file to $COCODE_HOME/vision.yaml (default: ~/.cocode/vision.yaml).
+# Copy this file to $COCODE_DSH_HOME/vision.yaml (default: ~/.dsh/vision.yaml).
 # Store credential references only. Do not put API keys in this file.
 
 provider: user

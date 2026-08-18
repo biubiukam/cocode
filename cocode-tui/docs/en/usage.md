@@ -70,11 +70,12 @@ Linux, and real terminal key combinations still require separate acceptance as
 described in [platform notes](./platforms.md); automated tests are not a
 substitute for a real TTY check.
 
-Configure a key on the first-run gate; it is stored in the official Harness credentials file
-`$DSH_HOME/.credentials.yaml`. The TUI does not add a separate API-key environment variable.
-For development, point `COCODE_HOME` and `DSH_HOME` at separate directories.
-DSH settings and credentials follow the official `$DSH_HOME` layout; sessions
-default to `$DSH_HOME/sessions`, or `~/.dsh/sessions` when `DSH_HOME` is unset.
+Configure a key on the first-run gate; it is stored directly in the shared DSH
+credentials file `~/.dsh/.credentials.yaml`. There is no automatic migration
+from an old `.cocode/credentials` directory. `COCODE_HOME` controls account and
+runtime data; `COCODE_DSH_HOME` controls shared settings, credentials, profile
+plugins, and sessions. Sessions default to `COCODE_DSH_HOME/sessions`, or
+`~/.dsh/sessions` when `COCODE_DSH_HOME` is unset.
 `DSH_SESSION_ROOT` can override the session directory.
 
 The same build runs on Windows, macOS, and Linux. On Windows, `notepad.exe` is used when neither `$VISUAL` nor `$EDITOR` is configured. WSL uses Linux process semantics and can fall back to `clip.exe` and `explorer.exe`; configure a GUI editor with a wait flag when using an editor such as VS Code.
@@ -211,7 +212,7 @@ The Host advertises the `commands` capability through `cocode/capabilities`. The
 
 The Host advertises the `plugins` capability through `cocode/capabilities`. The TUI reads live Loader entries through `cocode/plugins/list` and changes the current entry through `cocode/plugins/set-enabled`; without the corresponding capability, the TUI does not claim success. The plugin menu supports search and repeated toggles. These changes affect the live Loader only and are not written to the profile. Installation and uninstall require a later profile-management wire.
 
-The Host mounts Cocode's own `cocode-vision` plugin with `autoRead` enabled. For text-only models, `image` blocks are converted into visual evidence for the model while the TUI keeps showing the original user prompt; native vision models receive the durable attachment reference directly. Choose `cocode` for the Cocode service, whose default vision model is `gpt-luna`, or `user` for a user-managed OpenAI-compatible endpoint. After switching the account to Cocode, the plugin automatically reuses the account-generated `COCODE_LLM_PROVIDERS.cocode-nut` endpoint and credential reference; it does not select the first model from the cloud catalog. User settings are persisted in `$COCODE_HOME/vision.yaml` (default `~/.cocode/vision.yaml`); use [vision.yaml.example](./vision.yaml.example) as a template. Use `/vision` commands to change the provider, model, endpoint, or credential reference. Only credential references are configured here; Host credentials own the actual values, which never enter session logs or TUI settings.
+The Host mounts Cocode's own `cocode-vision` plugin with `autoRead` enabled. For text-only models, `image` blocks are converted into visual evidence for the model while the TUI keeps showing the original user prompt; native vision models receive the durable attachment reference directly. Choose `cocode` for the Cocode service, whose default vision model is `gpt-luna`, or `user` for a user-managed OpenAI-compatible endpoint. After switching the account to Cocode, the plugin automatically reuses the account-generated `COCODE_LLM_PROVIDERS.cocode-nut` endpoint and credential reference; it does not select the first model from the cloud catalog. User settings are persisted in `$COCODE_DSH_HOME/vision.yaml` (default `~/.dsh/vision.yaml`); use [vision.yaml.example](./vision.yaml.example) as a template. Use `/vision` commands to change the provider, model, endpoint, or credential reference. Only credential references are configured here; Host credentials own the actual values, which never enter session logs or TUI settings.
 
 In `/doctor`, `caps-configured` is what the TUI expects from local configuration and implementation, while `caps-runtime` is the result of probing the live JSON-RPC runtime after initialization. When they differ, the runtime result wins; `caps-errors` explains disabled capabilities. Probes use a random, non-existent session id and do not create or mutate a user session.
 

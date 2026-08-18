@@ -44,3 +44,4 @@ export type {
 
 /** @deprecated Use TuiLaunch. Kept for the scaffold call site. */
 export type { TuiLaunch as HarnessJsonRpcLaunch } from './types.ts'
+export { createExternalDshCatalog } from './external-dsh.ts'

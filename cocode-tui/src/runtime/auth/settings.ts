@@ -1,5 +1,5 @@
 /**
- * Read/patch harness settings.yaml (llm routes + default model).
+ * Read/patch the shared DSH settings document (LLM routes + default model).
  */
 
 import {

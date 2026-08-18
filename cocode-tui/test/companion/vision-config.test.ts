@@ -15,7 +15,7 @@ afterEach(() => {
 })
 
 describe('vision user configuration', () => {
-  it('loads provider settings from COCODE_HOME/vision.yaml', () => {
+  it('loads provider settings from COCODE_DSH_HOME/vision.yaml', () => {
     const home = mkdtempSync(join(tmpdir(), 'cocode-vision-'))
     temporaryDirectories.push(home)
     writeFileSync(join(home, 'vision.yaml'), [
@@ -27,7 +27,7 @@ describe('vision user configuration', () => {
       '  credentialRef: OPENAI_API_KEY',
     ].join('\n'))
 
-    expect(loadVisionConfig({ COCODE_HOME: home })).toEqual({
+    expect(loadVisionConfig({ COCODE_DSH_HOME: home })).toEqual({
       provider: 'user',
       timeoutMs: 30000,
       user: {
@@ -36,7 +36,7 @@ describe('vision user configuration', () => {
         credentialRef: 'OPENAI_API_KEY',
       },
     })
-    expect(visionConfigPath({ COCODE_HOME: home })).toBe(join(home, 'vision.yaml'))
+    expect(visionConfigPath({ COCODE_DSH_HOME: home })).toBe(join(home, 'vision.yaml'))
   })
 
   it('keeps the vision config when a shared Host lacks the client COCODE_HOME', async () => {
@@ -50,7 +50,7 @@ describe('vision user configuration', () => {
       '  credentialRef: VISION_KEY',
     ].join('\n'))
 
-    const runtimeEnv = resolveHostRuntimeEnv({ COCODE_HOME: home })
+    const runtimeEnv = resolveHostRuntimeEnv({ COCODE_DSH_HOME: home })
     const hostEnv = mergeHostRuntimeEnv({}, runtimeEnv, join(home, 'dsh'))
     const stored = loadVisionConfig(hostEnv)
     const service = createVisionService({
@@ -85,7 +85,7 @@ describe('vision user configuration', () => {
     temporaryDirectories.push(home)
     writeFileSync(join(home, 'vision.yaml'), 'provider: unsupported\n')
 
-    expect(() => loadVisionConfig({ COCODE_HOME: home })).toThrow('invalid provider')
+    expect(() => loadVisionConfig({ COCODE_DSH_HOME: home })).toThrow('invalid provider')
   })
 
   it('uses the persisted file as the vision configuration source', async () => {
@@ -98,7 +98,7 @@ describe('vision user configuration', () => {
       '  model: stored-model',
       '  credentialRef: STORED_KEY',
     ].join('\n'))
-    vi.stubEnv('COCODE_HOME', home)
+    vi.stubEnv('COCODE_DSH_HOME', home)
 
     const provided = new Map<string, unknown>()
     const context: RuntimeContext = {
@@ -124,7 +124,7 @@ describe('vision user configuration', () => {
   it('registers /vision and persists model changes without storing secrets', async () => {
     const home = mkdtempSync(join(tmpdir(), 'cocode-vision-'))
     temporaryDirectories.push(home)
-    vi.stubEnv('COCODE_HOME', home)
+    vi.stubEnv('COCODE_DSH_HOME', home)
 
     type RegisteredCommand = { handler(input: { rawInput: string; signal: AbortSignal }): Promise<unknown> }
     let registered: RegisteredCommand | undefined
@@ -154,10 +154,10 @@ describe('vision user configuration', () => {
     await expect(registered?.handler({ rawInput: 'model vision-model', signal: new AbortController().signal })).resolves.toMatchObject({
       kind: 'success',
     })
-    expect(loadVisionConfig({ COCODE_HOME: home })).toMatchObject({
+    expect(loadVisionConfig({ COCODE_DSH_HOME: home })).toMatchObject({
       user: { model: 'vision-model' },
     })
-    expect(JSON.stringify(loadVisionConfig({ COCODE_HOME: home }))).not.toContain('secret-value')
+    expect(JSON.stringify(loadVisionConfig({ COCODE_DSH_HOME: home }))).not.toContain('secret-value')
     await expect((provided.get('cocodeVision') as CocodeVisionService).status()).resolves.toMatchObject({
       provider: 'user',
       model: 'vision-model',

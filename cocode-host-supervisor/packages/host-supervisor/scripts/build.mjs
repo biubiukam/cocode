@@ -29,6 +29,9 @@ await build({
   entryPoints: [join(packageRoot, 'src/index.ts')],
   outfile: join(lib, 'index.js'),
   bundle: true,
+  // Pino is loaded as a normal runtime dependency. Its package uses Node
+  // compatibility paths that should not be inlined into the ESM bundle.
+  external: ['pino'],
   format: 'esm',
   platform: 'node',
   target: 'node22',

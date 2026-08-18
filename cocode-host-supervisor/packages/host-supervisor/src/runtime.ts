@@ -3,21 +3,102 @@ import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, re
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { runtimeSlotDirectory } from './paths.js'
-import { hostKey, stableJson, type HostRuntimeEnv, type HostScope } from './protocol.js'
+import { hostKey, resolveCocodeHome, stableJson, type HostRuntimeEnv, type HostScope } from './protocol.js'
 
 export type RuntimeSlot = { root: string; entry: string; version: string; buildId?: string; patch: string; jsonRpcEndpoint: string }
 
 export type RuntimePluginEntry = { name: string; entry: string }
 
+const COCODE_PROFILE_PACKAGE = {
+  name: 'cocode-profile',
+  private: true,
+  dsh: {
+    profile: {
+      bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app'],
+    },
+  },
+}
+
+/**
+ * Bootstrap the Cocode profile and runtime-owned directories. Settings,
+ * credentials, sessions, and attachments deliberately remain in the shared
+ * DSH home; the Cocode product home only owns its account and runtime state.
+ * Existing user edits to the profile patch are preserved byte-for-byte.
+ */
+export function ensureCocodeProfile(dshHome: string, cocodeHome = resolveCocodeHome()): string {
+  const profileRoot = join(resolve(dshHome), 'profiles', 'cocode')
+  mkdirSync(profileRoot, { recursive: true, mode: 0o700 })
+  mkdirSync(resolve(cocodeHome), { recursive: true, mode: 0o700 })
+  for (const directory of ['sessions', 'storages', 'attachments']) {
+    mkdirSync(join(resolve(dshHome), directory), { recursive: true, mode: 0o700 })
+  }
+  mkdirSync(join(resolve(cocodeHome), 'runtime'), { recursive: true, mode: 0o700 })
+  const packagePath = join(profileRoot, 'package.json')
+  if (!existsSync(packagePath)) writeFileSync(packagePath, `${JSON.stringify(COCODE_PROFILE_PACKAGE, null, 2)}\n`, { mode: 0o600 })
+  else assertCocodeProfilePackage(packagePath)
+  const workspacePath = join(profileRoot, 'pnpm-workspace.yaml')
+  if (!existsSync(workspacePath)) writeFileSync(workspacePath, [
+    'packages:',
+    '  - .',
+    '',
+    'nodeLinker: hoisted',
+    'autoInstallPeers: false',
+    '',
+  ].join('\n'), { mode: 0o600 })
+  const patchPath = join(profileRoot, 'cordis.patch.yml')
+  const sharedHomePatch = '# Cocode uses the shared DSH settings and credentials paths.\n[]\n'
+  if (!existsSync(patchPath)) {
+    writeFileSync(patchPath, sharedHomePatch, { mode: 0o600 })
+  } else {
+    if (isLegacyGeneratedCocodeProfilePatch(readFileSync(patchPath, 'utf8'))) {
+      writeFileSync(patchPath, sharedHomePatch, { mode: 0o600 })
+    }
+  }
+  return profileRoot
+}
+
+function isLegacyGeneratedCocodeProfilePatch(content: string): boolean {
+  const match = /^# Cocode-owned provider paths\. This profile is self-contained\.\n- id: settings\n  config:\n    path: (.+)\n- id: credentials\n  config:\n    path: (.+)\n$/.exec(content)
+  if (match === null) return false
+  try {
+    const settings = JSON.parse(match[1]!)
+    const credentials = JSON.parse(match[2]!)
+    if (typeof settings !== 'string' || typeof credentials !== 'string') return false
+    return basename(settings) === 'settings.yaml'
+      && basename(dirname(settings)) === 'settings'
+      && basename(credentials) === 'credentials.yaml'
+      && basename(dirname(credentials)) === 'credentials'
+      && dirname(dirname(settings)) === dirname(dirname(credentials))
+  } catch {
+    return false
+  }
+}
+
+function assertCocodeProfilePackage(packagePath: string): void {
+  let manifest: unknown
+  try {
+    manifest = JSON.parse(readFileSync(packagePath, 'utf8'))
+  } catch (error) {
+    throw new Error(`Cocode profile package is invalid: ${String(error)}`)
+  }
+  const record = manifest as { dsh?: { profile?: { bundles?: unknown } } } | null
+  const bundles = record?.dsh?.profile?.bundles
+  if (!Array.isArray(bundles) || bundles.length !== 2 || bundles[0] !== '@deepseek-ai/dsh-base' || bundles[1] !== '@deepseek-ai/dsh-web-app') {
+    throw new Error('Cocode profile bundle composition is incompatible')
+  }
+}
+
 export function mergeHostRuntimeEnv(
   baseEnv: NodeJS.ProcessEnv,
   runtimeEnv: HostRuntimeEnv | undefined,
   dshHome: string,
+  profile?: string,
 ): NodeJS.ProcessEnv {
   return {
     ...baseEnv,
     ...(runtimeEnv ?? {}),
     DSH_HOME: dshHome,
+    ...(profile === 'cocode' ? { DSH_SESSION_ROOT: join(resolve(dshHome), 'sessions') } : {}),
   }
 }
 
@@ -50,6 +131,7 @@ export function resolveDshPackage(): { root: string; entry: string; version: str
 }
 
 export function prepareRuntimeSlot(scope: HostScope, jsonRpcEndpoint: string, pluginPath: string): RuntimeSlot {
+  if (scope.profile === 'cocode') ensureCocodeProfile(scope.dshHome, resolveCocodeHome())
   const dsh = resolveDshPackage()
   const slot = runtimeSlotDirectory(scope, dsh.version)
   const dshSlotRoot = join(slot, 'node_modules', '@deepseek-ai', 'dsh')

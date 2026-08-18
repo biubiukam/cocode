@@ -9,6 +9,7 @@ import {
   isHostDescriptorCompatible,
   resolveHostRuntimeEnv,
   resolveHostScope,
+  resolveCocodeHostScope,
   stableJson,
 } from '../lib/index.js'
 
@@ -72,12 +73,13 @@ test('resolveHostScope applies the same environment-derived scope for every clie
     COCODE_RUNTIME_CHANNEL: 'stable',
     COCODE_LLM_PROVIDERS: ' {"cocode-nut":{"api":"openai-responses"}} ',
     COCODE_HOME: '/tmp/cocode-account',
+    COCODE_DSH_HOME: '/tmp/cocode-dsh',
     COCODE_NUT_API_KEY: 'secret-is-not-part-of-the-scope',
   }
   const scope = resolveHostScope(env)
   assert.deepEqual(resolveHostRuntimeEnv(env), {
     COCODE_LLM_PROVIDERS: env.COCODE_LLM_PROVIDERS.trim(),
-    COCODE_VISION_CONFIG: join(resolve('/tmp/cocode-account'), 'vision.yaml'),
+    COCODE_VISION_CONFIG: join(resolve('/tmp/cocode-dsh'), 'vision.yaml'),
   })
   assert.equal(scope.dshHome, '/tmp/cocode-dsh')
   assert.equal(scope.profile, 'web')
@@ -92,10 +94,22 @@ test('resolveHostScope expands a tilde-prefixed DSH_HOME', () => {
   )
 })
 
+test('resolveCocodeHostScope ignores ambient official DSH_HOME and fixes cocode profile', () => {
+  const scope = resolveCocodeHostScope({ DSH_HOME: '/tmp/official', DSH_PROFILE: 'web', COCODE_HOME: '/tmp/cocode' })
+  assert.equal(scope.dshHome, join(homedir(), '.dsh'))
+  assert.equal(scope.profile, 'cocode')
+  assert.match(scope.hostConfigFingerprint, /^cocode-web-jsonrpc-v3:[0-9a-f]{32}$/)
+  assert.equal(scope.runtimeChannel, 'stable')
+})
+
 test('resolveHostRuntimeEnv expands tilde-prefixed vision paths', () => {
   assert.deepEqual(
-    resolveHostRuntimeEnv({ COCODE_HOME: '~/.cocode' }),
-    { COCODE_VISION_CONFIG: join(homedir(), '.cocode', 'vision.yaml') },
+    resolveHostRuntimeEnv({ COCODE_DSH_HOME: '~/.dsh' }),
+    { COCODE_VISION_CONFIG: join(homedir(), '.dsh', 'vision.yaml') },
+  )
+  assert.deepEqual(
+    resolveHostRuntimeEnv({ DSH_HOME: '~/.alternate-dsh' }),
+    { COCODE_VISION_CONFIG: join(homedir(), '.alternate-dsh', 'vision.yaml') },
   )
   assert.deepEqual(
     resolveHostRuntimeEnv({ COCODE_VISION_CONFIG: '~/.cocode/vision.yaml' }),
@@ -103,29 +117,33 @@ test('resolveHostRuntimeEnv expands tilde-prefixed vision paths', () => {
   )
 })
 
-test('resolveHostScope ignores blank runtime configuration and secrets', () => {
+test('resolveHostScope ignores blank routes and secrets while retaining the shared vision path', () => {
   const scope = resolveHostScope({
     DSH_HOME: '/tmp/cocode-dsh',
     COCODE_LLM_PROVIDERS: '  ',
     COCODE_HOME: '  ',
     COCODE_NUT_API_KEY: 'secret',
   })
-  assert.equal(scope.hostConfigFingerprint, 'cocode-web-jsonrpc-v1')
-  assert.deepEqual(resolveHostRuntimeEnv({ COCODE_NUT_API_KEY: 'secret' }), {})
+  assert.match(scope.hostConfigFingerprint, /^cocode-web-jsonrpc-v1:[0-9a-f]{32}$/)
+  assert.deepEqual(resolveHostRuntimeEnv({ COCODE_NUT_API_KEY: 'secret' }), {
+    COCODE_VISION_CONFIG: join(homedir(), '.dsh', 'vision.yaml'),
+  })
 })
 
-test('vision config location isolates shared Hosts by account home', () => {
+test('account home does not split the Host scope when DSH configuration is shared', () => {
   const first = resolveHostScope({
     DSH_HOME: '/tmp/cocode-dsh',
+    COCODE_DSH_HOME: '/tmp/cocode-dsh',
     COCODE_HOME: '/tmp/cocode-account-a',
   })
   const second = resolveHostScope({
     DSH_HOME: '/tmp/cocode-dsh',
+    COCODE_DSH_HOME: '/tmp/cocode-dsh',
     COCODE_HOME: '/tmp/cocode-account-b',
   })
 
-  assert.notEqual(first.hostConfigFingerprint, second.hostConfigFingerprint)
-  assert.notEqual(hostKey(first), hostKey(second))
+  assert.equal(first.hostConfigFingerprint, second.hostConfigFingerprint)
+  assert.equal(hostKey(first), hostKey(second))
 })
 
 test('hostKey is stable for equivalent scopes', () => {

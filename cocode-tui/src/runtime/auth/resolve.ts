@@ -2,6 +2,8 @@
  * Decide whether the TUI can skip AuthGate and how to spawn.
  */
 
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 import { patchCredential, readCredentials } from './credentials.ts'
 import { agencyOrigin } from './origin.ts'
 import { readSettings, type ProductSettings } from './settings.ts'
@@ -20,8 +22,10 @@ import {
 } from './types.ts'
 
 export type ResolveInput = {
-  /** DSH home containing credentials and settings. */
+  /** Shared DSH home containing settings and credentials. */
   dshHome?: string
+  /** Shared DSH data home used by the child Host. */
+  sharedDshHome?: string
   /** Legacy test/caller alias; new code should pass dshHome. */
   home?: string
   env: NodeJS.ProcessEnv
@@ -39,6 +43,8 @@ export async function resolveAuth(input: ResolveInput): Promise<ResolveResult> {
   const env = input.env
   const home = input.dshHome ?? input.home
   if (home === undefined) throw new Error('resolveAuth requires dshHome')
+  const sharedDshHome = input.sharedDshHome ?? input.dshHome ?? nonempty(env.COCODE_DSH_HOME) ?? join(homedir(), '.dsh')
+  const accountHome = input.accountHome ?? nonempty(env.COCODE_HOME) ?? join(homedir(), '.cocode')
   const cwd = input.cwd?.trim() || process.cwd()
   const origin = agencyOrigin(env)
   const settings = await readSettings(home)
@@ -55,7 +61,8 @@ export async function resolveAuth(input: ResolveInput): Promise<ResolveResult> {
     credentials,
     cloudAccount: input.cloudAccount ?? false,
     cloudModels: input.cloudModels,
-    accountHome: input.accountHome,
+    accountHome,
+    sharedDshHome,
   })
   if (preferredReady !== undefined) return preferredReady
 
@@ -69,7 +76,8 @@ export async function resolveAuth(input: ResolveInput): Promise<ResolveResult> {
       credentials,
       cloudAccount: input.cloudAccount ?? false,
       cloudModels: input.cloudModels,
-      accountHome: input.accountHome,
+      accountHome,
+      sharedDshHome,
     })
     if (byok !== undefined) return byok
   } else if (preferred === DEFAULT_PROVIDER) {
@@ -82,7 +90,8 @@ export async function resolveAuth(input: ResolveInput): Promise<ResolveResult> {
       credentials,
       cloudAccount: input.cloudAccount ?? false,
       cloudModels: input.cloudModels,
-      accountHome: input.accountHome,
+      accountHome,
+      sharedDshHome,
     })
     if (cloud !== undefined) return cloud
   }
@@ -130,6 +139,7 @@ type ChannelInput = {
   cloudAccount: boolean
   cloudModels?: CloudModel[]
   accountHome?: string
+  sharedDshHome: string
 }
 
 function tryChannel(
@@ -137,7 +147,7 @@ function tryChannel(
   isPreferred: boolean,
   input: ChannelInput,
 ): { status: 'ready'; auth: ResolvedAuth } | undefined {
-  const { env, home, cwd, origin, settings, credentials, cloudAccount, cloudModels, accountHome } = input
+  const { env, home, cwd, origin, settings, credentials, cloudAccount, cloudModels, accountHome, sharedDshHome } = input
   const providerSettings = settings.providerCredentials[provider]
   const ref = apiKeyEnvFor(provider, providerSettings?.apiKeyEnv)
   const value = ref === undefined ? undefined : nonempty(env[ref]) ?? nonempty(credentials[ref])
@@ -163,6 +173,7 @@ function tryChannel(
       origin,
       accountHome ?? home,
       home,
+      sharedDshHome,
       env,
       launchCredential,
       cloudProvider,
@@ -177,6 +188,7 @@ function tryChannel(
       origin,
       accountHome ?? home,
       home,
+      sharedDshHome,
       env,
       {},
     )
@@ -208,6 +220,7 @@ function ready(
   origin: string,
   accountHome: string,
   dshHome: string,
+  sharedDshHome: string,
   env: NodeJS.ProcessEnv,
   extra: NodeJS.ProcessEnv,
   cloudProvider?: CloudProviderProfile,
@@ -217,7 +230,11 @@ function ready(
   delete spawn[DEEPSEEK_KEY_REF]
   delete spawn.COCODE_LLM_PROVIDERS
   Object.assign(spawn, extra)
-  spawn.DSH_HOME = dshHome
+  spawn.COCODE_HOME = accountHome
+  spawn.COCODE_DSH_HOME = sharedDshHome
+  spawn.DSH_HOME = sharedDshHome
+  spawn.DSH_SESSION_ROOT = join(sharedDshHome, 'sessions')
+  spawn.DSH_PROFILE = 'cocode'
   spawn.COCODE_PROVIDER = provider
   spawn.COCODE_MODEL = model
   if (cloudProvider !== undefined) {

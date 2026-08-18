@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto"
 import { appendFileSync, writeFileSync } from "node:fs"
 import * as path from "pathe"
-// eslint-disable-next-line import/no-named-as-default
 import pino, { type Logger as PinoLogger } from "pino"
 import type {
 	LogAttribute,

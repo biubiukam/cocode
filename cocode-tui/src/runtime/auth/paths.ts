@@ -21,6 +21,7 @@ function nonempty(value: string | undefined): string | undefined {
 export type ProductHomes = {
   accountHome: string
   dshHome: string
+  sharedDshHome: string
 }
 
 export function accountHome(ctx: HomeContext = defaultHomeContext()): string {
@@ -29,22 +30,33 @@ export function accountHome(ctx: HomeContext = defaultHomeContext()): string {
   return join(ctx.homedir, '.cocode')
 }
 
+/** Shared DSH configuration/data home; ambient official DSH_HOME is ignored. */
 export function dshHome(ctx: HomeContext = defaultHomeContext()): string {
-  const fromDsh = nonempty(ctx.env.DSH_HOME)
-  if (fromDsh !== undefined) return resolveUserPath(fromDsh, ctx.homedir)
-  return join(ctx.homedir, '.dsh')
+  return sharedDshHome(ctx)
+}
+
+/** Shared DSH data home used by the Cocode and official web profiles. */
+export function sharedDshHome(ctx: HomeContext = defaultHomeContext()): string {
+  const configured = nonempty(ctx.env.COCODE_DSH_HOME)
+  return resolveUserPath(configured ?? join(ctx.homedir, '.dsh'), ctx.homedir)
+}
+
+/** Explicit name for the shared DSH configuration/data home. */
+export function dshConfigHome(ctx: HomeContext = defaultHomeContext()): string {
+  return sharedDshHome(ctx)
 }
 
 export function productHomes(ctx: HomeContext = defaultHomeContext()): ProductHomes {
   return {
     accountHome: accountHome(ctx),
     dshHome: dshHome(ctx),
+    sharedDshHome: sharedDshHome(ctx),
   }
 }
 
-/** @deprecated Use dshHome for harness files and accountHome for Cocode identity. */
+/** @deprecated Use accountHome for product identity and dshConfigHome for DSH data. */
 export function productHome(ctx: HomeContext = defaultHomeContext()): string {
-  return dshHome(ctx)
+  return accountHome(ctx)
 }
 
 export function homeDisplay(home: string, ctx: HomeContext = defaultHomeContext()): string {
@@ -52,9 +64,12 @@ export function homeDisplay(home: string, ctx: HomeContext = defaultHomeContext(
     return nonempty(ctx.env.COCODE_HOME) !== undefined ? '$COCODE_HOME' : '~/.cocode'
   }
   if (home === dshHome(ctx)) {
-    return nonempty(ctx.env.DSH_HOME) !== undefined ? '$DSH_HOME' : '~/.dsh'
+    return nonempty(ctx.env.COCODE_DSH_HOME) !== undefined ? '$COCODE_DSH_HOME' : '~/.dsh'
   }
-  return '$DSH_HOME'
+  if (home === sharedDshHome(ctx)) {
+    return nonempty(ctx.env.COCODE_DSH_HOME) !== undefined ? '$COCODE_DSH_HOME' : '~/.dsh'
+  }
+  return '$COCODE_HOME'
 }
 
 export function credentialsPath(home: string): string {
