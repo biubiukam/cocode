@@ -6,6 +6,7 @@ import {
   launchDsh,
   parseCliArgs,
   resolveDshLaunch,
+  resolveDshVersion,
   resolveGuiLaunch,
 } from '../bin/cli.mjs'
 
@@ -17,6 +18,11 @@ describe('cocode CLI', () => {
       commandArgs: ['--workspace', '/tmp/project'],
     })
     expect(parseCliArgs(['--tui'])).toMatchObject({ command: 'tui', commandArgs: [] })
+  })
+
+  it('distinguishes the detailed version command from the script flag', () => {
+    expect(parseCliArgs(['version'])).toMatchObject({ version: true, versionCommand: true })
+    expect(parseCliArgs(['--version'])).toMatchObject({ version: true, versionCommand: false })
   })
 
   it('parses Host controls and scope options on either side of the command', () => {
@@ -90,6 +96,10 @@ describe('cocode CLI', () => {
       { COCODE_DSH_CLI_ENTRY: process.execPath, COCODE_NODE_EXECUTABLE: '/opt/Cocode/node' },
       { resolve: () => { throw new Error('unexpected package lookup') } },
     )).toEqual({ executable: '/opt/Cocode/node', entry: process.execPath })
+  })
+
+  it('reads the bundled DSH package version from its resolved entry', () => {
+    expect(resolveDshVersion({ staged: false })).toBe('0.1.0-rc.6')
   })
 
   it('passes DSH arguments unchanged and returns its exit code', () => {

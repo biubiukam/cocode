@@ -11,12 +11,13 @@ const DSH_ROOT_OPTIONS = new Set(['--patch', '--dump-config', '--dump-default-co
 const DEFAULT_PLUGIN_PROFILE = 'cocode'
 
 export function parseCliArgs(args) {
-  const options = { command: 'tui', commandArgs: [], force: false, json: false, help: false, version: false }
+  const options = { command: 'tui', commandArgs: [], force: false, json: false, help: false, version: false, versionCommand: false }
   const remaining = [...args]
   while (remaining.length > 0) {
     const value = remaining.shift()
     if (value === '--help' || value === '-h') { options.help = true; continue }
-    if (value === '--version' || value === '-v' || value === 'version') { options.version = true; continue }
+    if (value === '--version' || value === '-v') { options.version = true; continue }
+    if (value === 'version') { options.version = true; options.versionCommand = true; continue }
     if (value === '--force' || value === '-f') { options.force = true; continue }
     if (value === '--json') { options.json = true; continue }
     if (value === '--dsh-home' || value === '--profile' || value === '--runtime-channel') {
@@ -155,6 +156,19 @@ export function resolveDshLaunch(runtimePaths, env = process.env, requireImpl = 
   return { executable: env.COCODE_NODE_EXECUTABLE?.trim() || process.execPath, entry }
 }
 
+export function resolveDshVersion(runtimePaths, env = process.env) {
+  let directory = dirname(resolveDshLaunch(runtimePaths, env).entry)
+  while (directory !== dirname(directory)) {
+    const manifestPath = join(directory, 'package.json')
+    if (existsSync(manifestPath)) {
+      const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+      if (manifest.name === '@deepseek-ai/dsh') return String(manifest.version || 'unknown')
+    }
+    directory = dirname(directory)
+  }
+  throw new Error('Bundled DSH package metadata is missing.')
+}
+
 function runtimeDshEntries(root) {
   return [
     join(root, 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js'),
@@ -206,5 +220,38 @@ export function stagedPaths(scriptUrl) {
 }
 
 export function usage(version) {
-  return `Cocode ${version}\n\nUsage: cocode <command> [options]\n\nCommands:\n  gui [args...]              Open Cocode GUI\n  tui [args...]              Open Cocode TUI (default)\n  plugin [args...]           Manage bundled DSH profile plugins\n  host status [--json]       Show the shared Host status\n  host stop [--force]        Stop the Host and Supervisor\n  doctor                     Check TUI and Host prerequisites\n  version                    Show the installed Cocode version\n\nDSH-compatible options:\n      --patch <path>         Apply an extra DSH patch overlay\n      --dump-config          Print the composed DSH profile tree\n      --dump-default-config  Print the default DSH profile tree\n\nCocode options:\n  -h, --help                 Show this help\n  -v, --version              Show the installed version\n  -f, --force                Stop Host even when clients still hold leases\n      --json                 Print machine-readable status\n      --dsh-home <path>      Select the shared DSH home\n      --profile <name>       Select the DSH profile\n      --runtime-channel <c>  Select stable, preview, or dev runtime\n\nEnvironment:\n  COCODE_GUI_EXECUTABLE      Explicit GUI executable path\n  COCODE_GUI_PATH            Alias for COCODE_GUI_EXECUTABLE\n  COCODE_DSH_CLI_ENTRY       Explicit bundled DSH CLI entry path\n`
+  return [
+    `Cocode ${version}`,
+    '',
+    'Usage: cocode <command> [options]',
+    '',
+    'Commands:',
+    '  gui [args...]              Open Cocode GUI',
+    '  tui [args...]              Open Cocode TUI (default)',
+    '  plugin [args...]           Manage bundled DSH profile plugins',
+    '  host status [--json]       Show the shared Host status',
+    '  host stop [--force]        Stop the Host and Supervisor',
+    '  doctor                     Check TUI and Host prerequisites',
+    '  version                    Show Cocode and bundled DSH versions',
+    '',
+    'DSH-compatible options:',
+    '      --patch <path>         Apply an extra DSH patch overlay',
+    '      --dump-config          Print the composed DSH profile tree',
+    '      --dump-default-config  Print the default DSH profile tree',
+    '',
+    'Cocode options:',
+    '  -h, --help                 Show this help',
+    '  -v, --version              Show the installed Cocode version',
+    '  -f, --force                Stop Host even when clients still hold leases',
+    '      --json                 Print machine-readable status',
+    '      --dsh-home <path>      Select the shared DSH home',
+    '      --profile <name>       Select the DSH profile',
+    '      --runtime-channel <c>  Select stable, preview, or dev runtime',
+    '',
+    'Environment:',
+    '  COCODE_GUI_EXECUTABLE      Explicit GUI executable path',
+    '  COCODE_GUI_PATH            Alias for COCODE_GUI_EXECUTABLE',
+    '  COCODE_DSH_CLI_ENTRY       Explicit bundled DSH CLI entry path',
+    '',
+  ].join('\n')
 }

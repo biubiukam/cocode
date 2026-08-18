@@ -12,6 +12,7 @@ import {
   launchDsh,
   launchGui,
   parseCliArgs,
+  resolveDshVersion,
   stagedPaths,
   usage,
 } from './cli.mjs'
@@ -33,7 +34,16 @@ if (options.help) {
   process.exit(0)
 }
 if (options.version) {
-  process.stdout.write(`${paths.packageJson.version}\n`)
+  if (!options.versionCommand) {
+    process.stdout.write(`${paths.packageJson.version}\n`)
+    process.exit(0)
+  }
+  try {
+    process.stdout.write(`Cocode ${paths.packageJson.version}\nBundled DSH ${resolveDshVersion(paths, process.env)}\n`)
+  } catch (error) {
+    process.stderr.write(`cocode version: ${error instanceof Error ? error.message : String(error)}\n`)
+    process.exit(1)
+  }
   process.exit(0)
 }
 

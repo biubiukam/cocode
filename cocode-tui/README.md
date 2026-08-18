@@ -57,7 +57,8 @@ cocode [options] [command]
 | `cocode host stop --force` | Stop it even when leases are still held |
 | `cocode gui` | Open the installed Cocode desktop client |
 | `cocode plugin [args...]` | Manage bundled DSH plugins; defaults to the `cocode` profile |
-| `cocode --version` | Print the installed version |
+| `cocode version` | Show Cocode and bundled DSH versions |
+| `cocode --version` | Print the installed Cocode version |
 | `cocode --help` | Print the complete CLI help |
 
 Scope options can be used before a command:
