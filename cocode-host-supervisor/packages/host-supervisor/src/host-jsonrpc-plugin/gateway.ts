@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { basename, resolve } from "node:path";
 import { realpath } from "node:fs/promises";
 import { CompanionTransport } from "./transport.js";
+import { installAgentModelSelection } from "./model-selection.js";
 import type {
   Agent,
   AgentHandle,
@@ -145,6 +146,10 @@ type LoaderService = {
   entries(): Iterable<LoaderEntry>;
 };
 type LlmService = {
+  resolveCallConfig?: (config: {
+    provider: string;
+    model: string;
+  }) => Promise<{ provider: string; model: string }>;
   listProviders(): readonly { id: string; name?: string }[];
   listModels(provider: string): Promise<
     readonly {
@@ -160,6 +165,9 @@ type LlmService = {
   ) => Promise<{
     inputModalities?: readonly string[];
   }>;
+};
+type AgentDefaultModelService = {
+  saveSelection(selection: { provider: string; model: string }): Promise<void>;
 };
 type AttachmentService = {
   imageLimits: {
@@ -383,7 +391,13 @@ export class TuiCompanionGateway {
 
   async prompt(params: PromptParams): Promise<{ messageId: string }> {
     this.assertInitialized();
-    const contentBlocks = await this.preparePromptBlocks(params.contentBlocks);
+    const existing = this.sessions.get(params.sessionId);
+    const live =
+      existing === undefined ? this.ctx.agents.get(params.sessionId) : undefined;
+    const contentBlocks = await this.preparePromptBlocks(
+      params.contentBlocks,
+      existing?.handle.agent ?? live,
+    );
     const record = await this.getOrCreateSession(params.sessionId);
     this.assertLive(params.sessionId, record);
     const message = createUserMessage(contentBlocks);
@@ -405,33 +419,65 @@ export class TuiCompanionGateway {
 
   private async preparePromptBlocks(
     blocks: readonly ContentBlock[],
+    agent: Agent | undefined,
   ): Promise<ContentBlock[]> {
     if (!blocks.some((block) => block.type === "image")) return [...blocks];
-    if (await this.modelSupportsImages()) return [...blocks];
+    const selected =
+      agent === undefined
+        ? { provider: this.provider, model: this.model }
+        : installAgentModelSelection(agent, {
+            provider: this.provider,
+            model: this.model,
+          }).current;
+    if (selected !== undefined && (await this.modelSupportsImages(selected)))
+      return [...blocks];
 
     throw new Error("The selected model does not support image content.");
   }
 
-  private async modelSupportsImages(): Promise<boolean> {
-    const llm = this.ctx.get("llm") as LlmService | undefined;
-    if (llm?.resolveModelInfo !== undefined) {
-      try {
-        const model = await llm.resolveModelInfo(this.provider, this.model);
-        return model.inputModalities?.includes("image") === true;
-      } catch {
-        return false;
-      }
-    }
-    if (llm === undefined) return false;
+  private async modelSupportsImages(selected: {
+    provider: string;
+    model: string;
+  }): Promise<boolean> {
     try {
-      const models = await llm.listModels(this.provider);
-      return models.some(
-        (model) =>
-          model.id === this.model &&
-          model.inputModalities?.includes("image") === true,
+      return (
+        (await this.modelInputModalities(selected))?.includes("image") === true
       );
     } catch {
       return false;
+    }
+  }
+
+  private async modelInputModalities(selected: {
+    provider: string;
+    model: string;
+  }): Promise<readonly string[] | undefined> {
+    const llm = this.ctx.get("llm") as LlmService | undefined;
+    if (llm?.resolveModelInfo !== undefined) {
+      const model = await llm.resolveModelInfo(
+        selected.provider,
+        selected.model,
+      );
+      return model.inputModalities;
+    }
+    if (llm === undefined) return undefined;
+    const models = await llm.listModels(selected.provider);
+    return models.find((model) => model.id === selected.model)?.inputModalities;
+  }
+
+  private async assertModelSupportsSessionImages(
+    agent: Agent,
+    selected: { provider: string; model: string },
+  ): Promise<void> {
+    if (!agentHasImages(agent)) return;
+    const inputModalities = await this.modelInputModalities(selected);
+    if (
+      inputModalities !== undefined &&
+      !inputModalities.includes("image")
+    ) {
+      throw new Error(
+        `Model "${selected.model}" does not accept image input; select an image-capable model.`,
+      );
     }
   }
 
@@ -774,6 +820,10 @@ export class TuiCompanionGateway {
       },
       ...(composition.setup === undefined ? {} : { setup: composition.setup }),
     });
+    installAgentModelSelection(handle.agent, {
+      provider: this.provider,
+      model: this.model,
+    });
     this.sessions.set(sessionId, { handle, owned: true });
     await this.replaceSession(params.replaceSessionId, sessionId);
     return { sessionId, seedLength: seed.length, seed: [...seed] };
@@ -935,6 +985,49 @@ export class TuiCompanionGateway {
     return { groups, failures };
   }
 
+  async selectModel(params: {
+    sessionId: string;
+    provider: string;
+    model: string;
+  }): Promise<{ selected: { provider: string; model: string } }> {
+    this.assertInitialized();
+    if (params.sessionId.trim() === "")
+      throw new Error("session.selectModel requires a session id");
+    if (params.provider.trim() === "" || params.model.trim() === "")
+      throw new Error("session.selectModel requires provider and model");
+    const record = this.requireSession(params.sessionId);
+    const llm = this.ctx.get("llm") as LlmService | undefined;
+    if (llm?.resolveCallConfig === undefined)
+      throw new Error(
+        "session.selectModel is unavailable: llm call configuration is not configured",
+      );
+    const resolved = await llm.resolveCallConfig({
+      provider: params.provider,
+      model: params.model,
+    });
+    const selected = {
+      provider: resolved.provider,
+      model: resolved.model,
+    };
+    await this.assertModelSupportsSessionImages(record.handle.agent, selected);
+    installAgentModelSelection(record.handle.agent, {
+      provider: this.provider,
+      model: this.model,
+    }).current = selected;
+    this.provider = selected.provider;
+    this.model = selected.model;
+    const defaults = this.ctx.get("agentDefaultModel") as
+      | AgentDefaultModelService
+      | undefined;
+    try {
+      await defaults?.saveSelection(selected);
+    } catch {
+      // The live session has already switched; a persistence failure must not
+      // force the TUI to create a replacement session.
+    }
+    return { selected: { provider: selected.provider, model: selected.model } };
+  }
+
   async respondQuestion(
     params: Record<string, unknown>,
   ): Promise<Record<string, never>> {
@@ -1052,6 +1145,11 @@ export class TuiCompanionGateway {
       case "cocode/model/list":
       case "model/list":
         return this.listModels();
+      case "cocode/session/selectModel":
+      case "session.selectModel":
+        return this.selectModel(
+          params as { sessionId: string; provider: string; model: string },
+        );
       case "cocode/attachment/saveImages":
         return this.saveImages(params);
       case "cocode/permission/mode":
@@ -1196,6 +1294,10 @@ export class TuiCompanionGateway {
       },
       ...(composition.setup === undefined ? {} : { setup: composition.setup }),
     });
+    installAgentModelSelection(handle.agent, {
+      provider: this.provider,
+      model: this.model,
+    });
     const record = { handle, owned: true };
     this.sessions.set(sessionId, record);
     return record;
@@ -1224,6 +1326,10 @@ export class TuiCompanionGateway {
       },
       ...(composition.setup === undefined ? {} : { setup: composition.setup }),
     });
+    installAgentModelSelection(handle.agent, {
+      provider: this.provider,
+      model: this.model,
+    });
     return { handle, seed: [...inspection.events], owned: true };
   }
 
@@ -1243,6 +1349,10 @@ export class TuiCompanionGateway {
   }
 
   private borrowSession(agent: Agent): SessionRecord {
+    installAgentModelSelection(agent, {
+      provider: this.provider,
+      model: this.model,
+    });
     return {
       owned: false,
       handle: {
@@ -1636,4 +1746,37 @@ function resolveSessionPreset(
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function agentHasImages(agent: Agent): boolean {
+  const session = agent.session as Agent["session"] & {
+    deriveMessages?: () => readonly { content: unknown }[];
+  };
+  if (
+    session
+      .deriveMessages?.()
+      .some((message) => contentHasImage(message.content))
+  )
+    return true;
+  const inbox = (agent as Agent & {
+    inbox?: {
+      nextTurn?: readonly { content: unknown }[];
+      nextStep?: readonly { content: unknown }[];
+    };
+  }).inbox;
+  return (
+    inbox?.nextTurn?.some((message) => contentHasImage(message.content)) ===
+      true ||
+    inbox?.nextStep?.some((message) => contentHasImage(message.content)) ===
+      true
+  );
+}
+
+function contentHasImage(content: unknown): boolean {
+  if (!Array.isArray(content)) return false;
+  return content.some((value) => {
+    if (!isRecord(value)) return false;
+    if (value.type === "image") return true;
+    return value.type === "tool-result" && contentHasImage(value.content);
+  });
 }

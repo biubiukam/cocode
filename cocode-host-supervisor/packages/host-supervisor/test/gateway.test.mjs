@@ -10,15 +10,22 @@ function createContext(options = {}) {
   const ctx = {
     agents: {
       get(id) {
-        return activeAgent?.id === id ? activeAgent : undefined
+        return activeAgent?.id === id || activeAgent?.session.id === id ? activeAgent : undefined
       },
       async create(agentOptions) {
-        if (typeof agentOptions.setup === 'function') {
-          await agentOptions.setup({ agent: { id: 'agent-1' } })
+        const listeners = new Map()
+        const agentContext = {
+          agent: undefined,
+          on(event, handler) {
+            listeners.set(event, handler)
+            return () => listeners.delete(event)
+          },
+          listeners,
         }
         activeAgent = {
           id: 'agent-1',
           options: agentOptions,
+          ctx: agentContext,
           session: {
             id: agentOptions.sessionId,
             events: [],
@@ -38,6 +45,10 @@ function createContext(options = {}) {
           steer() {},
           cancel() {},
           async whenIdle() {},
+        }
+        agentContext.agent = activeAgent
+        if (typeof agentOptions.setup === 'function') {
+          await agentOptions.setup(agentContext)
         }
         created.push(activeAgent)
         return { agent: activeAgent, async dispose() {} }
@@ -66,10 +77,22 @@ function createContext(options = {}) {
             }]
           },
           async resolveModelInfo(_provider, model) {
+            if (options.resolveModelInfo !== undefined) {
+              return options.resolveModelInfo(_provider, model)
+            }
             return {
               id: model,
               inputModalities: options.resolvedInputModalities ?? options.inputModalities ?? ['text'],
             }
+          },
+          async resolveCallConfig({ provider, model }) {
+            if (options.resolveCallConfig !== undefined) {
+              return options.resolveCallConfig({ provider, model })
+            }
+            if (provider !== 'deepseek-official') {
+              throw new Error(`unknown provider: ${provider}`)
+            }
+            return { provider, model }
           },
         }
       }
@@ -116,7 +139,7 @@ const imageBlock = {
 }
 
 test('rejects unsupported images before they enter the session', async () => {
-  const { ctx, followed } = createContext()
+  const { ctx, followed, created } = createContext()
   const gateway = createGateway(ctx)
   await initialize(gateway)
 
@@ -125,6 +148,7 @@ test('rejects unsupported images before they enter the session', async () => {
     /does not support image content/i,
   )
   assert.equal(followed.length, 0)
+  assert.equal(created.length, 0)
 })
 
 test('asks for workspace authorization before creating a session', async () => {
@@ -348,6 +372,154 @@ test('uses exact model capabilities when a native vision model is not listed', a
   await gateway.prompt({ sessionId: 's1', contentBlocks: [imageBlock] })
 
   assert.deepEqual(followed[0]?.content, [imageBlock])
+})
+
+test('switches the live session model without creating a new agent', async () => {
+  const { ctx, created } = createContext()
+  const gateway = createGateway(ctx)
+  await initialize(gateway)
+
+  await gateway.prompt({ sessionId: 's1', contentBlocks: [{ type: 'text', text: 'hello' }] })
+  const agent = created[0]
+  const selected = await gateway.handleRequest('session.selectModel', {
+    sessionId: 's1',
+    provider: 'deepseek-official',
+    model: 'deepseek-v4-reasoner',
+  })
+
+  assert.deepEqual(selected, {
+    selected: {
+      provider: 'deepseek-official',
+      model: 'deepseek-v4-reasoner',
+    },
+  })
+  assert.equal(created.length, 1)
+
+  const assemble = agent.ctx.listeners.get('system-prompt/assemble')
+  const request = agent.ctx.listeners.get('agent/request')
+  assert.equal(typeof assemble, 'function')
+  assert.equal(typeof request, 'function')
+  await assemble({}, {}, async () => ({ variables: {} }))
+  assert.deepEqual(await request({}, async () => ({
+    provider: 'deepseek-official',
+    model: 'deepseek-v4-flash',
+  })), {
+    provider: 'deepseek-official',
+    model: 'deepseek-v4-reasoner',
+  })
+})
+
+test('keeps the model selection when a companion reconnects to the same agent', async () => {
+  const { ctx, created } = createContext()
+  const first = createGateway(ctx)
+  await initialize(first)
+  await first.prompt({ sessionId: 's1', contentBlocks: [{ type: 'text', text: 'hello' }] })
+  await first.handleRequest('session.selectModel', {
+    sessionId: 's1',
+    provider: 'deepseek-official',
+    model: 'deepseek-v4-reasoner',
+  })
+  await first.disconnect()
+
+  const second = createGateway(ctx)
+  await initialize(second)
+  const opened = await second.open({ sessionId: 's1' })
+  assert.equal(opened.opened, true)
+  const assemble = created[0].ctx.listeners.get('system-prompt/assemble')
+  const request = created[0].ctx.listeners.get('agent/request')
+  await assemble({}, {}, async () => ({ variables: {} }))
+  assert.deepEqual(await request({}, async () => ({
+    provider: 'deepseek-official',
+    model: 'deepseek-v4-flash',
+  })), {
+    provider: 'deepseek-official',
+    model: 'deepseek-v4-reasoner',
+  })
+  const selected = await second.handleRequest('session.selectModel', {
+    sessionId: 's1',
+    provider: 'deepseek-official',
+    model: 'deepseek-v4-flash',
+  })
+
+  assert.deepEqual(selected, {
+    selected: {
+      provider: 'deepseek-official',
+      model: 'deepseek-v4-flash',
+    },
+  })
+  assert.equal(created.length, 1)
+})
+
+test('switches the model for the next step even if the agent is running', async () => {
+  const { ctx, created } = createContext()
+  const gateway = createGateway(ctx)
+  await initialize(gateway)
+  await gateway.prompt({ sessionId: 's1', contentBlocks: [{ type: 'text', text: 'hello' }] })
+  created[0].status = 'running'
+
+  assert.deepEqual(await gateway.handleRequest('session.selectModel', {
+    sessionId: 's1',
+    provider: 'deepseek-official',
+    model: 'deepseek-v4-reasoner',
+  }), {
+    selected: {
+      provider: 'deepseek-official',
+      model: 'deepseek-v4-reasoner',
+    },
+  })
+})
+
+test('reports invalid model selections without changing the live session', async () => {
+  const { ctx, created } = createContext({
+    resolveCallConfig: async ({ provider, model }) => {
+      if (model === 'missing-model') throw new Error(`model unavailable: ${provider}/${model}`)
+      return { provider, model }
+    },
+  })
+  const gateway = createGateway(ctx)
+  await initialize(gateway)
+  await gateway.prompt({ sessionId: 's1', contentBlocks: [{ type: 'text', text: 'hello' }] })
+
+  await assert.rejects(
+    gateway.handleRequest('session.selectModel', {
+      sessionId: 's1',
+      provider: 'deepseek-official',
+      model: 'missing-model',
+    }),
+    /model unavailable/i,
+  )
+  assert.equal(created.length, 1)
+})
+
+test('keeps the current model when the new model cannot handle session images', async () => {
+  const { ctx, created } = createContext({
+    resolveModelInfo: async (_provider, model) => ({
+      inputModalities: model === 'text-only' ? ['text'] : ['text', 'image'],
+    }),
+  })
+  const gateway = createGateway(ctx)
+  await initialize(gateway)
+  await gateway.prompt({ sessionId: 's1', contentBlocks: [imageBlock] })
+  created[0].session.deriveMessages = () => [{ content: [imageBlock] }]
+
+  await assert.rejects(
+    gateway.handleRequest('session.selectModel', {
+      sessionId: 's1',
+      provider: 'deepseek-official',
+      model: 'text-only',
+    }),
+    /does not accept image input/i,
+  )
+  const request = created[0].ctx.listeners.get('agent/request')
+  const assemble = created[0].ctx.listeners.get('system-prompt/assemble')
+  await assemble({}, {}, async () => ({ variables: {} }))
+  assert.deepEqual(await request({}, async () => ({
+    provider: 'deepseek-official',
+    model: 'deepseek-v4-flash',
+  })), {
+    provider: 'deepseek-official',
+    model: 'deepseek-v4-flash',
+  })
 })
 
 test('lists skills from the current agent scope', async () => {
