@@ -54,6 +54,14 @@ Cocode 不打算做成又一个聊天窗口，不会把完整思维链当成卖�
 和 Host 配置作用域时，才会共享会话与任务状态。在同一作用域内从桌面端切换到终端，
 不会让工作重来一遍。
 
+### Cocode GUI
+
+[![Cocode 桌面工作台中的 DeepSeek Harness 会话](https://cocode.agency/product/gui-screenshot.webp)](https://cocode.agency/#gui)
+
+### Cocode TUI
+
+[![Cocode 终端界面中的 DeepSeek Harness 会话](https://cocode.agency/product/tui-screenshot.webp)](https://cocode.agency/#tui)
+
 ## 仓库结构
 
 这个仓库不是单一 workspace。三个组件各自是独立的 pnpm workspace，有各自的 lockfile

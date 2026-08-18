@@ -70,6 +70,14 @@ sessions and task state when they use the same `DSH_HOME`, profile, and Host
 configuration scope. Switching between the desktop app and the terminal does
 not reset your work within that scope.
 
+### Cocode GUI
+
+[![Cocode desktop workspace showing a DeepSeek Harness session](https://cocode.agency/product/gui-screenshot.webp)](https://cocode.agency/#gui)
+
+### Cocode TUI
+
+[![Cocode terminal interface showing a DeepSeek Harness session](https://cocode.agency/product/tui-screenshot.webp)](https://cocode.agency/#tui)
+
 ## Repository layout
 
 This repository is not a single workspace. Each component is an independent
