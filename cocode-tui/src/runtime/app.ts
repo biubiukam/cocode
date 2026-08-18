@@ -17,6 +17,11 @@ import type {
   TuiPluginEntry,
   TuiWorkspaceEnsureResult,
 } from '@cocode/tui-connection'
+import type {
+  ExternalDshReadSource,
+  ExternalSessionEvent,
+  ExternalSessionSummary,
+} from '@cocode/host-supervisor'
 import type { SelectModeResult } from './auth/store.ts'
 import type { AuthSnapshot, ResolvedAuth } from './auth/types.ts'
 import type { Assembler } from './assembler.ts'
@@ -277,6 +282,10 @@ export type TuiSnapshot = {
   header: {
     product: 'Cocode'
     sessionId: string
+    source: 'cocode' | 'shared-dsh'
+    readOnly: boolean
+    canMutate: boolean
+    concurrency: 'single-writer' | 'no-concurrent-writes'
     model: string
     provider: string
     cwd: string
@@ -415,6 +424,7 @@ export type TuiApp = {
 
 export type TuiAppOptions = {
   runtime: TuiRuntime
+  externalDsh?: ExternalDshReadSource
   cwd: string
   provider: string
   model: string
@@ -427,6 +437,8 @@ export type TuiAppOptions = {
     launchConfigured: boolean
     argsConfigured: boolean
     sessionRoot?: string
+    runtimeHome?: string
+    sharedDshHome?: string
   }
   setTheme?: (name: 'dark' | 'light') => void
   locale?: UiLocale
@@ -446,6 +458,7 @@ export function createTuiApp(options: TuiAppOptions): TuiApp {
 
 class TuiAppImpl implements TuiApp {
   private readonly runtime: TuiRuntime
+  private readonly externalDsh: ExternalDshReadSource | undefined
   private readonly cwd: string
   private provider: string
   private model: string
@@ -486,6 +499,7 @@ class TuiAppImpl implements TuiApp {
   private readonly terminalNotify: NonNullable<TuiAppOptions['terminalNotify']>
   private readonly imageReader: () => Promise<TuiImageInput>
   private readonly pastedImageReader: (path: string) => Promise<TuiImageInput | undefined>
+  private unsubscribeExternalDsh: (() => void) | undefined
   private readonly keymap: Keymap
   private imageSerial = 0
   private readonly activeSubagents = new Set<string>()
@@ -518,10 +532,22 @@ class TuiAppImpl implements TuiApp {
   private reviewPicker: ReviewPickerState | undefined
   private checklist: ChecklistState | undefined
   private reviewRequest = 0
+  private externalSession:
+    | {
+        id: string
+        identity: string
+        title?: string
+        cwd?: string
+        canMutate: boolean
+        concurrency: 'no-concurrent-writes'
+        revision?: string
+      }
+    | undefined
 
   constructor(options: TuiAppOptions) {
     const projection = createSessionProjection()
     this.runtime = options.runtime
+    this.externalDsh = options.externalDsh
     this.cwd = options.cwd
     this.provider = options.provider
     this.model = options.model
@@ -574,6 +600,10 @@ class TuiAppImpl implements TuiApp {
       )
       this.emit()
     })
+    this.unsubscribeExternalDsh = this.externalDsh?.subscribe(() => {
+      if (this.sessionTreePicker?.open === true) void this.showSessionTree()
+      else this.emit()
+    })
     try {
       const info = await this.runtime.start({
         cwd: this.cwd,
@@ -610,41 +640,51 @@ class TuiAppImpl implements TuiApp {
   }
 
   private async closeRuntime(): Promise<void> {
-    await closeRuntime({
-      unsubscribe: () => {
-        this.unsubscribeRuntime?.()
-        this.unsubscribeRuntime = undefined
-        this.unsubscribeQuestion?.()
-        this.unsubscribeQuestion = undefined
-        this.unsubscribeApproval?.()
-        this.unsubscribeApproval = undefined
-        this.questions.rejectAll(new Error('TUI closed before the question was answered'))
-        this.rejectApprovals(new Error('TUI closed before approval was answered'))
-      },
-      unsubscribeClose: () => {
-        this.unsubscribeRuntimeClose?.()
-        this.unsubscribeRuntimeClose = undefined
-      },
-      runtimeClose: () => this.runtime.close(),
-      markDead: () => {
-        this.agent = 'dead'
-        this.emit()
-      },
-    })
+    try {
+      await closeRuntime({
+        unsubscribe: () => {
+          this.unsubscribeRuntime?.()
+          this.unsubscribeRuntime = undefined
+          this.unsubscribeQuestion?.()
+          this.unsubscribeQuestion = undefined
+          this.unsubscribeApproval?.()
+          this.unsubscribeApproval = undefined
+          this.unsubscribeExternalDsh?.()
+          this.unsubscribeExternalDsh = undefined
+          this.questions.rejectAll(new Error('TUI closed before the question was answered'))
+          this.rejectApprovals(new Error('TUI closed before approval was answered'))
+        },
+        unsubscribeClose: () => {
+          this.unsubscribeRuntimeClose?.()
+          this.unsubscribeRuntimeClose = undefined
+        },
+        runtimeClose: () => this.runtime.close(),
+        markDead: () => {
+          this.agent = 'dead'
+          this.emit()
+        },
+      })
+    } finally {
+      await this.externalDsh?.dispose().catch(() => undefined)
+    }
   }
 
   snapshot(): TuiSnapshot {
-    const disabled = this.agent === 'dead' || this.exiting
+    const disabled = this.agent === 'dead' || this.exiting || this.externalSession?.canMutate === false
     const telemetry = this.telemetry.snapshot()
     const sessionState = this.sessionState.snapshot()
     const assemblerStats = this.assembler.stats()
     return {
       header: {
         product: 'Cocode',
-        sessionId: this.sessionId,
+        sessionId: this.externalSession?.identity ?? this.sessionId,
+        source: this.externalSession === undefined ? 'cocode' : 'shared-dsh',
+        readOnly: this.externalSession?.canMutate === false,
+        canMutate: this.externalSession?.canMutate ?? true,
+        concurrency: this.externalSession?.concurrency ?? 'single-writer',
         model: this.model,
         provider: this.provider,
-        cwd: this.cwd,
+        cwd: this.externalSession?.cwd ?? this.cwd,
         branch: this.workspaceBranch,
       },
       agent: this.agent,
@@ -1495,6 +1535,7 @@ class TuiAppImpl implements TuiApp {
   }
 
   private async forkSession(rewindToMessageSeq?: number): Promise<void> {
+    if (this.rejectExternalWrite()) return
     if (!this.capabilities.fork || this.agent !== 'idle') {
       this.notice = { tone: 'info', message: text(this.locale, 'forkUnavailable') }
       this.emit()
@@ -1566,10 +1607,12 @@ class TuiAppImpl implements TuiApp {
     this.notice = { tone: 'info', message: text(this.locale, 'sessionTreeLoading') }
     this.emit()
     try {
-      const items =
+      const ownItems =
         this.capabilities.sessionList === 'rpc' && this.runtime.listSessions !== undefined
           ? await this.loadRpcSessionTree()
           : await this.loadJsonlSessionTree()
+      const externalItems = await this.loadExternalSessionTree()
+      const items = [...ownItems, ...externalItems]
       if (items.length === 0) {
         this.sessionTreePicker = undefined
         this.notice = { tone: 'info', message: text(this.locale, 'sessionTreeEmpty') }
@@ -1588,6 +1631,8 @@ class TuiAppImpl implements TuiApp {
   }
 
   private startNewSession(): void {
+    const wasExternal = this.externalSession !== undefined
+    this.externalSession = undefined
     this.sessionId = createSessionId()
     this.assembler.reset()
     this.telemetry.reset()
@@ -1603,6 +1648,10 @@ class TuiAppImpl implements TuiApp {
     this.notice = {
       tone: 'info',
       message: `New session ${this.sessionId}`,
+    }
+    if (wasExternal) {
+      this.refreshRuntimeControls()
+      void this.refreshSessionControls()
     }
     this.emit()
   }
@@ -1642,7 +1691,7 @@ class TuiAppImpl implements TuiApp {
         updatedAt: summary.updatedAt,
       })),
       'rpc',
-      this.sessionId,
+      this.currentSessionIdentity(),
       this.sessionActivities,
     )
   }
@@ -1651,15 +1700,50 @@ class TuiAppImpl implements TuiApp {
     const root = this.diagnostics.sessionRoot
     if (root === undefined) return []
     const result = await listSessionSummaries({ root, cwd: this.cwd, limit: 50 })
-    return makeSessionTreeItems(result.sessions, 'jsonl', this.sessionId, this.sessionActivities)
+    return makeSessionTreeItems(result.sessions, 'jsonl', this.currentSessionIdentity(), this.sessionActivities)
+  }
+
+  private async loadExternalSessionTree(): Promise<SessionTreePickerItem[]> {
+    if (this.externalDsh === undefined) return []
+    try {
+      const status = await this.externalDsh.getStatus()
+      if (status.state !== 'available') return []
+      const summaries = await this.externalDsh.listSessions()
+      return makeExternalSessionTreeItems(
+        summaries,
+        this.currentSessionIdentity(),
+      )
+    } catch {
+      // The shared home is an optional catalog source. A missing, unreadable,
+      // or incompatible source must not prevent Cocode sessions
+      // from being listed or opened.
+      return []
+    }
+  }
+
+  private currentSessionIdentity(): string {
+    return this.externalSession?.identity ?? this.sessionId
+  }
+
+  private refreshRuntimeControls(): void {
+    this.refreshRuntimeCapabilities()
+    this.skills = []
+    this.remoteCommands = []
   }
 
   private async openSessionTreeItem(item: SessionTreePickerItem): Promise<void> {
+    if (item.source === 'external') {
+      await this.openExternalSession(item)
+      return
+    }
     if (item.source === 'jsonl' && item.path !== undefined) {
       await this.resumeSession(item.session.id, item.path)
       return
     }
-    if (!this.capabilities.open || this.runtime.open === undefined) {
+    const hostCanOpen =
+      this.runtime.open !== undefined &&
+      (this.runtimeCapabilitySnapshot?.capabilities.open === true || this.configuredCapabilities.open)
+    if (!hostCanOpen) {
       this.notice = {
         tone: 'info',
         message: text(this.locale, 'resumeUnavailable', { session: item.session.id.slice(0, 8) }),
@@ -1676,6 +1760,7 @@ class TuiAppImpl implements TuiApp {
       const openResult = normalizeOpenResult(opened)
       if (!openResult.opened) throw new Error(text(this.locale, 'sessionTreeOpenFailed'))
       this.sessionId = item.session.id
+      this.externalSession = undefined
       if (openResult.seed === undefined) {
         this.assembler.reset()
         this.telemetry.reset()
@@ -1688,6 +1773,7 @@ class TuiAppImpl implements TuiApp {
       this.clearQueuedPrompts()
       this.attachments = []
       this.images = []
+      this.refreshRuntimeControls()
       await this.refreshSessionControls()
       this.agent = 'idle'
       this.notice = {
@@ -1701,7 +1787,71 @@ class TuiAppImpl implements TuiApp {
     this.emit()
   }
 
+  private async openExternalSession(item: SessionTreePickerItem): Promise<void> {
+    const reader = this.externalDsh
+    const externalId = item.externalSessionId
+    if (reader === undefined || externalId === undefined) {
+      this.notice = { tone: 'error', message: 'Shared DSH data is unavailable.' }
+      this.emit()
+      return
+    }
+    this.agent = 'starting'
+    this.notice = { tone: 'info', message: text(this.locale, 'resumeLoading') }
+    this.emit()
+    try {
+      const history = await reader.readSessionHistory(externalId)
+      const previousSessionId = this.sessionId
+      let hostOpened = false
+      if (history.status === 'ok' && this.runtime.open !== undefined) {
+        try {
+          hostOpened = normalizeOpenResult(await this.runtime.open(externalId, previousSessionId)).opened
+        } catch {
+          hostOpened = false
+        }
+      }
+      this.replaceSessionProjection(history.events.map(toSessionEvent))
+      this.sessionId = externalId
+      const canMutate = history.status === 'ok' && hostOpened
+      const revision = await reader.getSessionRevision?.(externalId)
+      this.externalSession = {
+        id: externalId,
+        identity: externalSessionIdentity(externalId),
+        canMutate,
+        concurrency: 'no-concurrent-writes',
+        ...(revision === undefined ? {} : { revision }),
+        ...(history.session.title === undefined ? {} : { title: history.session.title }),
+        ...(history.session.cwd === undefined ? {} : { cwd: history.session.cwd }),
+      }
+      this.sessionTitleOverride = history.session.title
+      this.resetSubagentActivity()
+      this.clearQueuedPrompts()
+      this.attachments = []
+      this.images = []
+      this.skills = []
+      this.remoteCommands = []
+      this.refreshRuntimeControls()
+      await this.refreshSessionControls()
+      this.agent = 'idle'
+      const suffix =
+        history.status === 'incomplete'
+          ? ' · incomplete tail'
+          : history.status === 'incompatible'
+            ? ' · incompatible'
+            : ''
+      const writeSuffix = canMutate ? '' : ' · read-only in Cocode'
+      this.notice = {
+        tone: 'info',
+        message: `${text(this.locale, 'resumeLoaded', { session: externalSessionIdentity(externalId).slice(0, 17) })} · shared DSH${writeSuffix}${suffix}`,
+      }
+    } catch (error) {
+      this.agent = 'idle'
+      this.notice = { tone: 'error', message: errorMessage(error) }
+    }
+    this.emit()
+  }
+
   private openReview(args: string): void {
+    if (this.rejectExternalWrite()) return
     if (this.agent !== 'idle') {
       this.notice = { tone: 'info', message: text(this.locale, 'turnBusy') }
       this.emit()
@@ -2037,6 +2187,7 @@ class TuiAppImpl implements TuiApp {
   }
 
   private async togglePermissionMode(): Promise<void> {
+    if (this.rejectExternalWrite()) return
     if (!this.capabilities.permissionMode || this.runtime.permissionMode === undefined) {
       this.notice = { tone: 'info', message: text(this.locale, 'permissionUnavailable') }
       this.emit()
@@ -2074,6 +2225,7 @@ class TuiAppImpl implements TuiApp {
   }
 
   private async openPermissionPicker(): Promise<void> {
+    if (this.rejectExternalWrite()) return
     if (!this.capabilities.permissionMode || this.runtime.permissionMode === undefined) {
       this.notice = { tone: 'info', message: text(this.locale, 'permissionUnavailable') }
       this.emit()
@@ -2100,6 +2252,7 @@ class TuiAppImpl implements TuiApp {
   }
 
   private async confirmPermissionPicker(): Promise<void> {
+    if (this.rejectExternalWrite()) return
     const picker = this.permissionPicker
     if (picker === undefined || picker.pending !== undefined) return
     const mode = selectedPermissionMode(picker)
@@ -2165,6 +2318,7 @@ class TuiAppImpl implements TuiApp {
   }
 
   private async togglePlanMode(): Promise<void> {
+    if (this.rejectExternalWrite()) return
     if (!this.capabilities.planMode || this.runtime.planMode === undefined) {
       this.notice = { tone: 'info', message: text(this.locale, 'planUnavailable') }
       this.emit()
@@ -2192,6 +2346,7 @@ class TuiAppImpl implements TuiApp {
   }
 
   private setModel(value: string): void {
+    if (this.rejectExternalWrite()) return
     const model = value.trim()
     if (model === '') {
       this.notice = { tone: 'info', message: text(this.locale, 'modelUsage') }
@@ -2207,6 +2362,7 @@ class TuiAppImpl implements TuiApp {
   }
 
   private async openModelPicker(): Promise<void> {
+    if (this.rejectExternalWrite()) return
     if (this.agent === 'running' || this.agent === 'starting') {
       this.notice = { tone: 'info', message: text(this.locale, 'modelBusy') }
       this.emit()
@@ -2241,6 +2397,7 @@ class TuiAppImpl implements TuiApp {
   }
 
   private async switchModel(provider: string, model: string): Promise<void> {
+    if (this.rejectExternalWrite()) return
     const previousProvider = this.provider
     const previous = this.model
     this.clearQueuedPrompts()
@@ -2354,6 +2511,7 @@ class TuiAppImpl implements TuiApp {
         throw new Error(text(this.locale, 'sessionTreeOpenFailed'))
       }
       this.sessionId = sessionId
+      this.externalSession = undefined
       this.assembler = nextProjection.assembler
       this.telemetry = nextProjection.telemetry
       this.sessionState = nextProjection.sessionState
@@ -2362,7 +2520,10 @@ class TuiAppImpl implements TuiApp {
       this.clearQueuedPrompts()
       this.attachments = []
       this.images = []
+      this.refreshRuntimeControls()
       await this.refreshSessionControls()
+      await this.loadSkills()
+      await this.loadCommands()
       this.agent = 'idle'
       this.notice = {
         tone: 'info',
@@ -2376,6 +2537,7 @@ class TuiAppImpl implements TuiApp {
   }
 
   private openRewindPicker(): void {
+    if (this.rejectExternalWrite()) return
     const users = this.assembler
       .snapshot()
       .filter((node): node is Extract<ConversationNode, { kind: 'user' }> => node.kind === 'user')
@@ -2395,6 +2557,7 @@ class TuiAppImpl implements TuiApp {
   }
 
   private async rewindSession(item: { seq: number; text: string }): Promise<void> {
+    if (this.rejectExternalWrite()) return
     const previousSessionId = this.sessionId
     this.agent = 'starting'
     this.notice = { tone: 'info', message: text(this.locale, 'rewindLoading') }
@@ -2423,6 +2586,10 @@ class TuiAppImpl implements TuiApp {
     if (trimmed === '') return
     if (this.capturingByok) {
       void submitCapturedByok(this.switchHost(), trimmed)
+      return
+    }
+    if (this.externalSession?.canMutate === false && !trimmed.startsWith('/')) {
+      this.rejectExternalWrite()
       return
     }
     const pendingSkill = this.pendingSkillInvocation
@@ -2481,6 +2648,7 @@ class TuiAppImpl implements TuiApp {
   }
 
   private sendSkill(line: string): void {
+    if (this.rejectExternalWrite()) return
     if (this.agent !== 'idle') {
       this.notice = { tone: 'info', message: text(this.locale, 'turnBusy') }
       this.emit()
@@ -2496,6 +2664,7 @@ class TuiAppImpl implements TuiApp {
   }
 
   private requestCompact(): void {
+    if (this.rejectExternalWrite()) return
     if (this.agent !== 'idle') {
       this.notice = { tone: 'info', message: text(this.locale, 'turnBusy') }
       this.emit()
@@ -2538,13 +2707,17 @@ class TuiAppImpl implements TuiApp {
     mode: 'normal' | 'queue' | 'steer',
     images: readonly DraftImage[],
   ): Promise<string> {
+    if (this.externalSession?.canMutate === false) {
+      return Promise.reject(new Error('shared DSH session is read-only in Cocode'))
+    }
     const visiblePromptText = images.reduce(
       (value, image) => value.split(image.token).join(''),
       promptText,
     ).trim()
-    if (attachments.length === 0 && images.length === 0) {
-      return this.runtime.prompt(this.sessionId, [{ type: 'text', text: visiblePromptText }], mode)
-    }
+    const prompt = (): Promise<string> => {
+      if (attachments.length === 0 && images.length === 0) {
+        return this.runtime.prompt(this.sessionId, [{ type: 'text', text: visiblePromptText }], mode)
+      }
     const fileContext = attachments.length === 0
       ? Promise.resolve([])
       : loadFileContext({
@@ -2556,16 +2729,41 @@ class TuiAppImpl implements TuiApp {
       : this.runtime.saveImages === undefined
       ? Promise.reject(new Error(text(this.locale, 'imageRuntimeUnavailable')))
       : this.runtime.saveImages(images)
-    return Promise.all([fileContext, storedImages]).then(([files, imageRefs]) =>
-      this.runtime.prompt(
+      return Promise.all([fileContext, storedImages]).then(([files, imageRefs]) =>
+        this.runtime.prompt(
         this.sessionId,
         [
           ...buildPromptBlocks(visiblePromptText, files),
           ...imageRefs.map((attachment) => ({ type: 'image', attachment })),
         ],
-        mode,
-      ),
-    )
+          mode,
+        ),
+      )
+    }
+    if (this.externalSession === undefined) return prompt()
+    return this.guardSharedSessionMutation().then(prompt).then(async (result) => {
+      await this.refreshSharedSessionRevision()
+      return result
+    })
+  }
+
+  private async guardSharedSessionMutation(): Promise<void> {
+    const session = this.externalSession
+    if (session === undefined || !session.canMutate) return
+    const current = await this.externalDsh?.getSessionRevision?.(session.id)
+    if (session.revision !== undefined && current !== undefined && current !== session.revision) {
+      session.canMutate = false
+      this.notice = { tone: 'error', message: 'SHARED_HOME_CONFLICT: shared Session changed outside Cocode. Refresh before writing.' }
+      this.emit()
+      throw new Error('SHARED_HOME_CONFLICT')
+    }
+  }
+
+  private async refreshSharedSessionRevision(): Promise<void> {
+    const session = this.externalSession
+    if (session === undefined || !session.canMutate) return
+    const revision = await this.externalDsh?.getSessionRevision?.(session.id)
+    if (revision !== undefined) session.revision = revision
   }
 
   private async ensureWorkspaceAuthorization(): Promise<void> {
@@ -2813,6 +3011,10 @@ class TuiAppImpl implements TuiApp {
       this.emit()
       return
     }
+    if (this.externalSession?.canMutate === false && !externalCommandAllowed(parsed.name)) {
+      this.rejectExternalWrite()
+      return
+    }
     const command = this.commands.find(parsed.name, this.capabilities)
     if (command !== undefined) {
       this.draft = createDraft()
@@ -2862,6 +3064,7 @@ class TuiAppImpl implements TuiApp {
   }
 
   private executeRemoteCommand(line: string): void {
+    if (this.rejectExternalWrite()) return
     const execute = this.runtime.executeCommand
     if (execute === undefined) {
       this.notice = errorNotice('COMMAND_UNKNOWN', { name: parseSlash(line)?.name ?? line })
@@ -2888,6 +3091,16 @@ class TuiAppImpl implements TuiApp {
       },
     )
     this.emit()
+  }
+
+  private rejectExternalWrite(): boolean {
+    if (this.externalSession?.canMutate !== false) return false
+    this.notice = {
+      tone: 'info',
+      message: 'This shared DSH session is read-only in Cocode. Start a new session to continue.',
+    }
+    this.emit()
+    return true
   }
 
   private invokeSkill(
@@ -3144,8 +3357,9 @@ function makeSessionTreeItems(
     parentSession?: string
     seedLength?: number
     path: string
+    externalSessionId?: string
   }>,
-  source: 'rpc' | 'jsonl',
+  source: 'rpc' | 'jsonl' | 'external',
   currentSessionId: string,
   activities: ReadonlyMap<string, 'idle' | 'running'>,
 ): SessionTreePickerItem[] {
@@ -3160,9 +3374,79 @@ function makeSessionTreeItems(
         ? {}
         : { path: sourceSession.path }),
       ...(sourceSession?.updatedAt === undefined ? {} : { updatedAt: sourceSession.updatedAt }),
+      ...(sourceSession?.externalSessionId === undefined
+        ? {}
+        : { externalSessionId: sourceSession.externalSessionId }),
       ...(activity === undefined ? {} : { activity }),
     }
   })
+}
+
+function makeExternalSessionTreeItems(
+  summaries: readonly ExternalSessionSummary[],
+  currentSessionIdentity: string,
+): SessionTreePickerItem[] {
+  const sessions = summaries.map((summary) => ({
+    id: externalSessionIdentity(summary.id),
+    createdAt: summary.createdAt,
+    updatedAt: summary.updatedAt,
+    cwd: summary.cwd,
+    title: summary.title,
+    preview: summary.preview,
+    parentSession:
+      summary.parentSession === undefined
+        ? undefined
+        : externalSessionIdentity(summary.parentSession),
+    seedLength: summary.seedLength,
+    path: summary.path,
+    externalSessionId: summary.id,
+  }))
+  return makeSessionTreeItems(
+    sessions,
+    'external',
+    currentSessionIdentity,
+    new Map(),
+  )
+}
+
+function externalSessionIdentity(sessionId: string): string {
+  return `shared-dsh:${sessionId}`
+}
+
+function toSessionEvent(event: ExternalSessionEvent): SessionEvent {
+  return {
+    type: event.type,
+    seq: event.seq,
+    time: event.time,
+    data: event.data,
+    ...(event.ignorable === true ? { ignorable: true as const } : {}),
+  }
+}
+
+function externalCommandAllowed(name: string): boolean {
+  return new Set([
+    'help',
+    'exit',
+    'quit',
+    'q',
+    'redraw',
+    'status',
+    'doctor',
+    'theme',
+    'lang',
+    'thinking',
+    'tokens',
+    'cost',
+    'export',
+    'copy',
+    'todos',
+    'focus',
+    'clear',
+    'resume',
+    'new',
+    'tree',
+    'sessions',
+  ]).has(name.toLowerCase())
 }
 
 function normalizeOpenResult(result: boolean | TuiSessionOpenResult): TuiSessionOpenResult {

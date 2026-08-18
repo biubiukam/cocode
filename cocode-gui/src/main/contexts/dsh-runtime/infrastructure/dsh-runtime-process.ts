@@ -14,14 +14,13 @@ import { isDshHttpPath } from "../../../../contracts/dsh-runtime-path"
 import { parseDshRuntimeBootstrap } from "../../../../contracts/schemas/dsh-runtime.schema"
 import { extractDshBootManifest, extractDshThemePreference } from "./dsh-runtime-bootstrap"
 import { assertRequiredCocodeWebEndpoints } from "./dsh-runtime-health"
-import { resolveDshHome } from "./dsh-home"
+import { resolveCocodeDshHome, resolveCocodeHome } from "./dsh-home"
 import {
 	createHostSupervisorClient,
 	resolveHostRuntimeEnv,
-	resolveHostScope,
+	resolveCocodeHostScope,
 	type HostLease,
 } from "@cocode/host-supervisor"
-import { quarantineCorruptDshSessions } from "./dsh-session-recovery"
 import type { DesktopLogger } from "../../../shared/logging/desktop-logger"
 
 const FORWARDED_REQUEST_HEADERS = new Set(["accept", "content-type", "if-none-match", "range"])
@@ -75,16 +74,22 @@ export class DshRuntimeProcess {
 	public async start(): Promise<string> {
 		if (this.closing) throw new Error("DSH runtime is shutting down.")
 		if (this.lease !== null) throw new Error("DSH Host lease is already active.")
-		quarantineCorruptDshSessions(resolveDshHome(), (file, destination) => {
-			this.logger?.log("warn", "dsh.session.quarantined", {
-				attributes: {
-					sessionDirectory: path.basename(path.dirname(file)),
-					destinationDirectory: path.basename(path.dirname(destination)),
-				},
-			})
+		const cocodeHome = resolveCocodeHome()
+		const cocodeDshHome = resolveCocodeDshHome()
+		const scope = resolveCocodeHostScope({
+			...process.env,
+			COCODE_HOME: cocodeHome,
+			COCODE_DSH_HOME: cocodeDshHome,
 		})
-		const scope = resolveHostScope({ ...process.env, DSH_HOME: resolveDshHome() })
-		const runtimeEnv = resolveHostRuntimeEnv(process.env)
+		// Derive the runtime environment from the same explicit Cocode home used
+		// for the scope. Without this, a clean process with no ambient
+		// COCODE_HOME would fingerprint a vision path in the scope but omit it
+		// from the newly spawned Host environment.
+		const runtimeEnv = resolveHostRuntimeEnv({
+			...process.env,
+			COCODE_HOME: cocodeHome,
+			COCODE_DSH_HOME: cocodeDshHome,
+		})
 		this.logger?.log("info", "dsh.host.scope.resolved", {
 			attributes: {
 				dshHome: scope.dshHome,
@@ -105,6 +110,10 @@ export class DshRuntimeProcess {
 			runtimeEnv,
 		})
 		const endpoint = lease.descriptor.services.find((service) => service.service === "web")
+		if (lease.descriptor.dshHome !== scope.dshHome || lease.descriptor.profile !== "cocode") {
+			await lease.release().catch(() => undefined)
+			throw new Error("Cocode Host descriptor escaped the shared DSH home/profile boundary")
+		}
 		if (endpoint === undefined) {
 			await lease.release().catch(() => undefined)
 			throw new Error("shared Host did not advertise its Web service")

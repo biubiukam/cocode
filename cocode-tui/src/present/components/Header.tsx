@@ -72,6 +72,11 @@ export function Header(props: {
             </Text>
           ) : null}
           <Text color={theme.mute} wrap="truncate-start">
+            {header.source === 'shared-dsh'
+              ? header.readOnly
+                ? 'shared DSH · read-only · '
+                : 'shared DSH · '
+              : ''}
             {text(props.locale, 'session')} {session}
             {glyphs.chevronDown}
           </Text>

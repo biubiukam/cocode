@@ -205,6 +205,8 @@ else if (command === "typecheck") {
 				"exec",
 				"tsc",
 				"--noEmit",
+				"--emitDeclarationOnly",
+				"false",
 				"-p",
 				"tsconfig.build.json",
 			],

@@ -1,13 +1,20 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { homedir, tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { patchCredential } from '../../../src/runtime/auth/credentials.ts'
 import { deviceKeyName } from '../../../src/runtime/auth/device-name.ts'
 import { resolveAuth } from '../../../src/runtime/auth/resolve.ts'
+import { settingsPath } from '../../../src/runtime/auth/paths.ts'
 import { patchCloudRoute } from '../../../src/runtime/auth/settings.ts'
 
 const homes: string[] = []
+
+async function writeSettings(home: string, contents: string): Promise<void> {
+  const path = settingsPath(home)
+  await mkdir(dirname(path), { recursive: true })
+  await writeFile(path, contents)
+}
 
 async function tempHome(): Promise<string> {
   const home = await mkdtemp(join(tmpdir(), 'cocode-resolve-'))
@@ -37,7 +44,9 @@ describe('resolveAuth', () => {
     if (result.status !== 'ready') return
     expect(result.auth.mode).toBe('byok')
     expect(result.auth.env.DEEPSEEK_API_KEY).toBe('sk-env')
-    expect(result.auth.env.DSH_HOME).toBe(home)
+    expect(result.auth.env.COCODE_HOME).toBe(home)
+    expect(result.auth.env.DSH_HOME).toBe(join(homedir(), '.dsh'))
+    expect(result.auth.env.DSH_PROFILE).toBe('cocode')
   })
 
   it('skips the gate when a shared DeepSeek key exists', async () => {
@@ -54,10 +63,10 @@ describe('resolveAuth', () => {
     const home = await tempHome()
     await patchCredential(home, 'COCODE_NUT_API_KEY', 'ck_live_x')
     await patchCloudRoute(home, 'https://cocode.agency', [{ id: 'cloud-1', name: 'Cloud' }])
-    await expect(readFile(join(home, 'settings.yaml'), 'utf8')).resolves.toContain(
+    await expect(readFile(join(home, 'settings', 'settings.yaml'), 'utf8')).resolves.toContain(
       'api: openai-responses',
     )
-    await expect(readFile(join(home, 'settings.yaml'), 'utf8')).resolves.toContain(
+    await expect(readFile(join(home, 'settings', 'settings.yaml'), 'utf8')).resolves.toContain(
       'maxRetries: 5',
     )
     const result = await resolveAuth({
@@ -99,8 +108,8 @@ describe('resolveAuth', () => {
 
   it('uses the configured credential ref for a non-DeepSeek provider', async () => {
     const home = await tempHome()
-    await writeFile(
-      join(home, 'settings.yaml'),
+    await writeSettings(
+      home,
       [
         'agent-default-model:',
         '  provider: ai-gateway',
@@ -126,8 +135,8 @@ describe('resolveAuth', () => {
 
   it('does not use a DeepSeek key for a configured non-DeepSeek provider', async () => {
     const home = await tempHome()
-    await writeFile(
-      join(home, 'settings.yaml'),
+    await writeSettings(
+      home,
       'agent-default-model:\n  provider: ai-gateway\n  model: gateway-model\n',
     )
     await patchCredential(home, 'DEEPSEEK_API_KEY', 'sk-wrong-provider')
@@ -137,8 +146,8 @@ describe('resolveAuth', () => {
 
   it('accepts a route explicitly locked by the environment', async () => {
     const home = await tempHome()
-    await writeFile(
-      join(home, 'settings.yaml'),
+    await writeSettings(
+      home,
       [
         'agent-default-model:',
         '  provider: ai-gateway',
@@ -160,8 +169,8 @@ describe('resolveAuth', () => {
     const home = await tempHome()
     await patchCredential(home, 'DEEPSEEK_API_KEY', 'sk-file')
     await patchCredential(home, 'COCODE_NUT_API_KEY', 'ck_live_x')
-    await writeFile(
-      join(home, 'settings.yaml'),
+    await writeSettings(
+      home,
       [
         'agent-default-model:',
         '  provider: deepseek-official',
@@ -189,8 +198,8 @@ describe('resolveAuth', () => {
   it('falls back to BYOK when the preferred Cloud channel is gone', async () => {
     const home = await tempHome()
     await patchCredential(home, 'DEEPSEEK_API_KEY', 'sk-file')
-    await writeFile(
-      join(home, 'settings.yaml'),
+    await writeSettings(
+      home,
       'agent-default-model:\n  provider: cocode-nut\n  model: cloud-1\n',
     )
     const result = await resolveAuth({ home, env: {}, cwd: '/work' })

@@ -1,4 +1,7 @@
-import type { DshBootEntryDto, DshBootManifestDto } from "../../../../contracts/ipc/dsh-runtime.contract"
+import type {
+	DshBootEntryDto,
+	DshBootManifestDto,
+} from "../../../../contracts/ipc/dsh-runtime.contract"
 
 /** Cocode Web client entries required by the Desktop composition. */
 export const REQUIRED_COCODE_WEB_CLIENTS = [
@@ -27,7 +30,9 @@ export function assertRequiredCocodeWebEntries(boot: DshBootManifestDto): void {
 	)
 	if (missing.length === 0) return
 	throw new Error(
-		`Cocode Web runtime is incomplete; missing boot entr${missing.length === 1 ? "y" : "ies"}: ${missing.join(", ")}`,
+		`Cocode Web runtime is incomplete; missing boot entr${
+			missing.length === 1 ? "y" : "ies"
+		}: ${missing.join(", ")}`,
 	)
 }
 
@@ -43,12 +48,17 @@ export async function assertRequiredCocodeWebEndpoints(
 ): Promise<void> {
 	assertRequiredCocodeWebEntries(boot)
 	const checks = REQUIRED_COCODE_WEB_CLIENTS.map(async (id) => {
-		const entry = findDshBootEntry(boot, id)!
+		const entry = findDshBootEntry(boot, id)
+		if (entry === undefined) {
+			throw new Error(`Cocode Web client entry ${id} is missing from the DSH boot manifest`)
+		}
 		const url = new URL(entry.url, origin)
 		const response = await fetchImpl(url, { method: "GET" })
 		if (response.ok) return
 		throw new Error(
-			`Cocode Web client entry ${id} is not reachable: GET ${url.pathname} returned HTTP ${String(response.status)}`,
+			`Cocode Web client entry ${id} is not reachable: GET ${
+				url.pathname
+			} returned HTTP ${String(response.status)}`,
 		)
 	})
 	await Promise.all(checks)

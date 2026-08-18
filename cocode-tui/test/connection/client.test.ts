@@ -16,13 +16,14 @@ type ProbeCall = { method: string; params: object; timeoutMs?: number }
 describe('runtime capability negotiation', () => {
   it('passes the cloud provider route to the Host without forwarding credentials', () => {
     const env = {
-      DSH_HOME: '/tmp/cocode-home',
+      COCODE_HOME: '/tmp/cocode-home',
       COCODE_LLM_PROVIDERS: '{"cocode-nut":{"api":"openai-responses"}}',
       COCODE_NUT_API_KEY: 'ck_live_secret',
     }
 
     expect(resolveHostRuntimeEnv(env)).toEqual({
       COCODE_LLM_PROVIDERS: env.COCODE_LLM_PROVIDERS,
+      COCODE_VISION_CONFIG: join(resolve('/tmp/cocode-home'), 'vision.yaml'),
     })
   })
 
@@ -40,7 +41,7 @@ describe('runtime capability negotiation', () => {
 
   it('changes the Host scope when the runtime provider route changes', () => {
     const base = {
-      DSH_HOME: '/tmp/cocode-home',
+      COCODE_HOME: '/tmp/cocode-home',
       COCODE_HOST_CONFIG_FINGERPRINT: 'cocode-web-jsonrpc-v1',
     }
     const first = resolveHostScope({
@@ -68,7 +69,7 @@ describe('runtime capability negotiation', () => {
       env: { DSH_HOME: '/tmp/cocode-home' },
     })
 
-    expect(scope.hostConfigFingerprint).toMatch(/:plugins-[0-9a-f]{32}$/)
+    expect(scope.hostConfigFingerprint).toBe('cocode-web-jsonrpc-v3')
   })
 
   it('changes the plugin fingerprint when a bundled plugin changes', () => {

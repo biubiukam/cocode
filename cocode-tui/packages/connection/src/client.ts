@@ -4,7 +4,7 @@ import {
   connectJsonRpc,
   createHostSupervisorClient,
   resolveHostRuntimeEnv as resolveSharedHostRuntimeEnv,
-  resolveHostScope as resolveSharedHostScope,
+  resolveCocodeHostScope as resolveSharedCocodeHostScope,
   type HostLease,
   type HostClientKind,
   type HostRuntimeEnv,
@@ -39,7 +39,6 @@ import type {
   TuiImageInput,
 } from './types.ts'
 import { fallbackCapabilitySnapshot, probeRuntimeCapabilities } from './capability.ts'
-import { runtimePluginFingerprint } from './runtime-plugins.ts'
 
 type HarnessClient = JsonRpcPeer
 
@@ -76,13 +75,18 @@ class SdkTuiRuntime implements TuiRuntime {
     this.cwd = init.cwd
     this.capabilitySnapshot = fallbackCapabilitySnapshot()
     try {
+      const scope = resolveHostScope(this.launch)
       const lease = await createHostSupervisorClient().acquire({
-        scope: resolveHostScope(this.launch),
+        scope,
         clientKind: resolveTuiClientKind(this.launch.env ?? process.env),
         requiredServices: ['jsonrpc'],
         minProtocolRevision: '1.0',
         runtimeEnv: resolveHostRuntimeEnv(this.launch.env ?? process.env),
       })
+      if (lease.descriptor.dshHome !== scope.dshHome || lease.descriptor.profile !== 'cocode') {
+        await lease.release().catch(() => undefined)
+        throw new Error('Cocode Host descriptor escaped the shared DSH home/profile boundary')
+      }
       this.lease = lease
       const endpoint = lease.descriptor.services.find((service) => service.service === 'jsonrpc')
       if (endpoint === undefined) throw new Error('shared Host did not advertise its JSON-RPC service')
@@ -589,11 +593,7 @@ export function resolveHostRuntimeEnv(env: NodeJS.ProcessEnv): HostRuntimeEnv {
 }
 
 export function resolveHostScope(launch: TuiLaunch): HostScope {
-  const scope = resolveSharedHostScope(launch.env ?? process.env)
-  return {
-    ...scope,
-    hostConfigFingerprint: `${scope.hostConfigFingerprint}:plugins-${runtimePluginFingerprint()}`,
-  }
+  return resolveSharedCocodeHostScope(launch.env ?? process.env)
 }
 
 type CompanionCapabilities = {

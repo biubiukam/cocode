@@ -14,6 +14,8 @@ const ENVIRONMENT_KEYS = [
 	"COCODE_NODE_EXECUTABLE",
 	"COCODE_SUPERVISOR_SERVICE_ENTRY",
 	"COCODE_TUI_CLIENT_KIND",
+	"COCODE_HOME",
+	"COCODE_HOST_CONFIG_FINGERPRINT",
 	"COCODE_RUNTIME_CHANNEL",
 	"DSH_HOME",
 	"DSH_PROFILE",
@@ -33,6 +35,8 @@ test("Desktop CLI installation is idempotent and preserves unmanaged commands", 
 			assert.equal(first.status.persistentPathConfigured, true)
 			assert.equal(first.status.registrationSource, "desktop-startup")
 			assert.equal(first.status.runtimeValid, true)
+			assert.match(readFileSync(fixture.shimPath, "utf8"), /DSH_PROFILE='cocode'/)
+			assert.doesNotMatch(readFileSync(fixture.shimPath, "utf8"), /DSH_PROFILE=web/)
 			assert.match(readFileSync(fixture.shimPath, "utf8"), /cocode-desktop-cli-shim:v1/)
 
 			const second = await launcher.ensureCommandLineTool()
@@ -135,6 +139,8 @@ function createFixture(): {
 	process.env.COCODE_CLI_BIN_DIR = bin
 	process.env.COCODE_TUI_RESOURCES_ROOT = resources
 	process.env.DSH_HOME = path.join(root, "dsh-home")
+	delete process.env.COCODE_HOME
+	delete process.env.COCODE_HOST_CONFIG_FINGERPRINT
 	process.env.PATH = [bin, previous.PATH ?? ""].filter(Boolean).join(path.delimiter)
 	delete process.env.COCODE_NODE_EXECUTABLE
 	delete process.env.COCODE_SUPERVISOR_SERVICE_ENTRY

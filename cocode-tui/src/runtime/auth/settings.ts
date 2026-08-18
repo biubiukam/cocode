@@ -1,5 +1,5 @@
 /**
- * Read/patch harness settings.yaml (llm routes + default model).
+ * Read/patch Cocode-owned settings (llm routes + default model).
  */
 
 import {

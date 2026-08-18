@@ -6,7 +6,11 @@ import { readFileSync } from 'node:fs'
 import { access as accessAsync } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { render } from 'ink'
-import { parseInitFromEnv, parseLaunchFromEnv } from '@cocode/tui-connection'
+import {
+  createExternalDshCatalog,
+  parseInitFromEnv,
+  parseLaunchFromEnv,
+} from '@cocode/tui-connection'
 import { createTuiApp } from './runtime/app.ts'
 import { displayError } from './runtime/errors/index.ts'
 import { startErrorMessage } from './runtime/app-view.ts'
@@ -23,6 +27,7 @@ import {
   releaseLiveInstanceSync,
   type AuthStore,
 } from './runtime/auth/index.ts'
+import { defaultHomeContext, sharedDshHome } from './runtime/auth/paths.ts'
 import { AuthGate } from './present/auth-gate.tsx'
 import { Chat } from './present/chat.tsx'
 import { clearViewport, enterScreen, parseScreenMode } from './present/clear-screen.ts'
@@ -70,6 +75,7 @@ async function main(output: NodeJS.WriteStream): Promise<void> {
   }
 
   const resolved = auth.resolved()
+  const sharedHome = sharedDshHome(defaultHomeContext(process.env))
   await registerLiveInstance(resolved.dshHome)
   process.on('exit', () => {
     releaseLiveInstanceSync(resolved.dshHome)
@@ -83,6 +89,7 @@ async function main(output: NodeJS.WriteStream): Promise<void> {
   const sessionRoot = resolveSessionRoot({
     env: process.env,
     cwd: init.cwd,
+    runtimeHome: sharedHome,
   })
   const sessionList = (await directoryExists(sessionRoot.path)) ? 'jsonl' : 'none'
   const runtime = createTuiRuntime({
@@ -93,8 +100,10 @@ async function main(output: NodeJS.WriteStream): Promise<void> {
       DSH_SESSION_ROOT: sessionRoot.path,
     },
   })
+  const externalDsh = createExternalDshCatalog()
   const app = createTuiApp({
     runtime,
+    externalDsh,
     cwd: init.cwd,
     provider: resolved.provider,
     model: resolved.model,
@@ -117,6 +126,8 @@ async function main(output: NodeJS.WriteStream): Promise<void> {
       launchConfigured: true,
       argsConfigured: true,
       sessionRoot: sessionRoot.path,
+      runtimeHome: resolved.dshHome,
+      sharedDshHome: sharedHome,
     },
     locale: resolveUiLocale(process.env),
     setTheme,

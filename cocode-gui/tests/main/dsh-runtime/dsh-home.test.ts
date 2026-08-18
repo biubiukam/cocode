@@ -2,7 +2,11 @@ import { describe, it } from "node:test"
 import assert from "node:assert/strict"
 import os from "node:os"
 import * as path from "pathe"
-import { resolveDshHome } from "../../../src/main/contexts/dsh-runtime/infrastructure/dsh-home"
+import {
+	resolveCocodeHome,
+	resolveDshHome,
+	resolveOfficialDshSourceHome,
+} from "../../../src/main/contexts/dsh-runtime/infrastructure/dsh-home"
 
 describe("resolveDshHome", () => {
 	it("uses an explicit configured path first", () => {
@@ -23,5 +27,25 @@ describe("resolveDshHome", () => {
 		const expected = path.join(os.homedir(), ".dsh")
 		assert.equal(resolveDshHome(undefined, {}), expected)
 		assert.equal(resolveDshHome(undefined, { DSH_HOME: "   " }), expected)
+	})
+})
+
+describe("resolveCocodeHome", () => {
+	it("ignores ambient DSH_HOME", () => {
+		assert.equal(
+			resolveCocodeHome(undefined, { DSH_HOME: "~/official", COCODE_HOME: "~/embedded" }),
+			path.join(os.homedir(), "embedded"),
+		)
+		assert.equal(
+			resolveCocodeHome(undefined, { DSH_HOME: "~/official" }),
+			path.join(os.homedir(), ".cocode"),
+		)
+	})
+
+	it("resolves the explicit shared DSH home independently", () => {
+		assert.equal(
+			resolveOfficialDshSourceHome(undefined, { COCODE_DSH_HOME: "~/official" }),
+			path.join(os.homedir(), "official"),
+		)
 	})
 })

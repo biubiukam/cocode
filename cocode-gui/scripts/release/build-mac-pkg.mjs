@@ -98,13 +98,15 @@ export function macCliWrapper(environment = process.env) {
 		"# cocode-desktop-cli-shim:v1",
 		"# cocode-desktop-cli-source:installer",
 		"set -eu",
-		'if [ -z "${DSH_HOME:-}" ]; then export DSH_HOME="$HOME/.dsh"; fi',
+		'export COCODE_HOME="${COCODE_HOME:-$HOME/.cocode}"',
+		'export COCODE_DSH_HOME="${COCODE_DSH_HOME:-$HOME/.dsh}"',
+		'export DSH_HOME="$COCODE_DSH_HOME"',
 		`export COCODE_NODE_EXECUTABLE=${shellQuote(executable)}`,
 		`export COCODE_SUPERVISOR_SERVICE_ENTRY=${shellQuote(supervisorEntry)}`,
 		"export COCODE_TUI_CLIENT_KIND='desktop-tui'",
-		`export DSH_PROFILE=${shellQuote(environment.DSH_PROFILE?.trim() || "web")}`,
+		`export DSH_PROFILE=${shellQuote(environment.DSH_PROFILE?.trim() || "cocode")}`,
 		`export COCODE_HOST_CONFIG_FINGERPRINT=${shellQuote(
-			environment.COCODE_HOST_CONFIG_FINGERPRINT?.trim() || "cocode-web-jsonrpc-v1",
+			environment.COCODE_HOST_CONFIG_FINGERPRINT?.trim() || "cocode-web-jsonrpc-v3",
 		)}`,
 		`export COCODE_RUNTIME_CHANNEL=${shellQuote(
 			environment.COCODE_RUNTIME_CHANNEL?.trim() || "stable",

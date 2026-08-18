@@ -4,7 +4,7 @@ import { homedir as osHomedir } from 'node:os'
 import { expandTildePath } from '@cocode/host-supervisor'
 import { pathForPlatform } from './platform.ts'
 
-export type SessionRootSource = 'DSH_SESSION_ROOT' | 'DSH_HOME' | 'default'
+export type SessionRootSource = 'DSH_SESSION_ROOT' | 'COCODE_HOME' | 'default'
 
 export type SessionRoot = {
   path: string
@@ -16,6 +16,8 @@ export function resolveSessionRoot(options: {
   cwd?: string
   homedir?: string
   platform?: NodeJS.Platform
+  /** When set, explicit overrides are accepted only below this Cocode home. */
+  runtimeHome?: string
 }): SessionRoot {
   const env = options.env ?? process.env
   const pathApi = pathForPlatform(options.platform)
@@ -23,24 +25,41 @@ export function resolveSessionRoot(options: {
   const homedir = options.homedir ?? osHomedir()
   const configuredRoot = nonempty(env.DSH_SESSION_ROOT)
   if (configuredRoot !== undefined) {
+    const candidate = resolveFromCwd(configuredRoot, cwd, homedir, pathApi)
+    if (options.runtimeHome === undefined || isWithin(
+      candidate,
+      pathApi.resolve(expandTildePath(options.runtimeHome, homedir), 'sessions'),
+      pathApi,
+    )) {
+      return { path: candidate, source: 'DSH_SESSION_ROOT' }
+    }
+
+    // The embedded Cocode runtime must never fall back to an ambient
+    // official DSH session root. Once its home is known, keep the child
+    // runtime inside that home even when DSH_SESSION_ROOT points elsewhere.
     return {
-      path: resolveFromCwd(configuredRoot, cwd, homedir, pathApi),
-      source: 'DSH_SESSION_ROOT',
+      path: pathApi.resolve(expandTildePath(options.runtimeHome, homedir), 'sessions'),
+      source: 'COCODE_HOME',
     }
   }
 
-  const configuredHome = nonempty(env.DSH_HOME)
+  const configuredHome = nonempty(env.COCODE_HOME)
   if (configuredHome !== undefined) {
     return {
       path: pathApi.resolve(expandTildePath(configuredHome, homedir), 'sessions'),
-      source: 'DSH_HOME',
+      source: 'COCODE_HOME',
     }
   }
 
   return {
-    path: pathApi.resolve(homedir, '.dsh', 'sessions'),
+    path: pathApi.resolve(homedir, '.cocode', 'sessions'),
     source: 'default',
   }
+}
+
+function isWithin(target: string, root: string, pathApi: ReturnType<typeof pathForPlatform>): boolean {
+  const relative = pathApi.relative(pathApi.resolve(root), pathApi.resolve(target))
+  return relative === '' || (!pathApi.isAbsolute(relative) && relative !== '..' && !relative.startsWith(`..${pathApi.sep}`))
 }
 
 function nonempty(value: string | undefined): string | undefined {

@@ -9,6 +9,7 @@ import {
   isHostDescriptorCompatible,
   resolveHostRuntimeEnv,
   resolveHostScope,
+  resolveCocodeHostScope,
   stableJson,
 } from '../lib/index.js'
 
@@ -90,6 +91,14 @@ test('resolveHostScope expands a tilde-prefixed DSH_HOME', () => {
     resolveHostScope({ DSH_HOME: '~/.dsh' }).dshHome,
     join(homedir(), '.dsh'),
   )
+})
+
+test('resolveCocodeHostScope ignores ambient official DSH_HOME and fixes cocode profile', () => {
+  const scope = resolveCocodeHostScope({ DSH_HOME: '/tmp/official', DSH_PROFILE: 'web', COCODE_HOME: '/tmp/cocode' })
+  assert.equal(scope.dshHome, join(homedir(), '.dsh'))
+  assert.equal(scope.profile, 'cocode')
+  assert.match(scope.hostConfigFingerprint, /^cocode-web-jsonrpc-v3:[0-9a-f]{32}$/)
+  assert.equal(scope.runtimeChannel, 'stable')
 })
 
 test('resolveHostRuntimeEnv expands tilde-prefixed vision paths', () => {

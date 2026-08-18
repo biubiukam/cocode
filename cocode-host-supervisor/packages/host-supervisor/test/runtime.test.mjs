@@ -6,6 +6,7 @@ import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import YAML from 'yaml'
 import { addRuntimePluginDependencies, createRuntimePatch, hostKey, mergeHostRuntimeEnv, prepareRuntimeSlot } from '../lib/index.js'
 
 const runtimeRoot = fileURLToPath(new URL('../../../runtime/', import.meta.url))
@@ -16,7 +17,9 @@ test('the shared Host bundle includes the Cocode vision bridge', () => {
   const manifest = JSON.parse(readFileSync(new URL('../../../runtime/plugins.json', import.meta.url), 'utf8'))
 
   assert.ok(manifest.plugins.includes('cocode-vision'))
+  assert.equal(manifest.plugins.includes('cocode-external-dsh'), false)
   assert.equal(existsSync(`${runtimeRoot}plugins/cocode-vision/lib/index.js`), true)
+  assert.equal(existsSync(`${runtimeRoot}plugins/cocode-external-dsh`), false)
 })
 
 test('the Cocode vision bridge loads in the same pure ESM mode as DSH', () => {
@@ -140,6 +143,21 @@ test('createRuntimePatch registers Cocode plugins by package name', () => {
   assert.doesNotMatch(patch, /file:\/\/.*cocode-(sidebar|account|shortcuts)/)
 })
 
+test('createRuntimePatch keeps Cocode settings paths outside the official DSH home', () => {
+  const patch = createRuntimePatch(
+    'file:///tmp/cocode-host-jsonrpc-plugin.mjs',
+    'http://127.0.0.1:43123',
+    [{ name: 'cocode-workbench', entry: '/tmp/cocode-workbench/lib/index.js' }],
+    '/tmp/cocode-home',
+  )
+  const parsed = YAML.parse(patch)
+  assert.equal(parsed[1].insert[1].id, 'cocode-workbench')
+  assert.equal(parsed[2].id, 'settings')
+  assert.equal(parsed[2].config.path, '/tmp/cocode-home/settings/settings.yaml')
+  assert.equal(parsed[3].id, 'credentials')
+  assert.equal(parsed[3].config.path, '/tmp/cocode-home/credentials/credentials.yaml')
+})
+
 test('mergeHostRuntimeEnv preserves base credentials while overlaying the route', () => {
   const env = mergeHostRuntimeEnv(
     { PATH: '/usr/bin', COCODE_NUT_API_KEY: 'ck_live_secret' },
@@ -150,4 +168,16 @@ test('mergeHostRuntimeEnv preserves base credentials while overlaying the route'
   assert.equal(env.DSH_HOME, '/tmp/cocode-home')
   assert.equal(env.COCODE_LLM_PROVIDERS, '{"cocode-nut":{}}')
   assert.equal(env.COCODE_NUT_API_KEY, 'ck_live_secret')
+})
+
+test('mergeHostRuntimeEnv pins Cocode sessions inside the shared DSH home', () => {
+  const env = mergeHostRuntimeEnv(
+    { DSH_SESSION_ROOT: '/tmp/other-dsh/sessions' },
+    undefined,
+    '/tmp/shared-dsh-home',
+    'cocode',
+  )
+
+  assert.equal(env.DSH_HOME, '/tmp/shared-dsh-home')
+  assert.equal(env.DSH_SESSION_ROOT, '/tmp/shared-dsh-home/sessions')
 })

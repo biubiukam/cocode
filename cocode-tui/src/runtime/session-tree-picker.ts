@@ -2,7 +2,8 @@ import type { SessionTreeRow } from './session-tree.ts'
 
 export type SessionTreePickerItem = SessionTreeRow & {
   path?: string
-  source: 'rpc' | 'jsonl'
+  source: 'rpc' | 'jsonl' | 'external'
+  externalSessionId?: string
   updatedAt?: number
   activity?: 'idle' | 'running'
 }

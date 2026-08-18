@@ -6,7 +6,7 @@ import { spawn } from "node:child_process"
 // eslint-disable-next-line no-restricted-imports
 import path from "node:path"
 import { app } from "electron"
-import { resolveDshHome } from "../../dsh-runtime/infrastructure/dsh-home"
+import { resolveCocodeDshHome, resolveCocodeHome } from "../../dsh-runtime/infrastructure/dsh-home"
 import type {
 	TuiCommandLineToolResult,
 	TuiCommandLineToolRegistrationSource,
@@ -61,10 +61,12 @@ export class TuiLauncher {
 			COCODE_SUPERVISOR_SERVICE_ENTRY:
 				process.env.COCODE_SUPERVISOR_SERVICE_ENTRY?.trim() || supervisorEntry,
 			COCODE_TUI_CLIENT_KIND: "desktop-tui",
-			DSH_HOME: process.env.DSH_HOME?.trim() || resolveDshHome(),
-			DSH_PROFILE: process.env.DSH_PROFILE?.trim() || "web",
+			COCODE_HOME: resolveCocodeHome(),
+			COCODE_DSH_HOME: resolveCocodeDshHome(),
+			DSH_HOME: resolveCocodeDshHome(),
+			DSH_PROFILE: "cocode",
 			COCODE_HOST_CONFIG_FINGERPRINT:
-				process.env.COCODE_HOST_CONFIG_FINGERPRINT?.trim() || "cocode-web-jsonrpc-v1",
+				process.env.COCODE_HOST_CONFIG_FINGERPRINT?.trim() || "cocode-web-jsonrpc-v3",
 			COCODE_RUNTIME_CHANNEL: resolveRuntimeChannel(process.env.COCODE_RUNTIME_CHANNEL),
 		}
 		return { executable, args: [entry, ...args], env, cwd: process.cwd() }
@@ -211,6 +213,7 @@ function shellCommand(invocation: TuiInvocation): string {
 		"COCODE_NODE_EXECUTABLE",
 		"COCODE_SUPERVISOR_SERVICE_ENTRY",
 		"COCODE_TUI_CLIENT_KIND",
+		"COCODE_HOME",
 		"DSH_HOME",
 		"DSH_PROFILE",
 		"COCODE_HOST_CONFIG_FINGERPRINT",
@@ -229,6 +232,7 @@ function windowsCommand(invocation: TuiInvocation): string {
 		"COCODE_NODE_EXECUTABLE",
 		"COCODE_SUPERVISOR_SERVICE_ENTRY",
 		"COCODE_TUI_CLIENT_KIND",
+		"COCODE_HOME",
 		"DSH_HOME",
 		"DSH_PROFILE",
 		"COCODE_HOST_CONFIG_FINGERPRINT",

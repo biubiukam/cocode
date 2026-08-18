@@ -11,7 +11,7 @@ export class SecureVault<T> {
 	async read(): Promise<T | undefined> {
 		if (this.loaded) return this.value
 		this.loaded = true
-		if (!safeStorage.isEncryptionAvailable()) return undefined
+		if (safeStorage === undefined || !safeStorage.isEncryptionAvailable()) return undefined
 		try {
 			const encrypted = await readFile(join(app.getPath("userData"), this.filename))
 			this.value = JSON.parse(safeStorage.decryptString(encrypted)) as T
@@ -22,7 +22,8 @@ export class SecureVault<T> {
 	}
 
 	async write(value: T): Promise<void> {
-		if (!safeStorage.isEncryptionAvailable()) throw new Error("secure storage is unavailable")
+		if (safeStorage === undefined || !safeStorage.isEncryptionAvailable())
+			throw new Error("secure storage is unavailable")
 		this.value = value
 		this.loaded = true
 		await writeFile(

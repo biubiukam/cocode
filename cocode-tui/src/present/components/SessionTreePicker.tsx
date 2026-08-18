@@ -71,6 +71,7 @@ export function SessionTreePicker(props: {
           const indent = '  '.repeat(Math.min(item.depth, 8))
           const title =
             item.session.title ?? item.session.preview ?? text(props.locale, 'resumeNoSummary')
+          const sourceLabel = item.source === 'external' ? ' · shared DSH' : ''
           return (
             <Text
               key={`${item.session.id}:${item.depth}`}
@@ -79,7 +80,7 @@ export function SessionTreePicker(props: {
               wrap="truncate-end"
             >
               {active ? glyphs.optionActive : glyphs.optionInactive} {marker}{attachedActivity} {indent}
-              {title} · {item.session.id.slice(0, 8)}{' '}
+              {title}{sourceLabel} · {item.session.id.replace(/^shared-dsh:/, '').slice(0, 8)}{' '}
               <Text color={active ? theme.text : theme.dim}>
                 {formatTimestamp(item.updatedAt ?? item.session.createdAt, props.locale)}
               </Text>

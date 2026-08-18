@@ -11,14 +11,35 @@ bridge. Local `packages/client/*/lib/client.js` artifacts are emitted under the
 Renderer build's `dsh-client/` tree; non-copied host bundles continue to resolve
 against the sidecar origin.
 
-The sidecar follows the official DSH home resolution contract: a non-blank
-`DSH_HOME` value is used when present, otherwise the home defaults to `~/.dsh`.
-This keeps Electron and the standalone Cocode/DSH launcher on the same profiles,
-settings and plugin dependency state. Electron-specific composition is supplied
-as a separate `--patch` overlay generated under the application's own `userData`
-directory, so the patch artifact itself is not stored in the DSH home. Do not
-run incompatible DSH versions concurrently against the same home because the
-official launcher may heal `profiles/node_modules` and profile files during boot.
+The embedded Cocode sidecar is an independent product runtime with a shared DSH
+data home: `COCODE_HOME` (default `~/.cocode`) owns runtime slots, plugins,
+settings, credentials, and Supervisor state; `COCODE_DSH_HOME` (default `~/.dsh`)
+is passed as `DSH_HOME` with the fixed profile `cocode`. The official launcher
+continues to use the same DSH home with profile `web`. The two Hosts are
+independent, while sessions, workspace storage, projection cache, and
+attachments are shared files. Home-level `cordis.patch.yml` and
+`profiles/node_modules` remain shared DSH surfaces.
+
+Main may also create a Shared DSH data reader (the compatibility implementation
+is still named `ExternalDshReadSource`) for the shared home. It is an allow-listed,
+filesystem-read-only observation path for `sessions/**`, `storages/workspace.json`,
+the optional projection cache and opt-in attachments. Mutations go through the
+Cocode Host API. Because that Host uses the same `DSH_HOME`, the normal
+`ctx.sessions` and `ctx.workspaces` services are the single Desktop catalog and
+sidebar interaction surface. There is no separate "Shared DSH history" client
+entry. The reader remains a Main-owned observation and conflict-diagnostics
+capability; it is not mounted as another client Store.
+
+The shared objects are writable from Cocode, but the product does not support
+concurrent writes by the official Host and Cocode Host to the same Session or
+Workspace. Best-effort revision checks report
+`SHARED_HOME_CONFLICT`; they do not provide a cross-process lock, CAS, merge, or
+automatic retry.
+
+The shared home also means that `cordis.patch.yml` and
+`profiles/node_modules` remain common DSH surfaces. Cocode owns only its
+`profiles/cocode` manifest, runtime slot, plugin staging, settings, credentials,
+and Supervisor state; it does not modify the official `profiles/web` contents.
 
 HTTP `/api` traffic crosses the typed Preload/Main request bridge so a
 `file://`/Vite Renderer never depends on CORS. The two WebSocket downlinks remain

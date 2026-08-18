@@ -26,24 +26,24 @@ describe('resolveSessionRoot', () => {
     ).toEqual({ path: resolve(cwd, 'sessions'), source: 'DSH_SESSION_ROOT' })
   })
 
-  it('uses DSH_HOME sessions when configured', () => {
+  it('uses COCODE_HOME sessions when configured', () => {
     expect(
       resolveSessionRoot({
-        env: { DSH_HOME: resolve('dsh-home') },
+        env: { COCODE_HOME: resolve('cocode-home') },
         cwd,
         homedir,
       }),
-    ).toEqual({ path: resolve('dsh-home', 'sessions'), source: 'DSH_HOME' })
+    ).toEqual({ path: resolve('cocode-home', 'sessions'), source: 'COCODE_HOME' })
   })
 
-  it('expands tilde in DSH_HOME and DSH_SESSION_ROOT', () => {
+  it('expands tilde in COCODE_HOME and DSH_SESSION_ROOT', () => {
     expect(
       resolveSessionRoot({
-        env: { DSH_HOME: '~/.dsh' },
+        env: { COCODE_HOME: '~/.cocode' },
         cwd,
         homedir,
       }),
-    ).toEqual({ path: join(homedir, '.dsh', 'sessions'), source: 'DSH_HOME' })
+    ).toEqual({ path: join(homedir, '.cocode', 'sessions'), source: 'COCODE_HOME' })
     expect(
       resolveSessionRoot({
         env: { DSH_SESSION_ROOT: '~/.dsh/sessions' },
@@ -53,14 +53,36 @@ describe('resolveSessionRoot', () => {
     ).toEqual({ path: join(homedir, '.dsh', 'sessions'), source: 'DSH_SESSION_ROOT' })
   })
 
-  it('uses ~/.dsh/sessions by default', () => {
+  it('uses ~/.cocode/sessions by default', () => {
     expect(
       resolveSessionRoot({
         env: {},
         cwd,
         homedir,
       }),
-    ).toEqual({ path: join(homedir, '.dsh', 'sessions'), source: 'default' })
+    ).toEqual({ path: join(homedir, '.cocode', 'sessions'), source: 'default' })
+  })
+
+  it('ignores an ambient official session root when the Cocode runtime home is known', () => {
+    expect(
+      resolveSessionRoot({
+        env: { DSH_SESSION_ROOT: resolve('.dsh', 'sessions') },
+        cwd,
+        homedir,
+        runtimeHome: resolve('cocode-home'),
+      }),
+    ).toEqual({ path: resolve('cocode-home', 'sessions'), source: 'COCODE_HOME' })
+  })
+
+  it('keeps explicit session roots that remain below the Cocode home', () => {
+    expect(
+      resolveSessionRoot({
+        env: { DSH_SESSION_ROOT: resolve('cocode-home', 'sessions', 'legacy') },
+        cwd,
+        homedir,
+        runtimeHome: resolve('cocode-home'),
+      }),
+    ).toEqual({ path: resolve('cocode-home', 'sessions', 'legacy'), source: 'DSH_SESSION_ROOT' })
   })
 
   it('uses Windows path semantics when the platform is simulated', () => {
@@ -74,14 +96,14 @@ describe('resolveSessionRoot', () => {
     ).toEqual({ path: 'C:\\workspace\\sessions', source: 'DSH_SESSION_ROOT' })
   })
 
-  it('expands DSH_HOME with Windows path semantics', () => {
+  it('expands COCODE_HOME with Windows path semantics', () => {
     expect(
       resolveSessionRoot({
-        env: { DSH_HOME: '~/.dsh' },
+        env: { COCODE_HOME: '~/.cocode' },
         cwd: 'C:\\workspace',
         homedir: 'C:\\Users\\coder',
         platform: 'win32',
       }),
-    ).toEqual({ path: 'C:\\Users\\coder\\.dsh\\sessions', source: 'DSH_HOME' })
+    ).toEqual({ path: 'C:\\Users\\coder\\.cocode\\sessions', source: 'COCODE_HOME' })
   })
 })

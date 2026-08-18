@@ -30,22 +30,26 @@ describe('home resolution', () => {
     ).toBe(resolve('.dev/home'))
   })
 
-  it('expands tilde-prefixed COCODE_HOME and DSH_HOME against the user home', () => {
+  it('expands tilde-prefixed COCODE_HOME and ignores DSH_HOME', () => {
     const context = ctx({ env: { COCODE_HOME: '~/.cocode', DSH_HOME: '~/.dsh' } })
     expect(accountHome(context)).toBe(join(testHome, '.cocode'))
-    expect(dshHome(context)).toBe(join(testHome, '.dsh'))
+    expect(dshHome(context)).toBe(join(testHome, '.cocode'))
   })
 
-  it('keeps COCODE_HOME and DSH_HOME independent', () => {
+  it('uses COCODE_HOME for both Cocode account and runtime data', () => {
     const cocodeHome = resolve('tmp', 'cocode')
     const dshRoot = resolve('tmp', 'dsh')
     const context = ctx({ env: { COCODE_HOME: cocodeHome, DSH_HOME: dshRoot } })
     expect(accountHome(context)).toBe(cocodeHome)
-    expect(dshHome(context)).toBe(dshRoot)
-    expect(productHomes(context)).toEqual({ accountHome: cocodeHome, dshHome: dshRoot })
+    expect(dshHome(context)).toBe(cocodeHome)
+    expect(productHomes(context)).toEqual({
+      accountHome: cocodeHome,
+      dshHome: cocodeHome,
+      sharedDshHome: join(testHome, '.dsh'),
+    })
   })
 
-  it('uses DSH_HOME only for the harness home when COCODE_HOME is empty', () => {
+  it('ignores DSH_HOME when COCODE_HOME is empty', () => {
     const dshRoot = resolve('tmp', 'dsh')
     expect(
       dshHome(
@@ -53,7 +57,7 @@ describe('home resolution', () => {
           env: { COCODE_HOME: '  ', DSH_HOME: dshRoot },
         }),
       ),
-    ).toBe(dshRoot)
+    ).toBe(join(testHome, '.cocode'))
   })
 
   it('uses ~/.cocode for the account home without inspecting marker files', () => {
@@ -62,12 +66,12 @@ describe('home resolution', () => {
     )
   })
 
-  it('uses ~/.dsh for DSH data even when it does not exist yet', () => {
-    expect(dshHome(ctx({ files: [join(testHome, '.dsh')] }))).toBe(join(testHome, '.dsh'))
+  it('uses ~/.cocode for runtime data even when it does not exist yet', () => {
+    expect(dshHome(ctx({ files: [join(testHome, '.cocode')] }))).toBe(join(testHome, '.cocode'))
   })
 
-  it('keeps the deprecated productHome alias on ~/.dsh', () => {
-    expect(productHome(ctx({}))).toBe(join(testHome, '.dsh'))
+  it('keeps the deprecated productHome alias on ~/.cocode', () => {
+    expect(productHome(ctx({}))).toBe(join(testHome, '.cocode'))
   })
 })
 
@@ -81,6 +85,6 @@ describe('homeDisplay', () => {
       }),
     ).toBe('$COCODE_HOME')
     expect(homeDisplay(join(testHome, '.cocode'), ctx({}))).toBe('~/.cocode')
-    expect(homeDisplay(join(testHome, '.dsh'), ctx({}))).toBe('~/.dsh')
+    expect(homeDisplay(join(testHome, '.cocode'), ctx({}))).toBe('~/.cocode')
   })
 })
