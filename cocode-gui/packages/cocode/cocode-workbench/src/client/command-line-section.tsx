@@ -1,7 +1,9 @@
 import { useEffect, useState, useSyncExternalStore } from "react"
+import { Button } from "@deepseek-ai/dsh-client-ui-primitives"
 import type { DesktopApi } from "../../../../../src/contracts/ipc/desktop.contract.ts"
 import type { TuiCommandLineToolStatus } from "../../../../../src/contracts/ipc/tui.contract.ts"
 import { localeRevision, subscribeLocale, t } from "./locales.ts"
+import css from "./command-line-section.module.css"
 
 export function CommandLineSection(): JSX.Element {
   useSyncExternalStore(subscribeLocale, localeRevision, localeRevision)
@@ -52,16 +54,16 @@ export function CommandLineSection(): JSX.Element {
   }
 
   if (api === undefined) {
-    return <section style={styles.section}>
-      <h2 style={styles.title}>{t("commandLine.title")}</h2>
+    return <section className={css.section}>
+      <h2 className={css.title}>{t("commandLine.title")}</h2>
       <p>{t("commandLine.unavailable")}</p>
     </section>
   }
 
-  return <section style={styles.section}>
-    <h2 style={styles.title}>{t("commandLine.title")}</h2>
-    <p style={styles.description}>{t("commandLine.description")}</p>
-    <div style={styles.grid}>
+  return <section className={css.section}>
+    <h2 className={css.title}>{t("commandLine.title")}</h2>
+    <p className={css.description}>{t("commandLine.description")}</p>
+    <div className={css.grid}>
       <Metric label={t("commandLine.status")} value={statusLabel(status, zh)} />
       <Metric label={t("commandLine.path")} value={status?.path ?? "—"} />
       <Metric label={t("commandLine.pathDir")} value={status === undefined ? "—" : status.directoryOnPath ? t("commandLine.available") : t("commandLine.notDetected")} />
@@ -69,16 +71,16 @@ export function CommandLineSection(): JSX.Element {
       <Metric label={t("commandLine.registration")} value={registrationLabel(status, zh)} />
       <Metric label={t("commandLine.runtime")} value={runtimeLabel(status, zh)} />
     </div>
-    {status?.detail !== undefined && <p style={styles.notice}>{status.detail}</p>}
-    {status !== undefined && !status.directoryOnPath && <p style={styles.notice}>{t("commandLine.ensurePath", { path: status.directory })}</p>}
-    {status !== undefined && status.persistentPathConfigured && !status.directoryOnPath && <p style={styles.notice}>{t("commandLine.refreshProcess")}</p>}
-    <div style={styles.actions}>
-      <button type="button" disabled={busy || status?.canRepair !== true} onClick={repair}>{t("commandLine.repair")}</button>
-      <button type="button" disabled={busy} onClick={openInTerminal}>{t("commandLine.open")}</button>
-      <button type="button" disabled={busy} onClick={refresh}>{t("commandLine.refresh")}</button>
-      <button type="button" disabled={busy || status === undefined} onClick={copyDiagnostics}>{t("commandLine.copyDiagnostics")}</button>
+    {status?.detail !== undefined && <p className={css.notice}>{status.detail}</p>}
+    {status !== undefined && !status.directoryOnPath && <p className={css.notice}>{t("commandLine.ensurePath", { path: status.directory })}</p>}
+    {status !== undefined && status.persistentPathConfigured && !status.directoryOnPath && <p className={css.notice}>{t("commandLine.refreshProcess")}</p>}
+    <div className={css.actions}>
+      <Button variant="outline" size="sm" className={css.actionButton} disabled={busy || status?.canRepair !== true} onClick={repair}>{t("commandLine.repair")}</Button>
+      <Button variant="outline" size="sm" className={css.actionButton} disabled={busy} onClick={openInTerminal}>{t("commandLine.open")}</Button>
+      <Button variant="outline" size="sm" className={css.actionButton} disabled={busy} onClick={refresh}>{t("commandLine.refresh")}</Button>
+      <Button variant="outline" size="sm" className={css.actionButton} disabled={busy || status === undefined} onClick={copyDiagnostics}>{t("commandLine.copyDiagnostics")}</Button>
     </div>
-    {message !== undefined && <p role="status" style={styles.notice}>{message}</p>}
+    {message !== undefined && <p role="status" className={css.notice}>{message}</p>}
   </section>
 }
 
@@ -87,7 +89,7 @@ function getDesktopApi(): DesktopApi | undefined {
 }
 
 function Metric({ label, value }: { readonly label: string; readonly value: string }): JSX.Element {
-  return <div style={styles.metric}><span style={styles.metricLabel}>{label}</span><strong style={styles.metricValue}>{value}</strong></div>
+  return <div className={css.metric}><span className={css.metricLabel}>{label}</span><strong className={css.metricValue}>{value}</strong></div>
 }
 
 function statusLabel(status: TuiCommandLineToolStatus | undefined, zh: boolean): string {
@@ -130,15 +132,3 @@ function successMessage(): string { return t("commandLine.repaired") }
 function safeMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
-
-const styles = {
-  section: { display: "grid", gap: "12px", maxWidth: "720px", padding: "8px 0" },
-  title: { margin: 0, fontSize: "18px" },
-  description: { margin: 0, opacity: 0.72, lineHeight: 1.5 },
-  grid: { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "8px" },
-  metric: { display: "grid", gap: "4px", padding: "10px", border: "1px solid color-mix(in srgb, currentColor 14%, transparent)", borderRadius: "8px" },
-  metricLabel: { fontSize: "12px", opacity: 0.68 },
-  metricValue: { overflowWrap: "anywhere" as const },
-  actions: { display: "flex", flexWrap: "wrap" as const, gap: "8px" },
-  notice: { margin: 0, fontSize: "12px", opacity: 0.8 },
-} as const

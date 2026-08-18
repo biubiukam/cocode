@@ -9,6 +9,7 @@ import { LOCALE_NS, attachLocale, en, zh, t, type WorkbenchKey } from "./locales
 import { CommitModelRow } from "./settings-row.tsx"
 import { CommandLineSection } from "./command-line-section.tsx"
 import { DiagnosticsSection } from "./diagnostics-section.tsx"
+import { VersionSection } from "./version-section.tsx"
 import type { WorkbenchPanelProps } from "./model.ts"
 import { fileMentionText, registerFileMention } from "./file-mention.ts"
 import { bindFileShortcutRegistry, fileShortcutCommands, type FileShortcutRegistryFace } from "./file-shortcuts.ts"
@@ -122,5 +123,11 @@ export function apply(ctx: ClientContext): void {
     order: 900,
     label: () => t("diagnostics.title"),
   }, DiagnosticsSection))
+  slots.inject("settings.section", () => slots.register({
+    name: "settings.section",
+    id: "cocode-workbench-version",
+    order: 1000,
+    label: () => t("version.title"),
+  }, VersionSection))
   ctx.effect(() => () => { void disposeService() }, "cocode-workbench: dispose service")
 }

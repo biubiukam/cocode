@@ -1,11 +1,12 @@
-import { ipcMain } from "electron"
+import { app, ipcMain } from "electron"
 import { tuiChannels } from "../../../../../contracts/ipc/tui.contract"
 import type { TuiLauncher } from "../../infrastructure/tui-launcher"
 import type { DesktopLogger } from "../../../../shared/logging/desktop-logger"
 
 export function registerTuiIpc(launcher: TuiLauncher, logger?: DesktopLogger): void {
 	ipcMain.handle(tuiChannels.getCommandLineToolStatus, async () => {
-		return launcher.getCommandLineToolStatus()
+		const status = await launcher.getCommandLineToolStatus()
+		return { ...status, appVersion: app.getVersion() }
 	})
 	ipcMain.handle(tuiChannels.repairCommandLineTool, async () => {
 		const result = await launcher.repairCommandLineTool()

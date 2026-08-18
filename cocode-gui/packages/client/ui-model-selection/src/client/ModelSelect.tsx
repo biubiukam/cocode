@@ -102,6 +102,14 @@ export function ModelSelect(
     ], [reasoning, t])
   const busy = state.status === 'selecting'
 
+  // When the current model has no effort selector, the root menu only has a
+  // single Model row and adds an extra click. Keep the root when effort is
+  // available so that second control remains discoverable.
+  useEffect(() => {
+    if (!open || pane !== 'root' || state.status !== 'ready' || reasoning !== undefined) return
+    setPane('model')
+  }, [open, pane, reasoning, state.status])
+
   const reload = (): void => {
     lastActionRef.current = 'load'
     load()
@@ -127,7 +135,7 @@ export function ModelSelect(
   if (!available) return null
 
   const show = (): void => {
-    setPane('root')
+    setPane(state.status === 'ready' && reasoning === undefined ? 'model' : 'root')
     setOpen(true)
     reload()
   }

@@ -60,7 +60,7 @@ export type InputBarProps = ComposerBarProps
 
 export function InputBar({
   useSession, useInput, inputActions, keyboard, bindDraftInsertion, addImages, removeImage, draftImages,
-  resolveSubmitMode, toggleCommandMenu, stop, command, openFile, t,
+  resolveSubmitMode, stop, command, openFile, t,
   renderSlot, useNotices, useLexicon, useMenuLauncher,
   useProjection, sessionId, variant, disabled: inert = false, blocked,
   workspacePickerOpen = false, onRequestWorkspace,
@@ -121,6 +121,7 @@ export function InputBar({
       : `${promptError.error.message} (${promptError.error.code})`)
   }, [promptError, showToast, t, imageLimits])
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
   const rememberedSelectionRef = useRef<{ start: number; end: number }>()
   const cardRef = useRef<HTMLDivElement | null>(null)
   const dragDepthRef = useRef(0)
@@ -554,6 +555,14 @@ export function InputBar({
     if (rejected !== null) showToast(rejected)
   }, [addImages, attachments, imageLimits, showToast, t])
 
+  const onChooseFiles = (e: ChangeEvent<HTMLInputElement>): void => {
+    const files = Array.from(e.currentTarget.files ?? [])
+    // Reset the native input so choosing the same file again still emits a
+    // change event after the user removes it from the draft rail.
+    e.currentTarget.value = ''
+    if (files.length > 0) intakeImages(files)
+  }
+
   // Whole-page file-drop intake (DeepSeek Chat behavior): the listeners live
   // on the document so a drop anywhere over the window adds images, not only
   // over the composer card. Safe as document-level state: the composer-bar
@@ -619,6 +628,7 @@ export function InputBar({
     id: attachment.id,
     previewUrl: attachment.previewUrl,
     alt: attachment.file.name || t('image.pending'),
+    fileName: attachment.file.name || t('image.pending'),
     removeLabel: t('image.remove', { name: attachment.file.name }),
     attachment,
   })), [attachments, t])
@@ -637,11 +647,6 @@ export function InputBar({
   const keepFocus = (e: MouseEvent<HTMLButtonElement>): void => {
     e.preventDefault()
     inputRef.current?.focus({ preventScroll: true })
-  }
-
-  const onToggleCommandMenu = (): void => {
-    const el = inputRef.current
-    if (el !== null) toggleCommandMenu?.(selectionOf(el))
   }
 
   // Ordinary sessions retain their primary Send/Stop toggle. A continuable
@@ -847,20 +852,28 @@ export function InputBar({
         </div>
         <div className={css.row}>
           <div className={css.tools}>
-            <Tooltip label={t('input.commands')} side="top" delayMs={500}>
+            <Tooltip label={t('input.attach')} side="top" delayMs={500}>
               <button
                 type="button"
                 className={css.add}
-                aria-label={t('input.commands')}
-                aria-haspopup="listbox"
-                aria-expanded={commandMenuOpen}
-                disabled={locked || toggleCommandMenu === undefined}
+                aria-label={t('input.attach')}
+                disabled={locked || addImages === undefined}
                 onMouseDown={keepFocus}
-                onClick={onToggleCommandMenu}
+                onClick={() => { fileInputRef.current?.click() }}
               >
                 <IconPlusOutline16 size={14} />
               </button>
             </Tooltip>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              tabIndex={-1}
+              aria-hidden="true"
+              className={css.fileInput}
+              onChange={onChooseFiles}
+            />
             <div className={css.modes}>
               {accessSelect}
               {renderSlot('conversation.input.plan', { locked })}

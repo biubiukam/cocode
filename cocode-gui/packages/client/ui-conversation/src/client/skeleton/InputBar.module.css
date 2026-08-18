@@ -114,6 +114,18 @@
   pointer-events: none;
 }
 
+/* The picker is driven by the visible plus control; keep the native input out
+   of layout and keyboard order while retaining a real file chooser. */
+.fileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .cardWorkspaceTrigger:hover::after {
   background: var(--dsw-alias-state-business-primary);
 }

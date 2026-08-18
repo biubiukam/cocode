@@ -132,30 +132,35 @@ export class TuiLauncher {
 	}
 
 	private async getRuntimeMetadata(): Promise<DesktopCliRuntimeMetadata> {
-		this.buildInvocation()
 		const manifest = await this.readManifest()
+		const runtimeVersion =
+			typeof manifest?.dshRuntimeVersion === "string"
+				? manifest.dshRuntimeVersion
+				: await readDevelopmentDshVersion()
 		let runtimeValid = true
 		if (manifest !== null) {
-			const resourcesRoot = resolveResourcesRoot()
-			const cliEntry = path.join(resourcesRoot, "tui", "cocode-cli.mjs")
-			const runtimeEntry = path.join(resourcesRoot, "tui", "cocode-tui.mjs")
-			const cliHash = createHash("sha256")
-				.update(await readFile(cliEntry))
-				.digest("hex")
-			const runtimeHash = createHash("sha256")
-				.update(await readFile(runtimeEntry))
-				.digest("hex")
-			runtimeValid =
-				manifest.schemaVersion === 1 &&
-				manifest.entry === "tui/cocode-cli.mjs" &&
-				manifest.sha256 === cliHash &&
-				manifest.runtimeSha256 === runtimeHash
+			try {
+				const resourcesRoot = resolveResourcesRoot()
+				const cliEntry = path.join(resourcesRoot, "tui", "cocode-cli.mjs")
+				const runtimeEntry = path.join(resourcesRoot, "tui", "cocode-tui.mjs")
+				const cliHash = createHash("sha256")
+					.update(await readFile(cliEntry))
+					.digest("hex")
+				const runtimeHash = createHash("sha256")
+					.update(await readFile(runtimeEntry))
+					.digest("hex")
+				runtimeValid =
+					manifest.schemaVersion === 1 &&
+					manifest.entry === "tui/cocode-cli.mjs" &&
+					manifest.sha256 === cliHash &&
+					manifest.runtimeSha256 === runtimeHash
+			} catch {
+				runtimeValid = false
+			}
 		}
 		return {
 			runtimeValid,
-			...(typeof manifest?.dshRuntimeVersion === "string"
-				? { runtimeVersion: manifest.dshRuntimeVersion }
-				: {}),
+			...(runtimeVersion === undefined ? {} : { runtimeVersion }),
 			...(typeof manifest?.tuiVersion === "string"
 				? { tuiVersion: manifest.tuiVersion }
 				: {}),
@@ -164,6 +169,21 @@ export class TuiLauncher {
 				: {}),
 			...(manifest === null ? {} : { manifestFingerprint: tuiManifestFingerprint(manifest) }),
 		}
+	}
+}
+
+/** Read the DSH package version when the desktop is running from source. */
+async function readDevelopmentDshVersion(): Promise<string | undefined> {
+	try {
+		if (app.isPackaged) return undefined
+		const packagePath = path.resolve(
+			app.getAppPath(),
+			"../cocode-harness/apps/cli/package.json",
+		)
+		const packageJson = JSON.parse(await readFile(packagePath, "utf8")) as { version?: unknown }
+		return typeof packageJson.version === "string" ? packageJson.version : undefined
+	} catch {
+		return undefined
 	}
 }
 

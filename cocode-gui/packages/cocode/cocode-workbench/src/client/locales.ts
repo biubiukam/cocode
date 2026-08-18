@@ -130,6 +130,10 @@ export const zh = {
   "diagnostics.searchPlaceholder": "按事件名、来源、Host 或关联 ID 搜索",
   "diagnostics.query": "查询日志",
   "diagnostics.noMatches": "暂无匹配日志。",
+  "version.title": "版本",
+  "version.description": "查看当前 Cocode 桌面应用和 DSH 运行时版本。",
+  "version.cocode": "Cocode",
+  "version.dsh": "DSH",
 
   "dock.emptyTitle": "打开一个面板",
   "dock.emptyHint": "选一个面板停靠在这里，之后也可以用右上角的 + 添加。",
@@ -396,6 +400,10 @@ export const en: Record<WorkbenchKey, string> = {
   "diagnostics.searchPlaceholder": "Search event, source, Host or correlation ID",
   "diagnostics.query": "Query logs",
   "diagnostics.noMatches": "No matching log records.",
+  "version.title": "Version",
+  "version.description": "View the current Cocode desktop app and DSH runtime versions.",
+  "version.cocode": "Cocode",
+  "version.dsh": "DSH",
 
   "dock.emptyTitle": "Open a panel",
   "dock.emptyHint": "Pick a panel to dock here, or add one later from the + above.",

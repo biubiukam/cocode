@@ -97,6 +97,7 @@ function EmptyDock(props: {
 
 function Tab(props: {
   instance: WorkbenchPanelInstance
+  title: string
   icon?: ReactNode
   active: boolean
   activate: () => void
@@ -136,7 +137,7 @@ function Tab(props: {
   >
     <button type="button" className={css.tabMain} role="tab" aria-selected={props.active} onClick={props.activate}>
       {props.icon === undefined ? null : <span className={css.tabIcon}>{props.icon}</span>}
-      <span className={css.tabLabel}>{props.instance.title}</span>
+      <span className={css.tabLabel}>{props.title}</span>
     </button>
     <button type="button" className={css.tabClose} aria-label="Close panel" title="Close panel" onClick={props.close}><CloseIcon size={14} /></button>
   </div>
@@ -254,7 +255,8 @@ function Pane(props: {
       }}>
         {paneInstances.map(instance => {
           const descriptor = props.snapshot.catalog.find(item => item.id === instance.type)
-          return <Tab key={instance.id} instance={instance} icon={tabIcon(descriptor, instance)} active={instance.id === activeId} activate={() => props.controller.activate(instance.id)} close={() => props.controller.close(instance.id)} drop={(draggedId, beforeId) => props.controller.moveToPane(draggedId, props.node.id, beforeId)} contextMenu={(x, y) => {
+          const title = descriptor === undefined ? instance.title : panelTitle(descriptor)
+          return <Tab key={instance.id} instance={instance} title={title} icon={tabIcon(descriptor, instance)} active={instance.id === activeId} activate={() => props.controller.activate(instance.id)} close={() => props.controller.close(instance.id)} drop={(draggedId, beforeId) => props.controller.moveToPane(draggedId, props.node.id, beforeId)} contextMenu={(x, y) => {
             props.controller.activate(instance.id)
             setTabMenu({ id: instance.id, x, y })
           }} />

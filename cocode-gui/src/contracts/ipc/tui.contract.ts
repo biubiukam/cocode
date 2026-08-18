@@ -13,6 +13,7 @@ export type TuiCommandLineToolRegistrationSource =
 	| "unknown"
 
 export type TuiCommandLineToolStatus = {
+	readonly appVersion?: string
 	readonly state: TuiCommandLineToolState
 	readonly path: string
 	readonly directory: string

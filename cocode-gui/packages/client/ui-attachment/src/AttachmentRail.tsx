@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
 import {
-  IconChevronLeftOutline14, IconChevronRightOutline14, IconCloseFill14,
+  IconChevronLeftOutline14, IconChevronRightOutline14, IconCloseFill14, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import css from './AttachmentRail.module.css'
 
@@ -16,6 +16,8 @@ export interface AttachmentRailItem {
   previewUrl: string
   /** Image alt text (display name with the owner's fallback applied). */
   alt: string
+  /** The attachment's file name shown when the thumbnail is hovered or focused. */
+  fileName?: string
   /** Accessible label of the item's remove control. */
   removeLabel: string
 }
@@ -166,14 +168,16 @@ export function AttachmentRail<T extends AttachmentRailItem>({ items, labels, on
       >
         {items.map(item => (
           <div key={item.id} className={css.item}>
-            <button
-              type="button"
-              className={css.thumbnail}
-              title={labels.open}
-              onClick={() => { onOpen(item) }}
-            >
-              <img src={item.previewUrl} alt={item.alt} />
-            </button>
+            <Tooltip label={item.fileName ?? item.alt} side="top" delayMs={300} maxWidth={360}>
+              <button
+                type="button"
+                className={css.thumbnail}
+                aria-label={`${item.fileName ?? item.alt}: ${labels.open}`}
+                onClick={() => { onOpen(item) }}
+              >
+                <img src={item.previewUrl} alt={item.alt} />
+              </button>
+            </Tooltip>
             <button
               type="button"
               className={css.remove}
