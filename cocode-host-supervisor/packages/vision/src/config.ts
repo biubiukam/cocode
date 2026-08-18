@@ -79,8 +79,8 @@ export function visionConfigPath(env: NodeJS.ProcessEnv = process.env): string {
 function configPath(env: NodeJS.ProcessEnv): string {
   const configured = nonempty(env.COCODE_VISION_CONFIG)
   if (configured !== undefined) return isAbsolute(configured) ? configured : resolve(configured)
-  const home = nonempty(env.COCODE_HOME)
-  return join(home === undefined ? join(homedir(), '.cocode') : resolve(home), CONFIG_FILE_NAME)
+  const home = nonempty(env.COCODE_DSH_HOME)
+  return join(home === undefined ? join(homedir(), '.dsh') : resolve(home), CONFIG_FILE_NAME)
 }
 
 function parseVisionConfig(value: unknown, path: string): VisionConfig {

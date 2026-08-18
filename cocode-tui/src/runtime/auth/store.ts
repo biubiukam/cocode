@@ -3,6 +3,7 @@
  */
 
 import { deleteAccount, readAccount, writeAccount } from './account.ts'
+import { join } from 'node:path'
 import { withAccountLock } from './account-lock.ts'
 import { patchCredential, readCredentials } from './credentials.ts'
 import {
@@ -126,7 +127,10 @@ class AuthStoreImpl implements AuthStore {
   ) {}
 
   private async homeIsBusy(): Promise<boolean> {
-    return (await otherLiveCount(this.dshHome, this.live)) > 0
+    // Live-instance markers belong to Cocode's account/runtime home. The DSH
+    // home is shared with the official product and must not become a Cocode
+    // process-lock directory.
+    return (await otherLiveCount(join(this.accountHome, 'runtime'), this.live)) > 0
   }
 
   async hydrate(signal?: AbortSignal): Promise<void> {

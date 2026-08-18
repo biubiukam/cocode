@@ -68,7 +68,10 @@ export function parseCliArgs(args) {
 }
 
 export function applyScopeOptions(options, env = process.env) {
-  if (options.dshHome) env.DSH_HOME = options.dshHome
+  if (options.dshHome) {
+    env.COCODE_DSH_HOME = options.dshHome
+    env.DSH_HOME = options.dshHome
+  }
   if (options.profile) env.DSH_PROFILE = options.profile
   if (options.runtimeChannel) {
     if (!['stable', 'preview', 'dev'].includes(options.runtimeChannel)) throw new Error('--runtime-channel must be stable, preview, or dev.')

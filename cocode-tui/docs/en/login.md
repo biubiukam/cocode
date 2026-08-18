@@ -40,18 +40,19 @@ When `COCODE_PROVIDER` is set in the environment, `/use` does not change the def
 
 ## Relation to the desktop app
 
-The GUI and terminal share the official Harness settings and credentials under
+The GUI and terminal share DSH settings, credentials, and business data under
 `~/.dsh`. Cocode identity tokens stay in `~/.cocode/account.yaml`; the TUI
 builds the Cocode provider route only for the current process.
 
 ## Configuration directories
 
-Your API key is stored in the official Harness credentials file at
-`$DSH_HOME/.credentials.yaml`, defaulting to `~/.dsh/.credentials.yaml`. The TUI does not add a
-Cocode-specific API-key environment variable or copy the file-backed key into the process
-environment.
+Your API key is stored in the shared DSH credentials file at
+`~/.dsh/.credentials.yaml`. Cocode reads and writes that file directly; there
+is no one-time import or `.cocode/credentials` fallback. The TUI does not copy
+the file-backed key into the process environment.
 
-Set `COCODE_HOME` (default `~/.cocode`) or `DSH_HOME` (default `~/.dsh`) when you need isolated
-configuration. Development launch flags are documented in `.env.example`.
+Set `COCODE_HOME` (default `~/.cocode`) for account/runtime data or
+`COCODE_DSH_HOME` (default `~/.dsh`) for the shared DSH Home. Development launch
+flags are documented in `.env.example`.
 
 Sign-in or channel-switch failures show `CODE · explanation` on the status line. See [error codes](./errors.md).

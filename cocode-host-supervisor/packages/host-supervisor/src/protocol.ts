@@ -37,10 +37,15 @@ export function resolveCocodeDshHome(env: NodeJS.ProcessEnv = process.env): stri
 export const resolveOfficialDshSourceHome = resolveCocodeDshHome
 
 export function resolveCocodeHostScope(env: NodeJS.ProcessEnv = process.env): HostScope {
-  const runtimeEnv = resolveHostRuntimeEnv(env)
+  const dshHome = resolveCocodeDshHome(env)
+  const runtimeEnv = resolveHostRuntimeEnv({
+    ...env,
+    COCODE_DSH_HOME: dshHome,
+    DSH_HOME: dshHome,
+  })
   const baseFingerprint = env.COCODE_HOST_CONFIG_FINGERPRINT?.trim() || 'cocode-web-jsonrpc-v3'
   return canonicalizeScope({
-    dshHome: resolveCocodeDshHome(env),
+    dshHome,
     profile: 'cocode',
     hostConfigFingerprint: Object.keys(runtimeEnv).length === 0
       ? baseFingerprint
@@ -126,8 +131,8 @@ export function resolveHostRuntimeEnv(env: NodeJS.ProcessEnv): HostRuntimeEnv {
 function resolveVisionConfigPath(env: NodeJS.ProcessEnv): string | undefined {
   const configured = nonemptyEnv(env.COCODE_VISION_CONFIG)
   if (configured !== undefined) return resolveUserPath(configured)
-  const home = nonemptyEnv(env.COCODE_HOME)
-  return home === undefined ? undefined : join(resolveUserPath(home), 'vision.yaml')
+  const home = nonemptyEnv(env.COCODE_DSH_HOME) ?? nonemptyEnv(env.DSH_HOME)
+  return join(resolveUserPath(home ?? `${homedir()}/.dsh`), 'vision.yaml')
 }
 
 function nonemptyEnv(value: string | undefined): string | undefined {

@@ -12,13 +12,14 @@ Renderer build's `dsh-client/` tree; non-copied host bundles continue to resolve
 against the sidecar origin.
 
 The embedded Cocode sidecar is an independent product runtime with a shared DSH
-data home: `COCODE_HOME` (default `~/.cocode`) owns runtime slots, plugins,
-settings, credentials, and Supervisor state; `COCODE_DSH_HOME` (default `~/.dsh`)
-is passed as `DSH_HOME` with the fixed profile `cocode`. The official launcher
-continues to use the same DSH home with profile `web`. The two Hosts are
-independent, while sessions, workspace storage, projection cache, and
-attachments are shared files. Home-level `cordis.patch.yml` and
-`profiles/node_modules` remain shared DSH surfaces.
+home: `COCODE_HOME` (default `~/.cocode`) owns the account file, runtime slots,
+and Supervisor state; `COCODE_DSH_HOME` (default `~/.dsh`) is passed as `DSH_HOME`
+with the fixed profile `cocode`. Settings, credentials, profile plugins,
+sessions, workspace storage, projection cache, attachments, home-level
+`cordis.patch.yml`, and `profiles/node_modules` remain in the shared DSH home.
+The official launcher continues to use the same DSH home with profile `web`.
+The two Hosts are independent, but they intentionally share the DSH Home
+configuration and business data.
 
 Main may also create a Shared DSH data reader (the compatibility implementation
 is still named `ExternalDshReadSource`) for the shared home. It is an allow-listed,
@@ -30,6 +31,11 @@ sidebar interaction surface. There is no separate "Shared DSH history" client
 entry. The reader remains a Main-owned observation and conflict-diagnostics
 capability; it is not mounted as another client Store.
 
+GUI and TUI read and write the shared DSH settings and credentials directly:
+`~/.dsh/settings.yaml` and `~/.dsh/.credentials.yaml`. There is no credentials
+copy, migration marker, or `.cocode/credentials` fallback. Cocode account
+identity remains in `~/.cocode/account.yaml`.
+
 The shared objects are writable from Cocode, but the product does not support
 concurrent writes by the official Host and Cocode Host to the same Session or
 Workspace. Best-effort revision checks report
@@ -38,8 +44,10 @@ automatic retry.
 
 The shared home also means that `cordis.patch.yml` and
 `profiles/node_modules` remain common DSH surfaces. Cocode owns only its
-`profiles/cocode` manifest, runtime slot, plugin staging, settings, credentials,
-and Supervisor state; it does not modify the official `profiles/web` contents.
+`profiles/cocode` manifest and runtime slot; user/profile plugin state is under
+the shared `~/.dsh/profiles/cocode` tree. It does not modify the official
+`profiles/web` contents, but shared Home-level patch and dependency fallback
+behavior remains a documented limitation.
 
 HTTP `/api` traffic crosses the typed Preload/Main request bridge so a
 `file://`/Vite Renderer never depends on CORS. The two WebSocket downlinks remain

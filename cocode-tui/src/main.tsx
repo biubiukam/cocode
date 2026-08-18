@@ -4,7 +4,7 @@
 
 import { readFileSync } from 'node:fs'
 import { access as accessAsync } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 import { render } from 'ink'
 import {
   createExternalDshCatalog,
@@ -76,9 +76,10 @@ async function main(output: NodeJS.WriteStream): Promise<void> {
 
   const resolved = auth.resolved()
   const sharedHome = sharedDshHome(defaultHomeContext(process.env))
-  await registerLiveInstance(resolved.dshHome)
+  const liveInstanceHome = join(resolved.accountHome, 'runtime')
+  await registerLiveInstance(liveInstanceHome)
   process.on('exit', () => {
-    releaseLiveInstanceSync(resolved.dshHome)
+    releaseLiveInstanceSync(liveInstanceHome)
   })
   const init = parseInitFromEnv({
     ...process.env,
@@ -89,7 +90,7 @@ async function main(output: NodeJS.WriteStream): Promise<void> {
   const sessionRoot = resolveSessionRoot({
     env: process.env,
     cwd: init.cwd,
-    runtimeHome: sharedHome,
+    dshHome: sharedHome,
   })
   const sessionList = (await directoryExists(sessionRoot.path)) ? 'jsonl' : 'none'
   const runtime = createTuiRuntime({
@@ -112,7 +113,7 @@ async function main(output: NodeJS.WriteStream): Promise<void> {
       envLocked: auth.snapshot().envLocked,
       accountLabel: auth.snapshot().profile?.displayName,
       logout: () => auth.logout(),
-      exclusiveHome: async () => (await otherLiveCount(resolved.dshHome)) === 0,
+      exclusiveHome: async () => (await otherLiveCount(liveInstanceHome)) === 0,
       selectMode: (mode) => auth.selectMode(mode),
       login: () => auth.dispatch({ type: 'chooseCocode' }),
       submitByok: (key) => saveByokKey(resolved.dshHome, key),
@@ -126,7 +127,7 @@ async function main(output: NodeJS.WriteStream): Promise<void> {
       launchConfigured: true,
       argsConfigured: true,
       sessionRoot: sessionRoot.path,
-      runtimeHome: resolved.dshHome,
+      runtimeHome: resolved.accountHome,
       sharedDshHome: sharedHome,
     },
     locale: resolveUiLocale(process.env),
@@ -159,11 +160,11 @@ async function main(output: NodeJS.WriteStream): Promise<void> {
       output.write(`\n${text(app.snapshot().locale, 'farewell')}\n`)
     }
     try {
-      await releaseLiveInstance(resolved.dshHome)
+      await releaseLiveInstance(liveInstanceHome)
       await app.close()
       process.exit(0)
     } catch (error) {
-      await releaseLiveInstance(resolved.dshHome).catch(() => undefined)
+      await releaseLiveInstance(liveInstanceHome).catch(() => undefined)
       process.stderr.write(`Cocode TUI shutdown failed: ${displayError(error)}\n`)
       process.exit(1)
     }

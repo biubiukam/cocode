@@ -73,18 +73,25 @@ async function run() {
 }
 
 async function acquireHostEndpoint() {
-	const { createHostSupervisorClient, resolveHostRuntimeEnv, resolveHostScope } = await import(
+	const { createHostSupervisorClient, resolveCocodeHostScope, resolveHostRuntimeEnv } = await import(
 		"@cocode/host-supervisor"
 	)
+	const dshHome = resolveCocodeDshHome()
+	const hostEnv = {
+		...process.env,
+		COCODE_DSH_HOME: dshHome,
+		DSH_HOME: dshHome,
+		DSH_PROFILE: "cocode",
+	}
 	const lease = await createHostSupervisorClient({
 		nodeExecutable: process.execPath,
 		serviceEntry: supervisorEntry,
 	}).acquire({
-		scope: resolveHostScope({ ...process.env, DSH_HOME: resolveDshHome() }),
+		scope: resolveCocodeHostScope(hostEnv),
 		clientKind: "gui",
 		requiredServices: ["web"],
 		minProtocolRevision: "1.0",
-		runtimeEnv: resolveHostRuntimeEnv(process.env),
+		runtimeEnv: resolveHostRuntimeEnv(hostEnv),
 	})
 	hostLease = lease
 	const web = lease.descriptor.services.find((service) => service.service === "web")
@@ -122,8 +129,8 @@ function startVite(runtimeUrl) {
 	)
 }
 
-function resolveDshHome() {
-	const configured = process.env.DSH_HOME?.trim()
+function resolveCocodeDshHome() {
+	const configured = process.env.COCODE_DSH_HOME?.trim() || process.env.COCODE_DSH_SOURCE_HOME?.trim()
 	const selected =
 		configured !== undefined && configured.length > 0
 			? configured

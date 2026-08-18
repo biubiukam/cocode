@@ -44,7 +44,7 @@ describe('resolveAuth', () => {
     if (result.status !== 'ready') return
     expect(result.auth.mode).toBe('byok')
     expect(result.auth.env.DEEPSEEK_API_KEY).toBe('sk-env')
-    expect(result.auth.env.COCODE_HOME).toBe(home)
+    expect(result.auth.env.COCODE_HOME).toBe(join(homedir(), '.cocode'))
     expect(result.auth.env.DSH_HOME).toBe(join(homedir(), '.dsh'))
     expect(result.auth.env.DSH_PROFILE).toBe('cocode')
   })
@@ -63,10 +63,10 @@ describe('resolveAuth', () => {
     const home = await tempHome()
     await patchCredential(home, 'COCODE_NUT_API_KEY', 'ck_live_x')
     await patchCloudRoute(home, 'https://cocode.agency', [{ id: 'cloud-1', name: 'Cloud' }])
-    await expect(readFile(join(home, 'settings', 'settings.yaml'), 'utf8')).resolves.toContain(
+    await expect(readFile(join(home, 'settings.yaml'), 'utf8')).resolves.toContain(
       'api: openai-responses',
     )
-    await expect(readFile(join(home, 'settings', 'settings.yaml'), 'utf8')).resolves.toContain(
+    await expect(readFile(join(home, 'settings.yaml'), 'utf8')).resolves.toContain(
       'maxRetries: 5',
     )
     const result = await resolveAuth({

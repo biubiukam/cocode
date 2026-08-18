@@ -20,9 +20,9 @@ const COCODE_PROFILE_PACKAGE = {
 }
 
 /**
- * Bootstrap only Cocode-owned files. This function is intentionally idempotent
- * and never reads the official `web` profile or its settings/credentials;
- * DSH may still apply the shared home-level patch during Host boot.
+ * Bootstrap the Cocode profile and runtime-owned directories. Settings,
+ * credentials, sessions, and attachments deliberately remain in the shared
+ * DSH home; the Cocode product home only owns its account and runtime state.
  * Existing user edits to the profile patch are preserved byte-for-byte.
  */
 export function ensureCocodeProfile(dshHome: string, cocodeHome = resolveCocodeHome()): string {
@@ -32,9 +32,7 @@ export function ensureCocodeProfile(dshHome: string, cocodeHome = resolveCocodeH
   for (const directory of ['sessions', 'storages', 'attachments']) {
     mkdirSync(join(resolve(dshHome), directory), { recursive: true, mode: 0o700 })
   }
-  for (const directory of ['runtime', 'plugins', 'settings', 'credentials', 'logs']) {
-    mkdirSync(join(resolve(cocodeHome), directory), { recursive: true, mode: 0o700 })
-  }
+  mkdirSync(join(resolve(cocodeHome), 'runtime'), { recursive: true, mode: 0o700 })
   const packagePath = join(profileRoot, 'package.json')
   if (!existsSync(packagePath)) writeFileSync(packagePath, `${JSON.stringify(COCODE_PROFILE_PACKAGE, null, 2)}\n`, { mode: 0o600 })
   else assertCocodeProfilePackage(packagePath)
@@ -48,17 +46,32 @@ export function ensureCocodeProfile(dshHome: string, cocodeHome = resolveCocodeH
     '',
   ].join('\n'), { mode: 0o600 })
   const patchPath = join(profileRoot, 'cordis.patch.yml')
-  if (!existsSync(patchPath)) writeFileSync(patchPath, [
-    '# Cocode-owned provider paths. This profile is self-contained.',
-    '- id: settings',
-    '  config:',
-    `    path: ${JSON.stringify(join(resolve(cocodeHome), 'settings', 'settings.yaml'))}`,
-    '- id: credentials',
-    '  config:',
-    `    path: ${JSON.stringify(join(resolve(cocodeHome), 'credentials', 'credentials.yaml'))}`,
-    '',
-  ].join('\n'), { mode: 0o600 })
+  const sharedHomePatch = '# Cocode uses the shared DSH settings and credentials paths.\n[]\n'
+  if (!existsSync(patchPath)) {
+    writeFileSync(patchPath, sharedHomePatch, { mode: 0o600 })
+  } else {
+    if (isLegacyGeneratedCocodeProfilePatch(readFileSync(patchPath, 'utf8'))) {
+      writeFileSync(patchPath, sharedHomePatch, { mode: 0o600 })
+    }
+  }
   return profileRoot
+}
+
+function isLegacyGeneratedCocodeProfilePatch(content: string): boolean {
+  const match = /^# Cocode-owned provider paths\. This profile is self-contained\.\n- id: settings\n  config:\n    path: (.+)\n- id: credentials\n  config:\n    path: (.+)\n$/.exec(content)
+  if (match === null) return false
+  try {
+    const settings = JSON.parse(match[1]!)
+    const credentials = JSON.parse(match[2]!)
+    if (typeof settings !== 'string' || typeof credentials !== 'string') return false
+    return basename(settings) === 'settings.yaml'
+      && basename(dirname(settings)) === 'settings'
+      && basename(credentials) === 'credentials.yaml'
+      && basename(dirname(credentials)) === 'credentials'
+      && dirname(dirname(settings)) === dirname(dirname(credentials))
+  } catch {
+    return false
+  }
 }
 
 function assertCocodeProfilePackage(packagePath: string): void {
@@ -152,7 +165,7 @@ export function prepareRuntimeSlot(scope: HostScope, jsonRpcEndpoint: string, pl
   registerRuntimePluginsInDshManifest(slot, pluginEntries)
   restoreNodePtyHelper(slot)
   const patch = join(slot, 'cocode-host.patch.yml')
-  const rows = createRuntimePatch(pathToFileURL(pluginTarget).href, jsonRpcEndpoint, pluginEntries, scope.profile === 'cocode' ? resolveCocodeHome() : undefined)
+  const rows = createRuntimePatch(pathToFileURL(pluginTarget).href, jsonRpcEndpoint, pluginEntries)
   writeFileSync(patch, rows)
   writeFileSync(join(slot, 'active.json'), `${JSON.stringify({
     schemaVersion: 1,
@@ -236,7 +249,6 @@ export function createRuntimePatch(
   jsonRpcPluginUrl: string,
   jsonRpcEndpoint: string,
   pluginEntries: readonly RuntimePluginEntry[],
-  cocodeHome?: string,
 ): string {
   return [
     '# Align transient model-request recovery with Codex (5 bounded backoff retries).',
@@ -255,14 +267,6 @@ export function createRuntimePatch(
     ...pluginEntries.flatMap(({ name }) => [
       `    - id: ${name}`,
       `      name: ${JSON.stringify(name)}`,
-    ]),
-    ...(cocodeHome === undefined ? [] : [
-      '- id: settings',
-      '  config:',
-      `    path: ${JSON.stringify(join(resolve(cocodeHome), 'settings', 'settings.yaml'))}`,
-      '- id: credentials',
-      '  config:',
-      `    path: ${JSON.stringify(join(resolve(cocodeHome), 'credentials', 'credentials.yaml'))}`,
     ]),
     '',
   ].join('\n')

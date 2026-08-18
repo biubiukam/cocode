@@ -5,6 +5,7 @@
 export { createAuthStore, type AuthStore, type SelectModeResult } from './store.ts'
 export {
   accountHome,
+  dshConfigHome,
   dshHome,
   homeDisplay,
   productHome,

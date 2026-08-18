@@ -143,29 +143,26 @@ test('createRuntimePatch registers Cocode plugins by package name', () => {
   assert.doesNotMatch(patch, /file:\/\/.*cocode-(sidebar|account|shortcuts)/)
 })
 
-test('createRuntimePatch keeps Cocode settings paths outside the official DSH home', () => {
+test('createRuntimePatch leaves shared DSH settings and credentials at their defaults', () => {
   const patch = createRuntimePatch(
     'file:///tmp/cocode-host-jsonrpc-plugin.mjs',
     'http://127.0.0.1:43123',
     [{ name: 'cocode-workbench', entry: '/tmp/cocode-workbench/lib/index.js' }],
-    '/tmp/cocode-home',
   )
   const parsed = YAML.parse(patch)
   assert.equal(parsed[1].insert[1].id, 'cocode-workbench')
-  assert.equal(parsed[2].id, 'settings')
-  assert.equal(parsed[2].config.path, '/tmp/cocode-home/settings/settings.yaml')
-  assert.equal(parsed[3].id, 'credentials')
-  assert.equal(parsed[3].config.path, '/tmp/cocode-home/credentials/credentials.yaml')
+  assert.equal(parsed.some((entry) => entry?.id === 'settings'), false)
+  assert.equal(parsed.some((entry) => entry?.id === 'credentials'), false)
 })
 
 test('mergeHostRuntimeEnv preserves base credentials while overlaying the route', () => {
   const env = mergeHostRuntimeEnv(
     { PATH: '/usr/bin', COCODE_NUT_API_KEY: 'ck_live_secret' },
     { COCODE_LLM_PROVIDERS: '{"cocode-nut":{}}' },
-    '/tmp/cocode-home',
+    '/tmp/shared-dsh-home',
   )
 
-  assert.equal(env.DSH_HOME, '/tmp/cocode-home')
+  assert.equal(env.DSH_HOME, '/tmp/shared-dsh-home')
   assert.equal(env.COCODE_LLM_PROVIDERS, '{"cocode-nut":{}}')
   assert.equal(env.COCODE_NUT_API_KEY, 'ck_live_secret')
 })

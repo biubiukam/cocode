@@ -2,6 +2,7 @@
 
 import { existsSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
+import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { createRequire } from 'node:module'
 import { pathToFileURL } from 'node:url'
@@ -49,7 +50,7 @@ if (options.command === 'gui') {
 
 if (options.command === 'dsh') {
   try {
-    await configureRuntimeEnvironment(paths)
+    await configureRuntimeEnvironment(paths, options)
     process.exit(launchDsh(options.commandArgs, paths, process.env))
   } catch (error) {
     process.stderr.write(`cocode dsh: ${error instanceof Error ? error.message : String(error)}\n`)
@@ -58,7 +59,7 @@ if (options.command === 'dsh') {
 }
 
 if (options.command === 'host-status' || options.command === 'host-stop' || options.command === 'doctor') {
-  await configureRuntimeEnvironment(paths)
+  await configureRuntimeEnvironment(paths, options)
   const { createHostSupervisorClient, resolveHostRuntimeEnv, resolveHostScope } = await loadSupervisor(paths)
   const scope = resolveHostScope(process.env)
   const runtimeEnv = resolveHostRuntimeEnv(process.env)
@@ -94,7 +95,15 @@ if (result.error) {
 }
 process.exit(result.status ?? 1)
 
-async function configureRuntimeEnvironment(runtimePaths) {
+async function configureRuntimeEnvironment(runtimePaths, options = {}) {
+  if (!process.env.COCODE_DSH_HOME?.trim()) {
+    process.env.COCODE_DSH_HOME = process.env.COCODE_DSH_SOURCE_HOME?.trim() || join(homedir(), '.dsh')
+  }
+  // Cocode must not inherit an unrelated ambient DSH_HOME. The explicit
+  // Cocode DSH home is the source of truth for the embedded cocode profile.
+  process.env.DSH_HOME = process.env.COCODE_DSH_HOME
+  if (options.profile === undefined) process.env.DSH_PROFILE = 'cocode'
+  if (!process.env.DSH_SESSION_ROOT?.trim()) process.env.DSH_SESSION_ROOT = join(process.env.DSH_HOME, 'sessions')
   if (!process.env.COCODE_TUI_CLIENT_KIND?.trim()) process.env.COCODE_TUI_CLIENT_KIND = 'standalone-tui'
   if (!process.env.COCODE_NODE_EXECUTABLE?.trim()) process.env.COCODE_NODE_EXECUTABLE = process.execPath
   if (process.env.COCODE_SUPERVISOR_SERVICE_ENTRY?.trim()) return

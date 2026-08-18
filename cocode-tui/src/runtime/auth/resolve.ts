@@ -22,7 +22,7 @@ import {
 } from './types.ts'
 
 export type ResolveInput = {
-  /** Cocode home containing Cocode-owned credentials and settings. */
+  /** Shared DSH home containing settings and credentials. */
   dshHome?: string
   /** Shared DSH data home used by the child Host. */
   sharedDshHome?: string
@@ -43,7 +43,8 @@ export async function resolveAuth(input: ResolveInput): Promise<ResolveResult> {
   const env = input.env
   const home = input.dshHome ?? input.home
   if (home === undefined) throw new Error('resolveAuth requires dshHome')
-  const sharedDshHome = input.sharedDshHome ?? nonempty(env.COCODE_DSH_HOME) ?? join(homedir(), '.dsh')
+  const sharedDshHome = input.sharedDshHome ?? input.dshHome ?? nonempty(env.COCODE_DSH_HOME) ?? join(homedir(), '.dsh')
+  const accountHome = input.accountHome ?? nonempty(env.COCODE_HOME) ?? join(homedir(), '.cocode')
   const cwd = input.cwd?.trim() || process.cwd()
   const origin = agencyOrigin(env)
   const settings = await readSettings(home)
@@ -60,7 +61,7 @@ export async function resolveAuth(input: ResolveInput): Promise<ResolveResult> {
     credentials,
     cloudAccount: input.cloudAccount ?? false,
     cloudModels: input.cloudModels,
-    accountHome: input.accountHome,
+    accountHome,
     sharedDshHome,
   })
   if (preferredReady !== undefined) return preferredReady
@@ -75,7 +76,7 @@ export async function resolveAuth(input: ResolveInput): Promise<ResolveResult> {
       credentials,
       cloudAccount: input.cloudAccount ?? false,
       cloudModels: input.cloudModels,
-      accountHome: input.accountHome,
+      accountHome,
       sharedDshHome,
     })
     if (byok !== undefined) return byok
@@ -89,7 +90,7 @@ export async function resolveAuth(input: ResolveInput): Promise<ResolveResult> {
       credentials,
       cloudAccount: input.cloudAccount ?? false,
       cloudModels: input.cloudModels,
-      accountHome: input.accountHome,
+      accountHome,
       sharedDshHome,
     })
     if (cloud !== undefined) return cloud
@@ -229,7 +230,7 @@ function ready(
   delete spawn[DEEPSEEK_KEY_REF]
   delete spawn.COCODE_LLM_PROVIDERS
   Object.assign(spawn, extra)
-  spawn.COCODE_HOME = dshHome
+  spawn.COCODE_HOME = accountHome
   spawn.COCODE_DSH_HOME = sharedDshHome
   spawn.DSH_HOME = sharedDshHome
   spawn.DSH_SESSION_ROOT = join(sharedDshHome, 'sessions')

@@ -30,17 +30,20 @@ export function accountHome(ctx: HomeContext = defaultHomeContext()): string {
   return join(ctx.homedir, '.cocode')
 }
 
-/** Cocode-owned settings/credentials home; ambient official DSH_HOME is ignored. */
+/** Shared DSH configuration/data home; ambient official DSH_HOME is ignored. */
 export function dshHome(ctx: HomeContext = defaultHomeContext()): string {
-  const fromCocode = nonempty(ctx.env.COCODE_HOME)
-  if (fromCocode !== undefined) return resolveUserPath(fromCocode, ctx.homedir)
-  return join(ctx.homedir, '.cocode')
+  return sharedDshHome(ctx)
 }
 
 /** Shared DSH data home used by the Cocode and official web profiles. */
 export function sharedDshHome(ctx: HomeContext = defaultHomeContext()): string {
   const configured = nonempty(ctx.env.COCODE_DSH_HOME)
   return resolveUserPath(configured ?? join(ctx.homedir, '.dsh'), ctx.homedir)
+}
+
+/** Explicit name for the shared DSH configuration/data home. */
+export function dshConfigHome(ctx: HomeContext = defaultHomeContext()): string {
+  return sharedDshHome(ctx)
 }
 
 export function productHomes(ctx: HomeContext = defaultHomeContext()): ProductHomes {
@@ -51,9 +54,9 @@ export function productHomes(ctx: HomeContext = defaultHomeContext()): ProductHo
   }
 }
 
-/** @deprecated Use dshHome for Cocode settings and accountHome for identity. */
+/** @deprecated Use accountHome for product identity and dshConfigHome for DSH data. */
 export function productHome(ctx: HomeContext = defaultHomeContext()): string {
-  return dshHome(ctx)
+  return accountHome(ctx)
 }
 
 export function homeDisplay(home: string, ctx: HomeContext = defaultHomeContext()): string {
@@ -61,7 +64,7 @@ export function homeDisplay(home: string, ctx: HomeContext = defaultHomeContext(
     return nonempty(ctx.env.COCODE_HOME) !== undefined ? '$COCODE_HOME' : '~/.cocode'
   }
   if (home === dshHome(ctx)) {
-    return nonempty(ctx.env.COCODE_HOME) !== undefined ? '$COCODE_HOME' : '~/.cocode'
+    return nonempty(ctx.env.COCODE_DSH_HOME) !== undefined ? '$COCODE_DSH_HOME' : '~/.dsh'
   }
   if (home === sharedDshHome(ctx)) {
     return nonempty(ctx.env.COCODE_DSH_HOME) !== undefined ? '$COCODE_DSH_HOME' : '~/.dsh'
@@ -70,11 +73,11 @@ export function homeDisplay(home: string, ctx: HomeContext = defaultHomeContext(
 }
 
 export function credentialsPath(home: string): string {
-  return join(home, 'credentials', 'credentials.yaml')
+  return join(home, '.credentials.yaml')
 }
 
 export function settingsPath(home: string): string {
-  return join(home, 'settings', 'settings.yaml')
+  return join(home, 'settings.yaml')
 }
 
 export function accountPath(home: string): string {

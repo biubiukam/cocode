@@ -1,11 +1,15 @@
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
+  accountPath,
   accountHome,
+  credentialsPath,
+  dshConfigHome,
   dshHome,
   homeDisplay,
   productHome,
   productHomes,
+  settingsPath,
 } from '../../../src/runtime/auth/paths.ts'
 
 const testHome = resolve('test-home')
@@ -30,21 +34,21 @@ describe('home resolution', () => {
     ).toBe(resolve('.dev/home'))
   })
 
-  it('expands tilde-prefixed COCODE_HOME and ignores DSH_HOME', () => {
+  it('expands tilde-prefixed COCODE_HOME and ignores ambient DSH_HOME', () => {
     const context = ctx({ env: { COCODE_HOME: '~/.cocode', DSH_HOME: '~/.dsh' } })
     expect(accountHome(context)).toBe(join(testHome, '.cocode'))
-    expect(dshHome(context)).toBe(join(testHome, '.cocode'))
+    expect(dshHome(context)).toBe(join(testHome, '.dsh'))
+    expect(dshConfigHome(context)).toBe(join(testHome, '.dsh'))
   })
 
-  it('uses COCODE_HOME for both Cocode account and runtime data', () => {
+  it('keeps account and shared DSH homes separate', () => {
     const cocodeHome = resolve('tmp', 'cocode')
-    const dshRoot = resolve('tmp', 'dsh')
-    const context = ctx({ env: { COCODE_HOME: cocodeHome, DSH_HOME: dshRoot } })
+    const context = ctx({ env: { COCODE_HOME: cocodeHome, DSH_HOME: resolve('tmp', 'dsh') } })
     expect(accountHome(context)).toBe(cocodeHome)
-    expect(dshHome(context)).toBe(cocodeHome)
+    expect(dshHome(context)).toBe(join(testHome, '.dsh'))
     expect(productHomes(context)).toEqual({
       accountHome: cocodeHome,
-      dshHome: cocodeHome,
+      dshHome: join(testHome, '.dsh'),
       sharedDshHome: join(testHome, '.dsh'),
     })
   })
@@ -57,7 +61,7 @@ describe('home resolution', () => {
           env: { COCODE_HOME: '  ', DSH_HOME: dshRoot },
         }),
       ),
-    ).toBe(join(testHome, '.cocode'))
+    ).toBe(join(testHome, '.dsh'))
   })
 
   it('uses ~/.cocode for the account home without inspecting marker files', () => {
@@ -66,12 +70,19 @@ describe('home resolution', () => {
     )
   })
 
-  it('uses ~/.cocode for runtime data even when it does not exist yet', () => {
-    expect(dshHome(ctx({ files: [join(testHome, '.cocode')] }))).toBe(join(testHome, '.cocode'))
+  it('uses ~/.dsh for DSH data even when it does not exist yet', () => {
+    expect(dshHome(ctx({ files: [join(testHome, '.cocode')] }))).toBe(join(testHome, '.dsh'))
   })
 
   it('keeps the deprecated productHome alias on ~/.cocode', () => {
     expect(productHome(ctx({}))).toBe(join(testHome, '.cocode'))
+  })
+
+  it('places account identity in .cocode and DSH configuration in .dsh', () => {
+    const context = ctx({})
+    expect(accountPath(accountHome(context))).toBe(join(testHome, '.cocode', 'account.yaml'))
+    expect(credentialsPath(dshConfigHome(context))).toBe(join(testHome, '.dsh', '.credentials.yaml'))
+    expect(settingsPath(dshConfigHome(context))).toBe(join(testHome, '.dsh', 'settings.yaml'))
   })
 })
 
@@ -85,6 +96,6 @@ describe('homeDisplay', () => {
       }),
     ).toBe('$COCODE_HOME')
     expect(homeDisplay(join(testHome, '.cocode'), ctx({}))).toBe('~/.cocode')
-    expect(homeDisplay(join(testHome, '.cocode'), ctx({}))).toBe('~/.cocode')
+    expect(homeDisplay(join(testHome, '.dsh'), ctx({}))).toBe('~/.dsh')
   })
 })

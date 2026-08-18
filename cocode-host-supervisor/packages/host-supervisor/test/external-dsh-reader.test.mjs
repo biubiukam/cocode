@@ -1,9 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, readFileSync, symlinkSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { zstdCompressSync } from 'node:zlib'
+import YAML from 'yaml'
 import { createExternalDshReadSource, ensureCocodeProfile } from '../lib/index.js'
 
 const roots = []
@@ -15,15 +16,48 @@ test.afterEach(() => {
 test('bootstraps an idempotent cocode profile without touching an official profile', () => {
   const root = mkdtempSync(join(tmpdir(), 'cocode-profile-'))
   roots.push(root)
-  const profile = ensureCocodeProfile(root)
+  const cocodeHome = join(root, 'cocode-home')
+  const profile = ensureCocodeProfile(root, cocodeHome)
   const manifest = JSON.parse(readFileSync(join(profile, 'package.json'), 'utf8'))
   assert.deepEqual(manifest.dsh.profile.bundles, ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app'])
   assert.equal(readFileSync(join(profile, 'cordis.patch.yml'), 'utf8').includes('.dsh'), false)
   assert.match(readFileSync(join(profile, 'pnpm-workspace.yaml'), 'utf8'), /nodeLinker: hoisted/)
+  assert.equal(existsSync(join(cocodeHome, 'runtime')), true)
+  for (const directory of ['settings', 'credentials', 'plugins', 'logs', 'sessions']) {
+    assert.equal(existsSync(join(cocodeHome, directory)), false, directory)
+  }
   const patch = readFileSync(join(profile, 'cordis.patch.yml'), 'utf8')
+  assert.deepEqual(YAML.parse(patch), [])
   writeFileSync(join(profile, 'cordis.patch.yml'), `${patch}# user patch\n`)
-  ensureCocodeProfile(root)
+  ensureCocodeProfile(root, cocodeHome)
   assert.equal(readFileSync(join(profile, 'cordis.patch.yml'), 'utf8'), `${patch}# user patch\n`)
+})
+
+test('removes only the previously generated private settings override', () => {
+  const root = mkdtempSync(join(tmpdir(), 'cocode-profile-legacy-'))
+  roots.push(root)
+  const profile = join(root, 'profiles', 'cocode')
+  const legacyHome = join(root, 'old-custom-cocode-home')
+  mkdirSync(profile, { recursive: true })
+  writeFileSync(join(profile, 'package.json'), `${JSON.stringify({
+    name: 'cocode-profile',
+    private: true,
+    dsh: { profile: { bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app'] } },
+  })}\n`)
+  writeFileSync(join(profile, 'cordis.patch.yml'), [
+    '# Cocode-owned provider paths. This profile is self-contained.',
+    '- id: settings',
+    '  config:',
+    `    path: ${JSON.stringify(join(legacyHome, 'settings', 'settings.yaml'))}`,
+    '- id: credentials',
+    '  config:',
+    `    path: ${JSON.stringify(join(legacyHome, 'credentials', 'credentials.yaml'))}`,
+    '',
+  ].join('\n'))
+
+  ensureCocodeProfile(root, join(root, 'new-cocode-home'))
+
+  assert.deepEqual(YAML.parse(readFileSync(join(profile, 'cordis.patch.yml'), 'utf8')), [])
 })
 
 test('rejects a Cocode profile whose bundle composition was changed', () => {
