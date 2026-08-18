@@ -13,8 +13,10 @@ import {
   FILE_COLLAPSE_COMMAND, FILE_CONTEXT_MENU_COMMAND, FILE_COPY_COMMAND,
   FILE_CUT_COMMAND, FILE_DELETE_COMMAND, FILE_EXPAND_COMMAND, FILE_OPEN_COMMAND,
   FILE_PASTE_COMMAND, FILE_RENAME_COMMAND, FILE_SELECT_NEXT_COMMAND,
-  FILE_SELECT_PREVIOUS_COMMAND, setActiveFileShortcutTarget,
+  FILE_SELECT_PREVIOUS_COMMAND, fileShortcutBindingsSnapshot, fileShortcutLabel,
+  setActiveFileShortcutTarget, subscribeFileShortcutBindings,
 } from "./file-shortcuts.ts"
+import { treeMentionPath } from "./file-mention.ts"
 import { ChevronIcon, FileGlyph, FolderGlyph, SearchIcon } from "./icons.tsx"
 import { localeRevision, subscribeLocale, t } from "./locales.ts"
 import css from "./panels.module.css"
@@ -95,6 +97,11 @@ export function FilesPanel(props: WorkbenchPanelProps) {
   const [newOpen, setNewOpen] = useState(false)
   const [treeFocused, setTreeFocused] = useState(false)
   const treeRef = useRef<HTMLDivElement>(null)
+  const shortcutBindings = useSyncExternalStore(
+    subscribeFileShortcutBindings,
+    fileShortcutBindingsSnapshot,
+    fileShortcutBindingsSnapshot,
+  )
 
   const loadDir = async (dir: string, signal?: AbortSignal) => {
     if (sessionId === undefined) return
@@ -236,7 +243,7 @@ export function FilesPanel(props: WorkbenchPanelProps) {
     const dir = entry.isDir ? entry.path : parentOf(entry.path)
     switch (command) {
       case "open": openEntry(entry); return
-      case "addToChat": props.addFileToChat?.(relativeTo(cwd, entry.path)); return
+      case "addToChat": props.addFileToChat?.(treeMentionPath(cwd, entry.path, entry.isDir)); return
       case "newFile": startCreate(dir, "file"); return
       case "newFolder": startCreate(dir, "folder"); return
       case "refresh": void refresh(dir); return
@@ -291,8 +298,7 @@ export function FilesPanel(props: WorkbenchPanelProps) {
     switch (commandId) {
       case FILE_OPEN_COMMAND: runCommand("open", entry); return true
       case FILE_ADD_TO_CHAT_COMMAND:
-        if (entry.isDir) return false
-        return props.addFileToChat?.(relativeTo(cwd, entry.path)) ?? false
+        return props.addFileToChat?.(treeMentionPath(cwd, entry.path, entry.isDir)) ?? false
       case FILE_RENAME_COMMAND:
         runCommand("rename", entry); return true
       case FILE_DELETE_COMMAND:
@@ -472,7 +478,10 @@ export function FilesPanel(props: WorkbenchPanelProps) {
       portal
       compact
       getAnchorRect={anchorRect}
-      items={menu === undefined ? [] : fileMenuEntries({ isDir: menu.entry.isDir, isRoot: menu.entry.path === cwd, canPaste: clipboard !== undefined })}
+      items={menu === undefined ? [] : fileMenuEntries(
+        { isDir: menu.entry.isDir, isRoot: menu.entry.path === cwd, canPaste: clipboard !== undefined },
+        commandId => fileShortcutLabel(commandId, shortcutBindings),
+      )}
       onSelect={id => {
         const target = menu?.entry
         setMenu(undefined)

@@ -1,5 +1,11 @@
 import type { MenuEntry } from "@deepseek-ai/dsh-client-ui-primitives"
+import {
+  FILE_ADD_TO_CHAT_COMMAND, FILE_COPY_COMMAND, FILE_CUT_COMMAND,
+  FILE_DELETE_COMMAND, FILE_OPEN_COMMAND, FILE_PASTE_COMMAND, FILE_RENAME_COMMAND,
+} from "./file-shortcuts.ts"
 import { revealLabel, t } from "./locales.ts"
+
+type FileMenuEntry = MenuEntry & { readonly shortcut?: string }
 
 /** Every command the file tree context menu can emit. */
 export type FileCommand =
@@ -17,26 +23,42 @@ export function isFileCommand(id: string): id is FileCommand {
  * Build the menu for one tree target. The workspace root keeps only the
  * commands that make sense on it: it can never be renamed, moved or deleted.
  */
-export function fileMenuEntries(target: { readonly isDir: boolean; readonly isRoot: boolean; readonly canPaste: boolean }): readonly MenuEntry[] {
-  const entries: MenuEntry[] = []
+const SHORTCUT_COMMAND: Readonly<Partial<Record<FileCommand, string>>> = {
+  open: FILE_OPEN_COMMAND,
+  addToChat: FILE_ADD_TO_CHAT_COMMAND,
+  copy: FILE_COPY_COMMAND,
+  cut: FILE_CUT_COMMAND,
+  paste: FILE_PASTE_COMMAND,
+  rename: FILE_RENAME_COMMAND,
+  delete: FILE_DELETE_COMMAND,
+}
+
+export function fileMenuEntries(
+  target: { readonly isDir: boolean; readonly isRoot: boolean; readonly canPaste: boolean },
+  shortcutLabel: (commandId: string) => string | undefined = () => undefined,
+): readonly FileMenuEntry[] {
+  const entries: FileMenuEntry[] = []
+  const item = (id: FileCommand, label: string, options: { readonly disabled?: boolean; readonly danger?: boolean } = {}): FileMenuEntry => ({
+    id,
+    label,
+    ...options,
+    shortcut: SHORTCUT_COMMAND[id] === undefined ? undefined : shortcutLabel(SHORTCUT_COMMAND[id]),
+  })
   if (!target.isDir) {
-    entries.push(
-      { id: "open", label: t("files.open") },
-      { id: "addToChat", label: t("files.addToChat") },
-      { type: "separator", id: "sep-open" },
-    )
+    entries.push(item("open", t("files.open")))
   }
-  entries.push({ id: "newFile", label: t("files.newFile") }, { id: "newFolder", label: t("files.newFolder") })
-  if (target.isDir) entries.push({ id: "refresh", label: t("files.refresh") })
+  entries.push(item("addToChat", t("files.addToChat")), { type: "separator", id: "sep-open" })
+  entries.push(item("newFile", t("files.newFile")), item("newFolder", t("files.newFolder")))
+  if (target.isDir) entries.push(item("refresh", t("files.refresh")))
   entries.push({ type: "separator", id: "sep-new" })
-  if (!target.isRoot) entries.push({ id: "copy", label: t("files.copy") }, { id: "cut", label: t("files.cut") })
-  entries.push({ id: "paste", label: t("files.paste"), disabled: !target.canPaste })
+  if (!target.isRoot) entries.push(item("copy", t("files.copy")), item("cut", t("files.cut")))
+  entries.push(item("paste", t("files.paste"), { disabled: !target.canPaste }))
   entries.push({ type: "separator", id: "sep-clipboard" })
   if (!target.isRoot) {
-    entries.push({ id: "rename", label: t("files.rename") }, { id: "delete", label: t("files.delete"), danger: true }, { type: "separator", id: "sep-edit" })
+    entries.push(item("rename", t("files.rename")), item("delete", t("files.delete"), { danger: true }), { type: "separator", id: "sep-edit" })
   }
-  entries.push({ id: "copyPath", label: t("files.copyPath") })
-  if (!target.isRoot) entries.push({ id: "copyRelativePath", label: t("files.copyRelativePath") })
-  entries.push({ id: "reveal", label: revealLabel() })
+  entries.push(item("copyPath", t("files.copyPath")))
+  if (!target.isRoot) entries.push(item("copyRelativePath", t("files.copyRelativePath")))
+  entries.push(item("reveal", revealLabel()))
   return entries
 }

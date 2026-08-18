@@ -178,6 +178,21 @@
   white-space: nowrap;
 }
 
+.shortcut {
+  flex: none;
+  margin-left: 16px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.compactList .shortcut {
+  margin-left: 12px;
+  font-size: 11px;
+  line-height: 16px;
+}
+
 .check {
   flex: none;
   color: var(--dsw-alias-label-primary);

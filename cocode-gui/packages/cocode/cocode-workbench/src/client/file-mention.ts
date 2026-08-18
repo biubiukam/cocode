@@ -1,5 +1,5 @@
 import type { ClientContext } from "@deepseek-ai/dsh-client-runtime/client"
-import { baseName } from "../paths.ts"
+import { baseName, relativeTo } from "../paths.ts"
 import { listMentionPaths } from "./file-index.ts"
 import { bindWorkbenchCwd, workbenchCwd } from "./runtime-api.ts"
 
@@ -168,6 +168,12 @@ export function fileMentionText(path: string): string {
     ? `@${path}`
     : `@"${path.replaceAll("\\", "\\\\").replaceAll("\"", "\\\"")}"`
   return `${mention} `
+}
+
+/** Match the `@` picker's directory spelling when insertion starts from the file tree. */
+export function treeMentionPath(root: string, path: string, isDir: boolean): string {
+  const relative = path === root ? "." : relativeTo(root, path)
+  return isDir && relative !== "." && !relative.endsWith("/") ? `${relative}/` : relative
 }
 
 function rankPaths(paths: readonly string[], query: string, limit: number): string[] {

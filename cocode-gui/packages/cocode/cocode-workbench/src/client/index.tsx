@@ -11,7 +11,7 @@ import { CommandLineSection } from "./command-line-section.tsx"
 import { DiagnosticsSection } from "./diagnostics-section.tsx"
 import type { WorkbenchPanelProps } from "./model.ts"
 import { fileMentionText, registerFileMention } from "./file-mention.ts"
-import { fileShortcutCommands } from "./file-shortcuts.ts"
+import { bindFileShortcutRegistry, fileShortcutCommands, type FileShortcutRegistryFace } from "./file-shortcuts.ts"
 
 export type * from "./model.ts"
 export { WorkbenchController } from "./controller.ts"
@@ -33,7 +33,7 @@ declare module "@deepseek-ai/cordis" {
         }
         readonly run: (event?: KeyboardEvent) => void | boolean
       }): () => void
-    }
+    } & FileShortcutRegistryFace
   }
 }
 
@@ -74,6 +74,7 @@ export function apply(ctx: ClientContext): void {
   ctx.inject(["shortcuts"], (shortcutCtx: ClientContext) => {
     const shortcuts = shortcutCtx.get("shortcuts")
     if (shortcuts === undefined) return
+    shortcutCtx.effect(() => bindFileShortcutRegistry(shortcuts), "cocode-workbench: file shortcut menu hints")
     const translate = ctx.locale.bind(LOCALE_NS)
     for (const command of fileShortcutCommands((key) => translate(key as WorkbenchKey))) {
       ctx.effect(() => shortcuts.register(command), `cocode-workbench: ${command.id}`)

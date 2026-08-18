@@ -23,6 +23,8 @@ export interface MenuItem {
   disabled?: boolean
   /** Leading icon (figma .Menu_cell gap 8). */
   icon?: ReactNode
+  /** Trailing keyboard hint, aligned independently from the label. */
+  shortcut?: ReactNode
   /** Destructive row: error-colored text/icon and danger hover fill. */
   danger?: boolean
   /** Nested card opened to the right on hover/focus. */
@@ -237,6 +239,7 @@ export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, o
         >
           {entry.icon !== undefined && <span className={css.itemIcon}>{entry.icon}</span>}
           <span className={css.itemLabel}>{entry.label}</span>
+          {entry.shortcut !== undefined && <span className={css.shortcut}>{entry.shortcut}</span>}
           {/* Selection marker is a trailing check (figma .Menu_cell), not a fill. */}
           {selected && <IconCheckOutline16 className={css.check} />}
         </button>
@@ -253,6 +256,7 @@ export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, o
               >
                 {sub.icon !== undefined && <span className={css.itemIcon}>{sub.icon}</span>}
                 <span className={css.itemLabel}>{sub.label}</span>
+                {sub.shortcut !== undefined && <span className={css.shortcut}>{sub.shortcut}</span>}
               </button>
             ))}
           </div>

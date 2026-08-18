@@ -43,6 +43,79 @@ export interface ShortcutCommandLike {
   readonly run: () => boolean
 }
 
+export interface FileShortcutRegistryFace {
+  readonly subscribe: (listener: () => void) => () => void
+  readonly getSnapshot: () => {
+    readonly bindings: readonly {
+      readonly commandId: string
+      readonly combo: Combo
+    }[]
+  }
+}
+
+const EMPTY_SHORTCUT_SNAPSHOT: ReturnType<FileShortcutRegistryFace["getSnapshot"]> = { bindings: [] }
+const shortcutListeners = new Set<() => void>()
+let shortcutRegistry: FileShortcutRegistryFace | undefined
+let unsubscribeShortcutRegistry: (() => void) | undefined
+
+function notifyShortcutListeners(): void {
+  for (const listener of [...shortcutListeners]) listener()
+}
+
+/** Keep menu hints aligned with the user's effective, possibly customized bindings. */
+export function bindFileShortcutRegistry(registry: FileShortcutRegistryFace): () => void {
+  unsubscribeShortcutRegistry?.()
+  shortcutRegistry = registry
+  unsubscribeShortcutRegistry = registry.subscribe(notifyShortcutListeners)
+  notifyShortcutListeners()
+  return () => {
+    if (shortcutRegistry !== registry) return
+    unsubscribeShortcutRegistry?.()
+    unsubscribeShortcutRegistry = undefined
+    shortcutRegistry = undefined
+    notifyShortcutListeners()
+  }
+}
+
+export function subscribeFileShortcutBindings(listener: () => void): () => void {
+  shortcutListeners.add(listener)
+  return () => shortcutListeners.delete(listener)
+}
+
+export function fileShortcutBindingsSnapshot(): ReturnType<FileShortcutRegistryFace["getSnapshot"]> {
+  return shortcutRegistry?.getSnapshot() ?? EMPTY_SHORTCUT_SNAPSHOT
+}
+
+function currentPlatform(): string {
+  return typeof navigator === "undefined" ? "" : navigator.platform
+}
+
+/** Compact menu rendering: macOS uses glyph modifiers, other platforms use words. */
+export function formatFileShortcut(combo: Combo | undefined, platform = currentPlatform()): string | undefined {
+  if (combo === undefined) return undefined
+  const mac = platform.toLowerCase().includes("mac")
+  const key = combo.key.length === 1 ? combo.key.toUpperCase() : combo.key
+  if (!mac) {
+    const parts: string[] = []
+    if (combo.primary || combo.control) parts.push("Ctrl")
+    if (combo.alt) parts.push("Alt")
+    if (combo.shift) parts.push("Shift")
+    parts.push(key)
+    return parts.join("+")
+  }
+  return [
+    combo.control ? "⌃" : "",
+    combo.alt ? "⌥" : "",
+    combo.shift ? "⇧" : "",
+    combo.primary ? "⌘" : "",
+    key,
+  ].join("")
+}
+
+export function fileShortcutLabel(commandId: string, snapshot = fileShortcutBindingsSnapshot()): string | undefined {
+  return formatFileShortcut(snapshot.bindings.find(binding => binding.commandId === commandId)?.combo)
+}
+
 export function fileShortcutCommands(t: (key: string) => string = key => key): readonly ShortcutCommandLike[] {
   const command = (id: string, title: string, description: string, defaultCombo: Combo): ShortcutCommandLike => ({
     id,
