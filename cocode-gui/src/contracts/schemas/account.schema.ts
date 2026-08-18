@@ -20,6 +20,9 @@ const accountSnapshotSchema = z.object({
 			fiveHour: z.number().min(0).max(100).optional(),
 			week: z.number().min(0).max(100).optional(),
 			month: z.number().min(0).max(100).optional(),
+			currentPeriodEnd: z.string().optional(),
+			fiveHourResetAt: z.string().optional(),
+			weekResetAt: z.string().optional(),
 			syncedAt: z.string().optional(),
 			error: z.string().optional(),
 		})

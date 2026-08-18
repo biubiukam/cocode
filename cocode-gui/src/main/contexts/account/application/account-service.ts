@@ -91,6 +91,9 @@ type AccountAgency = {
 		readonly week: number
 		readonly month: number
 		readonly syncedAt: string
+		readonly currentPeriodEnd?: string
+		readonly fiveHourResetAt?: string
+		readonly weekResetAt?: string
 	}>
 	revokeApiKey(accessToken: string, keyId: string): Promise<void>
 	revoke(refreshToken: string): Promise<void>
@@ -269,7 +272,13 @@ function selectionSettingsOps(selection: DefaultSelection): {
 		{ op: "set", path: ["model"], value: selection.model },
 		...(selection.reasoningEffort === undefined
 			? [{ op: "unset" as const, path: ["reasoningEffort"] }]
-			: [{ op: "set" as const, path: ["reasoningEffort"], value: selection.reasoningEffort }]),
+			: [
+					{
+						op: "set" as const,
+						path: ["reasoningEffort"],
+						value: selection.reasoningEffort,
+					},
+			  ]),
 	]
 }
 

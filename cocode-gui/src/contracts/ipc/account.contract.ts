@@ -24,6 +24,9 @@ export type AccountUsage = {
 	readonly fiveHour?: number
 	readonly week?: number
 	readonly month?: number
+	readonly currentPeriodEnd?: string
+	readonly fiveHourResetAt?: string
+	readonly weekResetAt?: string
 	readonly syncedAt?: string
 	readonly error?: string
 }

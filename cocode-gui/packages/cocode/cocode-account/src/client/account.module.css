@@ -321,9 +321,9 @@
 
 .usageMetricHeader {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 4px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
 }
 
 .usageMetricLabel {
@@ -335,7 +335,6 @@
 }
 
 .usageMetricPercent {
-  flex: none;
   color: var(--dsw-alias-label-primary);
   font-variant-numeric: tabular-nums;
   font-size: 16px;
@@ -355,6 +354,16 @@
   border-radius: inherit;
   background: var(--dsw-alias-state-business-primary);
   transition: width 180ms var(--ds-ease-in-out);
+}
+
+.usageReset {
+  display: block;
+  min-height: 32px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+  white-space: normal;
 }
 
 @media (max-width: 460px) {
@@ -414,62 +423,37 @@
 
 .feedbackDraft {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   padding: 14px 16px;
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 14px;
-  background: var(--dsw-alias-bg-layer-1);
-}
-
-.feedbackDraftHeader,
-.feedbackActions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.feedbackField {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  color: var(--dsw-alias-label-secondary);
-  font-size: 11px;
-  line-height: 16px;
-}
-
-.feedbackField input,
-.feedbackField textarea {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 9px 10px;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 9px;
-  background: var(--dsw-alias-bg-overlay);
+  background: var(--dsw-alias-bg-layer-2);
   color: var(--dsw-alias-label-primary);
-  font: inherit;
-  font-size: 13px;
-  line-height: 18px;
-  resize: vertical;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color 140ms var(--ds-ease-in-out), transform 140ms var(--ds-ease-in-out);
 }
 
-.feedbackField input:focus,
-.feedbackField textarea:focus {
+.feedbackDraft:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.feedbackDraft:active {
+  transform: scale(0.985);
+}
+
+.feedbackDraft:focus-visible {
   outline: 2px solid var(--dsw-alias-state-business-primary);
   outline-offset: 1px;
 }
 
-.feedbackActions {
-  align-items: stretch;
-}
-
-.feedbackActions .panelAction {
-  flex: 1;
-  justify-content: center;
-  min-height: 38px;
-  padding: 0 10px;
-  font-size: 12px;
+.feedbackAddress {
+  color: var(--dsw-alias-label-secondary);
+  font-size: 13px;
+  line-height: 18px;
+  overflow-wrap: anywhere;
 }
 
 /* ---------- First-run sign-in prompt ---------- */

@@ -49,10 +49,14 @@ export type AgencyAccountUsage = {
 	readonly week: number
 	readonly month: number
 	readonly syncedAt: string
+	readonly currentPeriodEnd?: string
+	readonly fiveHourResetAt?: string
+	readonly weekResetAt?: string
 }
 
 type AgencyModelCredit = {
 	readonly plan?: string
+	readonly ends_at?: string
 	readonly granted_microusd?: number
 	readonly settled_microusd?: number
 	readonly reserved_microusd?: number
@@ -60,7 +64,13 @@ type AgencyModelCredit = {
 
 type AgencyModelUsage = {
 	readonly fresh_at?: string
+	readonly reset_at?: string
 	readonly totals?: { readonly billable_microusd?: number }
+}
+
+type AgencyModelUsageEvents = {
+	readonly data?: readonly { readonly occurred_at?: string }[]
+	readonly next_cursor?: string
 }
 
 const DEFAULT_ORIGIN = "https://cocode.agency"
@@ -309,6 +319,14 @@ export class AgencyClient {
 		const granted = finiteNumber(credit.value.granted_microusd)
 		const settled = finiteNumber(credit.value.settled_microusd)
 		const reserved = finiteNumber(credit.value.reserved_microusd)
+		const [fiveHourResetAt, weekResetAt] = await Promise.all([
+			fiveHourUsage.value.reset_at === undefined
+				? this.rollingWindowResetAt(accessToken, fiveHoursAgo, to)
+				: Promise.resolve(fiveHourUsage.value.reset_at),
+			weekUsage.value.reset_at === undefined
+				? this.rollingWindowResetAt(accessToken, weekAgo, to)
+				: Promise.resolve(weekUsage.value.reset_at),
+		])
 		return {
 			plan: credit.value.plan?.trim() || "unknown",
 			fiveHour: usagePercent(
@@ -321,7 +339,49 @@ export class AgencyClient {
 			),
 			month: usagePercent(settled + reserved, granted),
 			syncedAt: latestTimestamp(fiveHourUsage.value.fresh_at, weekUsage.value.fresh_at) ?? to,
+			...(typeof credit.value.ends_at === "string"
+				? { currentPeriodEnd: credit.value.ends_at }
+				: {}),
+			...(fiveHourResetAt === undefined ? {} : { fiveHourResetAt }),
+			...(weekResetAt === undefined ? {} : { weekResetAt }),
 		}
+	}
+
+	private async rollingWindowResetAt(
+		accessToken: string,
+		from: string,
+		to: string,
+	): Promise<string | undefined> {
+		const response = await this.request<AgencyModelUsageEvents>(
+			`/v1/me/model-usage/events?from=${encodeURIComponent(from)}&to=${encodeURIComponent(
+				to,
+			)}&limit=100`,
+			{ method: "GET", token: accessToken },
+		)
+		if (response.status !== 200) return undefined
+		const events = [...(response.value.data ?? [])]
+		let cursor = response.value.next_cursor?.trim()
+		while (cursor !== undefined && cursor !== "") {
+			const page = await this.request<AgencyModelUsageEvents>(
+				`/v1/me/model-usage/events?from=${encodeURIComponent(from)}&to=${encodeURIComponent(
+					to,
+				)}&limit=100&cursor=${encodeURIComponent(cursor)}`,
+				{ method: "GET", token: accessToken },
+			)
+			if (page.status !== 200) break
+			events.push(...(page.value.data ?? []))
+			cursor = page.value.next_cursor?.trim()
+		}
+		const earliest = events
+			.map((event) =>
+				typeof event.occurred_at === "string" ? new Date(event.occurred_at) : undefined,
+			)
+			.filter((date): date is Date => date !== undefined && !Number.isNaN(date.getTime()))
+			.sort((a, b) => a.getTime() - b.getTime())[0]
+		if (earliest === undefined) return undefined
+		return new Date(
+			earliest.getTime() + (new Date(to).getTime() - new Date(from).getTime()),
+		).toISOString()
 	}
 
 	async revokeApiKey(accessToken: string, keyId: string): Promise<void> {

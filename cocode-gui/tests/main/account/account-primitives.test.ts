@@ -280,6 +280,8 @@ test("Agency client calculates rolling account usage from credit and usage windo
 			return new Response(
 				JSON.stringify({
 					fresh_at: "2026-08-15T00:00:00.000Z",
+					reset_at:
+						usageCalls === 1 ? "2026-08-15T05:00:00.000Z" : "2026-08-22T00:00:00.000Z",
 					totals: { billable_microusd: usageCalls === 1 ? 10 : 20 },
 				}),
 				{ status: 200 },
@@ -331,7 +333,10 @@ test("Agency client keeps sub-percent usage so remaining can match the account s
 		assert.ok(usage.fiveHour > 0 && usage.fiveHour < 1)
 		assert.ok(usage.week > 0 && usage.week < 1)
 		assert.ok(usage.month > 0 && usage.month < 1)
-		assert.equal((100 - usage.month).toLocaleString("en-US", { maximumFractionDigits: 2 }), "99.97")
+		assert.equal(
+			(100 - usage.month).toLocaleString("en-US", { maximumFractionDigits: 2 }),
+			"99.97",
+		)
 	} finally {
 		globalThis.fetch = originalFetch
 	}

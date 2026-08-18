@@ -1,8 +1,9 @@
 import { createElement, Fragment, useEffect, useRef, useState, useSyncExternalStore } from "react"
-import type { ChangeEvent, MouseEvent as ReactMouseEvent, ReactNode } from "react"
+import type { MouseEvent as ReactMouseEvent, ReactNode } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import type { ClientContext } from "@deepseek-ai/dsh-client-runtime/client"
 import type { ConfigurableProviderView, ConnectionHandle } from "@deepseek-ai/dsh-api-remotes/client"
+import type {} from "@deepseek-ai/dsh-client-locale/client"
 import type {} from "@deepseek-ai/dsh-api-remotes/client"
 import {
   IconChevronUpOutline14,
@@ -17,7 +18,7 @@ type AccountSnapshot = {
   phase: "signed-out" | "signing-in" | "provisioning" | "signed-in" | "error"
   profile: { displayName: string; email?: string } | null
   cloud: { status: "absent" | "ready" | "conflict" | "error"; providerId: "cocode-nut" }
-  usage?: { plan?: string; fiveHour?: number; week?: number; month?: number; syncedAt?: string; error?: string }
+  usage?: { plan?: string; fiveHour?: number; week?: number; month?: number; currentPeriodEnd?: string; fiveHourResetAt?: string; weekResetAt?: string; syncedAt?: string; error?: string }
   error?: { code: string; message: string }
 }
 
@@ -41,13 +42,15 @@ type AccountProps = {
   readonly wide: boolean
   readonly store: AccountStore
   readonly providers: ProviderStore
+  readonly locale?: { subscribe(listener: () => void): () => void; getSnapshot(): { active: string } }
 }
 
 type AccountPanelKind = "usage" | "help"
 
 const FEEDBACK_TO = "support@cocode.agency"
-const FEEDBACK_SUBJECT = "Cocode 反馈"
-const FEEDBACK_BODY = "你好，\n\n我想反馈：\n\n\n---\nProvider："
+const EMPTY_LOCALE_SNAPSHOT = { active: "zh" }
+const EMPTY_LOCALE_SUBSCRIBE = (): (() => void) => () => {}
+let activeLocale: "zh" | "en" = "zh"
 
 type OnboardingProps = {
   readonly complete: () => void
@@ -94,13 +97,6 @@ const COPY = {
     help: "帮助与反馈",
     signOut: "退出登录",
     providerId: "Provider ID：",
-    feedbackTo: "收件人",
-    feedbackSubject: "主题",
-    feedbackBody: "正文",
-    feedbackHint: "点击发送会尝试打开系统邮件客户端。若当前环境无法唤起邮件客户端，可以直接复制下面的内容，手动发送到 support@cocode.agency。",
-    openMail: "打开邮件客户端",
-    copyMail: "复制邮件内容",
-    copiedMail: "已复制",
   },
   en: {
     signIn: "Sign in to Cocode",
@@ -134,20 +130,11 @@ const COPY = {
     help: "Help & feedback",
     signOut: "Sign out",
     providerId: "Provider ID: ",
-    feedbackTo: "To",
-    feedbackSubject: "Subject",
-    feedbackBody: "Message",
-    feedbackHint: "Send tries to open your system mail client. If this environment cannot open one, copy the draft below and send it manually to support@cocode.agency.",
-    openMail: "Open mail client",
-    copyMail: "Copy email",
-    copiedMail: "Copied",
   },
 } as const
 
 function copy(): typeof COPY.zh | typeof COPY.en {
-  return document.documentElement.lang.toLowerCase().startsWith("zh") || navigator.language.toLowerCase().startsWith("zh")
-    ? COPY.zh
-    : COPY.en
+  return activeLocale === "en" ? COPY.en : COPY.zh
 }
 
 class AccountStore {
@@ -459,6 +446,28 @@ function formatRemainingPercent(value: number): string {
   return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}%`
 }
 
+function formatDateTime(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return undefined
+  return date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
+}
+
+function formatTimeUntil(value: string | undefined, now = Date.now()): string {
+  if (value === undefined) return "等待数据"
+  const target = new Date(value).getTime()
+  if (!Number.isFinite(target)) return "等待数据"
+  const remaining = target - now
+  if (remaining <= 0) return "即将重置"
+  const minutes = Math.ceil(remaining / 60_000)
+  const days = Math.floor(minutes / (24 * 60))
+  const hours = Math.floor((minutes % (24 * 60)) / 60)
+  const mins = minutes % 60
+  if (days > 0) return `约 ${days} 天 ${hours} 小时后重置`
+  if (hours > 0) return `约 ${hours} 小时 ${mins} 分钟后重置`
+  return `约 ${mins} 分钟后重置`
+}
+
 function usageSyncLabel(snapshot: AccountSnapshot): string {
   if (snapshot.usage?.error !== undefined) return `同步失败：${snapshot.usage.error}`
   if (snapshot.usage?.syncedAt === undefined) return "正在同步账号用量…"
@@ -489,22 +498,27 @@ function AccountPanel({ kind, snapshot, provider, onClose }: {
   readonly onClose: () => void
 }): ReturnType<typeof createElement> {
   const t = copy()
-  const [feedbackSubject, setFeedbackSubject] = useState(FEEDBACK_SUBJECT)
-  const [feedbackBody, setFeedbackBody] = useState(`${FEEDBACK_BODY} ${provider?.name ?? "未知"}`)
-  const [copiedMail, setCopiedMail] = useState(false)
+  const [, refreshClock] = useState(() => Date.now())
+  useEffect(() => {
+    if (kind !== "usage") return
+    const timer = window.setInterval(() => refreshClock(Date.now()), 30_000)
+    return () => window.clearInterval(timer)
+  }, [kind])
   const title = kind === "usage" ? t.planUsage : t.help
   const isCloud = provider?.id === "cocode-nut"
     || (provider === null && (snapshot.cloud.status === "ready" || snapshot.cloud.status === "conflict"))
   const providerLabel = isCloud ? "Cocode Nut" : provider?.name ?? "当前 Provider"
-  const usageMetric = (label: string, value: number | undefined): ReturnType<typeof createElement> => {
+  const usageMetric = (label: string, value: number | undefined, resetAt: string | undefined): ReturnType<typeof createElement> => {
     const percentage = remainingUsagePercent(value)
     return createElement("div", { className: css.usageMetric },
       createElement("div", { className: css.usageMetricHeader },
         createElement("span", { className: css.usageMetricLabel }, label),
-        createElement("strong", { className: css.usageMetricPercent }, percentage === undefined ? "—" : formatRemainingPercent(percentage)),
+        createElement("strong", { className: css.usageMetricPercent }, percentage === undefined ? "—" : `${formatRemainingPercent(percentage)} 剩余`),
       ),
       createElement("div", { className: css.usageTrack }, createElement("span", { className: css.usageFill, style: { width: `${percentage ?? 0}%` } })),
-      createElement("span", { className: css.panelSecondary }, percentage === undefined ? (snapshot.usage?.error === undefined ? "正在同步" : "同步失败") : "剩余"),
+      createElement("span", { className: css.usageReset }, percentage === undefined
+        ? (snapshot.usage?.error === undefined ? "正在同步" : "同步失败")
+        : resetAt === undefined ? "滚动窗口，等待重置时间" : formatTimeUntil(resetAt)),
     )
   }
   const body = kind === "usage"
@@ -512,12 +526,14 @@ function AccountPanel({ kind, snapshot, provider, onClose }: {
           createElement("div", { className: css.planCard },
             createElement("span", { className: css.panelEyebrow }, "当前套餐"),
             createElement("strong", { className: css.planName }, snapshot.usage?.plan?.toUpperCase() ?? (snapshot.usage?.error === undefined ? "正在同步…" : "同步失败")),
-            createElement("span", { className: css.panelSecondary }, usageSyncLabel(snapshot)),
+            createElement("span", { className: css.panelSecondary }, snapshot.usage?.currentPeriodEnd === undefined
+              ? usageSyncLabel(snapshot)
+              : `当前周期到期：${formatDateTime(snapshot.usage.currentPeriodEnd) ?? "等待数据"}`),
           ),
           createElement("div", { className: css.usageGrid },
-            usageMetric("5 小时限额", snapshotUsage(snapshot, "fiveHour")),
-            usageMetric("周限额", snapshotUsage(snapshot, "week")),
-            usageMetric("月限额", snapshotUsage(snapshot, "month")),
+            usageMetric("5 小时限额", snapshotUsage(snapshot, "fiveHour"), snapshot.usage?.fiveHourResetAt),
+            usageMetric("周限额", snapshotUsage(snapshot, "week"), snapshot.usage?.weekResetAt),
+            usageMetric("月限额", snapshotUsage(snapshot, "month"), snapshot.usage?.currentPeriodEnd),
           ),
           createElement("p", { className: css.panelHint }, "百分比代表当前周期剩余额度。本地 Provider 的请求不会计入 Cocode Nut 用量。"),
         )
@@ -532,34 +548,9 @@ function AccountPanel({ kind, snapshot, provider, onClose }: {
             : "当前使用的是本地 Provider。连接、模型不可用或凭证问题，可以从 Provider 设置开始排查。"),
           isCloud ? createElement("a", { className: css.panelAction, href: ACCOUNT_CENTER_URL, target: "_blank", rel: "noreferrer" }, "打开 Cocode 个人中心") : null,
           createElement("a", { className: css.panelAction, href: "https://doc.cocode.agency", target: "_blank", rel: "noreferrer" }, "访问 Cocode 文档"),
-          createElement("div", { className: css.feedbackDraft },
-            createElement("div", { className: css.feedbackDraftHeader },
-              createElement("strong", null, "反馈邮件"),
-              createElement("span", { className: css.panelSecondary }, FEEDBACK_TO),
-            ),
-            createElement("label", { className: css.feedbackField },
-              createElement("span", null, t.feedbackTo),
-              createElement("input", { value: FEEDBACK_TO, readOnly: true }),
-            ),
-            createElement("label", { className: css.feedbackField },
-              createElement("span", null, t.feedbackSubject),
-              createElement("input", { value: feedbackSubject, onChange: (event: ChangeEvent<HTMLInputElement>) => setFeedbackSubject(event.target.value) }),
-            ),
-            createElement("label", { className: css.feedbackField },
-              createElement("span", null, t.feedbackBody),
-              createElement("textarea", { value: feedbackBody, onChange: (event: ChangeEvent<HTMLTextAreaElement>) => setFeedbackBody(event.target.value), rows: 6 }),
-            ),
-            createElement("p", { className: css.panelHint }, t.feedbackHint),
-            createElement("div", { className: css.feedbackActions },
-              createElement("a", { className: css.panelAction, href: `mailto:${FEEDBACK_TO}?subject=${encodeURIComponent(feedbackSubject)}&body=${encodeURIComponent(feedbackBody)}` }, t.openMail),
-              createElement("button", { type: "button", className: css.panelAction, onClick: () => {
-                const copyPromise = navigator.clipboard?.writeText(`To: ${FEEDBACK_TO}\nSubject: ${feedbackSubject}\n\n${feedbackBody}`)
-                if (copyPromise !== undefined) void copyPromise.then(() => {
-                    setCopiedMail(true)
-                    window.setTimeout(() => setCopiedMail(false), 1500)
-                  })
-              } }, copiedMail ? t.copiedMail : t.copyMail),
-            ),
+          createElement("a", { className: css.feedbackDraft, href: `mailto:${FEEDBACK_TO}` },
+            createElement("strong", null, "反馈邮件"),
+            createElement("span", { className: css.feedbackAddress }, FEEDBACK_TO),
           ),
         )
   return createElement("div", { className: css.panelOverlay, role: "presentation", onMouseDown: (event: ReactMouseEvent<HTMLDivElement>) => { if (event.target === event.currentTarget) onClose() } },
@@ -599,15 +590,17 @@ function AccountErrorModal({ snapshot, onClose, onRetry }: {
   ))
 }
 
-function AccountAction({ wide, store, providers }: AccountProps): ReturnType<typeof createElement> {
+function AccountAction({ wide, store, providers, locale }: AccountProps): ReturnType<typeof createElement> {
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
   const provider = useSyncExternalStore(providers.subscribe, providers.getSnapshot, providers.getSnapshot)
+  const localeSnapshot = useSyncExternalStore(locale?.subscribe ?? EMPTY_LOCALE_SUBSCRIBE, locale?.getSnapshot ?? (() => EMPTY_LOCALE_SNAPSHOT), locale?.getSnapshot ?? (() => EMPTY_LOCALE_SNAPSHOT))
+  activeLocale = localeSnapshot.active === "en" ? "en" : "zh"
   const [open, setOpen] = useState(false)
   const [panel, setPanel] = useState<AccountPanelKind | null>(null)
   const [errorOpen, setErrorOpen] = useState(false)
   const previousPhase = useRef(snapshot.phase)
   const signedIn = snapshot.phase === "signed-in" || snapshot.phase === "provisioning"
-  const t = copy()
+  const t = localeSnapshot.active === "en" ? COPY.en : COPY.zh
   // Waiting on the browser lasts as long as the user takes there, so the
   // trigger stays open during it and the menu carries the way out. Provisioning
   // is short, bounded and not interruptible, so it keeps the trigger disabled.
@@ -719,7 +712,7 @@ function AccountAction({ wide, store, providers }: AccountProps): ReturnType<typ
   )
 }
 
-export const inject = ["slots", "connection", "remote"]
+export const inject = ["slots", "connection", "remote", "locale"]
 
 export function apply(ctx: ClientContext): void {
   const store = new AccountStore()
@@ -746,7 +739,7 @@ export function apply(ctx: ClientContext): void {
     name: "sidebar.footer.action",
     id: "cocode-account",
     order: -100,
-    inject: () => ({ store, providers }),
+    inject: () => ({ store, providers, locale: ctx.locale }),
   }, AccountAction))
   slots.inject("settings.onboarding", () => slots.register({
     name: "settings.onboarding",
