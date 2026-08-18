@@ -23,9 +23,17 @@ const PROBE_ROUTE = '\u0000probe'
 export interface ProviderRow {
   /** The directory entry (route id, display name, settings address, live state). */
   entry: ConfigurableProviderView
-  /** Whether any layer configures this provider (its profile resolves). */
+  /**
+   * Whether the user has added this provider. Nested routes resolve from a
+   * stored profile; a whole-section route (official DeepSeek) is added only
+   * once the user layer has an overlay or a credential is stored.
+   */
   configured: boolean
-  /** Whether the user layer alone carries the profile (removal restores the base). */
+  /**
+   * Whether this page can take the provider off the list. Nested routes are
+   * removable when only the user layer owns the profile. A whole-section
+   * route is removable unless its stored credential is read-only.
+   */
   removable: boolean
   /** The credential reference the resolved profile names, when one does. */
   apiKeyEnv: string | undefined
@@ -114,6 +122,61 @@ function apiKeyEnvOf(namespace: SettingsNamespaceView | undefined, path: readonl
   return typeof ref === 'string' && ref.length > 0 ? ref : undefined
 }
 
+/**
+ * Whether the user layer owns this provider's profile. A nested path is owned
+ * when it is present; a whole-section overlay is owned only when it still
+ * carries at least one field — an empty object is the leftover of unsetting
+ * the section root, not an addition.
+ */
+function userOwnsProfile(
+  namespace: SettingsNamespaceView | undefined,
+  path: readonly string[],
+): boolean {
+  if (namespace === undefined) return false
+  if (path.length > 0) return hasPath(namespace.user, path)
+  const user = namespace.user
+  if (typeof user !== 'object' || user === null || Array.isArray(user)) return false
+  return Object.keys(user).length > 0
+}
+
+/**
+ * Whether the joined row belongs on the added-provider list.
+ * @param entry - directory route.
+ * @param namespace - owning settings namespace, when registered.
+ * @param credential - described state of the profile's named reference.
+ */
+function providerIsConfigured(
+  entry: ConfigurableProviderView,
+  namespace: SettingsNamespaceView | undefined,
+  credential: CredentialView | undefined,
+): boolean {
+  if (namespace === undefined) return false
+  if (entry.settingsPath.length > 0) {
+    return getPath(namespace.value, entry.settingsPath) !== undefined
+  }
+  return userOwnsProfile(namespace, entry.settingsPath) || credential?.configured === true
+}
+
+/**
+ * Whether this page can remove the route from the added-provider list.
+ * @param entry - directory route.
+ * @param namespace - owning settings namespace, when registered.
+ * @param credential - described state of the profile's named reference.
+ */
+function providerIsRemovable(
+  entry: ConfigurableProviderView,
+  namespace: SettingsNamespaceView | undefined,
+  credential: CredentialView | undefined,
+): boolean {
+  if (namespace === undefined || isCocodeNutProvider(entry.provider)) return false
+  if (entry.settingsPath.length > 0) {
+    return userOwnsProfile(namespace, entry.settingsPath)
+      && !hasPath(namespace.base, entry.settingsPath)
+  }
+  if (!providerIsConfigured(entry, namespace, credential)) return false
+  return credential?.configured !== true || credential.writable === true
+}
+
 /** The models settings page controller (one per settings surface). */
 export class ModelsSettingsStore {
   /** The snapshot the section renders from (uSES-safe store). */
@@ -180,24 +243,15 @@ export class ModelsSettingsStore {
             : entry
         )),
     )
-    const rows: ProviderRow[] = visibleProviders.map((entry) => {
+    const drafts = visibleProviders.map((entry) => {
       const namespace = namespaces.get(entry.settingsNs)
-      const configured = namespace !== undefined
-        && (entry.settingsPath.length === 0 || getPath(namespace.value, entry.settingsPath) !== undefined)
-      const removable = namespace !== undefined
-        && entry.settingsPath.length > 0
-        && hasPath(namespace.user, entry.settingsPath)
-        && !hasPath(namespace.base, entry.settingsPath)
-        && !isCocodeNutProvider(entry.provider)
       return {
         entry,
-        configured,
-        removable,
+        namespace,
         apiKeyEnv: apiKeyEnvOf(namespace, entry.settingsPath),
-        credential: undefined,
       }
     })
-    const refs = [...new Set(rows.flatMap(row => row.apiKeyEnv === undefined ? [] : [row.apiKeyEnv]))]
+    const refs = [...new Set(drafts.flatMap(draft => draft.apiKeyEnv === undefined ? [] : [draft.apiKeyEnv]))]
     let credentials: Record<string, CredentialView> = {}
     let credentialError: string | null = null
     if (refs.length > 0) {
@@ -213,17 +267,22 @@ export class ModelsSettingsStore {
       }
     }
     if (generation !== this.generation) return
+    const rows: ProviderRow[] = drafts.map(({ entry, namespace, apiKeyEnv }) => {
+      const credential = apiKeyEnv === undefined ? undefined : credentials[apiKeyEnv]
+      return {
+        entry,
+        configured: providerIsConfigured(entry, namespace, credential),
+        removable: providerIsRemovable(entry, namespace, credential),
+        apiKeyEnv,
+        ...credential === undefined ? {} : { credential },
+      }
+    })
     this.store.update((s) => {
       s.status = 'ready'
       s.error = null
       s.credentialError = credentialError
       s.writable = writable
-      s.rows = rows.map(row => ({
-        ...row,
-        ...row.apiKeyEnv !== undefined && credentials[row.apiKeyEnv] !== undefined
-          ? { credential: credentials[row.apiKeyEnv] }
-          : {},
-      }))
+      s.rows = rows
       s.namespaces = namespaces
     })
   }
