@@ -1,6 +1,6 @@
 import { Box, Text } from 'ink'
 import type { TuiSnapshot } from '../../runtime/app.ts'
-import { workspaceName } from '../../runtime/workspace.ts'
+import { workspaceName, workspacePath } from '../../runtime/workspace.ts'
 import { glyphs } from '../glyphs.ts'
 import { theme } from '../theme.ts'
 import { text, type UiLocale } from '../../runtime/ui-locale.ts'
@@ -28,10 +28,10 @@ export function Header(props: {
 }) {
   const { header } = props
   const session = header.sessionId.slice(0, 8)
-  const workspace = workspaceName(header.cwd)
   const density = compactColumns(props.columns)
   const compact = density !== 'wide'
   const wide = density === 'wide'
+  const workspace = wide ? workspacePath(header.cwd) : workspaceName(header.cwd)
   const model = header.model ?? ''
   const context = props.status?.telemetry.contextPercent
   const tokens = props.status?.tokens

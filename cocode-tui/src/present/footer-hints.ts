@@ -40,6 +40,7 @@ export type FooterProjectionContext = {
   activeOverlay?: FooterOverlay
   agent: 'idle' | 'running' | 'starting' | 'dead'
   draft: string
+  readOnly?: boolean
   messageSelection: boolean
   paneFocus?: 'conversation' | 'inspector'
   overlayConfirming?: boolean
@@ -129,6 +130,8 @@ function fixedShortcut(id: string): string | undefined {
     'message-copy': 'Ctrl+C',
     'message-actions': 'M',
     'message-close': 'Esc',
+    'read-only-back': 'Esc',
+    'read-only-quit': 'Ctrl+C',
     'message-details': 'Ctrl+O',
     'queue-draft': 'Tab',
     'pane-scroll': 'PageUp / PageDown',
@@ -169,6 +172,18 @@ function footerCandidates(context: FooterProjectionContext): readonly FooterHint
           )]
         : []),
       fixed('message-close', 'footerClose', 85, 'secondary'),
+    ]
+  }
+
+  if (context.readOnly === true) {
+    return [
+      fixed('message-scroll', 'footerScroll', 100, 'navigation'),
+      fixed('message-select', 'footerMessages', 95, 'navigation'),
+      ...(context.detailsAvailable === true
+        ? [command('details', 'transcript.toggleVerbose', 'footerDetailsLabel', 90, 'secondary')]
+        : []),
+      fixed('read-only-back', 'footerReadOnlyBack', 50, 'secondary'),
+      fixed('read-only-quit', 'footerReadOnlyQuit', 40, 'secondary'),
     ]
   }
 

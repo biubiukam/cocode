@@ -3,7 +3,8 @@
  */
 
 import { execFile } from 'node:child_process'
-import { basename } from 'node:path'
+import { homedir } from 'node:os'
+import { basename, isAbsolute, relative, resolve, sep } from 'node:path'
 
 export type WorkspaceInfo = {
   name: string
@@ -29,6 +30,19 @@ export function workspaceName(cwd: string): string {
   return basename(cwd) || cwd
 }
 
+/** Format the workspace path for the Header without exposing a noisy home path. */
+export function workspacePath(cwd: string, home = homedir()): string {
+  const resolvedCwd = resolve(cwd)
+  const resolvedHome = resolve(home)
+  const relativePath = relative(resolvedHome, resolvedCwd)
+
+  if (relativePath === '') return '~'
+  if (relativePath !== '..' && !relativePath.startsWith(`..${sep}`) && !isAbsolute(relativePath)) {
+    return `~/${toDisplaySeparators(relativePath)}`
+  }
+  return toDisplaySeparators(resolvedCwd)
+}
+
 export function readGitBranch(cwd: string): Promise<string | undefined> {
   return new Promise((resolve) => {
     execFile(
@@ -52,4 +66,8 @@ function normalizeBranch(branch: string | undefined): string | undefined {
     return undefined
   }
   return value
+}
+
+function toDisplaySeparators(path: string): string {
+  return path.split(sep).join('/')
 }

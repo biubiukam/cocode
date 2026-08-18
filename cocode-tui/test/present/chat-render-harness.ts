@@ -21,6 +21,7 @@ export type ChatRenderCase = {
   locale: 'en' | 'zh'
   theme: ThemeName
   keymap: Keymap
+  mouseSupported?: boolean
   snapshot: TuiSnapshot
 }
 
@@ -182,7 +183,9 @@ export async function renderChatContract(testCase: ChatRenderCase): Promise<Chat
   const element = () => React.createElement(Chat, {
     app: fixtureApp.app,
     keymap: testCase.keymap,
-    mouseSupported: false,
+    mouseSupported: testCase.mouseSupported ?? false,
+    mouseInput: stdin,
+    mouseOutput: stdout,
   })
   const screen = render(element(), {
     stdin: stdin as unknown as NodeJS.ReadStream,

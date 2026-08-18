@@ -205,6 +205,7 @@ export type TuiAction =
   | { type: 'interruptOrQuit' }
   | { type: 'session.new' }
   | { type: 'session.open' }
+  | { type: 'session.back' }
   | { type: 'file.open' }
   | { type: 'quit' }
   | { type: 'quit.move'; delta: number }
@@ -279,6 +280,30 @@ export type TuiAction =
 export type { TuiCapabilities }
 
 type TuiDisplayedCapabilityName = TuiRuntimeCapabilityName
+
+type ExternalSessionState = {
+  id: string
+  identity: string
+  title?: string
+  cwd?: string
+  canMutate: boolean
+  concurrency: 'no-concurrent-writes'
+  revision?: string
+}
+
+type PreviousSessionView = {
+  sessionId: string
+  assembler: Assembler
+  telemetry: TelemetryProjector
+  sessionState: SessionStateProjector
+  externalSession: ExternalSessionState | undefined
+  sessionTitleOverride: string | undefined
+  provider: string
+  model: string
+  capabilities: TuiCapabilities
+  skills: SkillEntry[]
+  remoteCommands: TuiCommandDescriptor[]
+}
 
 export type TuiSnapshot = {
   header: {
@@ -537,17 +562,8 @@ class TuiAppImpl implements TuiApp {
   private reviewPicker: ReviewPickerState | undefined
   private checklist: ChecklistState | undefined
   private reviewRequest = 0
-  private externalSession:
-    | {
-        id: string
-        identity: string
-        title?: string
-        cwd?: string
-        canMutate: boolean
-        concurrency: 'no-concurrent-writes'
-        revision?: string
-      }
-    | undefined
+  private externalSession: ExternalSessionState | undefined
+  private previousSessionView: PreviousSessionView | undefined
 
   constructor(options: TuiAppOptions) {
     const projection = createSessionProjection()
@@ -933,6 +949,9 @@ class TuiAppImpl implements TuiApp {
         return
       case 'session.open':
         void this.showSessionTree()
+        return
+      case 'session.back':
+        void this.returnToPreviousSession()
         return
       case 'file.open':
         this.openFileMention()
@@ -1739,6 +1758,11 @@ class TuiAppImpl implements TuiApp {
     return this.externalSession?.identity ?? this.sessionId
   }
 
+  /** A read-only shared session is only a local history projection, not an open Host session. */
+  private runtimeReplaceSessionId(): string | undefined {
+    return this.externalSession?.canMutate === false ? undefined : this.sessionId
+  }
+
   private refreshRuntimeControls(): void {
     this.refreshRuntimeCapabilities()
     this.skills = []
@@ -1768,7 +1792,7 @@ class TuiAppImpl implements TuiApp {
     this.agent = 'starting'
     this.notice = { tone: 'info', message: text(this.locale, 'resumeLoading') }
     this.emit()
-    const previousSessionId = this.sessionId
+    const previousSessionId = this.runtimeReplaceSessionId()
     try {
       const opened = await this.runtime.open(item.session.id, previousSessionId)
       const openResult = normalizeOpenResult(opened)
@@ -1815,13 +1839,29 @@ class TuiAppImpl implements TuiApp {
     try {
       const history = await reader.readSessionHistory(externalId)
       const previousSessionId = this.sessionId
+      const replaceSessionId = this.runtimeReplaceSessionId()
       let hostOpened = false
       if (history.status === 'ok' && this.runtime.open !== undefined) {
         try {
-          hostOpened = normalizeOpenResult(await this.runtime.open(externalId, previousSessionId)).opened
+          hostOpened = normalizeOpenResult(
+            await this.runtime.open(externalId, replaceSessionId),
+          ).opened
         } catch {
           hostOpened = false
         }
+      }
+      this.previousSessionView = {
+        sessionId: previousSessionId,
+        assembler: this.assembler,
+        telemetry: this.telemetry,
+        sessionState: this.sessionState,
+        externalSession: this.externalSession,
+        sessionTitleOverride: this.sessionTitleOverride,
+        provider: this.provider,
+        model: this.model,
+        capabilities: this.capabilities,
+        skills: this.skills,
+        remoteCommands: this.remoteCommands,
       }
       this.replaceSessionProjection(history.events.map(toSessionEvent))
       this.sessionId = externalId
@@ -1860,6 +1900,53 @@ class TuiAppImpl implements TuiApp {
     } catch (error) {
       this.agent = 'idle'
       this.notice = { tone: 'error', message: errorMessage(error) }
+    }
+    this.emit()
+  }
+
+  private async returnToPreviousSession(): Promise<void> {
+    const previous = this.previousSessionView
+    if (previous === undefined || this.externalSession === undefined) {
+      void this.showSessionTree()
+      return
+    }
+    this.agent = 'starting'
+    this.notice = { tone: 'info', message: text(this.locale, 'returningPreviousSession') }
+    this.emit()
+    const currentIsReadOnly = this.externalSession.canMutate === false
+    try {
+      if (this.runtime.open !== undefined) {
+        const opened = normalizeOpenResult(
+          await this.runtime.open(previous.sessionId, this.runtimeReplaceSessionId()),
+        )
+        // A read-only shared projection may leave the previous Cocode session
+        // attached in the runtime, so `opened: false` is an idempotent result.
+        if (!opened.opened && !currentIsReadOnly) {
+          throw new Error(text(this.locale, 'sessionTreeOpenFailed'))
+        }
+      }
+      this.sessionId = previous.sessionId
+      this.assembler = previous.assembler
+      this.telemetry = previous.telemetry
+      this.sessionState = previous.sessionState
+      this.externalSession = previous.externalSession
+      this.sessionTitleOverride = previous.sessionTitleOverride
+      this.provider = previous.provider
+      this.model = previous.model
+      this.capabilities = previous.capabilities
+      this.skills = previous.skills
+      this.remoteCommands = previous.remoteCommands
+      this.previousSessionView = undefined
+      this.agent = 'idle'
+      this.notice = {
+        tone: 'info',
+        message: text(this.locale, 'returnedToPreviousSession'),
+      }
+    } catch {
+      this.agent = 'idle'
+      this.previousSessionView = undefined
+      await this.showSessionTree()
+      return
     }
     this.emit()
   }
@@ -2546,7 +2633,7 @@ class TuiAppImpl implements TuiApp {
     this.notice = { tone: 'info', message: text(this.locale, 'resumeLoading') }
     this.emit()
     try {
-      const previousSessionId = this.sessionId
+      const previousSessionId = this.runtimeReplaceSessionId()
       const nextProjection = await loadSessionProjection(path)
       const opened = await this.runtime.open(sessionId, previousSessionId)
       if (!normalizeOpenResult(opened).opened) {
