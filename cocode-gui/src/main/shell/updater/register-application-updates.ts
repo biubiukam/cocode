@@ -1,6 +1,12 @@
-import { app, autoUpdater, dialog, type Event as ElectronEvent } from "electron"
+import { app, autoUpdater, dialog } from "electron"
 import { UpdateSourceType, updateElectronApp, type IUpdateElectronApp } from "update-electron-app"
 import packageMetadata from "../../../../package.json"
+import {
+	createApplicationUpdateCoordinator,
+	type ApplicationUpdateCoordinator,
+	type ApplicationUpdateEventSource,
+	type ApplicationUpdateState,
+} from "./application-update-coordinator"
 import {
 	resolveApplicationUpdateConfig,
 	resolveGitHubRepositoryFromUrl,
@@ -13,9 +19,7 @@ export interface ApplicationUpdateLifecycle {
 	readonly requestQuitForUpdate: (installUpdate: () => void) => boolean
 }
 
-export interface ApplicationUpdateRegistration {
-	readonly dispose: () => void
-}
+export type ApplicationUpdateRegistration = ApplicationUpdateCoordinator
 
 export function registerApplicationUpdates(
 	lifecycle: ApplicationUpdateLifecycle,
@@ -65,9 +69,27 @@ export function registerApplicationUpdates(
 				promptOpen = false
 			})
 	}
+	const coordinator = createApplicationUpdateCoordinator({
+		enabled: true,
+		version: app.getVersion(),
+		updater: autoUpdater as unknown as ApplicationUpdateEventSource,
+		onStateChange: () => undefined,
+		onLatest: showLatestVersionDialog,
+		onError: handleUpdateError,
+		onDownloaded: promptForUpdate,
+	})
 
 	if (config.channel === "msix") {
-		return registerMsixUpdates(config, promptForUpdate)
+		const msix = registerMsixUpdates(config)
+		return {
+			enabled: true,
+			checkNow: coordinator.checkNow,
+			subscribe: coordinator.subscribe,
+			dispose: () => {
+				msix.dispose()
+				coordinator.dispose()
+			},
+		}
 	}
 
 	let updater: IUpdateElectronApp | null = null
@@ -77,47 +99,55 @@ export function registerApplicationUpdates(
 			repo: config.repository,
 		},
 		updateInterval: config.updateInterval,
-		notifyUser: true,
-		onNotifyUser: ({ releaseName }) => promptForUpdate(releaseName),
+		notifyUser: false,
 	})
 
 	return {
+		enabled: true,
+		checkNow: coordinator.checkNow,
+		subscribe: coordinator.subscribe,
 		dispose: () => {
+			coordinator.dispose()
 			updater?.stopUpdates()
 			updater = null
 		},
 	}
 }
 
-function registerMsixUpdates(
-	config: Extract<ApplicationUpdateConfig, { enabled: true }>,
-	promptForUpdate: (releaseName?: string) => void,
-): ApplicationUpdateRegistration {
+function registerMsixUpdates(config: Extract<ApplicationUpdateConfig, { enabled: true }>): {
+	readonly dispose: () => void
+} {
 	const architecture = resolveWindowsUpdateArchitecture(process.arch)
 	const feedUrl = resolvePublicMsixFeedUrl(config.repository, architecture, app.getVersion())
 	console.info(`Registering MSIX automatic updates from ${feedUrl}`)
 	autoUpdater.setFeedURL({ url: feedUrl })
+	let checkInFlight = false
 	const onCheckingForUpdate = () => {
+		checkInFlight = true
 		console.info("Checking for an MSIX application update.")
 	}
+	const onUpdateNotAvailable = () => {
+		checkInFlight = false
+		console.info("No MSIX application update is available.")
+	}
 	const onUpdateAvailable = () => {
+		checkInFlight = true
 		console.info("An MSIX application update is available and is being downloaded.")
 	}
-	const onUpdateDownloaded = (
-		_event: ElectronEvent,
-		_releaseNotes: string,
-		releaseName: string,
-	) => {
-		promptForUpdate(releaseName)
+	const onUpdateDownloaded = () => {
+		checkInFlight = false
 	}
 	const onUpdaterError = (error: Error) => {
+		checkInFlight = false
 		console.error("MSIX automatic update failed:", error)
 	}
 	autoUpdater.on("checking-for-update", onCheckingForUpdate)
+	autoUpdater.on("update-not-available", onUpdateNotAvailable)
 	autoUpdater.on("update-available", onUpdateAvailable)
 	autoUpdater.on("update-downloaded", onUpdateDownloaded)
 	autoUpdater.on("error", onUpdaterError)
 	const checkForUpdates = () => {
+		if (checkInFlight) return
 		try {
 			autoUpdater.checkForUpdates()
 		} catch (error) {
@@ -134,6 +164,7 @@ function registerMsixUpdates(
 		dispose: () => {
 			clearInterval(timer)
 			autoUpdater.removeListener("checking-for-update", onCheckingForUpdate)
+			autoUpdater.removeListener("update-not-available", onUpdateNotAvailable)
 			autoUpdater.removeListener("update-available", onUpdateAvailable)
 			autoUpdater.removeListener("update-downloaded", onUpdateDownloaded)
 			autoUpdater.removeListener("error", onUpdaterError)
@@ -147,5 +178,42 @@ function resolveWindowsUpdateArchitecture(architecture: string): "x64" | "arm64"
 }
 
 function createInactiveRegistration(): ApplicationUpdateRegistration {
-	return { dispose: () => undefined }
+	return {
+		enabled: false,
+		checkNow: () => undefined,
+		subscribe: (_listener: (state: ApplicationUpdateState) => void) => () => undefined,
+		dispose: () => undefined,
+	}
+}
+
+function showLatestVersionDialog(version: string): void {
+	void dialog
+		.showMessageBox({
+			type: "info",
+			noLink: true,
+			title: "检查更新",
+			message: "当前版本已经是最新",
+			detail: `当前版本：v${version}`,
+		})
+		.catch((error: unknown) => {
+			console.error("Failed to show the latest-version dialog:", error)
+		})
+}
+
+function showUpdateErrorDialog(): void {
+	void dialog
+		.showMessageBox({
+			type: "error",
+			noLink: true,
+			title: "检查更新失败",
+			message: "检查更新失败，请稍后重试",
+		})
+		.catch((error: unknown) => {
+			console.error("Failed to show the update-error dialog:", error)
+		})
+}
+
+function handleUpdateError(error: Error): void {
+	console.error("Application update check failed:", error)
+	showUpdateErrorDialog()
 }
