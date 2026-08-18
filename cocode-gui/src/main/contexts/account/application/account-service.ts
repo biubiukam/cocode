@@ -390,8 +390,16 @@ export class AccountService {
 			state === undefined
 				? existingPending ?? { pending: true as const }
 				: cleanupStateOf(state)
-		const defaultReady = await this.restoreDefaultOrQueue(pending)
+		let defaultReady = false
 		let cleanupError: unknown
+		try {
+			defaultReady = await this.restoreDefaultOrQueue(pending)
+		} catch (error) {
+			// A model/settings error must not keep the desktop identity alive. The
+			// non-secret pending marker lets the runtime retry cloud cleanup later.
+			cleanupError = error
+			await this.writePendingBestEffort(pending)
+		}
 		if (defaultReady) {
 			try {
 				this.stage = "cleanup"
@@ -879,30 +887,33 @@ export class AccountService {
 	private async restoreDefaultIfNeeded(previous: DefaultSelection | undefined): Promise<void> {
 		const current = await this.dsh.currentDefault()
 		if (current.provider !== CLOUD_PROVIDER) return
-		if (previous === undefined)
-			throw new Error("choose another default model before signing out")
-		const groups = await this.dsh.models()
-		if (!modelExists(groups, previous))
-			throw new Error("the previous default model is no longer available")
+		const restorePrevious =
+			previous !== undefined && modelExists(await this.dsh.models(), previous)
 		const settings = await this.dsh.describeSettings()
 		const namespace = settings.namespaces.find((item) => item.ns === "agent-default-model")
 		if (namespace === undefined) throw new Error("default model settings are unavailable")
 		await this.dsh.mutateSettings({
 			ns: "agent-default-model",
 			expectedRevision: namespace.revision,
-			ops: [
-				{ op: "set", path: ["provider"], value: previous.provider },
-				{ op: "set", path: ["model"], value: previous.model },
-				...(previous.reasoningEffort === undefined
-					? [{ op: "unset" as const, path: ["reasoningEffort"] }]
-					: [
-							{
-								op: "set" as const,
-								path: ["reasoningEffort"],
-								value: previous.reasoningEffort,
-							},
-					  ]),
-			],
+			ops: restorePrevious
+				? [
+						{ op: "set", path: ["provider"], value: previous.provider },
+						{ op: "set", path: ["model"], value: previous.model },
+						...(previous.reasoningEffort === undefined
+							? [{ op: "unset" as const, path: ["reasoningEffort"] }]
+							: [
+									{
+										op: "set" as const,
+										path: ["reasoningEffort"],
+										value: previous.reasoningEffort,
+									},
+							  ]),
+				  ]
+				: [
+						{ op: "unset", path: ["provider"] },
+						{ op: "unset", path: ["model"] },
+						{ op: "unset", path: ["reasoningEffort"] },
+				  ],
 		})
 	}
 

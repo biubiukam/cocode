@@ -674,6 +674,110 @@ test("sign out restores a cloud default before removing only the managed provide
 	assert.equal((await service.snapshot()).phase, "signed-out")
 })
 
+test("sign out falls back to the deployment default when the previous model is gone", async () => {
+	const identity = new MemoryVault(
+		validIdentity({
+			preLoginDefault: { provider: "deleted-provider", model: "deleted-model" },
+			managedRoute: {
+				baseURL: "https://cocode.agency/v1",
+				apiKeyEnv: "COCODE_NUT_API_KEY",
+			},
+		}),
+	)
+	const { client } = agency()
+	const mutations: { ns: string; ops: { op: "set" | "unset"; path: readonly string[] }[] }[] = []
+	const dsh = {
+		currentDefault: async () => ({ provider: "cocode-nut", model: "cloud-model" }),
+		models: async () => [
+			{
+				id: "cocode-nut",
+				name: "Cocode Nut",
+				models: [{ id: "cloud-model", name: "Cloud Model" }],
+			},
+		],
+		describeSettings: async () => ({
+			writable: true,
+			namespaces: [
+				{
+					ns: "agent-default-model",
+					revision: 7,
+					value: { provider: "cocode-nut", model: "cloud-model" },
+				},
+				{
+					ns: "llm-pi-ai",
+					revision: 9,
+					value: {
+						providers: {
+							"cocode-nut": {
+								api: "openai-responses",
+								baseURL: "https://cocode.agency/v1",
+								apiKeyEnv: "COCODE_NUT_API_KEY",
+							},
+						},
+					},
+				},
+			],
+		}),
+		describeCredentials: async () => ({
+			COCODE_NUT_API_KEY: { configured: true, writable: true },
+		}),
+		providers: async (): Promise<ProviderView[]> => [],
+		setCredential: async (): Promise<void> => undefined,
+		unsetCredential: async (): Promise<void> => undefined,
+		mutateSettings: async (request: {
+			ns: string
+			ops: { op: "set" | "unset"; path: readonly string[] }[]
+		}) => {
+			mutations.push(request)
+		},
+	} as never
+	const { deps, pending } = dependencies(identity, new MemoryVault("ck_test"))
+	const service = new AccountService(dsh, client, deps)
+
+	await service.signOut()
+
+	assert.deepEqual(mutations[0], {
+		ns: "agent-default-model",
+		expectedRevision: 7,
+		ops: [
+			{ op: "unset", path: ["provider"] },
+			{ op: "unset", path: ["model"] },
+			{ op: "unset", path: ["reasoningEffort"] },
+		],
+	})
+	assert.equal(identity.value, undefined)
+	assert.equal(pending.value, undefined)
+	assert.equal((await service.snapshot()).phase, "signed-out")
+})
+
+test("sign out clears local identity when default restoration fails", async () => {
+	const identity = new MemoryVault(
+		validIdentity({
+			preLoginDefault: { provider: "deepseek-official", model: "deepseek-v4-flash" },
+			managedRoute: {
+				baseURL: "https://cocode.agency/v1",
+				apiKeyEnv: "COCODE_NUT_API_KEY",
+			},
+		}),
+	)
+	const { client } = agency()
+	const dsh = {
+		currentDefault: async () => ({ provider: "cocode-nut", model: "cloud-model" }),
+		models: async () => {
+			throw new Error("model catalog unavailable")
+		},
+	} as never
+	const { deps, cloudKey, pending } = dependencies(identity, new MemoryVault("ck_test"))
+	const service = new AccountService(dsh, client, deps)
+
+	await service.signOut()
+
+	assert.equal(identity.value, undefined)
+	assert.equal(cloudKey.value, undefined)
+	assert.equal(pending.value?.pending, true)
+	assert.equal((await service.snapshot()).phase, "error")
+})
+
 test("a temporary refresh failure keeps the encrypted identity for retry", async () => {
 	const identity = new MemoryVault(validIdentity({ accessExpiresAt: Date.now() - 1 }))
 	const { client } = agency({
