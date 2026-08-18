@@ -14,8 +14,8 @@ import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 /** Hosted Cocode Nut route and the pre-rename alias. */
 const COCODE_NUT_PROVIDER = 'cocode-nut'
 const LEGACY_COCODE_NUT_PROVIDER = 'cocode-cloud'
-/** Preferred Nut model; name/id matching "flash" is enough when the exact id is absent. */
-const PREFERRED_NUT_MODEL_ID = 'deepseek-v4-flash'
+/** Preferred recovery model; name/id matching "flash" is enough when the exact id is absent. */
+const PREFERRED_MODEL_ID = 'deepseek-v4-flash'
 
 function isFlashModel(model: { id: string; name: string }): boolean {
   return /flash/i.test(model.id) || /flash/i.test(model.name)
@@ -42,18 +42,10 @@ function groupsForDisplay(groups: readonly ModelProviderGroup[]): readonly Model
   return [...nut, ...rest]
 }
 
-/**
- * Recover an unroutable session onto Cocode Nut Flash when that catalog is live.
- * Prefers the current `cocode-nut` id over the legacy alias, then the exact
- * Flash id, then any advertised model whose id or name contains "flash".
- */
-function preferredNutFlash(groups: readonly ModelProviderGroup[]): ModelSelection | undefined {
-  const group = groups.find(entry => entry.id === COCODE_NUT_PROVIDER && entry.models.length > 0)
-    ?? groups.find(entry => entry.id === LEGACY_COCODE_NUT_PROVIDER && entry.models.length > 0)
-  if (group === undefined) return undefined
-  const model = group.models.find(entry => entry.id === PREFERRED_NUT_MODEL_ID)
-    ?? group.models.find(isFlashModel)
-  if (model === undefined) return undefined
+function selectionOf(
+  group: ModelProviderGroup,
+  model: ModelProviderGroup['models'][number],
+): ModelSelection {
   return {
     provider: group.id,
     model: model.id,
@@ -61,6 +53,24 @@ function preferredNutFlash(groups: readonly ModelProviderGroup[]): ModelSelectio
       ? {}
       : { reasoningEffort: model.reasoning.defaultEffort },
   }
+}
+
+/**
+ * Recover an unroutable session onto a live catalog model. Display order
+ * (Nut first) is the provider preference; Flash wins over any other
+ * advertised model, then the first model of the first live group.
+ */
+function preferredFallback(groups: readonly ModelProviderGroup[]): ModelSelection | undefined {
+  const ordered = groupsForDisplay(groups).filter(group => group.models.length > 0)
+  for (const group of ordered) {
+    const flash = group.models.find(entry => entry.id === PREFERRED_MODEL_ID)
+      ?? group.models.find(isFlashModel)
+    if (flash !== undefined) return selectionOf(group, flash)
+  }
+  const group = ordered[0]
+  const model = group?.models[0]
+  if (group === undefined || model === undefined) return undefined
+  return selectionOf(group, model)
 }
 
 /** Directory snapshot both entries render from. */
@@ -134,9 +144,10 @@ export class ModelDirectory {
       s.status = 'ready'
       s.error = null
     })
-    // Composer blocks when the host cannot serve the current provider. If Nut
-    // Flash is advertised, switch onto it instead of leaving the user stuck.
-    const fallback = preferredNutFlash(groups)
+    // Composer blocks when the host cannot serve the current provider. If the
+    // catalog advertises any model, switch onto Flash (or the first live
+    // model) instead of leaving the user stuck.
+    const fallback = preferredFallback(groups)
     if (
       !routable
       && fallback !== undefined
