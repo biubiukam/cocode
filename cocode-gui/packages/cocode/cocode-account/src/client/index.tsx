@@ -69,6 +69,9 @@ const COPY = {
     provisioningHint: "正在为你的账号配置 Cocode Nut 云模型，稍等片刻。",
     onboardingTitle: "登录 Cocode",
     onboardingAction: "立即登录",
+    signInErrorTitle: "登录 Cocode 失败",
+    close: "关闭",
+    retryLogin: "重试登录",
     intro: "登录后可直接使用账号内的云端模型，无需自行配置 Provider。你当前的默认模型保持不变。",
     later: "稍后再说",
     conflict: "本机已有同名 Provider 或凭证，请先在模型设置中处理冲突。",
@@ -98,6 +101,9 @@ const COPY = {
     provisioningHint: "Setting up Cocode Nut cloud models for your account. This takes a moment.",
     onboardingTitle: "Sign in to Cocode",
     onboardingAction: "Sign in",
+    signInErrorTitle: "Cocode sign-in failed",
+    close: "Close",
+    retryLogin: "Retry sign-in",
     intro: "Sign in to use the cloud models included with your account — no provider setup needed. Your current default model stays unchanged.",
     later: "Not now",
     conflict: "A provider or credential with the reserved Cocode name already exists. Resolve it in Models settings first.",
@@ -491,23 +497,47 @@ function AccountPanel({ kind, snapshot, provider, onClose }: {
   )
 }
 
+function AccountErrorModal({ snapshot, onClose, onRetry }: {
+  readonly snapshot: AccountSnapshot
+  readonly onClose: () => void
+  readonly onRetry: () => void
+}): ReturnType<typeof createElement> {
+  const t = copy()
+  return createElement("div", {
+    className: css.panelOverlay,
+    role: "presentation",
+    onMouseDown: (event: ReactMouseEvent<HTMLDivElement>) => { if (event.target === event.currentTarget) onClose() },
+  },
+  createElement("section", { className: css.panel, role: "alertdialog", "aria-modal": "true", "aria-label": t.signInErrorTitle },
+    createElement("header", { className: css.panelHeader },
+      createElement("h2", { className: css.panelTitle }, t.signInErrorTitle),
+      createElement("button", { type: "button", className: css.panelClose, onClick: onClose, "aria-label": t.close }, "×"),
+    ),
+    createElement("div", { className: css.panelStack },
+      createElement("p", { className: css.onboardingError, role: "alert" }, accountError(snapshot)),
+      createElement("div", { className: css.onboardingActions },
+        createElement("button", { type: "button", className: `${css.onboardingButton} ${css.onboardingGhost}`, onClick: onClose }, t.close),
+        createElement("button", { type: "button", className: `${css.onboardingButton} ${css.onboardingPrimary}`, onClick: onRetry }, t.retryLogin),
+      ),
+    ),
+  ))
+}
+
 function AccountAction({ wide, store, providers }: AccountProps): ReturnType<typeof createElement> {
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
   const provider = useSyncExternalStore(providers.subscribe, providers.getSnapshot, providers.getSnapshot)
   const [open, setOpen] = useState(false)
   const [panel, setPanel] = useState<AccountPanelKind | null>(null)
+  const [errorOpen, setErrorOpen] = useState(false)
+  const previousPhase = useRef(snapshot.phase)
   const signedIn = snapshot.phase === "signed-in" || snapshot.phase === "provisioning"
   const t = copy()
   const busy = snapshot.phase === "signing-in" || snapshot.phase === "provisioning"
-  const primary = signedIn
-    ? snapshot.profile?.displayName ?? "Cocode"
-    : snapshot.phase === "signing-in"
-      ? t.waiting
-      : snapshot.phase === "provisioning"
-        ? t.provisioning
-        : snapshot.phase === "error"
-          ? t.retry
-      : t.settingsOrSignIn
+  useEffect(() => {
+    if (snapshot.phase === "error" && previousPhase.current !== "error") setErrorOpen(true)
+    previousPhase.current = snapshot.phase
+  }, [snapshot.phase])
+  const primary = signedIn ? snapshot.profile?.displayName ?? "Cocode" : t.settingsOrSignIn
   const title = accountError(snapshot) ?? primary
   const entries: MenuEntry[] = signedIn
     ? [
@@ -592,6 +622,11 @@ function AccountAction({ wide, store, providers }: AccountProps): ReturnType<typ
       },
     ),
     panel === null ? null : createElement(AccountPanel, { kind: panel, snapshot, provider, onClose: () => setPanel(null) }),
+    errorOpen ? createElement(AccountErrorModal, {
+      snapshot,
+      onClose: () => setErrorOpen(false),
+      onRetry: () => { setErrorOpen(false); void store.activate() },
+    }) : null,
   )
 }
 
