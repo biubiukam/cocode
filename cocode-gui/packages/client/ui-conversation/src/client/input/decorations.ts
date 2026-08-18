@@ -113,9 +113,41 @@ export function atNameIsPrefix(name: string, names: readonly string[]): boolean 
   return names.some(candidate => candidate !== name && candidate.startsWith(name))
 }
 
-/** File-shaped `@` mention (path, extension, or quoted name) — not a bare subagent label. */
+/** File-shaped `@` mention (path, extension, quoted name, or folder) — not a bare subagent label. */
 export function isFileMentionPath(name: string): boolean {
-  return name !== '' && name !== '.' && !name.endsWith('/') && /[./\\ ]/.test(name)
+  return name !== '' && name !== '.' && /[./\\ ]/.test(name)
+}
+
+/**
+ * Scan sent user text for `/command` and `@mention` tokens by shape alone.
+ * Compose-time validation already happened; the bubble does not need a lexicon.
+ */
+export function scanSentTextRefs(draft: string): TextRefRange[] {
+  if (draft === '') return []
+  const out: TextRefRange[] = []
+  SLASH_REF_RE.lastIndex = 0
+  let match: RegExpExecArray | null
+  while ((match = SLASH_REF_RE.exec(draft)) !== null) {
+    const start = match.index + (match[1]?.length ?? 0)
+    out.push({ start, end: start + 1 + (match[2] ?? '').length, trigger: '/' })
+  }
+  let index = 0
+  while (index < draft.length) {
+    const at = draft.indexOf('@', index)
+    if (at < 0) break
+    if (at > 0 && !/\s/u.test(draft.charAt(at - 1))) {
+      index = at + 1
+      continue
+    }
+    const mention = readAtMention(draft, at)
+    if (mention !== undefined) {
+      out.push({ start: at, end: mention.end, trigger: '@' })
+      index = mention.end
+      continue
+    }
+    index = at + 1
+  }
+  return out.sort((left, right) => left.start - right.start)
 }
 
 function readAtMention(draft: string, at: number): { name: string; end: number } | undefined {

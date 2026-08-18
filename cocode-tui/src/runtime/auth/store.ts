@@ -11,7 +11,9 @@ import {
   loadProfile,
   mintPersonalKey,
   pollDeviceToken,
+  probeHostedModels,
   refreshAccess,
+  revokePersonalKey,
   revokeToken,
   startDeviceAuthorization,
   type AgencyClient,
@@ -303,7 +305,18 @@ class AuthStoreImpl implements AuthStore {
       firstError = error
     }
     if (account !== undefined) {
-      await revokeToken(account.origin, account.refreshToken, this.client, operation.signal)
+      // 先撤设备密钥再撤 token 家族：家族一旦失效，access token 也无法再调撤销接口。
+      const current = await this.accessForRevocation(account, operation.signal)
+      if (current.personalKeyId !== undefined) {
+        await revokePersonalKey(
+          current.origin,
+          current.accessToken,
+          current.personalKeyId,
+          this.client,
+          operation.signal,
+        )
+      }
+      await revokeToken(current.origin, current.refreshToken, this.client, operation.signal)
     }
     for (const cleanup of [
       () => deleteAccount(this.accountHome),
@@ -317,6 +330,33 @@ class AuthStoreImpl implements AuthStore {
       }
     }
     return firstError
+  }
+
+  /**
+   * 登出时 access token 通常已过期，先换一张才撤得掉设备密钥。
+   * 刷新失败不阻断登出，沿用旧凭据尽力而为。
+   */
+  private async accessForRevocation(
+    account: AccountRecord,
+    signal: AbortSignal,
+  ): Promise<AccountRecord> {
+    if (account.accessExpiresAt > Date.now() + 30_000) return account
+    try {
+      const refreshed = await refreshAccess(
+        account.origin,
+        account.refreshToken,
+        this.client,
+        signal,
+      )
+      return {
+        ...account,
+        accessToken: refreshed.access_token,
+        refreshToken: refreshed.refresh_token,
+        accessExpiresAt: Date.now() + refreshed.expires_in * 1000,
+      }
+    } catch {
+      return account
+    }
   }
 
   private envLocked(mode: 'byok' | 'cocode'): boolean {
@@ -431,9 +471,25 @@ class AuthStoreImpl implements AuthStore {
       await withAccountLock(this.accountHome, async () => {
         const existing = await readAccount(this.accountHome)
         const credentials = await readCredentials(this.dshHome)
-        let secret = credentials[CLOUD_KEY_REF]?.trim()
-        const reusable = existing?.origin === origin && secret !== undefined && secret !== ''
-        if (!reusable || secret === undefined) {
+        const stored = credentials[CLOUD_KEY_REF]?.trim()
+        const reusable =
+          existing !== undefined &&
+          existing.origin === origin &&
+          stored !== undefined &&
+          stored !== ''
+        // 本地密钥会过期，也可能已在 Web 端撤销，验证通过才复用。
+        let secret = stored
+        let models = reusable
+          ? await probeHostedModels(origin, stored, this.client, poll.signal)
+          : undefined
+        this.ensureCurrent(operation)
+        if (reusable && models !== undefined) {
+          account = {
+            ...account,
+            personalKeyId: existing.personalKeyId,
+            personalKeyName: existing.personalKeyName ?? KEY_NAME,
+          }
+        } else {
           const minted = await mintPersonalKey(origin, account.accessToken, this.client, poll.signal)
           this.ensureCurrent(operation)
           secret = minted.secret
@@ -442,22 +498,16 @@ class AuthStoreImpl implements AuthStore {
             personalKeyId: minted.id,
             personalKeyName: KEY_NAME,
           }
-        } else {
-          account = {
-            ...account,
-            personalKeyId: existing.personalKeyId,
-            personalKeyName: existing.personalKeyName ?? KEY_NAME,
-          }
+          models = await listHostedModels(origin, minted.secret, this.client, poll.signal)
+          this.ensureCurrent(operation)
         }
-        const models = await listHostedModels(origin, secret, this.client, poll.signal)
-        this.ensureCurrent(operation)
         if (models.length === 0) throw new TuiError('AUTH_NO_HOSTED_MODELS')
         this.cloudModels = models
         const settingsBackup = await captureCloudSettings(this.dshHome)
         const previousCloudKey = credentials[CLOUD_KEY_REF]
         try {
           this.ensureCurrent(operation)
-          if (!reusable) await patchCredential(this.dshHome, CLOUD_KEY_REF, secret)
+          if (secret !== stored) await patchCredential(this.dshHome, CLOUD_KEY_REF, secret)
           this.ensureCurrent(operation)
           await patchCloudRoute(this.dshHome, origin, models)
           this.ensureCurrent(operation)

@@ -70,8 +70,10 @@
   border-radius: var(--ds-radius-composer);
   background: var(--dsw-specific-input-major);
   box-shadow: var(--dsw-shadow-lv2);
-  font-size: 16px;
-  line-height: 24px;
+  /* Same source as the transcript column: placeholder, caret, and draft
+     glyphs inherit this so the composer tracks Appearance font size. */
+  font-size: var(--dsw-conversation-message-font-size, 14px);
+  line-height: 1.5;
   /* Elevated surface in dark, same as the menus: the draft scrollport inside
      scrolls once the composer hits its height cap, so the thumb takes the l2
      pair. Declared on the card because the elevation belongs to the surface,
@@ -158,7 +160,8 @@
    MUST share font, line-height, padding and wrapping rules or heights diverge. */
 .grow {
   position: relative;
-  min-height: 56px;
+  /* Two lines of the inherited draft size plus the shared top pad. */
+  min-height: calc(3em + 4px);
 }
 
 /* Decoration backdrop: same metrics as the textarea, transparent glyphs; only
@@ -257,16 +260,6 @@
      it: WebKit reserves gutter space for an overflow-y:auto textarea and not
      for the overflow:hidden layers beside it, leaving them 8px apart
      (768 against 776) — worth 2 to 5 wrapped lines on a long draft. */
-}
-
-/* Empty composer: caption-scale metrics on all three glyph layers so the
-   caret (textarea) matches the ::placeholder. Once the user types, data-empty
-   drops and the stack inherits the card's 16/24 draft size again. */
-.grow[data-empty] .input,
-.grow[data-empty] .mirror,
-.grow[data-empty] .backdrop {
-  font-size: 13px;
-  line-height: 20px;
 }
 
 /* figma 34:10434: #ADB2B8 light / #81858C dark — the caption pair exactly. */
@@ -452,8 +445,7 @@
 .textRefAt {
   background-color: transparent;
   color: var(--dsw-alias-state-business-primary);
-  text-decoration: underline;
-  text-underline-offset: 2px;
+  text-decoration: none;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
 }

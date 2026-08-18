@@ -13,6 +13,7 @@ import {
   IconRefreshOutline16, JsonBlock, MessageText, StateDot, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatNodeViewProps, ChatViewSlotProps } from '../contract/slots.ts'
+import { isFileMentionPath, scanSentTextRefs, textRefName } from '../input/decorations.ts'
 import type { InjectFace } from '@deepseek-ai/dsh-client-ui-slots'
 import { ImageGallery, type ImageLoader } from '@deepseek-ai/dsh-client-ui-attachment'
 import { messageImageLabels } from '../image-labels.ts'
@@ -190,30 +191,53 @@ function TurnMaxTokensItem({ t }: {
  * scan as the composer, minus the lexicon: sent tokens were validated at
  * compose time, so shape alone decorates).
  */
-function projectUserText(text: string): ReactNode {
-  const re = /(^|\s)([/@][\w-]+)(?=\s|$)/g
+function projectUserText(text: string, openFile?: (path: string) => void): ReactNode {
+  const refs = scanSentTextRefs(text)
+  if (refs.length === 0) return <MessageText text={text} />
   const parts: ReactNode[] = []
   let cursor = 0
-  let m: RegExpExecArray | null
-  while ((m = re.exec(text)) !== null) {
-    const tokenStart = m.index + (m[1]?.length ?? 0)
-    const label = m[2] ?? ''
-    if (tokenStart > cursor) parts.push(<MessageText key={cursor} text={text.slice(cursor, tokenStart)} />)
-    parts.push(
-      <span key={tokenStart} className={css.refChip} data-ref-chip={label.startsWith('@') ? 'subagent' : 'skill'}>
-        {label}
-      </span>,
-    )
-    cursor = tokenStart + label.length
+  for (const ref of refs) {
+    if (ref.start > cursor) parts.push(<span key={cursor} className={css.plain}>{text.slice(cursor, ref.start)}</span>)
+    const label = text.slice(ref.start, ref.end)
+    const name = ref.trigger === '@' ? textRefName(text, ref) : label.slice(1)
+    const fileLike = ref.trigger === '@' && isFileMentionPath(name)
+    if (fileLike) {
+      const canOpen = openFile !== undefined && !name.endsWith('/')
+      parts.push(
+        <span
+          key={ref.start}
+          className={css.fileRef}
+          role={canOpen ? 'link' : undefined}
+          tabIndex={canOpen ? 0 : undefined}
+          onClick={canOpen ? () => { openFile(name) } : undefined}
+          onKeyDown={canOpen
+            ? (event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault()
+                openFile(name)
+              }
+            }
+            : undefined}
+        >
+          {label}
+        </span>,
+      )
+    } else {
+      parts.push(
+        <span key={ref.start} className={css.refChip} data-ref-chip={ref.trigger === '@' ? 'subagent' : 'skill'}>
+          {label}
+        </span>,
+      )
+    }
+    cursor = ref.end
   }
-  if (parts.length === 0) return <MessageText text={text} />
-  if (cursor < text.length) parts.push(<MessageText key={cursor} text={text.slice(cursor)} />)
+  if (cursor < text.length) parts.push(<span key={cursor} className={css.plain}>{text.slice(cursor)}</span>)
   return <>{parts}</>
 }
 
 /** Right-aligned bubble shared by user and steering rows. */
 function UserStyleBubble({
-  content, imageLoader, actions, pending = false, t,
+  content, imageLoader, actions, pending = false, openFile, t,
 }: {
   content: readonly unknown[]
   imageLoader: ImageLoader
@@ -221,6 +245,7 @@ function UserStyleBubble({
   actions?: (text: string) => ReactNode
   /** Whether this is the Host-authoritative pre-admission steering projection. */
   pending?: boolean
+  openFile?: (path: string) => void
   t: ChatViewSlotProps['t']
 }): ReactNode {
   const { text, images, rest } = contentParts(content)
@@ -231,7 +256,7 @@ function UserStyleBubble({
       <div className={css.userStack}>
         <ImageGallery images={images} load={imageLoader} align="end" labels={messageImageLabels(t)} />
         {showBubble && <div className={css.bubble}>
-          {projectUserText(text)}
+          {projectUserText(text, openFile)}
           {rest.map((block, i) => <JsonBlock key={i} label={t('message.extraBlock')} payload={block} truncatedLabel={truncated} />)}
         </div>}
       </div>
@@ -246,9 +271,10 @@ function UserStyleBubble({
  * @param props - Pending message content and conversation translator.
  * @returns the pending steering bubble.
  */
-export function PendingSteeringBubble({ content, loadImage, t }: {
+export function PendingSteeringBubble({ content, loadImage, openFile, t }: {
   content: readonly unknown[]
   loadImage?: ImageLoader
+  openFile?: (path: string) => void
   t: ChatViewSlotProps['t']
 }): ReactNode {
   const imageLoader = loadImage ?? (() => Promise.reject(new Error(t('image.serviceUnavailable'))))
@@ -257,6 +283,7 @@ export function PendingSteeringBubble({ content, loadImage, t }: {
       content={content}
       imageLoader={imageLoader}
       pending
+      openFile={openFile}
       t={t}
       actions={text => (
         <MessageIconActions
@@ -272,13 +299,14 @@ export function PendingSteeringBubble({ content, loadImage, t }: {
 
 /** User and admitted-steering keyed Chat renderer. */
 export const UserMessageNodeView = memo(function UserMessageNodeView({
-  node, loadImage, t,
+  node, loadImage, openFile, t,
 }: ChatNodeViewProps<'user' | 'steering'>) {
   const data = node.data
   return (
     <UserStyleBubble
       content={data.content}
       imageLoader={loadImage}
+      openFile={openFile}
       t={t}
       actions={text => (
         <MessageIconActions

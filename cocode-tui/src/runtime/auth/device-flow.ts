@@ -196,6 +196,10 @@ export async function listHostedModels(
     fetch: client.fetch,
     signal,
   })
+  // 401/403 单独区分：密钥过期或被撤销时调用方要重新领一把，而不是当成拉取失败。
+  if (listed.status === 401 || listed.status === 403) {
+    throw new TuiError('AUTH_KEY_REJECTED')
+  }
   if (listed.status !== 200) {
     throw new TuiError('AUTH_MODELS_LIST_FAILED')
   }
@@ -215,6 +219,50 @@ export async function listHostedModels(
       name:
         typeof row.name !== 'string' || row.name.trim() === '' ? row.id.trim() : row.name.trim(),
     }))
+}
+
+/**
+ * 校验本地保存的密钥是否仍被服务端接受。已过期或已在 Web 端撤销时返回 undefined，
+ * 由调用方重新领取，否则登录会卡在拉模型这一步。
+ */
+export async function probeHostedModels(
+  origin: string,
+  apiKey: string,
+  client: AgencyClient = {},
+  signal?: AbortSignal,
+): Promise<CloudModel[] | undefined> {
+  try {
+    return await listHostedModels(origin, apiKey, client, signal)
+  } catch (error) {
+    if (error instanceof TuiError && error.code === 'AUTH_KEY_REJECTED') return undefined
+    throw error
+  }
+}
+
+/**
+ * 撤销本机登录时创建的设备密钥。密钥的生命周期与 token 家族无关，
+ * 不在登出时主动撤销就会永久留在账号里。
+ */
+export async function revokePersonalKey(
+  origin: string,
+  accessToken: string,
+  keyId: string,
+  client: AgencyClient = {},
+  signal?: AbortSignal,
+): Promise<void> {
+  try {
+    await jsonRequest(
+      `${normalizeAgencyOrigin(origin)}/v1/me/api-keys/${encodeURIComponent(keyId)}`,
+      {
+        method: 'DELETE',
+        token: accessToken,
+        fetch: client.fetch,
+        signal,
+      },
+    )
+  } catch {
+    // Local sign-out still proceeds.
+  }
 }
 
 export async function revokeToken(

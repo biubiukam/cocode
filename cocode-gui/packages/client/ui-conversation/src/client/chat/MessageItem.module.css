@@ -293,3 +293,26 @@
   white-space: nowrap;
   vertical-align: baseline;
 }
+
+.plain {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* File mention in a user bubble: the same link-blue as the composer, not a chip. */
+.fileRef {
+  color: var(--dsw-alias-state-business-primary);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.fileRef[role='link']:hover,
+.fileRef[role='link']:focus {
+  outline: none;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.fileRef:not([role='link']) {
+  cursor: inherit;
+}

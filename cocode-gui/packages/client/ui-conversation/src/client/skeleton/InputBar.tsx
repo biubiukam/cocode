@@ -707,7 +707,7 @@ export function InputBar({
             key={`ref-${b.ref.start}`}
             className={b.ref.trigger === '@' ? css.textRefAt : css.textRef}
             data-decoration="text-ref"
-            data-at-path={atPath !== undefined && isFileMentionPath(atPath) ? atPath : undefined}
+            data-at-path={atPath !== undefined && isFileMentionPath(atPath) && !atPath.endsWith('/') ? atPath : undefined}
           >
             {draft.slice(b.ref.start, b.ref.end)}
           </mark>,
@@ -785,7 +785,7 @@ export function InputBar({
             offset the browser applies to both layers at once, never a JS mirror between two boxes,
             which a compositor-driven gesture outruns and leaves the words trailing the caret. */}
         <div ref={scrollRef} className={css.scroll} data-input-scroll>
-          <div className={css.grow} data-empty={draft.length === 0 ? '' : undefined}>
+          <div className={css.grow}>
             <div aria-hidden className={css.backdrop} data-input-backdrop>{backdrop}</div>
             <textarea
               ref={inputRef}

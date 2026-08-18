@@ -84,6 +84,11 @@ export const ERROR_CATALOG = {
     en: 'Could not create an API key.',
     zh: '无法创建 API Key。',
   },
+  AUTH_KEY_REJECTED: {
+    domain: 'AUTH',
+    en: 'The stored API key was expired or revoked.',
+    zh: '本地保存的 API Key 已过期或已被撤销。',
+  },
   AUTH_MODELS_LIST_FAILED: {
     domain: 'AUTH',
     en: 'Could not list hosted models.',
