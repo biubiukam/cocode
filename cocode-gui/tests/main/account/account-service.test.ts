@@ -750,6 +750,34 @@ test("sign out falls back to the deployment default when the previous model is g
 	assert.equal((await service.snapshot()).phase, "signed-out")
 })
 
+test("sign out clears local identity when default restoration fails", async () => {
+	const identity = new MemoryVault(
+		validIdentity({
+			preLoginDefault: { provider: "deepseek-official", model: "deepseek-v4-flash" },
+			managedRoute: {
+				baseURL: "https://cocode.agency/v1",
+				apiKeyEnv: "COCODE_NUT_API_KEY",
+			},
+		}),
+	)
+	const { client } = agency()
+	const dsh = {
+		currentDefault: async () => ({ provider: "cocode-nut", model: "cloud-model" }),
+		models: async () => {
+			throw new Error("model catalog unavailable")
+		},
+	} as never
+	const { deps, cloudKey, pending } = dependencies(identity, new MemoryVault("ck_test"))
+	const service = new AccountService(dsh, client, deps)
+
+	await service.signOut()
+
+	assert.equal(identity.value, undefined)
+	assert.equal(cloudKey.value, undefined)
+	assert.equal(pending.value?.pending, true)
+	assert.equal((await service.snapshot()).phase, "error")
+})
+
 test("a temporary refresh failure keeps the encrypted identity for retry", async () => {
 	const identity = new MemoryVault(validIdentity({ accessExpiresAt: Date.now() - 1 }))
 	const { client } = agency({

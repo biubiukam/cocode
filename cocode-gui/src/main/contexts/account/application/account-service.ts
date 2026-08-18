@@ -390,8 +390,16 @@ export class AccountService {
 			state === undefined
 				? existingPending ?? { pending: true as const }
 				: cleanupStateOf(state)
-		const defaultReady = await this.restoreDefaultOrQueue(pending)
+		let defaultReady = false
 		let cleanupError: unknown
+		try {
+			defaultReady = await this.restoreDefaultOrQueue(pending)
+		} catch (error) {
+			// A model/settings error must not keep the desktop identity alive. The
+			// non-secret pending marker lets the runtime retry cloud cleanup later.
+			cleanupError = error
+			await this.writePendingBestEffort(pending)
+		}
 		if (defaultReady) {
 			try {
 				this.stage = "cleanup"
