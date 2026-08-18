@@ -3,7 +3,7 @@
  */
 
 import { Box, Text, useInput, useStdout, useStdin } from 'ink'
-import { useEffect, useMemo, useReducer, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import type { TuiApp, TuiSnapshot } from '../runtime/app.ts'
 import { matchKey, type Keymap } from '../runtime/keymap.ts'
 import { resolveKeymap } from '../runtime/keymap-config.ts'
@@ -2590,8 +2590,17 @@ export function Chat(props: {
           width={mainColumns}
           marginTop={Math.max(0, layout.rows.footer - 1)}
         >
-          <Text color={theme.mute} wrap="truncate-end">
-            {resolvedFooter.hints.map((hint) => hint.text).join(' · ')}
+          <Text wrap="truncate-end">
+            {resolvedFooter.hints.map((hint, index) => (
+              <Fragment key={hint.id}>
+                {index > 0 ? <Text color={theme.border}> · </Text> : null}
+                {hint.shortcut !== undefined ? (
+                  <Text color={theme.text} bold>{hint.shortcut}</Text>
+                ) : null}
+                {hint.shortcut !== undefined ? ' ' : null}
+                <Text color={theme.dim}>{hint.label}</Text>
+              </Fragment>
+            ))}
           </Text>
         </Box>
       </Box>
