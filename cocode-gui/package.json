@@ -1,7 +1,7 @@
 {
 	"name": "@cocode/gui-root",
 	"productName": "Cocode",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"description": "Cocode GUI Root",
 	"repository": {
 		"type": "git",
