@@ -10,7 +10,7 @@ import {
   type HostRuntimeEnv,
   type HostScope,
   type JsonRpcPeer,
-} from '@cocode/host-supervisor'
+} from '@cocode-agency/host-supervisor'
 
 import type {
   TuiCapabilitySnapshot,

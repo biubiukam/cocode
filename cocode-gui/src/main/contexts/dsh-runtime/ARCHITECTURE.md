@@ -2,7 +2,7 @@
 
 The DSH runtime is a managed sidecar shipped inside the Electron application. Electron starts it with the embedded Electron Node runtime, so an installed desktop user does not need a separate Node.js, pnpm, or `dsh` executable.
 
-Development and production resolve the independent `@cocode/host-supervisor` runtime. The Supervisor owns an immutable `@deepseek-ai/dsh` npm closure, starts one shared Host per canonical `DSH_HOME + profile + configuration`, and exposes the Host Web endpoint to Electron. Electron never discovers or starts a Harness checkout.
+Development and production resolve the independent `@cocode-agency/host-supervisor` runtime. The Supervisor owns an immutable `@deepseek-ai/dsh` npm closure, starts one shared Host per canonical `DSH_HOME + profile + configuration`, and exposes the Host Web endpoint to Electron. Electron never discovers or starts a Harness checkout.
 
 The sidecar owns the existing DSH Web HTTP and WebSocket protocol. Electron loads
 the local Forge Renderer build, while Main reads the sidecar's

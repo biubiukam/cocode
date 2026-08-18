@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { closeSync, createReadStream, createWriteStream, existsSync, fsyncSync, mkdirSync, openSync, readdirSync, renameSync, statSync, unlinkSync, writeSync } from 'node:fs'
 import { join } from 'node:path'
-import { resolveCocodeLogLayout } from '@cocode/host-supervisor'
+import { resolveCocodeLogLayout } from '@cocode-agency/host-supervisor'
 import { createGzip } from 'node:zlib'
 import { pipeline } from 'node:stream/promises'
 

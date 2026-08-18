@@ -149,7 +149,7 @@ export function resolveDshLaunch(runtimePaths, env = process.env, requireImpl = 
     // The bundled DSH is resolved from the Host Supervisor package below.
   }
   try {
-    const supervisorPackage = requireImpl.resolve('@cocode/host-supervisor/package.json')
+    const supervisorPackage = requireImpl.resolve('@cocode-agency/host-supervisor/package.json')
     candidates.push(createRequire(supervisorPackage).resolve('@deepseek-ai/dsh/lib/bin.js'))
   } catch {
     // A packaged runtime does not expose Node's package resolution tree.

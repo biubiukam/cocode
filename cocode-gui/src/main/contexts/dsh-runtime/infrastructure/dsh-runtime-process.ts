@@ -20,7 +20,7 @@ import {
 	resolveHostRuntimeEnv,
 	resolveCocodeHostScope,
 	type HostLease,
-} from "@cocode/host-supervisor"
+} from "@cocode-agency/host-supervisor"
 import type { DesktopLogger } from "../../../shared/logging/desktop-logger"
 
 const FORWARDED_REQUEST_HEADERS = new Set(["accept", "content-type", "if-none-match", "range"])

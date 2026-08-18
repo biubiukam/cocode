@@ -1,7 +1,7 @@
 /** Resolve the session-log root shared by the TUI and its child runtime. */
 
 import { homedir as osHomedir } from 'node:os'
-import { expandTildePath } from '@cocode/host-supervisor'
+import { expandTildePath } from '@cocode-agency/host-supervisor'
 import { pathForPlatform } from './platform.ts'
 
 export type SessionRootSource = 'DSH_SESSION_ROOT' | 'DSH_HOME' | 'default'

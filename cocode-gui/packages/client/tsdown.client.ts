@@ -80,7 +80,7 @@ export const CLIENT_EXTERNALS: readonly string[] = [...PLATFORM_MODULES, RUNTIME
 
 const REPOSITORY_ROOT = fileURLToPath(new URL('../..', import.meta.url))
 const GUI_REQUIRE = createRequire(resolvePath(REPOSITORY_ROOT, 'package.json'))
-const SUPERVISOR_MANIFEST = GUI_REQUIRE.resolve('@cocode/host-supervisor/package.json')
+const SUPERVISOR_MANIFEST = GUI_REQUIRE.resolve('@cocode-agency/host-supervisor/package.json')
 const SUPERVISOR_ROOT = dirname(SUPERVISOR_MANIFEST)
 const SUPERVISOR_REQUIRE = createRequire(SUPERVISOR_MANIFEST)
 const SUPERVISOR_PNPM_REQUIRE_PATH = join(

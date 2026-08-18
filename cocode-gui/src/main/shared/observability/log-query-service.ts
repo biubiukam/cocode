@@ -8,7 +8,7 @@ import type {
 	DiagnosticsLogRecordDto,
 	DiagnosticsLogSourceDto,
 } from "../../../contracts/ipc/diagnostics.contract"
-import type { CocodeLogLayout } from "@cocode/host-supervisor"
+import type { CocodeLogLayout } from "@cocode-agency/host-supervisor"
 
 type LogSource = "desktop" | "audit" | "host" | "tui"
 

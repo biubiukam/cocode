@@ -2,7 +2,7 @@
 
 import { homedir as osHomedir } from 'node:os'
 import { join } from 'node:path'
-import { resolveUserPath } from '@cocode/host-supervisor'
+import { resolveUserPath } from '@cocode-agency/host-supervisor'
 
 export type HomeContext = {
   env: NodeJS.ProcessEnv

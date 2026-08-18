@@ -28,6 +28,32 @@ file.
 > and Windows artifacts, and this repository does not include a hosted backend or
 > a vendored Harness checkout.
 
+## Install and try it in five minutes
+
+| Use case | Install | Start |
+| --- | --- | --- |
+| **GUI** | Download the installer for your platform from the [GitHub Releases](https://github.com/cocode-agency/cocode/releases) page. | Launch Cocode, then choose Cocode Nut or your own DeepSeek-compatible key. |
+| **TUI** | Node.js `22.19.x` or later (`24+` is also supported), then `npm install --global @cocode-agency/tui`. | Run `cocode doctor`, then `cocode`. A real terminal is required. |
+| **From source** | Follow the component-specific pnpm instructions below. | Use `make dev gui` or `make dev tui`. |
+
+The published TUI package installs the matching `@cocode-agency/host-supervisor`
+automatically. For every release, keep `@cocode-agency/tui` and
+`@cocode-agency/host-supervisor` on the same version line; do not mix versions from
+different releases. GUI installers are downloaded separately from the matching
+GitHub Release and are not installed through npm. The current repository is a
+developer preview, so release availability and upstream Harness compatibility
+can change.
+
+### Five-minute first run
+
+1. Install the GUI from GitHub Releases, or run `npm install --global @cocode-agency/tui`.
+2. Start the GUI, or run `cocode doctor` followed by `cocode` in a real TTY.
+3. Choose Cocode Nut or enter your own DeepSeek-compatible API key.
+4. Open a workspace and ask the agent to inspect a file or explain the project.
+5. If startup fails, save the output of `cocode doctor` and
+   `cocode host status --json` for troubleshooting. Remove credentials and
+   private session data before sharing diagnostics.
+
 ---
 
 ## Why Cocode
@@ -65,7 +91,7 @@ reshape to your own liking.
 | **Cocode GUI** | A desktop workspace built on Electron. Sessions, files, terminals, and runtime state live on one surface. Diffs and attachments open in a preview panel, so you see exactly what changed before you confirm. |
 | **Cocode TUI** | A terminal client for keyboard-first and remote work. SSH into a machine and keep pushing tasks with no graphical environment required. |
 
-Both attach to the same Host through `@cocode/host-supervisor`, so they can share
+Both attach to the same Host through `@cocode-agency/host-supervisor`, so they can share
 sessions and task state when they use the same `DSH_HOME`, profile, and Host
 configuration scope. Switching between the desktop app and the terminal does
 not reset your work within that scope.
@@ -87,13 +113,13 @@ pnpm workspace with its own lockfile and toolchain, tied together by a root
 ```text
 cocode/
 ├── cocode-gui/               # Electron desktop / web GUI  (@cocode/gui-root)
-├── cocode-tui/               # Terminal client             (@cocode/tui)
-├── cocode-host-supervisor/   # Shared DSH Host lifecycle   (@cocode/host-supervisor)
+├── cocode-tui/               # Terminal client             (@cocode-agency/tui)
+├── cocode-host-supervisor/   # Shared DSH Host lifecycle   (@cocode-agency/host-supervisor)
 ├── Makefile                  # Root dev shortcuts
 └── AGENTS.md                 # Engineering contract for contributors and agents
 ```
 
-The runtime itself is not vendored here. `@cocode/host-supervisor` pins
+The runtime itself is not vendored here. `@cocode-agency/host-supervisor` pins
 `@deepseek-ai/dsh` from npm and owns the Supervisor service, the local IPC and
 lease protocol, runtime-slot materialization, and the Cocode JSON-RPC Host
 plugin. GUI and TUI never launch a Harness process themselves — they acquire a
@@ -102,7 +128,7 @@ to the endpoint the Host advertises.
 
 ```text
 Cocode GUI ─┐
-            ├─→ @cocode/host-supervisor ─→ @deepseek-ai/dsh (npm) ─→ models · tools · sessions
+            ├─→ @cocode-agency/host-supervisor ─→ @deepseek-ai/dsh (npm) ─→ models · tools · sessions
 Cocode TUI ─┘
 ```
 

@@ -1,4 +1,4 @@
-import { type ExternalDshReadSource } from "@cocode/host-supervisor"
+import { type ExternalDshReadSource } from "@cocode-agency/host-supervisor"
 import type {
 	ExternalAttachmentRequestDto,
 	ExternalCatalogDto,
@@ -57,7 +57,11 @@ export class SharedDshCatalog {
 		id?: string
 		expectedRevision: string
 	}): Promise<ExternalDshConflictStatusDto> {
-		if (request.kind === "session" && request.id !== undefined && this.source.checkSessionRevision !== undefined) {
+		if (
+			request.kind === "session" &&
+			request.id !== undefined &&
+			this.source.checkSessionRevision !== undefined
+		) {
 			return this.source.checkSessionRevision(request.id, request.expectedRevision)
 		}
 		if (request.kind === "workspace" && this.source.checkWorkspaceRevision !== undefined) {
@@ -74,7 +78,12 @@ export class SharedDshCatalog {
 
 	public subscribe(listener: (change: ExternalDshChangeDto) => void): () => void {
 		return this.source.subscribe((change) =>
-			listener({ source: "shared-dsh", canMutate: true, concurrency: "no-concurrent-writes", ...change }),
+			listener({
+				source: "shared-dsh",
+				canMutate: true,
+				concurrency: "no-concurrent-writes",
+				...change,
+			}),
 		)
 	}
 

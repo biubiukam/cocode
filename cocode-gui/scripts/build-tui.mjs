@@ -13,7 +13,7 @@ export function buildTui({ output = defaultOutput() } = {}) {
 	if (!existsSync(tuiRoot)) throw new Error(`TUI checkout not found: ${tuiRoot}`)
 	ensureWorkspaceDependencies({
 		root: tuiRoot,
-		label: "@cocode/tui",
+		label: "@cocode-agency/tui",
 		requiredPaths: [
 			path.join(tuiRoot, "node_modules", ".modules.yaml"),
 			path.join(tuiRoot, "node_modules", "esbuild", "package.json"),
@@ -75,11 +75,7 @@ export function buildTui({ output = defaultOutput() } = {}) {
 	return { output, manifest }
 }
 
-export function esbuildPlatformPackagePath(
-	root,
-	platform = process.platform,
-	arch = process.arch,
-) {
+export function esbuildPlatformPackagePath(root, platform = process.platform, arch = process.arch) {
 	return path.join(root, "node_modules", "@esbuild", `${platform}-${arch}`, "package.json")
 }
 

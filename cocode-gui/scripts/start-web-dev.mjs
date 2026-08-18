@@ -73,9 +73,8 @@ async function run() {
 }
 
 async function acquireHostEndpoint() {
-	const { createHostSupervisorClient, resolveCocodeHostScope, resolveHostRuntimeEnv } = await import(
-		"@cocode/host-supervisor"
-	)
+	const { createHostSupervisorClient, resolveCocodeHostScope, resolveHostRuntimeEnv } =
+		await import("@cocode-agency/host-supervisor")
 	const dshHome = resolveCocodeDshHome()
 	const hostEnv = {
 		...process.env,
@@ -130,7 +129,8 @@ function startVite(runtimeUrl) {
 }
 
 function resolveCocodeDshHome() {
-	const configured = process.env.COCODE_DSH_HOME?.trim() || process.env.COCODE_DSH_SOURCE_HOME?.trim()
+	const configured =
+		process.env.COCODE_DSH_HOME?.trim() || process.env.COCODE_DSH_SOURCE_HOME?.trim()
 	const selected =
 		configured !== undefined && configured.length > 0
 			? configured

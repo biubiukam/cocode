@@ -79,7 +79,7 @@ DSH_DISABLE_RUNTIME_CACHE=1 make dev gui
 
 ## Host and credentials
 
-The GUI connects to the shared Host through `@cocode/host-supervisor`. To share
+The GUI connects to the shared Host through `@cocode-agency/host-supervisor`. To share
 sessions with Cocode TUI, use the same `DSH_HOME`, `DSH_PROFILE`, and Host
 configuration scope in both clients.
 

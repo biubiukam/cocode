@@ -5,8 +5,8 @@ connects to the shared Cocode DSH Host through the Host Supervisor and keeps
 the terminal client separate from the Agent runtime.
 
 > **Project status:** Developer preview. The source workspace is authoritative.
-> Use a published `@cocode/tui` only with the matching
-> `@cocode/host-supervisor` release.
+> Use a published `@cocode-agency/tui` only with the matching
+> `@cocode-agency/host-supervisor` release.
 
 ## Requirements
 
@@ -150,7 +150,7 @@ terminal or live Host session.
 
 ## Publishing
 
-The source workspace links `@cocode/host-supervisor` from the sibling
+The source workspace links `@cocode-agency/host-supervisor` from the sibling
 `cocode-host-supervisor/` directory. A release package must resolve a matching
 versioned Supervisor package instead of that local link.
 
@@ -165,7 +165,7 @@ Only install the generated tarball when the matching Host Supervisor package is
 available. After both packages are released, the intended installation is:
 
 ```sh
-npm install --global @cocode/tui
+npm install --global @cocode-agency/tui
 cocode --doctor
 ```
 

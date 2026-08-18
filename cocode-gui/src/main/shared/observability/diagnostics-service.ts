@@ -12,7 +12,7 @@ import {
 import * as path from "pathe"
 import { create as createTar } from "tar"
 import { homedir } from "node:os"
-import { resolveCocodeLogLayout, type CocodeLogLayout } from "@cocode/host-supervisor"
+import { resolveCocodeLogLayout, type CocodeLogLayout } from "@cocode-agency/host-supervisor"
 import type {
 	DiagnosticsBundleDto,
 	DiagnosticsLogQueryDto,

@@ -14,10 +14,18 @@ Host per profile:
 cd /path/to/cocode-tui
 pnpm run build
 npm pack
-npm install --global ./cocode-tui-0.1.0.tgz
+npm install --global ./cocode-agency-tui-0.1.0.tgz
 ```
 
-After publication, install it directly with `npm install --global @cocode/tui`.
+For normal use, install the published package directly with:
+
+```sh
+npm install --global @cocode-agency/tui
+```
+
+The local tarball path above is only for checking a build before publication.
+It automatically installs the matching `@cocode-agency/host-supervisor`
+dependency when the package is published.
 
 Verify the Supervisor, Host descriptor, JSON-RPC service, and lease lifecycle:
 

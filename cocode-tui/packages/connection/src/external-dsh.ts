@@ -3,7 +3,7 @@ import {
   resolveCocodeDshHome,
   resolveCocodeHome,
   type ExternalDshReadSource,
-} from '@cocode/host-supervisor'
+} from '@cocode-agency/host-supervisor'
 
 /** Filesystem reader for the shared DSH catalog; mutations still go through the Cocode Host. */
 export function createExternalDshCatalog(options: {

@@ -77,7 +77,7 @@ export function buildSupervisor({ clean = false, manifestPath = defaultManifestP
 		)
 	if (!valid) {
 		ensureSupervisorDependencies()
-		console.log("[supervisor-build] building @cocode/host-supervisor")
+		console.log("[supervisor-build] building @cocode-agency/host-supervisor")
 		execFileSync(
 			process.platform === "win32" ? "corepack.cmd" : "corepack",
 			["pnpm@10.34.5", "run", "build:with-gui-plugins"],
@@ -128,7 +128,7 @@ export function buildSupervisor({ clean = false, manifestPath = defaultManifestP
 function ensureSupervisorDependencies() {
 	ensureWorkspaceDependencies({
 		root: supervisorRoot,
-		label: "@cocode/host-supervisor",
+		label: "@cocode-agency/host-supervisor",
 		requiredPaths: [
 			path.join(supervisorRoot, "node_modules", "esbuild", "package.json"),
 			path.join(supervisorRoot, "node_modules", "typescript", "package.json"),

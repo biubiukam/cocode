@@ -4,7 +4,7 @@ import type {
 	ExternalDshChange,
 	ExternalDshReadSource,
 	ExternalDshSourceStatus,
-} from "@cocode/host-supervisor"
+} from "@cocode-agency/host-supervisor"
 import {
 	externalDshChannels,
 	sharedDshChannels,
@@ -116,9 +116,9 @@ function fakeSource(status: ExternalDshSourceStatus): ExternalDshReadSource {
 			revision: "1",
 			workspaces: [
 				{
-				source: "shared-dsh",
-				canMutate: true,
-				concurrency: "no-concurrent-writes",
+					source: "shared-dsh",
+					canMutate: true,
+					concurrency: "no-concurrent-writes",
 					workspaceId: "workspace-1",
 					path: "/workspace",
 					sessionIds: ["session-1"],

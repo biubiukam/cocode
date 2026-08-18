@@ -3,7 +3,7 @@ import type {
   ExternalDshReadSource,
   ExternalSessionHistory,
   ExternalSessionSummary,
-} from '@cocode/host-supervisor'
+} from '@cocode-agency/host-supervisor'
 import type { TuiRuntime } from '@cocode/tui-connection'
 import type { TuiNotification } from '@cocode/tui-connection'
 import { createTuiApp } from '../../src/runtime/app.ts'

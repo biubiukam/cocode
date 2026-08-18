@@ -1,4 +1,4 @@
-# @cocode/host-supervisor
+# @cocode-agency/host-supervisor
 
 Shared local lifecycle control for the Cocode DSH Host. GUI and TUI clients
 acquire a lease for the same canonical `DSH_HOME + profile + Host configuration`
@@ -37,7 +37,7 @@ make dev dsh
 When a matching public release is available, install the package with:
 
 ```sh
-npm install @cocode/host-supervisor
+npm install @cocode-agency/host-supervisor
 cocode-host-supervisor --version
 cocode-host-supervisor doctor
 ```
@@ -46,7 +46,7 @@ The GUI and TUI normally start or discover the Supervisor automatically. Direct
 clients can use the public API:
 
 ```ts
-import { connectJsonRpc, createHostSupervisorClient } from '@cocode/host-supervisor'
+import { connectJsonRpc, createHostSupervisorClient } from '@cocode-agency/host-supervisor'
 
 const lease = await createHostSupervisorClient().acquire({
   scope: {

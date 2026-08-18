@@ -8,7 +8,7 @@ importers:
 
   .:
     dependencies:
-      '@cocode/host-supervisor':
+      '@cocode-agency/host-supervisor':
         specifier: link:../cocode-host-supervisor
         version: link:../cocode-host-supervisor
       '@hookform/resolvers':

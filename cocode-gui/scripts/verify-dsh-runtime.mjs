@@ -30,7 +30,7 @@ export function verifyRuntime(
 		throw new Error("Runtime manifest fingerprint is invalid.")
 	assertFile(path.join(root, manifest.supervisor.entry), "Supervisor entry")
 	const supervisorPackage = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"))
-	if (supervisorPackage.name !== "@cocode/host-supervisor")
+	if (supervisorPackage.name !== "@cocode-agency/host-supervisor")
 		throw new Error("Staged supervisor package name is invalid.")
 	if (String(supervisorPackage.version) !== String(manifest.supervisor.version))
 		throw new Error("Supervisor version mismatch.")

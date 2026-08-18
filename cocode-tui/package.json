@@ -1,7 +1,17 @@
 {
-  "name": "@cocode/tui",
+  "name": "@cocode-agency/tui",
   "version": "0.1.0",
   "description": "Cocode terminal client for DeepSeek DSH sessions",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cocode-agency/cocode.git",
+    "directory": "cocode-tui"
+  },
+  "homepage": "https://github.com/cocode-agency/cocode#readme",
+  "bugs": {
+    "url": "https://github.com/cocode-agency/cocode/issues"
+  },
   "publishConfig": {
     "access": "public"
   },
@@ -36,7 +46,7 @@
     "README.md"
   ],
   "dependencies": {
-    "@cocode/host-supervisor": "link:../cocode-host-supervisor",
+    "@cocode-agency/host-supervisor": "link:../cocode-host-supervisor",
     "tsx": "^4.20.5"
   },
   "devDependencies": {

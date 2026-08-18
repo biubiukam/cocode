@@ -129,9 +129,9 @@ async function configureRuntimeEnvironment(runtimePaths, options = {}) {
       return
     }
   }
-  const packageJsonPath = require.resolve('@cocode/host-supervisor/package.json')
+  const packageJsonPath = require.resolve('@cocode-agency/host-supervisor/package.json')
   const entry = join(dirname(packageJsonPath), 'packages', 'host-supervisor', 'lib', 'bin.js')
-  if (!existsSync(entry)) throw new Error(`@cocode/host-supervisor is missing its built service entry: ${entry}`)
+  if (!existsSync(entry)) throw new Error(`@cocode-agency/host-supervisor is missing its built service entry: ${entry}`)
   process.env.COCODE_SUPERVISOR_SERVICE_ENTRY = entry
 }
 
@@ -170,7 +170,7 @@ async function runDoctor(runtimePaths, scope, runtimeEnv) {
 }
 
 async function loadSupervisor(runtimePaths) {
-  if (!runtimePaths.staged) return import('@cocode/host-supervisor')
+  if (!runtimePaths.staged) return import('@cocode-agency/host-supervisor')
   const serviceEntry = process.env.COCODE_SUPERVISOR_SERVICE_ENTRY?.trim()
   const entry = serviceEntry
     ? resolve(dirname(serviceEntry), 'index.js')

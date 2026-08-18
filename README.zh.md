@@ -20,6 +20,28 @@
 > 和 Linux 上进行源码构建；当前发布脚本面向 macOS 和 Windows 安装包，本仓库不包含
 > 托管后端，也不包含 Harness 的 vendored 副本。
 
+## 安装方式与五分钟上手
+
+| 场景 | 安装 | 启动 |
+| --- | --- | --- |
+| **GUI** | 从 [GitHub Releases](https://github.com/cocode-agency/cocode/releases) 下载对应平台安装包。 | 打开 Cocode，然后选择 Cocode Nut 或自己的 DeepSeek 兼容 Key。 |
+| **TUI** | Node.js `22.19.x` 或更高版本（也支持 `24+`），执行 `npm install --global @cocode-agency/tui`。 | 先执行 `cocode doctor`，再执行 `cocode`；需要真实终端。 |
+| **源码开发** | 按下面各组件的 pnpm 说明安装。 | 使用 `make dev gui` 或 `make dev tui`。 |
+
+发布版 TUI 会自动安装匹配版本的 `@cocode-agency/host-supervisor`。每次发布时，
+`@cocode-agency/tui` 与 `@cocode-agency/host-supervisor` 必须保持同一版本线，不要混用不同发布版。
+GUI 安装包从对应的 GitHub Release 单独下载，不通过 npm 安装。本仓库当前仍是开发者
+预览版，发布内容和上游 Harness 兼容性可能变化。
+
+### 五分钟完成第一次运行
+
+1. 从 GitHub Releases 安装 GUI，或执行 `npm install --global @cocode-agency/tui`。
+2. 打开 GUI；或者在真实 TTY 中依次执行 `cocode doctor`、`cocode`。
+3. 选择 Cocode Nut，或输入自己的 DeepSeek 兼容 API Key。
+4. 打开一个工作区，让 Agent 检查一个文件或解释项目。
+5. 如果启动失败，保存 `cocode doctor` 和 `cocode host status --json` 的输出用于排查。
+   分享前请删除凭证和私有会话内容。
+
 ---
 
 ## 为什么是 Cocode
@@ -50,7 +72,7 @@ Cocode 不打算做成又一个聊天窗口，不会把完整思维链当成卖�
 | **Cocode GUI** | 基于 Electron 的桌面工作台。会话、文件、终端和运行时状态在同一个界面里，代码 diff 与附件在预览面板中打开，确认之前就能看清改了什么。 |
 | **Cocode TUI** | 面向键盘流和远程场景的终端客户端。SSH 上去就能继续推进任务，不需要图形环境。 |
 
-两者通过 `@cocode/host-supervisor` 接到同一个 Host；只有使用相同的 `DSH_HOME`、profile
+两者通过 `@cocode-agency/host-supervisor` 接到同一个 Host；只有使用相同的 `DSH_HOME`、profile
 和 Host 配置作用域时，才会共享会话与任务状态。在同一作用域内从桌面端切换到终端，
 不会让工作重来一遍。
 
@@ -70,20 +92,20 @@ Cocode 不打算做成又一个聊天窗口，不会把完整思维链当成卖�
 ```text
 cocode/
 ├── cocode-gui/               # Electron 桌面 / Web GUI  (@cocode/gui-root)
-├── cocode-tui/               # 终端客户端                (@cocode/tui)
-├── cocode-host-supervisor/   # 共享 DSH Host 生命周期     (@cocode/host-supervisor)
+├── cocode-tui/               # 终端客户端                (@cocode-agency/tui)
+├── cocode-host-supervisor/   # 共享 DSH Host 生命周期     (@cocode-agency/host-supervisor)
 ├── Makefile                  # 根级开发快捷命令
 └── AGENTS.md                 # 面向贡献者与 agent 的工程约定
 ```
 
-运行时本身不在这里。`@cocode/host-supervisor` 从 npm 固定依赖 `@deepseek-ai/dsh`，
+运行时本身不在这里。`@cocode-agency/host-supervisor` 从 npm 固定依赖 `@deepseek-ai/dsh`，
 并负责 Supervisor 服务、本地 IPC 与 lease 协议、运行时槽位物化，以及 Cocode 的
 JSON-RPC Host 插件。GUI 和 TUI 自己不启动 Harness 进程——它们为一个规范化的
 `DSH_HOME + profile + Host 配置` 作用域申请 lease，然后连到 Host 广播出来的端点。
 
 ```text
 Cocode GUI ─┐
-            ├─→ @cocode/host-supervisor ─→ @deepseek-ai/dsh (npm) ─→ 模型 · 工具 · 会话
+            ├─→ @cocode-agency/host-supervisor ─→ @deepseek-ai/dsh (npm) ─→ 模型 · 工具 · 会话
 Cocode TUI ─┘
 ```
 

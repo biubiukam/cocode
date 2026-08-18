@@ -47,7 +47,7 @@ All four are MIT, Copyright (c) 2021-present Shigma.
 
 ### DeepSeek Harness
 
-`@cocode/host-supervisor` pins the DeepSeek Harness runtime from npm. These
+`@cocode-agency/host-supervisor` pins the DeepSeek Harness runtime from npm. These
 packages are not vendored into this repository; they are resolved at install
 time.
 

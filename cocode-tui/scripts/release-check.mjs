@@ -30,15 +30,15 @@ if (packageJson.bin?.['cocode-tui']) failures.push('package.json must not expose
 if (!packageJson.dependencies?.tsx) failures.push('package.json must include tsx for the TUI entry')
 const supervisorManifestPath = resolve(root, '../cocode-host-supervisor/package.json')
 if (!existsSync(supervisorManifestPath)) {
-  failures.push('missing sibling @cocode/host-supervisor package.json')
+  failures.push('missing sibling @cocode-agency/host-supervisor package.json')
 } else {
   const supervisorVersion = JSON.parse(readFileSync(supervisorManifestPath, 'utf8')).version
-  if (!supervisorVersion) failures.push('@cocode/host-supervisor must declare a version')
+  if (!supervisorVersion) failures.push('@cocode-agency/host-supervisor must declare a version')
   const publishable = toPublishablePackageJson(packageJson, supervisorVersion)
-  const supervisorDependency = publishable.dependencies?.['@cocode/host-supervisor']
-  if (!supervisorDependency) failures.push('package.json must include @cocode/host-supervisor')
+  const supervisorDependency = publishable.dependencies?.['@cocode-agency/host-supervisor']
+  if (!supervisorDependency) failures.push('package.json must include @cocode-agency/host-supervisor')
   if (isProtocolDependency(supervisorDependency)) {
-    failures.push('package.json must not publish a link: @cocode/host-supervisor dependency')
+    failures.push('package.json must not publish a link: @cocode-agency/host-supervisor dependency')
   }
 }
 for (const file of releaseFiles) {

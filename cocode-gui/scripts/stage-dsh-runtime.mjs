@@ -7,24 +7,24 @@ import {
 	readFileSync,
 	readdirSync,
 	realpathSync,
-} from 'node:fs'
-import { createHash } from 'node:crypto'
-import { createRequire } from 'node:module'
-import * as path from 'pathe'
-import process from 'node:process'
+} from "node:fs"
+import { createHash } from "node:crypto"
+import { createRequire } from "node:module"
+import * as path from "pathe"
+import process from "node:process"
 
-const destination = readArgument('--destination')
+const destination = readArgument("--destination")
 if (!destination) {
-	console.error('Usage: node scripts/stage-dsh-runtime.mjs --destination <directory>')
+	console.error("Usage: node scripts/stage-dsh-runtime.mjs --destination <directory>")
 	process.exit(2)
 }
 
 const require = createRequire(import.meta.url)
-const supervisorManifest = require.resolve('@cocode/host-supervisor/package.json')
+const supervisorManifest = require.resolve("@cocode-agency/host-supervisor/package.json")
 const supervisorRoot = path.dirname(supervisorManifest)
-const supervisorPackage = JSON.parse(readFileSync(supervisorManifest, 'utf8'))
+const supervisorPackage = JSON.parse(readFileSync(supervisorManifest, "utf8"))
 const supervisorRequire = createRequire(supervisorManifest)
-const dshManifest = supervisorRequire.resolve('@deepseek-ai/dsh/package.json')
+const dshManifest = supervisorRequire.resolve("@deepseek-ai/dsh/package.json")
 
 verifyWorkspacePluginArtifacts(supervisorRoot)
 
@@ -34,8 +34,8 @@ copyTree(supervisorRoot, destination)
 materializeDependencyClosure(
 	supervisorRoot,
 	destination,
-	readDirectory(path.join(supervisorRoot, 'runtime', 'plugins')).map((entry) =>
-		path.join(supervisorRoot, 'runtime', 'plugins', entry),
+	readDirectory(path.join(supervisorRoot, "runtime", "plugins")).map((entry) =>
+		path.join(supervisorRoot, "runtime", "plugins", entry),
 	),
 )
 materializeBundledPlugins(destination)
@@ -44,11 +44,13 @@ restoreNodePtyHelper(destination)
 const marker = {
 	package: supervisorPackage.name,
 	supervisorVersion: supervisorPackage.version,
-	dshVersion: JSON.parse(readFileSync(dshManifest, 'utf8')).version,
-	entry: path.join(destination, 'packages', 'host-supervisor', 'lib', 'bin.js'),
+	dshVersion: JSON.parse(readFileSync(dshManifest, "utf8")).version,
+	entry: path.join(destination, "packages", "host-supervisor", "lib", "bin.js"),
 }
-cpSync(dshManifest, path.join(destination, 'dsh-package.json'))
-process.stdout.write(`Staged shared DSH Host runtime ${marker.dshVersion} with Supervisor ${marker.supervisorVersion}\n`)
+cpSync(dshManifest, path.join(destination, "dsh-package.json"))
+process.stdout.write(
+	`Staged shared DSH Host runtime ${marker.dshVersion} with Supervisor ${marker.supervisorVersion}\n`,
+)
 
 function readArgument(name) {
 	const index = process.argv.indexOf(name)
@@ -62,18 +64,25 @@ function copyTree(source, target) {
 		filter: (entry) => {
 			// pathe normalizes relative paths to forward slashes on every platform.
 			const relative = path.relative(source, entry)
-			if (relative === '') return true
+			if (relative === "") return true
 			// Every installed tree is skipped, including the one pnpm creates inside
 			// each workspace package. Those directories hold links into the local
 			// store that `dereference` cannot resolve once a layout switch leaves one
 			// dangling, and materializeDependencyClosure rebuilds the closure anyway.
-			const segments = relative.split('/')
-			return !segments.includes('node_modules') && !segments.includes('.cache')
+			const segments = relative.split("/")
+			return !segments.includes("node_modules") && !segments.includes(".cache")
 		},
 	})
 	for (const candidate of [
-		path.join(target, 'node_modules', 'node-pty', 'prebuilds', `${process.platform}-${process.arch}`, 'spawn-helper'),
-		path.join(target, 'node_modules', 'node-pty', 'build', 'Release', 'spawn-helper'),
+		path.join(
+			target,
+			"node_modules",
+			"node-pty",
+			"prebuilds",
+			`${process.platform}-${process.arch}`,
+			"spawn-helper",
+		),
+		path.join(target, "node_modules", "node-pty", "build", "Release", "spawn-helper"),
 	]) {
 		if (existsSync(candidate)) chmodSync(candidate, 0o755)
 	}
@@ -87,7 +96,7 @@ function copyTree(source, target) {
  * startup, so the staged Supervisor must itself be self-contained first.
  */
 function materializeDependencyClosure(supervisorRoot, destination, additionalRoots) {
-	const targetModules = path.join(destination, 'node_modules')
+	const targetModules = path.join(destination, "node_modules")
 	const pending = [
 		{ root: realpathSync(supervisorRoot), copy: false },
 		...additionalRoots.map((root) => ({ root: realpathSync(root), copy: true })),
@@ -95,12 +104,12 @@ function materializeDependencyClosure(supervisorRoot, destination, additionalRoo
 	const visited = new Set()
 	while (pending.length > 0) {
 		const { root, copy } = pending.shift()
-		const manifestPath = path.join(root, 'package.json')
-		const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
-		if (typeof manifest.name !== 'string' || visited.has(manifest.name)) continue
+		const manifestPath = path.join(root, "package.json")
+		const manifest = JSON.parse(readFileSync(manifestPath, "utf8"))
+		if (typeof manifest.name !== "string" || visited.has(manifest.name)) continue
 		visited.add(manifest.name)
 		if (copy) {
-			const target = path.join(targetModules, ...manifest.name.split('/'))
+			const target = path.join(targetModules, ...manifest.name.split("/"))
 			mkdirSync(path.dirname(target), { recursive: true })
 			copyPackageTree(root, target)
 		}
@@ -117,9 +126,12 @@ function materializeDependencyClosure(supervisorRoot, destination, additionalRoo
 				if (
 					manifest.optionalDependencies?.[dependency] !== undefined ||
 					manifest.peerDependenciesMeta?.[dependency]?.optional === true
-				) continue
+				)
+					continue
 				throw new Error(
-					`Unable to resolve staged runtime dependency ${dependency} from ${root}: ${String(error)}`,
+					`Unable to resolve staged runtime dependency ${dependency} from ${root}: ${String(
+						error,
+					)}`,
 				)
 			}
 		}
@@ -132,29 +144,31 @@ function copyPackageTree(source, target) {
 		dereference: true,
 		filter: (entry) => {
 			const relative = path.relative(source, entry)
-			if (relative === '') return true
-			return path.basename(entry) !== 'node_modules' && !relative.split('/').includes('.cache')
+			if (relative === "") return true
+			return (
+				path.basename(entry) !== "node_modules" && !relative.split("/").includes(".cache")
+			)
 		},
 	})
 }
 
 function resolvePackageRoot(packageRequire, packageName) {
 	for (const searchPath of packageRequire.resolve.paths(packageName) ?? []) {
-		const candidate = path.join(searchPath, ...packageName.split('/'))
-		const manifestPath = path.join(candidate, 'package.json')
+		const candidate = path.join(searchPath, ...packageName.split("/"))
+		const manifestPath = path.join(candidate, "package.json")
 		if (!existsSync(manifestPath)) continue
-		const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+		const manifest = JSON.parse(readFileSync(manifestPath, "utf8"))
 		if (manifest.name === packageName) return realpathSync(candidate)
 	}
 	throw new Error(`package root not found for ${packageName}`)
 }
 
 function materializeBundledPlugins(root) {
-	const pluginsRoot = path.join(root, 'runtime', 'plugins')
+	const pluginsRoot = path.join(root, "runtime", "plugins")
 	if (!existsSync(pluginsRoot)) return
 	for (const entry of readDirectory(pluginsRoot)) {
 		const source = path.join(pluginsRoot, entry)
-		const target = path.join(root, 'node_modules', ...entry.split('/'))
+		const target = path.join(root, "node_modules", ...entry.split("/"))
 		mkdirSync(path.dirname(target), { recursive: true })
 		cpSync(source, target, { recursive: true, dereference: true })
 	}
@@ -167,14 +181,14 @@ function materializeBundledPlugins(root) {
  * check.
  */
 function verifyWorkspacePluginArtifacts(supervisorRoot) {
-	const workspacePlugins = path.resolve(process.cwd(), 'packages', 'cocode')
+	const workspacePlugins = path.resolve(process.cwd(), "packages", "cocode")
 	if (!existsSync(workspacePlugins)) return
-	const bundledPlugins = path.join(supervisorRoot, 'runtime', 'plugins')
+	const bundledPlugins = path.join(supervisorRoot, "runtime", "plugins")
 	for (const entry of readDirectory(workspacePlugins)) {
 		const source = path.join(workspacePlugins, entry)
 		const bundled = path.join(bundledPlugins, entry)
-		if (!existsSync(path.join(source, 'package.json'))) continue
-		for (const artifact of ['lib/index.js', 'lib/client.js']) {
+		if (!existsSync(path.join(source, "package.json"))) continue
+		for (const artifact of ["lib/index.js", "lib/client.js"]) {
 			const sourceFile = path.join(source, artifact)
 			const bundledFile = path.join(bundled, artifact)
 			if (!existsSync(sourceFile) || !existsSync(bundledFile)) continue
@@ -184,12 +198,12 @@ function verifyWorkspacePluginArtifacts(supervisorRoot) {
 				)
 			}
 		}
-		const sourceManifest = JSON.parse(readFileSync(path.join(source, 'package.json'), 'utf8'))
-		const bundledManifestPath = path.join(bundled, 'package.json')
+		const sourceManifest = JSON.parse(readFileSync(path.join(source, "package.json"), "utf8"))
+		const bundledManifestPath = path.join(bundled, "package.json")
 		if (!existsSync(bundledManifestPath)) {
 			throw new Error(`Supervisor runtime plugin ${entry} is missing package.json.`)
 		}
-		const bundledManifest = JSON.parse(readFileSync(bundledManifestPath, 'utf8'))
+		const bundledManifest = JSON.parse(readFileSync(bundledManifestPath, "utf8"))
 		if (
 			bundledManifest.name !== sourceManifest.name ||
 			bundledManifest.version !== sourceManifest.version ||
@@ -203,13 +217,20 @@ function verifyWorkspacePluginArtifacts(supervisorRoot) {
 }
 
 function sha256(file) {
-	return createHash('sha256').update(readFileSync(file)).digest('hex')
+	return createHash("sha256").update(readFileSync(file)).digest("hex")
 }
 
 function restoreNodePtyHelper(root) {
 	for (const helper of [
-		path.join(root, 'node_modules', 'node-pty', 'prebuilds', `${process.platform}-${process.arch}`, 'spawn-helper'),
-		path.join(root, 'node_modules', 'node-pty', 'build', 'Release', 'spawn-helper'),
+		path.join(
+			root,
+			"node_modules",
+			"node-pty",
+			"prebuilds",
+			`${process.platform}-${process.arch}`,
+			"spawn-helper",
+		),
+		path.join(root, "node_modules", "node-pty", "build", "Release", "spawn-helper"),
 	]) {
 		if (existsSync(helper)) chmodSync(helper, 0o755)
 	}

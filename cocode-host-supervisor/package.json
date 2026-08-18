@@ -1,7 +1,17 @@
 {
-  "name": "@cocode/host-supervisor",
+  "name": "@cocode-agency/host-supervisor",
   "version": "0.1.0",
   "description": "Shared lifecycle supervisor for the Cocode DSH host.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cocode-agency/cocode.git",
+    "directory": "cocode-host-supervisor"
+  },
+  "homepage": "https://github.com/cocode-agency/cocode#readme",
+  "bugs": {
+    "url": "https://github.com/cocode-agency/cocode/issues"
+  },
   "type": "module",
   "main": "packages/host-supervisor/lib/index.js",
   "types": "packages/host-supervisor/lib/index.d.ts",

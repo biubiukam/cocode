@@ -5,7 +5,7 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 // Source keeps link:; pack/publish rewrite it to the sibling version.
-const SUPERVISOR_PACKAGE = '@cocode/host-supervisor'
+const SUPERVISOR_PACKAGE = '@cocode-agency/host-supervisor'
 
 function backupPathFor(root) {
   const id = createHash('sha1').update(root).digest('hex').slice(0, 12)

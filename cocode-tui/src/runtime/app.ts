@@ -21,7 +21,7 @@ import type {
   ExternalDshReadSource,
   ExternalSessionEvent,
   ExternalSessionSummary,
-} from '@cocode/host-supervisor'
+} from '@cocode-agency/host-supervisor'
 import type { SelectModeResult } from './auth/store.ts'
 import type { AuthSnapshot, ResolvedAuth } from './auth/types.ts'
 import type { Assembler } from './assembler.ts'

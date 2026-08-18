@@ -2,7 +2,7 @@ import {
 	createExternalDshReadSource,
 	resolveCocodeDshHome,
 	resolveCocodeHome,
-} from "@cocode/host-supervisor"
+} from "@cocode-agency/host-supervisor"
 import { SharedDshCatalog } from "./external-dsh-catalog"
 
 /** Compose the Desktop-only reader without exposing filesystem access to Renderer. */

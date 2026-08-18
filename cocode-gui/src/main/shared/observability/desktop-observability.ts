@@ -1,7 +1,7 @@
 import { app, crashReporter } from "electron"
 import * as path from "pathe"
 import { readdirSync, statSync, unlinkSync } from "node:fs"
-import { resolveCocodeLogLayout } from "@cocode/host-supervisor"
+import { resolveCocodeLogLayout } from "@cocode-agency/host-supervisor"
 import { DesktopLogger } from "../logging/desktop-logger"
 import { createDiagnosticsService, type DiagnosticsService } from "./diagnostics-service"
 import { ResourceMonitor } from "./resource-monitor"

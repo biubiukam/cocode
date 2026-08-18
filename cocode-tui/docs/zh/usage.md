@@ -6,17 +6,24 @@
 
 要求 Node.js 22.19.x 或 24 及以上版本。
 
-发布包通过 `@cocode/host-supervisor` 直接获得版本化的
+发布包通过 `@cocode-agency/host-supervisor` 直接获得版本化的
 `@deepseek-ai/dsh` runtime。Supervisor 会按 profile 启动或发现共享 Host：
 
 ```sh
 cd /path/to/cocode-tui
 pnpm run build
 npm pack
-npm install --global ./cocode-tui-0.1.0.tgz
+npm install --global ./cocode-agency-tui-0.1.0.tgz
 ```
 
-正式发布后可直接执行 `npm install --global @cocode/tui`。
+日常使用建议直接安装已发布的 npm 包：
+
+```sh
+npm install --global @cocode-agency/tui
+```
+
+上面的本地 tarball 路径只用于发布前检查构建结果；正式包会自动安装匹配版本的
+`@cocode-agency/host-supervisor`。
 
 检查 Supervisor、Host descriptor、JSON-RPC 服务和 lease 生命周期：
 
