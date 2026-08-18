@@ -36,6 +36,9 @@ describe('cocode CLI', () => {
     expect(() => parseCliArgs(['dsh', 'plugin', '--profile', 'web', 'add', 'dshmarket'])).toThrow(
       'The `cocode dsh ...` form is no longer supported.',
     )
+    expect(() => parseCliArgs(['web', '--help'])).toThrow(
+      'The `cocode web` command is disabled.',
+    )
     expect(parseCliArgs(['plugin', '--profile', 'web', 'add', 'dshmarket'])).toMatchObject({
       command: 'dsh',
       commandArgs: ['plugin', '--profile', 'web', 'add', 'dshmarket'],
@@ -52,10 +55,6 @@ describe('cocode CLI', () => {
       command: 'dsh',
       profile: 'web',
       commandArgs: ['plugin', '--profile', 'web', 'add', 'dshmarket'],
-    })
-    expect(parseCliArgs(['web', '--help'])).toMatchObject({
-      command: 'dsh',
-      commandArgs: ['web', '--help'],
     })
     expect(parseCliArgs(['--patch', './extra.yml', 'web'])).toMatchObject({
       command: 'dsh',
