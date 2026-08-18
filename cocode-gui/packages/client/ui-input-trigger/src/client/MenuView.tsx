@@ -7,9 +7,9 @@
  * are mousedown-handled and the highlight is exposed via
  * aria-activedescendant on the listbox).
  */
-import { Fragment, useEffect, useRef, useSyncExternalStore } from 'react'
+import { Fragment, useEffect, useRef, useSyncExternalStore, type ReactNode } from 'react'
 import clsx from 'clsx'
-import { useAnchoredMaxHeight } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconFolderClose16, useAnchoredMaxHeight } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import css from './MenuView.module.css'
 import type { MenuViewInjected } from './slots.ts'
@@ -88,12 +88,13 @@ export function MenuView({ menu, onPick, onDismiss, t }: MenuViewProps) {
                   const active = highlight !== null && highlight.source === group.source && highlight.index === index
                   return (
                     <button
-                      key={`${group.source}:${item.name}`}
+                      key={`${group.source}:${index}:${item.name}`}
                       id={optionId(group.source, index)}
                       type="button"
                       role="option"
                       aria-selected={active}
-                      className={clsx(css.item, active && css.active)}
+                      className={clsx(css.item, active && css.active, group.source === 'file' && css.fileItem)}
+                      title={item.description === undefined ? item.name : `${item.description}/${item.name}`}
                       // mousedown, not click: the textarea keeps focus (combobox
                       // pattern) — preventing default stops the focus steal, and the
                       // pick runs before any blur-driven teardown.
@@ -102,9 +103,15 @@ export function MenuView({ menu, onPick, onDismiss, t }: MenuViewProps) {
                         onPick(group.source, index)
                       }}
                     >
-                      {item.icon !== undefined && <span className={css.itemIcon} aria-hidden>{item.icon}</span>}
+                      {group.source === 'file'
+                        ? <FileKindMark name={item.name} />
+                        : item.icon !== undefined && <span className={css.itemIcon} aria-hidden>{item.icon}</span>}
                       <span className={css.itemName}>{item.name}</span>
-                      {item.description !== undefined && <span className={css.itemDescription}>{item.description}</span>}
+                      {item.description !== undefined && (
+                        <span className={css.itemDescription}>
+                          {group.source === 'file' ? <span>{item.description}</span> : item.description}
+                        </span>
+                      )}
                     </button>
                   )
                 })}
@@ -113,4 +120,43 @@ export function MenuView({ menu, onPick, onDismiss, t }: MenuViewProps) {
       </div>
     </div>
   )
+}
+
+function FileKindMark({ name }: { readonly name: string }): ReactNode {
+  if (name.endsWith('/')) {
+    return <span className={css.kindMark} data-kind="folder" aria-hidden><IconFolderClose16 size={16} /></span>
+  }
+  const mark = kindMarkOf(extensionOf(name))
+  if (mark === undefined) {
+    return <span className={css.kindMark} data-kind="file" aria-hidden><FileGlyph /></span>
+  }
+  return <span className={css.kindMark} data-kind={mark.kind} aria-hidden>{mark.label}</span>
+}
+
+function FileGlyph(): ReactNode {
+  return (
+    <svg width={16} height={16} viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M4.25 2.5h5.1L11.75 5v8.5h-7.5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+      <path d="M9.25 2.75V5h2.25" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function extensionOf(name: string): string {
+  const base = name.replace(/\/$/, '')
+  const dot = base.lastIndexOf('.')
+  if (dot <= 0 || dot === base.length - 1) return ''
+  return base.slice(dot + 1).toLowerCase()
+}
+
+function kindMarkOf(ext: string): { readonly kind: string; readonly label: string } | undefined {
+  if (ext === 'js' || ext === 'mjs' || ext === 'cjs') return { kind: 'js', label: 'JS' }
+  if (ext === 'jsx') return { kind: 'jsx', label: 'JX' }
+  if (ext === 'ts' || ext === 'mts' || ext === 'cts') return { kind: 'ts', label: 'TS' }
+  if (ext === 'tsx') return { kind: 'tsx', label: 'TSX' }
+  if (ext === 'json' || ext === 'jsonc') return { kind: 'json', label: '{ }' }
+  if (ext === 'md' || ext === 'mdx') return { kind: 'md', label: 'MD' }
+  if (ext === 'css' || ext === 'scss' || ext === 'less') return { kind: 'css', label: '#' }
+  if (ext === 'yml' || ext === 'yaml') return { kind: 'yml', label: 'YML' }
+  return undefined
 }

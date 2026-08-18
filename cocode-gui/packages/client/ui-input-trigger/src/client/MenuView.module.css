@@ -9,11 +9,10 @@
   bottom: calc(100% + 4px);
   left: 0;
   z-index: 100;
+  /* Match the composer card so file rows have room for name + path. */
+  width: 100%;
   min-width: min(260px, 100%);
-  /* 537 is the design cap; the 100% clamp keeps the menu inside the composer
-     card when a narrow viewport shrinks the card below the cap (the overlay
-     anchor is exactly the card's width). */
-  max-width: min(537px, 100%);
+  max-width: 100%;
   /* Height cap: the 320px design maximum, clamped at runtime to the space
    * above the composer (inline max-height set in MenuView.tsx). */
   max-height: 320px;
@@ -72,7 +71,8 @@
 
 .itemName {
   flex: none;
-  max-width: 40%;
+  min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -85,6 +85,90 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--dsw-alias-label-tertiary);
+}
+
+.kindMark {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 7px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: #fff;
+}
+
+.kindMark[data-kind="folder"] {
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.kindMark[data-kind="js"] {
+  background: #c6b02a;
+  color: #1c1a0a;
+}
+
+.kindMark[data-kind="ts"] {
+  background: #3178c6;
+}
+
+.kindMark[data-kind="tsx"] {
+  background: #149eca;
+  font-size: 6px;
+}
+
+.kindMark[data-kind="jsx"] {
+  background: #61dafb;
+  color: #1c1a0a;
+}
+
+.kindMark[data-kind="json"] {
+  background: #cbb27a;
+  color: #1c1a0a;
+}
+
+.kindMark[data-kind="md"] {
+  background: #519aba;
+}
+
+.kindMark[data-kind="css"] {
+  background: #563d7c;
+}
+
+.kindMark[data-kind="yml"] {
+  background: #cb171e;
+  font-size: 6px;
+}
+
+.kindMark[data-kind="file"] {
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+/* File mentions: icon + name + parent path, path uses leading ellipsis. */
+.fileItem .itemName {
+  flex: 0 1 auto;
+  max-width: 55%;
+}
+
+.fileItem .itemDescription {
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-caption);
+  direction: rtl;
+  text-align: left;
+  text-overflow: ellipsis;
+}
+
+.fileItem .itemDescription > span {
+  direction: ltr;
+  unicode-bidi: isolate;
 }
 
 /* Heading row above a source group: non-interactive small grey text,

@@ -10,6 +10,7 @@ import { CommitModelRow } from "./settings-row.tsx"
 import { CommandLineSection } from "./command-line-section.tsx"
 import { DiagnosticsSection } from "./diagnostics-section.tsx"
 import type { WorkbenchPanelProps } from "./model.ts"
+import { registerFileMention } from "./file-mention.ts"
 
 export type * from "./model.ts"
 export { WorkbenchController } from "./controller.ts"
@@ -36,6 +37,7 @@ export function apply(ctx: ClientContext): void {
   // through the module-level translate instead of an injected `t` seat.
   attachLocale(ctx.locale)
   ctx.effect(() => ctx.locale.register(LOCALE_NS, { zh, en }), "cocode-workbench: dictionaries")
+  ctx.inject(["inputTriggers"], (scope: ClientContext) => { registerFileMention(scope) })
   const controller = new WorkbenchController(layout, window.localStorage)
   const disposeService = ctx.reflect.provide("workbench", controller)
   for (const descriptor of builtInPanels()) {

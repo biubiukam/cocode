@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "pathe"
 import { describe, expect, it } from "vitest"
@@ -104,6 +104,20 @@ describe("Cocode Workbench host API", () => {
     const result = await invoke(route, "fs.read", { sessionId: "s1", cwd, path: "note.txt" })
     expect(result.status).toBe(200)
     expect(result.value?.value).toMatchObject({ kind: "text", content: "hello" })
+  })
+
+  it("indexes workspace files and folders for @ mentions", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "cocode-workbench-search-"))
+    await mkdir(join(cwd, "src"))
+    await mkdir(join(cwd, "node_modules"))
+    await writeFile(join(cwd, "src", "main.ts"), "export {}\n")
+    await writeFile(join(cwd, "node_modules", "ignored.js"), "ignored\n")
+    const route = createWorkbenchApi(context(cwd))
+    const result = await invoke(route, "fs.search", { sessionId: "s1" })
+    const paths = (result.value?.value as { paths?: string[] }).paths ?? []
+    expect(paths).toContain("src/")
+    expect(paths).toContain("src/main.ts")
+    expect(paths).not.toContain("node_modules/ignored.js")
   })
 
   it("does not fence a named session against process.cwd", async () => {

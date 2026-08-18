@@ -7,6 +7,7 @@ import { hasSeparator } from "./paths.ts"
 import { applyBrowserHost } from "./browser/host.ts"
 import { absolutePath, assertWritable, canWrite, readablePath, sessionCwd, writablePath } from "./file-access.ts"
 import { gitDispatch } from "./git-api.ts"
+import { searchWorkspace } from "./fs-search.ts"
 
 const exec = promisify(execFile)
 const MAX_FILE_BYTES = 4 * 1024 * 1024
@@ -206,6 +207,7 @@ async function dispatch(ctx: WorkbenchContext, method: string, payload: Record<s
   switch (method) {
     case "session.cwd": return { cwd: sessionCwd(ctx, payload) }
     case "fs.tree": return tree(ctx, payload)
+    case "fs.search": return searchWorkspace(ctx, payload)
     case "fs.read": return fileRead(ctx, payload)
     case "fs.write": return fileWrite(ctx, payload)
     case "fs.mkdir": return fileMkdir(ctx, payload)

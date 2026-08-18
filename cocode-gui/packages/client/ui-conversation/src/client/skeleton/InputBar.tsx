@@ -24,7 +24,7 @@ import type {} from '@deepseek-ai/dsh-goal/client'
 // api-remotes import already places it in every client program.
 import type { Translate } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ComposerAttachment, ComposerBarProps } from '../contract/slots.ts'
-import { deriveDecorations } from '../input/decorations.ts'
+import { atNameIsPrefix, deriveDecorations, isFileMentionPath, textRefName } from '../input/decorations.ts'
 import type { DraftDecorations } from '../input/decorations.ts'
 import {
   attachmentErrorText, attachmentRailLabels, dropOverlayLabels, imageSizeText, lightboxLabels,
@@ -36,6 +36,21 @@ import css from './InputBar.module.css'
 /** Decoration product of the no-session state (no machine, empty draft). */
 const INERT_DECORATIONS: DraftDecorations = { token: null, chips: [], textRefs: [], hint: null }
 
+/** Hit-test the backdrop mark under the caret layer (temporarily click-through). */
+function filePathAtPoint(textarea: HTMLTextAreaElement, clientX: number, clientY: number): string | undefined {
+  textarea.style.pointerEvents = 'none'
+  const hit = document.elementFromPoint(clientX, clientY)
+  textarea.style.pointerEvents = ''
+  if (!(hit instanceof Element)) return undefined
+  const path = hit.closest('[data-at-path]')?.getAttribute('data-at-path')
+  return path === null || path === undefined || path === '' ? undefined : path
+}
+
+function setOverMention(textarea: HTMLTextAreaElement, over: boolean): void {
+  if (over) textarea.dataset.overMention = ''
+  else delete textarea.dataset.overMention
+}
+
 /** Rail thumbnail carrying its source attachment for the open/remove callbacks. */
 interface ComposerRailItem extends AttachmentRailItem {
   attachment: ComposerAttachment
@@ -45,7 +60,7 @@ export type InputBarProps = ComposerBarProps
 
 export function InputBar({
   useSession, useInput, inputActions, keyboard, addImages, removeImage, draftImages,
-  resolveSubmitMode, toggleCommandMenu, stop, command, t,
+  resolveSubmitMode, toggleCommandMenu, stop, command, openFile, t,
   renderSlot, useNotices, useLexicon, useMenuLauncher,
   useProjection, sessionId, variant, disabled: inert = false, blocked,
   workspacePickerOpen = false, onRequestWorkspace,
@@ -280,6 +295,19 @@ export function InputBar({
     return () => { el.removeEventListener('wheel', onWheel) }
   }, [])
 
+  useEffect(() => {
+    const clear = (): void => {
+      const el = inputRef.current
+      if (el !== null) setOverMention(el, false)
+    }
+    window.addEventListener('keyup', clear)
+    window.addEventListener('blur', clear)
+    return () => {
+      window.removeEventListener('keyup', clear)
+      window.removeEventListener('blur', clear)
+    }
+  }, [])
+
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>): void => {
     if (workspaceTrigger) {
       if (e.key === 'Enter' || e.key === ' ') {
@@ -316,6 +344,32 @@ export function InputBar({
       const redo = e.key === 'y' || e.shiftKey
       if (redo) keyboard.redo()
       else keyboard.undo()
+      return
+    }
+    if (e.key === 'Backspace' || e.key === 'Delete') {
+      if (composing || machineBusy || locked || input === undefined) return
+      const el = e.currentTarget
+      const caret = el.selectionStart ?? 0
+      const end = el.selectionEnd ?? caret
+      if (caret !== end) return
+      const mentions = deriveDecorations(input, lexicon).textRefs.filter(ref => ref.trigger === '@')
+      const range = e.key === 'Backspace'
+        ? mentions.find(ref => caret > ref.start && caret <= ref.end)
+        : mentions.find(ref => caret >= ref.start && caret < ref.end)
+      if (range === undefined) return
+      // Still typing a path that is a prefix of a longer index entry: one char at a time.
+      if (e.key === 'Backspace' && caret === range.end
+        && atNameIsPrefix(textRefName(draft, range), lexicon.get('@') ?? [])) {
+        return
+      }
+      e.preventDefault()
+      keyboard.setDraft(draft.slice(0, range.start) + draft.slice(range.end), {
+        start: range.start,
+        end: range.end,
+        insertedLength: 0,
+      })
+      restoreCaret(el, range.start)
+      keyboard.track(keyboard.snapshot.draft, range.start)
       return
     }
     if (e.key === ' ') {
@@ -427,6 +481,24 @@ export function InputBar({
     const caret = sel.start + text.length
     restoreCaret(el, caret)
     keyboard.track(keyboard.snapshot.draft, caret)
+  }
+
+  const onMouseDown = (e: MouseEvent<HTMLTextAreaElement>): void => {
+    if (openFile === undefined || e.button !== 0 || !(e.metaKey || e.ctrlKey)) return
+    const path = filePathAtPoint(e.currentTarget, e.clientX, e.clientY)
+    if (path === undefined) return
+    e.preventDefault()
+    openFile(path)
+  }
+
+  const onMouseMove = (e: MouseEvent<HTMLTextAreaElement>): void => {
+    const over = openFile !== undefined && (e.metaKey || e.ctrlKey)
+      && filePathAtPoint(e.currentTarget, e.clientX, e.clientY) !== undefined
+    setOverMention(e.currentTarget, over)
+  }
+
+  const onMouseLeave = (e: MouseEvent<HTMLTextAreaElement>): void => {
+    setOverMention(e.currentTarget, false)
   }
 
   // Intake pre-check (DeepSeek Chat semantics): an addition that would break
@@ -629,8 +701,14 @@ export function InputBar({
       } else {
         // Plain-range highlight: the glyphs stay the
         // textarea's (advance untouched); the mark paints the chip look.
+        const atPath = b.ref.trigger === '@' ? textRefName(draft, b.ref) : undefined
         backdrop.push(
-          <mark key={`ref-${b.ref.start}`} className={css.textRef} data-decoration="text-ref">
+          <mark
+            key={`ref-${b.ref.start}`}
+            className={b.ref.trigger === '@' ? css.textRefAt : css.textRef}
+            data-decoration="text-ref"
+            data-at-path={atPath !== undefined && isFileMentionPath(atPath) ? atPath : undefined}
+          >
             {draft.slice(b.ref.start, b.ref.end)}
           </mark>,
         )
@@ -732,6 +810,9 @@ export function InputBar({
               rows={2}
               onChange={onChange}
               onKeyDown={onKeyDown}
+              onMouseDown={onMouseDown}
+              onMouseMove={onMouseMove}
+              onMouseLeave={onMouseLeave}
               onSelect={onSelect}
               onCopy={(e) => { onCopyOrCut(e, false) }}
               onCut={(e) => { onCopyOrCut(e, true) }}

@@ -117,6 +117,35 @@ function basename(path: string): string {
   return at === -1 ? path : path.slice(at + 1)
 }
 
+function openPreviewFile(
+  ctx: Context,
+  sessions: ISessions,
+  sessionId: SessionId,
+  path: string,
+): void {
+  const cwd = sessions.list.getSnapshot().byId[sessionId]?.cwd
+  const resolved = resolveWorkspacePath(cwd, path)
+  if (path === '.') {
+    void ctx.workspaces.openPath(resolved).catch(() => {
+      // Host/OS open failures stay silent in the chat row.
+    })
+    return
+  }
+  const workbench = ctx.get('workbench') as PreviewWorkbench | undefined
+  if (workbench !== undefined) {
+    workbench.open('preview', {
+      title: basename(resolved),
+      dock: 'right',
+      target: { path: resolved },
+      sessionId,
+    })
+    return
+  }
+  void ctx.workspaces.openPath(resolved).catch(() => {
+    // Host/OS open failures stay silent; the native app surfaces its own dialog.
+  })
+}
+
 /** Resolve package-internal attachment operations from the public service registration. */
 function concreteConversation(ctx: Context): ConversationController {
   const conversation = ctx.get('conversation') as ConversationController | undefined
@@ -340,6 +369,7 @@ export function apply(ctx: Context): void {
           toggleCommandMenu: undefined,
           stop: undefined,
           command: undefined,
+          openFile: undefined,
           hooks: { notices: ABSENT_NOTICES, lexicon: ABSENT_LEXICON, menuLauncher: ABSENT_MENU_LAUNCHER },
         }
       }
@@ -394,6 +424,7 @@ export function apply(ctx: Context): void {
           const result = await session.command(line)
           return result.ok && result.value.matched
         },
+        openFile: (path) => { openPreviewFile(ctx, sessions, sessionId, path) },
         hooks: {
           notices: shell.notices,
           lexicon: shell.lexicon,
@@ -435,30 +466,7 @@ export function apply(ctx: Context): void {
           layout.openDetails()
         },
         fileMentions: owner => ctx.get('chatFileMentions')?.forClosing(owner),
-        openFile: (path) => {
-          const cwd = sessions.list.getSnapshot().byId[sessionId]?.cwd
-          const resolved = resolveWorkspacePath(cwd, path)
-          if (path === '.') {
-            void workspaces.openPath(resolved).catch(() => {
-              // Host/OS open failures stay silent in the chat row.
-            })
-            return
-          }
-          const workbench = ctx.get('workbench') as PreviewWorkbench | undefined
-          if (workbench !== undefined) {
-            workbench.open('preview', {
-              title: basename(resolved),
-              dock: 'right',
-              target: { path: resolved },
-              sessionId,
-            })
-            return
-          }
-          void workspaces.openPath(resolved).catch(() => {
-            // Host/OS open failures stay silent in the chat row; the native
-            // app surfaces its own error dialog when the path is unusable.
-          })
-        },
+        openFile: (path) => { openPreviewFile(ctx, sessions, sessionId, path) },
         loadOlder: () => { void scoped.loadOlder() },
         loadImage: attachment => conversation.resolveImage(sessionId, attachment),
         // Unregistered 'trajectory' id is safe: the tab ring falls back to

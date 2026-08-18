@@ -48,14 +48,15 @@ export interface DraftDecorations {
   readonly hint: string | null
 }
 
-/** Token matcher: a trigger char at line start or after whitespace, then a word-ish name (never crosses \n). */
-const TEXT_REF_RE = /(^|\s)([/@])([\w-]+)/g
+/** Slash token: `/name` at line start or after whitespace. */
+const SLASH_REF_RE = /(^|\s)\/([\w-]+)/g
 
 /**
  * Scan the draft for plain-text reference tokens against the hot lexicons.
  * Word-boundary discipline: the trigger must sit at the draft
  * start or after whitespace ('x/name' never matches); the name must be an
- * exact lexicon member.
+ * exact lexicon member. `@` mentions accept file paths (`@src/a.ts`,
+ * `@"my file.ts"`) as well as bare names.
  * @param draft - draft text.
  * @param lexicon - per-trigger name lists (a missing trigger scans nothing).
  * @returns matched ranges in draft order.
@@ -65,17 +66,78 @@ export function scanTextRefs(
 ): TextRefRange[] {
   if (lexicon.size === 0 || draft === '') return []
   const out: TextRefRange[] = []
-  TEXT_REF_RE.lastIndex = 0
-  let m: RegExpExecArray | null
-  while ((m = TEXT_REF_RE.exec(draft)) !== null) {
-    const trigger = m[2] as '/' | '@'
-    const name = m[3] ?? ''
-    if (lexicon.get(trigger)?.includes(name)) {
-      const start = m.index + (m[1]?.length ?? 0)
-      out.push({ start, end: start + 1 + name.length, trigger })
+  const slashNames = lexicon.get('/')
+  if (slashNames !== undefined && slashNames.length > 0) {
+    SLASH_REF_RE.lastIndex = 0
+    let match: RegExpExecArray | null
+    while ((match = SLASH_REF_RE.exec(draft)) !== null) {
+      const name = match[2] ?? ''
+      if (!slashNames.includes(name)) continue
+      const start = match.index + (match[1]?.length ?? 0)
+      out.push({ start, end: start + 1 + name.length, trigger: '/' })
+    }
+  }
+  const atNames = lexicon.get('@')
+  if (atNames !== undefined && atNames.length > 0) {
+    const known = new Set(atNames)
+    let index = 0
+    while (index < draft.length) {
+      const at = draft.indexOf('@', index)
+      if (at < 0) break
+      if (at > 0 && !/\s/u.test(draft.charAt(at - 1))) {
+        index = at + 1
+        continue
+      }
+      const mention = readAtMention(draft, at)
+      if (mention !== undefined && known.has(mention.name)) {
+        out.push({ start: at, end: mention.end, trigger: '@' })
+        index = mention.end
+        continue
+      }
+      index = at + 1
     }
   }
   return out
+}
+
+/** The mention/command name inside a decorated range (no trigger char, unquoted). */
+export function textRefName(draft: string, range: TextRefRange): string {
+  if (range.trigger === '@') {
+    return readAtMention(draft, range.start)?.name ?? draft.slice(range.start + 1, range.end)
+  }
+  return draft.slice(range.start + 1, range.end)
+}
+
+/** True when another lexicon name continues this one — keep end-of-token Backspace character-wise. */
+export function atNameIsPrefix(name: string, names: readonly string[]): boolean {
+  return names.some(candidate => candidate !== name && candidate.startsWith(name))
+}
+
+/** File-shaped `@` mention (path, extension, or quoted name) — not a bare subagent label. */
+export function isFileMentionPath(name: string): boolean {
+  return name !== '' && name !== '.' && !name.endsWith('/') && /[./\\ ]/.test(name)
+}
+
+function readAtMention(draft: string, at: number): { name: string; end: number } | undefined {
+  if (draft.charAt(at + 1) === '"') {
+    let name = ''
+    for (let cursor = at + 2; cursor < draft.length; cursor += 1) {
+      const char = draft.charAt(cursor)
+      if (char === '\n') return undefined
+      if (char === '\\' && cursor + 1 < draft.length) {
+        name += draft.charAt(cursor + 1)
+        cursor += 1
+        continue
+      }
+      if (char === '"') return { name, end: cursor + 1 }
+      name += char
+    }
+    return undefined
+  }
+  let end = at + 1
+  while (end < draft.length && !/\s/u.test(draft.charAt(end))) end += 1
+  if (end === at + 1) return undefined
+  return { name: draft.slice(at + 1, end), end }
 }
 
 /** The empty lexicon (default: zero text-ref decorations, old call sites unchanged). */

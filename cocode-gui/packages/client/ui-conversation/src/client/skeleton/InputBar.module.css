@@ -220,6 +220,10 @@
   caret-color: var(--dsw-alias-state-business-primary);
 }
 
+.input[data-over-mention] {
+  cursor: pointer;
+}
+
 .input,
 .mirror,
 .backdrop {
@@ -441,6 +445,19 @@
   -webkit-box-decoration-break: clone;
 }
 .textRef:after {
+  display: none;
+}
+
+/* @ file mention: the same link-blue language as markdown file mentions. */
+.textRefAt {
+  background-color: transparent;
+  color: var(--dsw-alias-state-business-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+.textRefAt:after {
   display: none;
 }
 
