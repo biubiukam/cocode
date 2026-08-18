@@ -14,4 +14,6 @@ export const diagnosticsBridge: DiagnosticsApi = {
 	clearLogs: () => ipcRenderer.invoke(diagnosticsChannels.clearLogs),
 	enableTemporaryDebug: (request) =>
 		ipcRenderer.invoke(diagnosticsChannels.enableTemporaryDebug, request),
+	queryLogs: (query) => ipcRenderer.invoke(diagnosticsChannels.queryLogs, query),
+	listLogSources: () => ipcRenderer.invoke(diagnosticsChannels.listLogSources),
 }

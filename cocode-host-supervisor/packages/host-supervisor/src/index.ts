@@ -1,4 +1,6 @@
 export * from './protocol.js'
+export * from './observability.js'
+export { HostLogger, type HostLoggerOptions } from './logging.js'
 export * from './client.js'
 export { isLeaseActive, type LeaseRecord } from './lifecycle.js'
 export {

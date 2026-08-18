@@ -42,8 +42,15 @@ import { fallbackCapabilitySnapshot, probeRuntimeCapabilities } from './capabili
 
 type HarnessClient = JsonRpcPeer
 
-export function createTuiRuntime(launch: TuiLaunch): TuiRuntime {
-  return new SdkTuiRuntime(launch)
+export interface TuiRuntimeLogSink {
+  debug(eventName: string, attributes?: Readonly<Record<string, string | number | boolean | null>>): void
+  info(eventName: string, attributes?: Readonly<Record<string, string | number | boolean | null>>): void
+  warn(eventName: string, attributes?: Readonly<Record<string, string | number | boolean | null>>): void
+  error(eventName: string, attributes?: Readonly<Record<string, string | number | boolean | null>>): void
+}
+
+export function createTuiRuntime(launch: TuiLaunch, logger?: TuiRuntimeLogSink): TuiRuntime {
+  return new SdkTuiRuntime(launch, logger)
 }
 
 class SdkTuiRuntime implements TuiRuntime {
@@ -60,9 +67,11 @@ class SdkTuiRuntime implements TuiRuntime {
   private approvalHandler: ((request: TuiApprovalRequest) => Promise<TuiApprovalAnswer>) | undefined
   private capabilitySnapshot: TuiCapabilitySnapshot = fallbackCapabilitySnapshot()
   private cwd = process.cwd()
+  private readonly logger: TuiRuntimeLogSink | undefined
 
-  constructor(launch: TuiLaunch) {
+  constructor(launch: TuiLaunch, logger?: TuiRuntimeLogSink) {
     this.launch = launch
+    this.logger = logger
   }
 
   async start(init: TuiInitialize): Promise<{
@@ -74,6 +83,7 @@ class SdkTuiRuntime implements TuiRuntime {
     this.wire = 'unknown'
     this.cwd = init.cwd
     this.capabilitySnapshot = fallbackCapabilitySnapshot()
+    this.logger?.info('host.lease.acquire.started')
     try {
       const scope = resolveHostScope(this.launch)
       const lease = await createHostSupervisorClient().acquire({
@@ -88,24 +98,29 @@ class SdkTuiRuntime implements TuiRuntime {
         throw new Error('Cocode Host descriptor escaped the shared DSH home/profile boundary')
       }
       this.lease = lease
+      this.logger?.info('host.lease.acquired', { leaseIdPresent: true })
       const endpoint = lease.descriptor.services.find((service) => service.service === 'jsonrpc')
       if (endpoint === undefined) throw new Error('shared Host did not advertise its JSON-RPC service')
       const client = await connectJsonRpc(endpoint)
       this.client = client
+      this.logger?.info('jsonrpc.connect.completed')
       this.unsubscribe = client.subscribe((notification) => {
         void this.handleNotification(notification.method, notification.params)
       })
       this.unsubscribeClose = client.onClose((error) => {
         if (this.closing) return
+        this.logger?.warn('jsonrpc.disconnected')
         for (const handler of this.closeHandlers) handler(error)
       })
       const result = await client.request<{ serverInfo: { name: string; version: string } }>('initialize', init as unknown as Record<string, unknown>)
       const advertised = await this.negotiateWire(client)
+      this.logger?.info('runtime.initialize.completed', { runtimeName: result.serverInfo.name })
       return {
         ...result.serverInfo,
         ...(advertised === undefined ? {} : { capabilities: advertised }),
       }
     } catch (error) {
+      this.logger?.error('host.runtime.start.failed')
       this.closing = true
       await this.close().catch(() => undefined)
       throw error
@@ -120,6 +135,7 @@ class SdkTuiRuntime implements TuiRuntime {
     version: string
     capabilities?: import('./types.ts').TuiRuntimeAdvertisement
   }> {
+    this.logger?.info('runtime.restart.started')
     await this.close()
     this.closing = false
     this.client = undefined
@@ -137,8 +153,11 @@ class SdkTuiRuntime implements TuiRuntime {
       }
     }
     try {
-      return await this.start(init)
+      const result = await this.start(init)
+      this.logger?.info('runtime.restart.completed')
+      return result
     } catch (error) {
+      this.logger?.error('runtime.restart.failed')
       this.launch = previousLaunch
       throw error
     }
@@ -150,6 +169,7 @@ class SdkTuiRuntime implements TuiRuntime {
     mode: TuiPromptMode = 'normal',
   ): Promise<string> {
     const client = this.requireClient()
+    this.logger?.debug('session.prompt.accepted', { mode, sessionIdPresent: sessionId !== '' })
     if (mode !== 'normal') {
       const modes = this.capabilitySnapshot.modes?.promptModes ?? []
       if (!modes.includes(mode))
@@ -184,6 +204,7 @@ class SdkTuiRuntime implements TuiRuntime {
     replaceSessionId?: string,
   ): Promise<boolean | TuiSessionOpenResult> {
     const client = this.requireClient()
+    this.logger?.debug('session.open.started', { replaceSession: replaceSessionId !== undefined })
     this.requireCapability('open')
     const params = {
       sessionId,
@@ -196,10 +217,14 @@ class SdkTuiRuntime implements TuiRuntime {
     if (!isRecord(result) || typeof result.opened !== 'boolean') {
       throw new Error(`session/open returned no open result: ${JSON.stringify(result)}`)
     }
-    if (!Array.isArray(result.seed)) return result.opened
+    if (!Array.isArray(result.seed)) {
+      this.logger?.debug('session.open.completed', { opened: result.opened })
+      return result.opened
+    }
     if (!result.seed.every(isSessionEvent)) {
       throw new Error(`session/open returned an invalid seed: ${JSON.stringify(result)}`)
     }
+    this.logger?.debug('session.open.completed', { opened: result.opened, seedLength: result.seed.length })
     return {
       opened: result.opened,
       seed: result.seed,
@@ -451,6 +476,7 @@ class SdkTuiRuntime implements TuiRuntime {
   }
 
   async close(): Promise<void> {
+    this.logger?.info('runtime.close.started')
     this.closing = true
     this.unsubscribe?.()
     this.unsubscribe = undefined
@@ -460,6 +486,8 @@ class SdkTuiRuntime implements TuiRuntime {
     this.client = undefined
     await this.lease?.release().catch(() => undefined)
     this.lease = undefined
+    this.logger?.info('host.lease.released')
+    this.logger?.info('runtime.close.completed')
   }
 
   private requireClient(): HarnessClient {
@@ -504,6 +532,7 @@ class SdkTuiRuntime implements TuiRuntime {
         modes: advertised,
         errors: {},
       }
+      this.logger?.debug('capability.probe.completed', { wire: 'companion' })
       return advertised
     } catch (error) {
       if (!isUnsupportedCompanionError(error)) throw error
@@ -515,6 +544,7 @@ class SdkTuiRuntime implements TuiRuntime {
         { request },
         { onRequest: false, advertised },
       )
+      this.logger?.debug('capability.probe.completed', { wire: 'legacy' })
       return advertised
     }
   }
@@ -546,6 +576,7 @@ class SdkTuiRuntime implements TuiRuntime {
   private async respondToQuestion(params: Record<string, unknown>): Promise<void> {
     const requestId = params.requestId
     if (typeof requestId !== 'string') return
+    this.logger?.debug('question.received')
     let response: { answer: TuiQuestionAnswer } | { cancelled: true }
     try {
       const handler = this.questionHandler
@@ -560,11 +591,13 @@ class SdkTuiRuntime implements TuiRuntime {
     await this.requireClient()
       .request('cocode/question/respond', { requestId, ...response })
       .catch(() => undefined)
+    this.logger?.debug('question.responded', { cancelled: 'cancelled' in response })
   }
 
   private async respondToApproval(params: Record<string, unknown>): Promise<void> {
     const requestId = params.requestId
     if (typeof requestId !== 'string') return
+    this.logger?.debug('approval.received')
     let outcome: TuiApprovalAnswer = { outcome: 'unavailable' }
     try {
       const handler = this.approvalHandler
@@ -575,6 +608,7 @@ class SdkTuiRuntime implements TuiRuntime {
     await this.requireClient()
       .request('cocode/approval/respond', { requestId, outcome: outcome.outcome })
       .catch(() => undefined)
+    this.logger?.debug('approval.responded', { outcome: outcome.outcome })
   }
 }
 

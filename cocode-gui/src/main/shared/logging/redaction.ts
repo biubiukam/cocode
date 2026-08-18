@@ -2,6 +2,8 @@ import type { LogAttribute, RendererLogRecordDto } from "./log-types"
 
 const SENSITIVE_KEY =
 	/(?:authorization|cookie|password|passwd|secret|token|api[-_]?key|credential|oauth|client[-_]?secret|private[-_]?key|prompt|completion|response|body|headers?|args?|output|clipboard|env)/i
+const SENSITIVE_CONTENT =
+	/\b(?:prompt|completion|assistant\s+(?:message|response)|model\s+(?:response|output)|tool\s+(?:input|output|arguments?)|clipboard\s+contents?|password|token|api[-_]?key)\b/i
 const MAX_STRING_LENGTH = 4_096
 const MAX_ATTRIBUTES = 64
 
@@ -57,5 +59,6 @@ function sanitizeText(value: string, maxLength: number): string {
 		.replace(/[\r\n]/g, " ")
 		.replaceAll(String.fromCharCode(0), " ")
 		.replace(/((?:https?|wss?):\/\/[^\s?#]+)(?:\?[^\s#]*)?(?:#[^\s]*)?/gi, "$1")
-	return sanitizePath(cleaned).slice(0, maxLength)
+	const safe = sanitizePath(cleaned)
+	return SENSITIVE_CONTENT.test(safe) ? "[REDACTED]" : safe.slice(0, maxLength)
 }

@@ -182,6 +182,7 @@ import {
 } from './image-clipboard.ts'
 import type { Keymap } from './keymap.ts'
 import { resolveKeymap } from './keymap-config.ts'
+import type { TuiLogger } from './logging.ts'
 
 export type TuiAction =
   | { type: 'submit'; text: string }
@@ -450,6 +451,7 @@ export type TuiAppOptions = {
   }
   readClipboardImage?: () => Promise<TuiImageInput>
   readPastedImage?: (path: string) => Promise<TuiImageInput | undefined>
+  logger?: TuiLogger
 }
 
 export function createTuiApp(options: TuiAppOptions): TuiApp {
@@ -499,6 +501,7 @@ class TuiAppImpl implements TuiApp {
   private readonly terminalNotify: NonNullable<TuiAppOptions['terminalNotify']>
   private readonly imageReader: () => Promise<TuiImageInput>
   private readonly pastedImageReader: (path: string) => Promise<TuiImageInput | undefined>
+  private readonly logger: TuiLogger | undefined
   private unsubscribeExternalDsh: (() => void) | undefined
   private readonly keymap: Keymap
   private imageSerial = 0
@@ -570,6 +573,7 @@ class TuiAppImpl implements TuiApp {
       options.terminalNotify ?? (process.stdout.isTTY === true ? {} : { mode: 'off' })
     this.imageReader = options.readClipboardImage ?? (() => readClipboardImage())
     this.pastedImageReader = options.readPastedImage ?? readImageFile
+    this.logger = options.logger
     this.keymap = resolveKeymap()
     this.questions = createQuestionCoordinator({
       emit: () => this.emit(),
@@ -585,6 +589,7 @@ class TuiAppImpl implements TuiApp {
   }
 
   async start(): Promise<void> {
+    this.logger?.info('tui.runtime.start.started')
     this.agent = 'starting'
     this.emit()
     this.unsubscribeRuntime = this.runtime.subscribe((n) => this.onNotification(n))
@@ -622,6 +627,7 @@ class TuiAppImpl implements TuiApp {
       await this.loadSkills()
       await this.loadCommands()
       if (this.exiting) return
+      this.logger?.info('tui.runtime.start.completed')
     } catch (error) {
       if (this.exiting) return
       this.agent = 'dead'
@@ -630,6 +636,7 @@ class TuiAppImpl implements TuiApp {
         tone: 'error',
         message: startErrorMessage(error),
       }
+      this.logger?.error('tui.runtime.start.failed')
     }
     this.emit()
   }
@@ -640,6 +647,7 @@ class TuiAppImpl implements TuiApp {
   }
 
   private async closeRuntime(): Promise<void> {
+    this.logger?.info('tui.runtime.close.started')
     try {
       await closeRuntime({
         unsubscribe: () => {
@@ -666,6 +674,7 @@ class TuiAppImpl implements TuiApp {
       })
     } finally {
       await this.externalDsh?.dispose().catch(() => undefined)
+      this.logger?.info('tui.runtime.close.completed')
     }
   }
 
@@ -2707,6 +2716,11 @@ class TuiAppImpl implements TuiApp {
     mode: 'normal' | 'queue' | 'steer',
     images: readonly DraftImage[],
   ): Promise<string> {
+    this.logger?.debug('session.prompt.accepted', {
+      mode,
+      attachmentCount: attachments.length,
+      imageCount: images.length,
+    })
     if (this.externalSession?.canMutate === false) {
       return Promise.reject(new Error('shared DSH session is read-only in Cocode'))
     }

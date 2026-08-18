@@ -1,6 +1,7 @@
 import { app, crashReporter } from "electron"
 import * as path from "pathe"
 import { readdirSync, statSync, unlinkSync } from "node:fs"
+import { resolveCocodeLogLayout } from "@cocode/host-supervisor"
 import { DesktopLogger } from "../logging/desktop-logger"
 import { createDiagnosticsService, type DiagnosticsService } from "./diagnostics-service"
 import { ResourceMonitor } from "./resource-monitor"
@@ -13,18 +14,31 @@ export interface DesktopObservability {
 }
 
 export function createDesktopObservability(): DesktopObservability {
-	const logDirectory = resolveLogDirectory()
+	const logLayout = resolveLogDirectory()
 	const logger = new DesktopLogger({
-		directory: logDirectory,
+		directory: logLayout.root,
+		layout: "unified",
 		serviceName: "cocode-desktop",
 		serviceVersion: app.getVersion(),
 		buildId: process.env.COCODE_BUILD_ID?.trim() || undefined,
 		processType: "main",
 		defaultLevel: "info",
 	})
+	const previousConsoleWarn = console.warn
+	const previousConsoleError = console.error
+	console.warn = (...args: unknown[]) => {
+		logger.log("warn", "process.console-warn", { attributes: { argumentCount: args.length } })
+		previousConsoleWarn(...args)
+	}
+	console.error = (...args: unknown[]) => {
+		logger.log("error", "process.console-error", { attributes: { argumentCount: args.length } })
+		previousConsoleError(...args)
+	}
 	const resources = new ResourceMonitor(logger)
 	const diagnostics = createDiagnosticsService({
 		logger,
+		logRoot: logLayout.root,
+		logLayout,
 		buildId: process.env.COCODE_BUILD_ID?.trim() || undefined,
 		resources,
 	})
@@ -72,6 +86,8 @@ export function createDesktopObservability(): DesktopObservability {
 			for (const remove of removers.splice(0)) remove()
 			resources.dispose()
 			logger.log("info", "app.shutdown.completed")
+			console.warn = previousConsoleWarn
+			console.error = previousConsoleError
 			logger.close()
 		},
 	}
@@ -98,16 +114,23 @@ function pruneCrashDumps(logger: DesktopLogger): void {
 	}
 }
 
-function resolveLogDirectory(): string {
+function resolveLogDirectory(): ReturnType<typeof resolveCocodeLogLayout> {
 	try {
-		const defaultLogsPath = app.getPath("logs")
-		const desiredPath =
-			path.basename(defaultLogsPath) === "cocode"
-				? defaultLogsPath
-				: path.join(defaultLogsPath, "cocode")
-		app.setAppLogsPath(desiredPath)
-		return desiredPath
+		const layout = resolveCocodeLogLayout()
+		app.setPath("logs", layout.root)
+		app.setPath("crashDumps", layout.crashDumps)
+		app.setAppLogsPath(layout.root)
+		return layout
 	} catch {
-		return path.join(process.cwd(), ".cocode-logs")
+		const root = path.join(process.cwd(), ".cocode-logs")
+		return {
+			root,
+			desktopApp: path.join(root, "desktop", "app"),
+			desktopAudit: path.join(root, "desktop", "audit"),
+			host: path.join(root, "host"),
+			tui: path.join(root, "tui"),
+			crashDumps: path.join(root, "crashDumps"),
+			diagnostics: path.join(root, "diagnostics"),
+		}
 	}
 }

@@ -1,21 +1,28 @@
 import { useEffect, useState } from "react"
 import type { DesktopApi } from "../../../../../src/contracts/ipc/desktop.contract.ts"
-import type { DiagnosticsStatusDto } from "../../../../../src/contracts/ipc/diagnostics.contract.ts"
+import type {
+  DiagnosticsLogRecordDto,
+  DiagnosticsStatusDto,
+} from "../../../../../src/contracts/ipc/diagnostics.contract.ts"
 
 export function DiagnosticsSection(): JSX.Element {
   const api = getDesktopApi()?.diagnostics
   const [status, setStatus] = useState<DiagnosticsStatusDto | undefined>()
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | undefined>()
+  const [queryText, setQueryText] = useState("")
+  const [records, setRecords] = useState<readonly DiagnosticsLogRecordDto[]>([])
 
   const refresh = (): void => {
     if (api === undefined) return
     void api.getStatus().then(setStatus, (error: unknown) => setMessage(safeMessage(error)))
+    void api.queryLogs({ text: queryText.trim() || undefined, limit: 50 }).then((result) => setRecords(result.items), (error: unknown) => setMessage(safeMessage(error)))
   }
 
   useEffect(() => {
     if (api === undefined) return
     void api.getStatus().then(setStatus, (error: unknown) => setMessage(safeMessage(error)))
+    void api.queryLogs({ limit: 50 }).then((result) => setRecords(result.items), (error: unknown) => setMessage(safeMessage(error)))
   }, [api])
 
   const run = (operation: () => Promise<void>, success: string): void => {
@@ -37,7 +44,9 @@ export function DiagnosticsSection(): JSX.Element {
     <p style={styles.description}>{isChinese() ? "日志只保存在本机，默认不包含 Prompt、模型正文、工具参数或凭据。" : "Logs stay on this device and exclude prompts, model content, tool arguments, and credentials by default."}</p>
     <div style={styles.grid}>
       <Metric label={isChinese() ? "应用日志" : "App logs"} value={formatBytes(status?.appLogBytes ?? 0)} />
+      <Metric label={isChinese() ? "审计日志" : "Audit logs"} value={formatBytes(status?.auditLogBytes ?? 0)} />
       <Metric label={isChinese() ? "Host 日志" : "Host logs"} value={formatBytes(status?.hostLogBytes ?? 0)} />
+      <Metric label={isChinese() ? "TUI 日志" : "TUI logs"} value={formatBytes(status?.tuiLogBytes ?? 0)} />
       <Metric label={isChinese() ? "崩溃文件" : "Crash dumps"} value={String(status?.crashCount ?? 0)} />
       <Metric label={isChinese() ? "丢弃记录" : "Dropped records"} value={String(status?.droppedRecordCount ?? 0)} />
       <Metric label={isChinese() ? "Electron 内存" : "Electron memory"} value={formatBytes(status?.resources?.latest?.electronWorkingSetBytes ?? 0)} />
@@ -50,6 +59,26 @@ export function DiagnosticsSection(): JSX.Element {
       <button type="button" disabled={busy} onClick={() => { if (window.confirm(isChinese() ? "清理本地日志？" : "Clear local logs?")) run(api.clearLogs, isChinese() ? "日志已清理。" : "Logs cleared.") }}>{isChinese() ? "清理日志" : "Clear logs"}</button>
       <button type="button" disabled={busy} onClick={() => run(async () => { await api.enableTemporaryDebug({ durationMinutes: 30 }) }, isChinese() ? "Debug 日志已临时开启 30 分钟。" : "Debug logging enabled for 30 minutes.")}>{isChinese() ? "开启 Debug（30 分钟）" : "Enable Debug (30 min)"}</button>
       <button type="button" disabled={busy} onClick={refresh}>{isChinese() ? "刷新状态" : "Refresh status"}</button>
+    </div>
+    <div style={styles.query}>
+      <input
+        value={queryText}
+        placeholder={isChinese() ? "按事件名、来源、Host 或关联 ID 搜索" : "Search event, source, Host or correlation ID"}
+        onChange={(event) => setQueryText(event.currentTarget.value)}
+        onKeyDown={(event) => { if (event.key === "Enter") refresh() }}
+      />
+      <button type="button" disabled={busy} onClick={refresh}>{isChinese() ? "查询日志" : "Query logs"}</button>
+    </div>
+    <div style={styles.records} aria-live="polite">
+      {records.length === 0 ? <p style={styles.notice}>{isChinese() ? "暂无匹配日志。" : "No matching log records."}</p> : records.map((record) => (
+        <div key={`${record.eventId ?? record.timestamp}-${record.sequence ?? record.eventName}`} style={styles.record}>
+          <code>{record.timestamp}</code>
+          <strong>{record.severityText ?? "INFO"}</strong>
+          <span>{record.source}</span>
+          <span>{record.eventName}</span>
+          {record.message !== undefined && <span style={styles.message}>{record.message}</span>}
+        </div>
+      ))}
     </div>
     {message !== undefined && <p role="status" style={styles.notice}>{message}</p>}
   </section>
@@ -85,5 +114,9 @@ const styles = {
   metric: { display: "grid", gap: "4px", padding: "10px", border: "1px solid color-mix(in srgb, currentColor 14%, transparent)", borderRadius: "8px" },
   metricLabel: { fontSize: "12px", opacity: 0.68 },
   actions: { display: "flex", flexWrap: "wrap" as const, gap: "8px" },
+  query: { display: "flex", gap: "8px" },
+  records: { display: "grid", gap: "4px", maxHeight: "260px", overflow: "auto" as const, border: "1px solid color-mix(in srgb, currentColor 14%, transparent)", borderRadius: "8px", padding: "8px" },
+  record: { display: "grid", gridTemplateColumns: "180px 56px 56px minmax(140px, 1fr) minmax(0, 2fr)", gap: "8px", fontSize: "12px", alignItems: "baseline" },
+  message: { opacity: 0.72, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const },
   notice: { margin: 0, fontSize: "12px", opacity: 0.8 },
 } as const
