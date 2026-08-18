@@ -6,6 +6,7 @@ import {
   launchDsh,
   parseCliArgs,
   resolveDshLaunch,
+  resolveDshVersion,
   resolveGuiLaunch,
 } from '../bin/cli.mjs'
 
@@ -17,6 +18,11 @@ describe('cocode CLI', () => {
       commandArgs: ['--workspace', '/tmp/project'],
     })
     expect(parseCliArgs(['--tui'])).toMatchObject({ command: 'tui', commandArgs: [] })
+  })
+
+  it('distinguishes the detailed version command from the script flag', () => {
+    expect(parseCliArgs(['version'])).toMatchObject({ version: true, versionCommand: true })
+    expect(parseCliArgs(['--version'])).toMatchObject({ version: true, versionCommand: false })
   })
 
   it('parses Host controls and scope options on either side of the command', () => {
@@ -32,15 +38,38 @@ describe('cocode CLI', () => {
     })
   })
 
-  it('treats dsh as a passthrough command and preserves its flags', () => {
-    expect(parseCliArgs(['dsh', 'plugin', '--profile', 'web', 'add', 'dshmarket'])).toMatchObject({
+  it('rejects the removed dsh wrapper and preserves direct DSH commands', () => {
+    expect(() => parseCliArgs(['dsh', 'plugin', '--profile', 'web', 'add', 'dshmarket'])).toThrow(
+      'The `cocode dsh ...` form is no longer supported.',
+    )
+    expect(() => parseCliArgs(['web', '--help'])).toThrow(
+      'The `cocode web` command is disabled.',
+    )
+    expect(parseCliArgs(['plugin', '--profile', 'web', 'add', 'dshmarket'])).toMatchObject({
       command: 'dsh',
       commandArgs: ['plugin', '--profile', 'web', 'add', 'dshmarket'],
     })
-    expect(parseCliArgs(['--profile', 'web', 'dsh', 'plugin', '--profile', 'preview'])).toMatchObject({
+    expect(parseCliArgs(['plugin', 'add', 'dshmarket'])).toMatchObject({
+      command: 'dsh',
+      commandArgs: ['plugin', '--profile', 'cocode', 'add', 'dshmarket'],
+    })
+    expect(parseCliArgs(['plugin', '--profile=web', 'list'])).toMatchObject({
+      command: 'dsh',
+      commandArgs: ['plugin', '--profile=web', 'list'],
+    })
+    expect(parseCliArgs(['--profile', 'web', 'plugin', 'add', 'dshmarket'])).toMatchObject({
       command: 'dsh',
       profile: 'web',
-      commandArgs: ['plugin', '--profile', 'preview'],
+      commandArgs: ['plugin', '--profile', 'web', 'add', 'dshmarket'],
+    })
+    expect(parseCliArgs(['--patch', './extra.yml', 'web'])).toMatchObject({
+      command: 'dsh',
+      commandArgs: ['--patch', './extra.yml', 'web'],
+    })
+    expect(parseCliArgs(['--profile', 'web', '--dump-config'])).toMatchObject({
+      command: 'dsh',
+      profile: 'web',
+      commandArgs: ['--profile', 'web', '--dump-config'],
     })
   })
 
@@ -67,6 +96,10 @@ describe('cocode CLI', () => {
       { COCODE_DSH_CLI_ENTRY: process.execPath, COCODE_NODE_EXECUTABLE: '/opt/Cocode/node' },
       { resolve: () => { throw new Error('unexpected package lookup') } },
     )).toEqual({ executable: '/opt/Cocode/node', entry: process.execPath })
+  })
+
+  it('reads the bundled DSH package version from its resolved entry', () => {
+    expect(resolveDshVersion({ staged: false })).toBe('0.1.0-rc.6')
   })
 
   it('passes DSH arguments unchanged and returns its exit code', () => {

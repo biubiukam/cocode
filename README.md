@@ -122,9 +122,12 @@ Run `make` with no arguments to list every target.
 After installing the TUI or desktop build, `cocode` is the unified entry point. With no subcommand it keeps the existing behavior and opens the TUI. GUI, TUI, and Host management use the same environment-derived Host scope, so different clients can attach to the same Host.
 
 ```sh
-cocode --version                 # Show the installed version
+cocode version                   # Show Cocode and bundled DSH versions
+cocode --version                 # Print the installed Cocode version
 cocode gui                       # Open the GUI
 cocode tui                       # Open the TUI
+cocode plugin list               # List plugins in the default cocode profile
+cocode plugin --profile web list # List plugins in a selected DSH profile
 cocode host status               # Inspect the shared Host without starting it
 cocode host status --json        # Print machine-readable status
 cocode host stop                 # Stop Host and Supervisor when no clients hold leases
