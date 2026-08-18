@@ -50,6 +50,7 @@ export interface WebSearchBlockProps {
   truncated: boolean
   /** Extra class merged onto the wrapper (callers position; this component draws). */
   className?: string | undefined
+  labels?: Partial<WebBlockLabels> | undefined
 }
 
 /** A `web_fetch` card: the retrieval summary for one fetched URL. */
@@ -63,6 +64,13 @@ export interface WebFetchBlockProps {
   truncated: boolean
   /** Extra class merged onto the wrapper (callers position; this component draws). */
   className?: string | undefined
+  labels?: Partial<WebBlockLabels> | undefined
+}
+
+export interface WebBlockLabels {
+  empty: string
+  sourcesTruncated: string
+  contentTruncated: string
 }
 
 /** A completed web retrieval card, discriminated by `kind`. */
@@ -153,7 +161,8 @@ function SourceItem({ source, ordinal }: { source: WebSourceView; ordinal: numbe
  * @param props - see {@link WebSearchBlockProps}.
  * @returns the search card element.
  */
-function WebSearchBlock({ answer, sources, truncated, className }: WebSearchBlockProps) {
+function WebSearchBlock({ answer, sources, truncated, className, labels }: WebSearchBlockProps) {
+  const copy = { empty: '未找到结果', sourcesTruncated: '来源列表已截断', contentTruncated: '内容已截断', ...labels }
   // A provider may legitimately return no answer and no sources; the chat WebRow
   // does not show the raw result content, so without this the user would see an
   // empty card. Mirror the backend's `No results found.` render text.
@@ -164,13 +173,13 @@ function WebSearchBlock({ answer, sources, truncated, className }: WebSearchBloc
         <div className={css.answer}><MarkdownText text={answer} /></div>
       )}
       {empty ? (
-        <div className={css.empty}>未找到结果</div>
+        <div className={css.empty}>{copy.empty}</div>
       ) : (
         <ol className={css.sources}>
           {sources.map((source, index) => <SourceItem key={index} source={source} ordinal={index + 1} />)}
         </ol>
       )}
-      {truncated && <div className={css.truncated}>来源列表已截断</div>}
+      {truncated && <div className={css.truncated}>{copy.sourcesTruncated}</div>}
     </div>
   )
 }
@@ -180,13 +189,14 @@ function WebSearchBlock({ answer, sources, truncated, className }: WebSearchBloc
  * @param props - see {@link WebFetchBlockProps}.
  * @returns the fetch card element.
  */
-function WebFetchBlock({ url, statusCode, truncated, className }: WebFetchBlockProps) {
+function WebFetchBlock({ url, statusCode, truncated, className, labels }: WebFetchBlockProps) {
+  const copy = { empty: '未找到结果', sourcesTruncated: '来源列表已截断', contentTruncated: '内容已截断', ...labels }
   return (
     <div className={clsx(css.block, css.fetch, className)} data-web="fetch">
       <SafeLink url={url} label={url} className={css.fetchUrl} />
       <div className={css.fetchMeta}>
         <span className={css.status}>HTTP {statusCode}</span>
-        {truncated && <span className={css.truncated}>内容已截断</span>}
+        {truncated && <span className={css.truncated}>{copy.contentTruncated}</span>}
       </div>
     </div>
   )

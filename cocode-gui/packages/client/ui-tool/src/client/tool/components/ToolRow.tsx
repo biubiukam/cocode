@@ -28,6 +28,7 @@ import { CHAT_DIFF_MAX_LINES, type DiffCardModel } from '../models/diff-card-mod
 import { CHAT_READ_MAX_LINES, type ReadCardModel } from '../models/read-card-model.ts'
 import { CHAT_SEARCH_MAX_LINES, type SearchCardModel } from '../models/search-card-model.ts'
 import { terminalBlockLabels, type TerminalCardModel } from '../models/terminal-card-model.ts'
+import { diffBlockLabels, readBlockLabels, searchBlockLabels, webBlockLabels } from '../models/output-card-labels.ts'
 import type { ToolRowState, ToolRowVariant } from '../models/tool-call-model.ts'
 import css from './ToolRow.module.css'
 
@@ -260,13 +261,13 @@ export function ToolRow({
               />
             )
             : diffBody !== null
-              ? <DiffBlock {...diffBody.card} maxLines={CHAT_DIFF_MAX_LINES} className={css.diffBody} />
+              ? <DiffBlock {...diffBody.card} labels={diffBlockLabels(t)} maxLines={CHAT_DIFF_MAX_LINES} className={css.diffBody} />
               : readBody !== null
-                ? <ReadBlock {...readBody} maxLines={CHAT_READ_MAX_LINES} className={css.readBody} />
+                ? <ReadBlock {...readBody} labels={readBlockLabels(t)} maxLines={CHAT_READ_MAX_LINES} className={css.readBody} />
                 : searchBody !== null
                   ? (
                     <>
-                      <SearchBlock {...searchBody.card} maxLines={CHAT_SEARCH_MAX_LINES} className={css.searchBody} />
+                      <SearchBlock {...searchBody.card} labels={searchBlockLabels(t)} maxLines={CHAT_SEARCH_MAX_LINES} className={css.searchBody} />
                       {/* A capped search's recovery locator lives only in the result
                           text; show it below the card so the dropped rows survive. */}
                       {searchBody.recovery !== undefined && (
@@ -275,7 +276,7 @@ export function ToolRow({
                     </>
                   )
                   : webBody !== null
-                    ? <WebBlock {...webBody} className={css.webBody} />
+                    ? <WebBlock {...webBody} labels={webBlockLabels(t)} className={css.webBody} />
                     : (
                       <>
                         {variant === 'code' && body !== null && (

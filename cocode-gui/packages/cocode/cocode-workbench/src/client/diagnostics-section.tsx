@@ -1,11 +1,13 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState, useSyncExternalStore } from "react"
 import type { DesktopApi } from "../../../../../src/contracts/ipc/desktop.contract.ts"
 import type {
   DiagnosticsLogRecordDto,
   DiagnosticsStatusDto,
 } from "../../../../../src/contracts/ipc/diagnostics.contract.ts"
+import { localeRevision, subscribeLocale, t } from "./locales.ts"
 
 export function DiagnosticsSection(): JSX.Element {
+  useSyncExternalStore(subscribeLocale, localeRevision, localeRevision)
   const api = getDesktopApi()?.diagnostics
   const [status, setStatus] = useState<DiagnosticsStatusDto | undefined>()
   const [busy, setBusy] = useState(false)
@@ -36,41 +38,41 @@ export function DiagnosticsSection(): JSX.Element {
   }
 
   if (api === undefined) {
-    return <section style={styles.section}><h2 style={styles.title}>{isChinese() ? "诊断" : "Diagnostics"}</h2><p>{isChinese() ? "桌面诊断桥不可用。" : "Desktop diagnostics bridge is unavailable."}</p></section>
+    return <section style={styles.section}><h2 style={styles.title}>{t("diagnostics.title")}</h2><p>{t("diagnostics.unavailable")}</p></section>
   }
 
   return <section style={styles.section}>
-    <h2 style={styles.title}>{isChinese() ? "诊断" : "Diagnostics"}</h2>
-    <p style={styles.description}>{isChinese() ? "日志只保存在本机，默认不包含 Prompt、模型正文、工具参数或凭据。" : "Logs stay on this device and exclude prompts, model content, tool arguments, and credentials by default."}</p>
+    <h2 style={styles.title}>{t("diagnostics.title")}</h2>
+    <p style={styles.description}>{t("diagnostics.description")}</p>
     <div style={styles.grid}>
-      <Metric label={isChinese() ? "应用日志" : "App logs"} value={formatBytes(status?.appLogBytes ?? 0)} />
-      <Metric label={isChinese() ? "审计日志" : "Audit logs"} value={formatBytes(status?.auditLogBytes ?? 0)} />
-      <Metric label={isChinese() ? "Host 日志" : "Host logs"} value={formatBytes(status?.hostLogBytes ?? 0)} />
-      <Metric label={isChinese() ? "TUI 日志" : "TUI logs"} value={formatBytes(status?.tuiLogBytes ?? 0)} />
-      <Metric label={isChinese() ? "崩溃文件" : "Crash dumps"} value={String(status?.crashCount ?? 0)} />
-      <Metric label={isChinese() ? "丢弃记录" : "Dropped records"} value={String(status?.droppedRecordCount ?? 0)} />
-      <Metric label={isChinese() ? "Electron 内存" : "Electron memory"} value={formatBytes(status?.resources?.latest?.electronWorkingSetBytes ?? 0)} />
-      <Metric label={isChinese() ? "Electron 进程" : "Electron processes"} value={String(status?.resources?.latest?.processCount ?? 0)} />
+      <Metric label={t("diagnostics.appLogs")} value={formatBytes(status?.appLogBytes ?? 0)} />
+      <Metric label={t("diagnostics.auditLogs")} value={formatBytes(status?.auditLogBytes ?? 0)} />
+      <Metric label={t("diagnostics.hostLogs")} value={formatBytes(status?.hostLogBytes ?? 0)} />
+      <Metric label={t("diagnostics.tuiLogs")} value={formatBytes(status?.tuiLogBytes ?? 0)} />
+      <Metric label={t("diagnostics.crashDumps")} value={String(status?.crashCount ?? 0)} />
+      <Metric label={t("diagnostics.dropped")} value={String(status?.droppedRecordCount ?? 0)} />
+      <Metric label={t("diagnostics.electronMemory")} value={formatBytes(status?.resources?.latest?.electronWorkingSetBytes ?? 0)} />
+      <Metric label={t("diagnostics.electronProcesses")} value={String(status?.resources?.latest?.processCount ?? 0)} />
     </div>
-    {status?.temporaryDebugUntil !== undefined && <p style={styles.notice}>{isChinese() ? `Debug 日志开启至 ${status.temporaryDebugUntil}` : `Debug logging enabled until ${status.temporaryDebugUntil}`}</p>}
+    {status?.temporaryDebugUntil !== undefined && <p style={styles.notice}>{t("diagnostics.debugUntil", { time: status.temporaryDebugUntil })}</p>}
     <div style={styles.actions}>
-      <button type="button" disabled={busy} onClick={() => run(api.openLogFolder, isChinese() ? "已打开日志目录。" : "Log folder opened.")}>{isChinese() ? "打开日志目录" : "Open log folder"}</button>
-      <button type="button" disabled={busy} onClick={() => run(async () => { const result = await api.exportBundle(); if (!result.cancelled) setMessage(isChinese() ? `已导出 ${result.fileName ?? "诊断包"}。` : `Exported ${result.fileName ?? "diagnostics bundle"}.`) }, isChinese() ? "导出已完成。" : "Export completed.")}>{isChinese() ? "导出诊断包" : "Export diagnostics"}</button>
-      <button type="button" disabled={busy} onClick={() => { if (window.confirm(isChinese() ? "清理本地日志？" : "Clear local logs?")) run(api.clearLogs, isChinese() ? "日志已清理。" : "Logs cleared.") }}>{isChinese() ? "清理日志" : "Clear logs"}</button>
-      <button type="button" disabled={busy} onClick={() => run(async () => { await api.enableTemporaryDebug({ durationMinutes: 30 }) }, isChinese() ? "Debug 日志已临时开启 30 分钟。" : "Debug logging enabled for 30 minutes.")}>{isChinese() ? "开启 Debug（30 分钟）" : "Enable Debug (30 min)"}</button>
-      <button type="button" disabled={busy} onClick={refresh}>{isChinese() ? "刷新状态" : "Refresh status"}</button>
+      <button type="button" disabled={busy} onClick={() => run(api.openLogFolder, t("diagnostics.folderOpened"))}>{t("diagnostics.openFolder")}</button>
+      <button type="button" disabled={busy} onClick={() => run(async () => { const result = await api.exportBundle(); if (!result.cancelled) setMessage(t("diagnostics.exported", { file: result.fileName ?? "diagnostics bundle" })) }, t("diagnostics.exportComplete"))}>{t("diagnostics.export")}</button>
+      <button type="button" disabled={busy} onClick={() => { if (window.confirm(t("diagnostics.clearConfirm"))) run(api.clearLogs, t("diagnostics.cleared")) }}>{t("diagnostics.clear")}</button>
+      <button type="button" disabled={busy} onClick={() => run(async () => { await api.enableTemporaryDebug({ durationMinutes: 30 }) }, t("diagnostics.debugEnabled"))}>{t("diagnostics.enableDebug")}</button>
+      <button type="button" disabled={busy} onClick={refresh}>{t("diagnostics.refresh")}</button>
     </div>
     <div style={styles.query}>
       <input
         value={queryText}
-        placeholder={isChinese() ? "按事件名、来源、Host 或关联 ID 搜索" : "Search event, source, Host or correlation ID"}
+        placeholder={t("diagnostics.searchPlaceholder")}
         onChange={(event) => setQueryText(event.currentTarget.value)}
         onKeyDown={(event) => { if (event.key === "Enter") refresh() }}
       />
-      <button type="button" disabled={busy} onClick={refresh}>{isChinese() ? "查询日志" : "Query logs"}</button>
+      <button type="button" disabled={busy} onClick={refresh}>{t("diagnostics.query")}</button>
     </div>
     <div style={styles.records} aria-live="polite">
-      {records.length === 0 ? <p style={styles.notice}>{isChinese() ? "暂无匹配日志。" : "No matching log records."}</p> : records.map((record) => (
+      {records.length === 0 ? <p style={styles.notice}>{t("diagnostics.noMatches")}</p> : records.map((record) => (
         <div key={`${record.eventId ?? record.timestamp}-${record.sequence ?? record.eventName}`} style={styles.record}>
           <code>{record.timestamp}</code>
           <strong>{record.severityText ?? "INFO"}</strong>
@@ -90,10 +92,6 @@ function getDesktopApi(): DesktopApi | undefined {
 
 function Metric({ label, value }: { readonly label: string; readonly value: string }): JSX.Element {
   return <div style={styles.metric}><span style={styles.metricLabel}>{label}</span><strong>{value}</strong></div>
-}
-
-function isChinese(): boolean {
-  return document.documentElement.lang.toLowerCase().startsWith("zh") || navigator.language.toLowerCase().startsWith("zh")
 }
 
 function formatBytes(value: number): string {

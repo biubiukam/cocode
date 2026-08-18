@@ -30,7 +30,7 @@ import css from './HoverCard.module.css'
  */
 export function HoverCard({
   anchor, content, openDelayMs = 500, disabled = false,
-  copyText, copyLabel = '复制', copiedLabel = '复制成功',
+  copyText, copyLabel, copiedLabel,
 }: {
   anchor: ReactNode
   content: ReactNode
@@ -51,6 +51,9 @@ export function HoverCard({
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
   const [copied, setCopied] = useState(false)
+  const chinese = typeof document !== 'undefined' && document.documentElement.lang.toLowerCase().startsWith('zh')
+  const resolvedCopyLabel = copyLabel ?? (chinese ? '复制' : 'Copy')
+  const resolvedCopiedLabel = copiedLabel ?? (chinese ? '复制成功' : 'Copied')
 
   const clearCopied = useCallback(() => {
     if (copyTimerRef.current !== null) {
@@ -153,7 +156,7 @@ export function HoverCard({
       style={{ ...pos, minHeight: copied && copyHeightRef.current !== null ? copyHeightRef.current : undefined }}
       role={copyable ? 'button' : undefined}
       tabIndex={copyable ? 0 : undefined}
-      aria-label={copyable ? `${copyLabel}: ${copyText}` : undefined}
+      aria-label={copyable ? `${resolvedCopyLabel}: ${copyText}` : undefined}
       onClick={copyable
         ? (e) => {
           const selection = window.getSelection()
@@ -173,7 +176,7 @@ export function HoverCard({
         }
         : undefined}
     >
-      {copied ? <span className={css.copied} aria-hidden="true">{copiedLabel}</span> : content}
+      {copied ? <span className={css.copied} aria-hidden="true">{resolvedCopiedLabel}</span> : content}
     </div>
   )
 
@@ -209,7 +212,7 @@ export function HoverCard({
       }}
     >
       {anchor}
-      {open && copyable && <span className={css.status} role="status">{copied ? copiedLabel : ''}</span>}
+      {open && copyable && <span className={css.status} role="status">{copied ? resolvedCopiedLabel : ''}</span>}
       {card !== false && createPortal(card, document.body)}
     </span>
   )

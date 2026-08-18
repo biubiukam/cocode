@@ -34,6 +34,8 @@ import {
 	unregisterDiagnosticsIpc,
 } from "../contexts/diagnostics/presentation/ipc/register-diagnostics-ipc"
 import { createDesktopObservability } from "../shared/observability/desktop-observability"
+import { createApplicationLocale } from "../shared/locale/application-locale"
+import { registerLocaleIpc, unregisterLocaleIpc } from "../shared/locale/register-locale-ipc"
 import { registerElectronObservers } from "../shared/observability/register-electron-observers"
 import { TuiLauncher } from "../contexts/tui/infrastructure/tui-launcher"
 import { registerTuiIpc, unregisterTuiIpc } from "../contexts/tui/presentation/ipc/register-tui-ipc"
@@ -56,7 +58,9 @@ export const startApplication = (): void => {
 	// duplicate launch never touches state the running instance owns.
 	if (!acquireSingleInstanceLock()) return
 
-	const observability = createDesktopObservability()
+	const locale = createApplicationLocale()
+	const observability = createDesktopObservability(locale)
+	registerLocaleIpc(locale)
 	const unregisterElectronObservers = registerElectronObservers(observability.logger)
 	registerDiagnosticsIpc(observability.diagnostics, observability.logger)
 
@@ -160,8 +164,8 @@ export const startApplication = (): void => {
 			})
 			shortcuts = new ShortcutService(() => mainWindow)
 			registerShortcutsIpc(shortcuts, observability.logger)
-			applicationUpdates = registerApplicationUpdates(lifecycle)
-			applicationMenu = registerApplicationMenu(applicationUpdates)
+			applicationUpdates = registerApplicationUpdates(lifecycle, locale)
+			applicationMenu = registerApplicationMenu(applicationUpdates, locale)
 			observability.logger.log("info", "app.ready.completed")
 		},
 		onBeforeQuit: async () => {
@@ -171,6 +175,7 @@ export const startApplication = (): void => {
 			applicationUpdates?.dispose()
 			applicationUpdates = null
 			try {
+				unregisterLocaleIpc()
 				unregisterDiagnosticsIpc()
 				unregisterTuiIpc()
 				tuiLauncher = null

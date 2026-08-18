@@ -25,7 +25,10 @@ export interface CodeBlockProps {
   copiedLabel?: string | undefined
 }
 
-export function CodeBlock({ code, lang, className, copyLabel = '复制', copiedLabel = '复制成功' }: CodeBlockProps) {
+export function CodeBlock({ code, lang, className, copyLabel, copiedLabel }: CodeBlockProps) {
+  const chinese = typeof document !== 'undefined' && document.documentElement.lang.toLowerCase().startsWith('zh')
+  const resolvedCopyLabel = copyLabel ?? (chinese ? '复制' : 'Copy')
+  const resolvedCopiedLabel = copiedLabel ?? (chinese ? '复制成功' : 'Copied')
   const trimmed = code.endsWith('\n') ? code.slice(0, -1) : code
   const hasLanguage = lang !== undefined && lang.length > 0
   // Re-render when a lazy grammar finishes loading, so a fence that showed plain
@@ -69,11 +72,11 @@ export function CodeBlock({ code, lang, className, copyLabel = '复制', copiedL
         <div className={css.banner}>
           <div className={css.infostring}>{lang ?? ''}</div>
           <div className={css.action}>
-            <Tooltip label={copied ? copiedLabel : copyLabel} side="bottom">
+            <Tooltip label={copied ? resolvedCopiedLabel : resolvedCopyLabel} side="bottom">
               <button
                 type="button"
                 className={css.copyButton}
-                aria-label={copied ? copiedLabel : copyLabel}
+                aria-label={copied ? resolvedCopiedLabel : resolvedCopyLabel}
                 onClick={onCopy}
               >
                 {copied ? <IconCheckOutline16 /> : <IconCopyOutline16 />}

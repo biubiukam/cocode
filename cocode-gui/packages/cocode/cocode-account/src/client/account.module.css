@@ -110,7 +110,8 @@
 .secondary {
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .primary {
@@ -331,7 +332,8 @@
   color: var(--dsw-alias-label-secondary);
   font-size: 11px;
   line-height: 16px;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .usageMetricPercent {
@@ -396,6 +398,8 @@
   font: inherit;
   text-align: left;
   text-decoration: none;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .panelAction:hover {

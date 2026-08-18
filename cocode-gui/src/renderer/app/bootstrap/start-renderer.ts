@@ -136,7 +136,8 @@ function createFailureView(error: unknown): HTMLElement {
 	const container = document.createElement("main")
 	container.className = "dsh-desktop-startup-error"
 	const heading = document.createElement("h1")
-	heading.textContent = "DeepSeek Harness 启动失败"
+	const chinese = typeof navigator !== "undefined" && /^zh(?:-|$)/i.test(navigator.language)
+	heading.textContent = chinese ? "DeepSeek Harness 启动失败" : "DeepSeek Harness failed to start"
 	const message = document.createElement("p")
 	message.textContent = error instanceof Error ? error.message : String(error)
 	container.append(heading, message)

@@ -5,6 +5,7 @@ import type { ShortcutsApi } from "./shortcuts.contract"
 import type { DiagnosticsApi } from "./diagnostics.contract"
 import type { TuiApi } from "./tui.contract"
 import type { ExternalDshApi, SharedDshApi } from "./external-dsh.contract"
+import type { LocaleApi } from "./locale.contract"
 
 export interface DesktopApi {
 	readonly database: DatabaseApi
@@ -16,4 +17,5 @@ export interface DesktopApi {
 	readonly sharedDsh: SharedDshApi
 	/** @deprecated Use sharedDsh. */
 	readonly externalDsh: ExternalDshApi
+	readonly locale: LocaleApi
 }

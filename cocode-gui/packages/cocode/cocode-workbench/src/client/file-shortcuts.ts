@@ -43,7 +43,7 @@ export interface ShortcutCommandLike {
   readonly run: () => boolean
 }
 
-export function fileShortcutCommands(): readonly ShortcutCommandLike[] {
+export function fileShortcutCommands(t: (key: string) => string = key => key): readonly ShortcutCommandLike[] {
   const command = (id: string, title: string, description: string, defaultCombo: Combo): ShortcutCommandLike => ({
     id,
     title,
@@ -55,18 +55,18 @@ export function fileShortcutCommands(): readonly ShortcutCommandLike[] {
     },
   })
   return [
-    command(FILE_OPEN_COMMAND, "打开文件", "打开当前选中的文件", { key: "Enter" }),
-    command(FILE_ADD_TO_CHAT_COMMAND, "添加到聊天", "将当前文件作为 @文件 插入聊天输入框", { key: "l", primary: true }),
-    command(FILE_RENAME_COMMAND, "重命名文件", "重命名当前选中的文件或文件夹", { key: "F2" }),
-    command(FILE_DELETE_COMMAND, "删除文件", "删除当前选中的文件或文件夹", { key: "Delete" }),
-    command(FILE_COPY_COMMAND, "复制文件", "复制当前选中的文件或文件夹", { key: "c", primary: true }),
-    command(FILE_CUT_COMMAND, "剪切文件", "剪切当前选中的文件或文件夹", { key: "x", primary: true }),
-    command(FILE_PASTE_COMMAND, "粘贴文件", "粘贴文件到当前目录", { key: "v", primary: true }),
-    command(FILE_SELECT_PREVIOUS_COMMAND, "选择上一个文件", "在文件列表中选择上一项", { key: "ArrowUp" }),
-    command(FILE_SELECT_NEXT_COMMAND, "选择下一个文件", "在文件列表中选择下一项", { key: "ArrowDown" }),
-    command(FILE_EXPAND_COMMAND, "展开文件夹", "展开当前文件夹或进入其第一项", { key: "ArrowRight" }),
-    command(FILE_COLLAPSE_COMMAND, "收起文件夹", "收起当前文件夹或选择其父目录", { key: "ArrowLeft" }),
-    command(FILE_CONTEXT_MENU_COMMAND, "打开文件菜单", "打开当前项的右键菜单", { key: "F10", shift: true }),
-    command(FILE_CANCEL_COMMAND, "取消文件操作", "取消当前文件列表操作", { key: "Escape" }),
+    command(FILE_OPEN_COMMAND, t("files.shortcut.open"), t("files.shortcut.openHint"), { key: "Enter" }),
+    command(FILE_ADD_TO_CHAT_COMMAND, t("files.shortcut.addToChat"), t("files.shortcut.addToChatHint"), { key: "l", primary: true }),
+    command(FILE_RENAME_COMMAND, t("files.shortcut.rename"), t("files.shortcut.renameHint"), { key: "F2" }),
+    command(FILE_DELETE_COMMAND, t("files.shortcut.delete"), t("files.shortcut.deleteHint"), { key: "Delete" }),
+    command(FILE_COPY_COMMAND, t("files.shortcut.copy"), t("files.shortcut.copyHint"), { key: "c", primary: true }),
+    command(FILE_CUT_COMMAND, t("files.shortcut.cut"), t("files.shortcut.cutHint"), { key: "x", primary: true }),
+    command(FILE_PASTE_COMMAND, t("files.shortcut.paste"), t("files.shortcut.pasteHint"), { key: "v", primary: true }),
+    command(FILE_SELECT_PREVIOUS_COMMAND, t("files.shortcut.previous"), t("files.shortcut.previousHint"), { key: "ArrowUp" }),
+    command(FILE_SELECT_NEXT_COMMAND, t("files.shortcut.next"), t("files.shortcut.nextHint"), { key: "ArrowDown" }),
+    command(FILE_EXPAND_COMMAND, t("files.shortcut.expand"), t("files.shortcut.expandHint"), { key: "ArrowRight" }),
+    command(FILE_COLLAPSE_COMMAND, t("files.shortcut.collapse"), t("files.shortcut.collapseHint"), { key: "ArrowLeft" }),
+    command(FILE_CONTEXT_MENU_COMMAND, t("files.shortcut.menu"), t("files.shortcut.menuHint"), { key: "F10", shift: true }),
+    command(FILE_CANCEL_COMMAND, t("files.shortcut.cancel"), t("files.shortcut.cancelHint"), { key: "Escape" }),
   ]
 }

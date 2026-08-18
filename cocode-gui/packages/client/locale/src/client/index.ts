@@ -132,6 +132,7 @@ export class LocaleRuntime {
     this.host = host
     this.provisional = resolveInitialLocale()
     this.snapshot = Object.freeze({ active: this.provisional, locales: LOCALES, revision: 0 })
+    if (typeof document !== 'undefined') document.documentElement.lang = this.provisional
     if (host !== undefined) {
       ctx.effect(() => host.subscribe(() => { this.adopt(host) }), 'locale: settings scope adoption')
       this.adopt(host)
@@ -294,6 +295,7 @@ export class LocaleRuntime {
    * re-register slots in response).
    */
   private publish(active: LocaleId, localeChanged: boolean): void {
+    if (typeof document !== 'undefined') document.documentElement.lang = active
     this.snapshot = Object.freeze({
       active,
       locales: this.snapshot.locales,
@@ -365,6 +367,14 @@ export function apply(ctx: ClientContext): void {
   const store = createLanguageRowStore()
   let bound: BoundActions<typeof store> | undefined
   const sync = (snapshot: LocaleSnapshot): void => {
+    try {
+      const desktop = (globalThis as typeof globalThis & {
+        desktopApi?: { locale?: { set(locale: LocaleId): void } }
+      }).desktopApi
+      desktop?.locale?.set(snapshot.active)
+    } catch {
+      // Browser-only previews do not expose the Electron bridge.
+    }
     bound?.sync(
       snapshot.active,
       snapshot.locales.map(l => ({ id: l.id, label: l.label })),
@@ -372,6 +382,7 @@ export function apply(ctx: ClientContext): void {
     )
   }
   ctx.on('locale/change', sync)
+  sync(locale.getLocale())
   const injected = (actions: BoundActions<typeof store>): LanguageRowInjected => {
     bound = actions
     // Re-sync from the getter so no event is lost between registration and

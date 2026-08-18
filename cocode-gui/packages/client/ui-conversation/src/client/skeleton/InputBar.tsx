@@ -113,7 +113,7 @@ export function InputBar({
   useEffect(() => {
     if (promptError === null) return
     if (promptError.error.message.startsWith('OUTCOME_UNKNOWN:')) {
-      showToast('运行状态未知：请先刷新会话状态，确认后再重试。')
+      showToast(t('error.outcomeUnknown'))
       return
     }
     showToast(promptError.error.code === 'attachment-error'

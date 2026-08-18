@@ -5,7 +5,7 @@ import { DockSurface } from "./DockSurface.tsx"
 import { Launcher } from "./Launcher.tsx"
 import { WorkbenchController, type WorkbenchLayoutFace } from "./controller.ts"
 import { builtInPanels } from "./builtins.tsx"
-import { LOCALE_NS, attachLocale, en, zh, type WorkbenchKey } from "./locales.ts"
+import { LOCALE_NS, attachLocale, en, zh, t, type WorkbenchKey } from "./locales.ts"
 import { CommitModelRow } from "./settings-row.tsx"
 import { CommandLineSection } from "./command-line-section.tsx"
 import { DiagnosticsSection } from "./diagnostics-section.tsx"
@@ -74,7 +74,8 @@ export function apply(ctx: ClientContext): void {
   ctx.inject(["shortcuts"], (shortcutCtx: ClientContext) => {
     const shortcuts = shortcutCtx.get("shortcuts")
     if (shortcuts === undefined) return
-    for (const command of fileShortcutCommands()) {
+    const translate = ctx.locale.bind(LOCALE_NS)
+    for (const command of fileShortcutCommands((key) => translate(key as WorkbenchKey))) {
       ctx.effect(() => shortcuts.register(command), `cocode-workbench: ${command.id}`)
     }
   })
@@ -112,17 +113,13 @@ export function apply(ctx: ClientContext): void {
     name: "settings.section",
     id: "cocode-workbench-command-line",
     order: 850,
-    label: () => isChinese() ? "命令行" : "Command line",
+    label: () => t("commandLine.title"),
   }, CommandLineSection))
   slots.inject("settings.section", () => slots.register({
     name: "settings.section",
     id: "cocode-workbench-diagnostics",
     order: 900,
-    label: () => isChinese() ? "诊断" : "Diagnostics",
+    label: () => t("diagnostics.title"),
   }, DiagnosticsSection))
   ctx.effect(() => () => { void disposeService() }, "cocode-workbench: dispose service")
-}
-
-function isChinese(): boolean {
-  return document.documentElement.lang.toLowerCase().startsWith("zh") || navigator.language.toLowerCase().startsWith("zh")
 }

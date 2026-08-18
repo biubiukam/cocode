@@ -25,6 +25,7 @@ import { DesktopLogger } from "../logging/desktop-logger"
 import { sanitizePath } from "../logging/redaction"
 import type { ResourceMonitor } from "./resource-monitor"
 import { LogQueryService } from "./log-query-service"
+import type { ApplicationLocale } from "../locale/application-locale"
 
 export interface DiagnosticsServiceOptions {
 	readonly logger: DesktopLogger
@@ -33,6 +34,7 @@ export interface DiagnosticsServiceOptions {
 	readonly logLayout?: CocodeLogLayout
 	readonly buildId?: string
 	readonly resources?: ResourceMonitor
+	readonly locale?: ApplicationLocale
 }
 
 export class DiagnosticsService {
@@ -44,6 +46,7 @@ export class DiagnosticsService {
 	private readonly buildId: string | undefined
 	private readonly resources: ResourceMonitor | undefined
 	private readonly logQuery: LogQueryService
+	private readonly locale: ApplicationLocale | undefined
 
 	public constructor(options: DiagnosticsServiceOptions) {
 		this.logger = options.logger
@@ -59,6 +62,7 @@ export class DiagnosticsService {
 		this.hostLogDirectory = options.hostLogDirectory
 		this.buildId = options.buildId
 		this.resources = options.resources
+		this.locale = options.locale
 		mkdirSync(this.diagnosticsDirectory, { recursive: true, mode: 0o700 })
 		this.logQuery = new LogQueryService({
 			layout: this.logLayout,
@@ -105,7 +109,7 @@ export class DiagnosticsService {
 			.toISOString()
 			.replace(/[:.]/g, "-")}.tgz`
 		const selected = await dialog.showSaveDialog({
-			title: "导出 Cocode 诊断包",
+			title: this.locale?.get() === "en" ? "Export Cocode Diagnostics" : "导出 Cocode 诊断包",
 			defaultPath: path.join(this.diagnosticsDirectory, defaultName),
 			filters: [{ name: "Gzip Tar Archive", extensions: ["tgz"] }],
 		})
@@ -292,12 +296,21 @@ export class DiagnosticsService {
 		if (countCrashDumps() === 0) return false
 		const result = await dialog.showMessageBox({
 			type: "warning",
-			buttons: ["不包含崩溃文件", "包含崩溃文件"],
+			buttons:
+				this.locale?.get() === "en"
+					? ["Exclude Crash Dumps", "Include Crash Dumps"]
+					: ["不包含崩溃文件", "包含崩溃文件"],
 			defaultId: 0,
 			cancelId: 0,
-			title: "导出崩溃文件",
-			message: "诊断包中是否包含本地 Electron 崩溃文件？",
-			detail: "崩溃文件可能包含系统和运行时诊断信息，仅在提交给技术支持时选择包含。",
+			title: this.locale?.get() === "en" ? "Export Crash Dumps" : "导出崩溃文件",
+			message:
+				this.locale?.get() === "en"
+					? "Include local Electron crash dumps in the diagnostics bundle?"
+					: "诊断包中是否包含本地 Electron 崩溃文件？",
+			detail:
+				this.locale?.get() === "en"
+					? "Crash dumps may contain system and runtime diagnostic data. Include them only when sending the bundle to support."
+					: "崩溃文件可能包含系统和运行时诊断信息，仅在提交给技术支持时选择包含。",
 		})
 		return result.response === 1
 	}

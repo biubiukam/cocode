@@ -56,8 +56,8 @@ function renderWordmark(): string {
 const WORDMARK = renderWordmark()
 
 /**
- * Kickers keep the site's `PRODUCT / 描述` shape, where the uppercase product
- * segment stays English in both locales.
+ * Kickers keep the site's `PRODUCT / DESCRIPTION` shape, where the uppercase
+ * product segment stays English in both locales.
  */
 const COPY = {
 	zh: {
@@ -88,9 +88,36 @@ const COPY = {
 	},
 } as const
 
-/** Mirror cocode.agency: any Chinese preference wins, everything else is English. */
-function pickLocale(acceptLanguage: string | undefined): keyof typeof COPY {
-	return acceptLanguage !== undefined && /\bzh\b/i.test(acceptLanguage) ? "zh" : "en"
+/**
+ * Follow the browser's normal language negotiation rules. `Accept-Language`
+ * is ordered by preference and may attach a q-weight to each range; do not
+ * let a lower-priority Chinese fallback override a browser whose primary
+ * language is English.
+ */
+export function pickLocale(
+	acceptLanguage: string | readonly string[] | undefined,
+): keyof typeof COPY {
+	if (acceptLanguage === undefined) return "en"
+	const header = typeof acceptLanguage === "string" ? acceptLanguage : acceptLanguage.join(",")
+	const candidates = header
+		.split(",")
+		.map((part, index) => {
+			const [range, ...parameters] = part.trim().split(";")
+			const qParameter = parameters.find((parameter) => /^\s*q\s*=/i.test(parameter))
+			const parsedWeight = qParameter === undefined ? 1 : Number(qParameter.split("=")[1])
+			return {
+				range: range.toLowerCase().split("-")[0],
+				weight: Number.isFinite(parsedWeight) ? Math.max(0, Math.min(1, parsedWeight)) : 0,
+				index,
+			}
+		})
+		.filter((candidate) => candidate.weight > 0)
+		.sort((left, right) => right.weight - left.weight || left.index - right.index)
+	for (const candidate of candidates) {
+		if (candidate.range === "zh") return "zh"
+		if (candidate.range === "en") return "en"
+	}
+	return "en"
 }
 
 const STYLE = `

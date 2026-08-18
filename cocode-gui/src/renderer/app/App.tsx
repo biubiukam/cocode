@@ -1,6 +1,9 @@
 import { Button } from "@/components/ui/button"
 
 export function App(): JSX.Element {
+	const chinese =
+		typeof document !== "undefined" &&
+		document.documentElement.lang.toLowerCase().startsWith("zh")
 	return (
 		<main className="flex min-h-screen items-center justify-center p-6">
 			<section className="w-full max-w-xl space-y-6 rounded-lg border bg-card p-8 shadow-sm">
@@ -10,10 +13,12 @@ export function App(): JSX.Element {
 						React + Tailwind + shadcn/ui
 					</h1>
 					<p className="text-muted-foreground">
-						Renderer 基础设施已初始化，可以按业务限界上下文继续演进。
+						{chinese
+							? "Renderer 基础设施已初始化，可以按业务限界上下文继续演进。"
+							: "Renderer infrastructure is ready for the next product features."}
 					</p>
 				</div>
-				<Button>开始构建</Button>
+				<Button>{chinese ? "开始构建" : "Start building"}</Button>
 			</section>
 		</main>
 	)

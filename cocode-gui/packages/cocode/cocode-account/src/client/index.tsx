@@ -97,6 +97,26 @@ const COPY = {
     help: "帮助与反馈",
     signOut: "退出登录",
     providerId: "Provider ID：",
+    waitData: "等待数据",
+    resettingSoon: "即将重置",
+    resetIn: "约 {value} 后重置",
+    syncFailed: "同步失败：{message}",
+    syncingUsage: "正在同步账号用量…",
+    usageSynced: "账号用量已同步",
+    updatedAt: "更新于 {time}",
+    currentProvider: "当前 Provider",
+    currentPlan: "当前套餐",
+    remaining: "剩余",
+    rollingReset: "滚动窗口，等待重置时间",
+    periodEnds: "当前周期到期：{time}",
+    usageHint: "百分比代表当前周期剩余额度。本地 Provider 的请求不会计入 Cocode Nut 用量。",
+    cloudProvider: "账号云模型与 Cocode Nut 服务",
+    localProvider: "本地 Provider 与凭证配置",
+    cloudHelp: "Cocode Nut 的账号、套餐和云模型问题，可以先打开个人中心；模型选择和本地配置仍在模型设置中管理。",
+    localHelp: "当前使用的是本地 Provider。连接、模型不可用或凭证问题，可以从 Provider 设置开始排查。",
+    openAccountCenter: "打开 Cocode 个人中心",
+    openDocs: "访问 Cocode 文档",
+    feedbackMail: "反馈邮件",
   },
   en: {
     signIn: "Sign in to Cocode",
@@ -130,8 +150,29 @@ const COPY = {
     help: "Help & feedback",
     signOut: "Sign out",
     providerId: "Provider ID: ",
+    waitData: "Waiting for data",
+    resettingSoon: "Resetting soon",
+    resetIn: "Resets in about {value}",
+    syncFailed: "Sync failed: {message}",
+    syncingUsage: "Syncing account usage…",
+    usageSynced: "Account usage synced",
+    updatedAt: "Updated {time}",
+    currentProvider: "Current provider",
+    currentPlan: "Current plan",
+    remaining: "remaining",
+    rollingReset: "Rolling window; reset time is unavailable",
+    periodEnds: "Current period ends {time}",
+    usageHint: "Percentages show the remaining allowance for the current period. Local provider requests are not counted toward Cocode Nut usage.",
+    cloudProvider: "Account cloud models and Cocode Nut service",
+    localProvider: "Local provider and credential configuration",
+    cloudHelp: "For Cocode Nut account, plan, or cloud-model issues, open the account center first. Model selection and local configuration remain in Models settings.",
+    localHelp: "You are using a local provider. Start with provider settings when a connection, model, or credential is unavailable.",
+    openAccountCenter: "Open Cocode account center",
+    openDocs: "Open Cocode documentation",
+    feedbackMail: "Feedback email",
   },
 } as const
+type AccountCopy = typeof COPY.zh | typeof COPY.en
 
 function copy(): typeof COPY.zh | typeof COPY.en {
   return activeLocale === "en" ? COPY.en : COPY.zh
@@ -453,26 +494,25 @@ function formatDateTime(value: string | undefined): string | undefined {
   return date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
 }
 
-function formatTimeUntil(value: string | undefined, now = Date.now()): string {
-  if (value === undefined) return "等待数据"
+function formatTimeUntil(value: string | undefined, t: AccountCopy, now = Date.now()): string {
+  if (value === undefined) return t.waitData
   const target = new Date(value).getTime()
-  if (!Number.isFinite(target)) return "等待数据"
+  if (!Number.isFinite(target)) return t.waitData
   const remaining = target - now
-  if (remaining <= 0) return "即将重置"
+  if (remaining <= 0) return t.resettingSoon
   const minutes = Math.ceil(remaining / 60_000)
   const days = Math.floor(minutes / (24 * 60))
   const hours = Math.floor((minutes % (24 * 60)) / 60)
   const mins = minutes % 60
-  if (days > 0) return `约 ${days} 天 ${hours} 小时后重置`
-  if (hours > 0) return `约 ${hours} 小时 ${mins} 分钟后重置`
-  return `约 ${mins} 分钟后重置`
+  const valueText = days > 0 ? `${days}d ${hours}h` : hours > 0 ? `${hours}h ${mins}m` : `${mins}m`
+  return t.resetIn.replace('{value}', valueText)
 }
 
-function usageSyncLabel(snapshot: AccountSnapshot): string {
-  if (snapshot.usage?.error !== undefined) return `同步失败：${snapshot.usage.error}`
-  if (snapshot.usage?.syncedAt === undefined) return "正在同步账号用量…"
+function usageSyncLabel(snapshot: AccountSnapshot, t: AccountCopy): string {
+  if (snapshot.usage?.error !== undefined) return t.syncFailed.replace('{message}', snapshot.usage.error)
+  if (snapshot.usage?.syncedAt === undefined) return t.syncingUsage
   const date = new Date(snapshot.usage.syncedAt)
-  return Number.isNaN(date.getTime()) ? "账号用量已同步" : `更新于 ${date.toLocaleString()}`
+  return Number.isNaN(date.getTime()) ? t.usageSynced : t.updatedAt.replace('{time}', date.toLocaleString())
 }
 
 type MenuGlyphKind = "account" | "usage" | "settings" | "help" | "logout"
@@ -507,49 +547,49 @@ function AccountPanel({ kind, snapshot, provider, onClose }: {
   const title = kind === "usage" ? t.planUsage : t.help
   const isCloud = provider?.id === "cocode-nut"
     || (provider === null && (snapshot.cloud.status === "ready" || snapshot.cloud.status === "conflict"))
-  const providerLabel = isCloud ? "Cocode Nut" : provider?.name ?? "当前 Provider"
+  const providerLabel = isCloud ? "Cocode Nut" : provider?.name ?? t.currentProvider
   const usageMetric = (label: string, value: number | undefined, resetAt: string | undefined): ReturnType<typeof createElement> => {
     const percentage = remainingUsagePercent(value)
     return createElement("div", { className: css.usageMetric },
       createElement("div", { className: css.usageMetricHeader },
         createElement("span", { className: css.usageMetricLabel }, label),
-        createElement("strong", { className: css.usageMetricPercent }, percentage === undefined ? "—" : `${formatRemainingPercent(percentage)} 剩余`),
+        createElement("strong", { className: css.usageMetricPercent }, percentage === undefined ? "—" : `${formatRemainingPercent(percentage)} ${t.remaining}`),
       ),
       createElement("div", { className: css.usageTrack }, createElement("span", { className: css.usageFill, style: { width: `${percentage ?? 0}%` } })),
       createElement("span", { className: css.usageReset }, percentage === undefined
-        ? (snapshot.usage?.error === undefined ? "正在同步" : "同步失败")
-        : resetAt === undefined ? "滚动窗口，等待重置时间" : formatTimeUntil(resetAt)),
+        ? (snapshot.usage?.error === undefined ? t.syncingUsage : t.syncFailed.replace('{message}', ''))
+        : resetAt === undefined ? t.rollingReset : formatTimeUntil(resetAt, t)),
     )
   }
   const body = kind === "usage"
       ? createElement("div", { className: css.panelStack },
           createElement("div", { className: css.planCard },
-            createElement("span", { className: css.panelEyebrow }, "当前套餐"),
-            createElement("strong", { className: css.planName }, snapshot.usage?.plan?.toUpperCase() ?? (snapshot.usage?.error === undefined ? "正在同步…" : "同步失败")),
+            createElement("span", { className: css.panelEyebrow }, t.currentPlan),
+            createElement("strong", { className: css.planName }, snapshot.usage?.plan?.toUpperCase() ?? (snapshot.usage?.error === undefined ? t.syncingUsage : t.syncFailed.replace('{message}', ''))),
             createElement("span", { className: css.panelSecondary }, snapshot.usage?.currentPeriodEnd === undefined
-              ? usageSyncLabel(snapshot)
-              : `当前周期到期：${formatDateTime(snapshot.usage.currentPeriodEnd) ?? "等待数据"}`),
+              ? usageSyncLabel(snapshot, t)
+              : t.periodEnds.replace('{time}', formatDateTime(snapshot.usage.currentPeriodEnd) ?? t.waitData)),
           ),
           createElement("div", { className: css.usageGrid },
-            usageMetric("5 小时限额", snapshotUsage(snapshot, "fiveHour"), snapshot.usage?.fiveHourResetAt),
-            usageMetric("周限额", snapshotUsage(snapshot, "week"), snapshot.usage?.weekResetAt),
-            usageMetric("月限额", snapshotUsage(snapshot, "month"), snapshot.usage?.currentPeriodEnd),
+            usageMetric(t === COPY.en ? "5-hour limit" : "5 小时限额", snapshotUsage(snapshot, "fiveHour"), snapshot.usage?.fiveHourResetAt),
+            usageMetric(t === COPY.en ? "Weekly limit" : "周限额", snapshotUsage(snapshot, "week"), snapshot.usage?.weekResetAt),
+            usageMetric(t === COPY.en ? "Monthly limit" : "月限额", snapshotUsage(snapshot, "month"), snapshot.usage?.currentPeriodEnd),
           ),
-          createElement("p", { className: css.panelHint }, "百分比代表当前周期剩余额度。本地 Provider 的请求不会计入 Cocode Nut 用量。"),
+          createElement("p", { className: css.panelHint }, t.usageHint),
         )
       : createElement("div", { className: css.panelStack },
           createElement("div", { className: css.providerHelpCard },
-            createElement("span", { className: css.panelEyebrow }, "当前 Provider"),
+            createElement("span", { className: css.panelEyebrow }, t.currentProvider),
             createElement("strong", { className: css.planName }, providerLabel),
-            createElement("span", { className: css.panelSecondary }, isCloud ? "账号云模型与 Cocode Nut 服务" : "本地 Provider 与凭证配置"),
+            createElement("span", { className: css.panelSecondary }, isCloud ? t.cloudProvider : t.localProvider),
           ),
           createElement("p", { className: css.panelIntro }, isCloud
-            ? "Cocode Nut 的账号、套餐和云模型问题，可以先打开个人中心；模型选择和本地配置仍在模型设置中管理。"
-            : "当前使用的是本地 Provider。连接、模型不可用或凭证问题，可以从 Provider 设置开始排查。"),
-          isCloud ? createElement("a", { className: css.panelAction, href: ACCOUNT_CENTER_URL, target: "_blank", rel: "noreferrer" }, "打开 Cocode 个人中心") : null,
-          createElement("a", { className: css.panelAction, href: "https://doc.cocode.agency", target: "_blank", rel: "noreferrer" }, "访问 Cocode 文档"),
+            ? t.cloudHelp
+            : t.localHelp),
+          isCloud ? createElement("a", { className: css.panelAction, href: ACCOUNT_CENTER_URL, target: "_blank", rel: "noreferrer" }, t.openAccountCenter) : null,
+          createElement("a", { className: css.panelAction, href: "https://doc.cocode.agency", target: "_blank", rel: "noreferrer" }, t.openDocs),
           createElement("a", { className: css.feedbackDraft, href: `mailto:${FEEDBACK_TO}` },
-            createElement("strong", null, "反馈邮件"),
+            createElement("strong", null, t.feedbackMail),
             createElement("span", { className: css.feedbackAddress }, FEEDBACK_TO),
           ),
         )
@@ -557,7 +597,7 @@ function AccountPanel({ kind, snapshot, provider, onClose }: {
     createElement("section", { className: css.panel, role: "dialog", "aria-modal": "true", "aria-label": title },
       createElement("header", { className: css.panelHeader },
         createElement("h2", { className: css.panelTitle }, title),
-        createElement("button", { type: "button", className: css.panelClose, onClick: onClose, "aria-label": "关闭" }, "×"),
+        createElement("button", { type: "button", className: css.panelClose, onClick: onClose, "aria-label": t.close }, "×"),
       ),
       body,
     ),

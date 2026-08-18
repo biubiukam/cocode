@@ -7,6 +7,7 @@ import { shortcutsBridge } from "./bridges/shortcuts.bridge"
 import { diagnosticsBridge } from "./bridges/diagnostics.bridge"
 import { tuiBridge } from "./bridges/tui.bridge"
 import { sharedDshBridge } from "./bridges/external-dsh.bridge"
+import { localeBridge } from "./bridges/locale.bridge"
 
 const desktopApi: DesktopApi = {
 	database: databaseBridge,
@@ -18,6 +19,7 @@ const desktopApi: DesktopApi = {
 	sharedDsh: sharedDshBridge,
 	// Compatibility for an older Renderer bundle during a rolling desktop update.
 	externalDsh: sharedDshBridge,
+	locale: localeBridge,
 }
 
 contextBridge.exposeInMainWorld("desktopApi", desktopApi)

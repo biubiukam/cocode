@@ -10,7 +10,7 @@
  * through the three framework shares — zero cordis or framework imports,
  * zero self-made hooks.
  */
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import type { PropsRenderSlots, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import {
@@ -28,8 +28,14 @@ type RuntimeRecoveryDetail = {
   error?: { code: string; message: string }
 }
 
-function RuntimeRecoveryBanner() {
+type LayoutLocale = { subscribe(listener: () => void): () => void; getSnapshot(): { active: string }; bind(namespace: string): (key: string, params?: Record<string, unknown>) => string }
+
+const EMPTY_LOCALE = { active: 'zh' }
+const EMPTY_SUBSCRIBE = (): (() => void) => () => {}
+
+function RuntimeRecoveryBanner({ locale }: { locale?: LayoutLocale }) {
   const [detail, setDetail] = useState<RuntimeRecoveryDetail | null>(null)
+  const localeSnapshot = useSyncExternalStore(locale?.subscribe ?? EMPTY_SUBSCRIBE, locale?.getSnapshot ?? (() => EMPTY_LOCALE), locale?.getSnapshot ?? (() => EMPTY_LOCALE))
 
   useEffect(() => {
     const root = document.documentElement
@@ -63,16 +69,19 @@ function RuntimeRecoveryBanner() {
     }).desktopApi?.diagnostics
     if (api !== undefined) void api.openLogFolder()
   }
+  const english = localeSnapshot.active === 'en'
   return (
     <div className={css.recoveryBanner} role={failed ? 'alert' : 'status'} aria-live="polite">
       <span>
         {failed
-          ? `本地运行时恢复失败（${String(detail.attempt)}/${String(detail.maxAttempts)}）`
-          : '正在恢复本地运行时，暂时禁止发送新操作…'}
+          ? english
+            ? `Local runtime recovery failed (${String(detail.attempt)}/${String(detail.maxAttempts)})`
+            : `本地运行时恢复失败（${String(detail.attempt)}/${String(detail.maxAttempts)}）`
+          : english ? 'Recovering the local runtime; new actions are temporarily disabled…' : '正在恢复本地运行时，暂时禁止发送新操作…'}
         {failed && detail.error?.message !== undefined ? `：${detail.error.message}` : ''}
       </span>
-      {failed && <button type="button" onClick={retry}>重试恢复</button>}
-      {failed && <button type="button" onClick={diagnostics}>打开诊断</button>}
+      {failed && <button type="button" onClick={retry}>{english ? 'Retry recovery' : '重试恢复'}</button>}
+      {failed && <button type="button" onClick={diagnostics}>{english ? 'Open diagnostics' : '打开诊断'}</button>}
     </div>
   )
 }
@@ -82,6 +91,7 @@ export type AppFrameProps =
   & PropsRuntime<'root'>
   & PropsRenderSlots<'sidebar' | 'conversation' | 'details' | 'workbench.right' | 'workbench.bottom' | 'shell.overlay'>
   & PropsStore<ReturnType<typeof createLayoutStore>>
+  & { locale?: LayoutLocale }
 
 /** Center column grid item (session-body building block). */
 function CenterColumn(props: { children?: ReactNode }) {
@@ -165,6 +175,7 @@ export function AppFrame({
   useSessions,
   actions,
   renderSlot,
+  locale,
 }: AppFrameProps) {
   const panels = useStore(s => s)
   const detailsSession = useSessions((s) => {
@@ -267,7 +278,7 @@ export function AppFrame({
       data-workbench-bottom-collapsed={bottom === 0 || undefined}
       data-dragging={dragging || undefined}
     >
-      <RuntimeRecoveryBanner />
+      <RuntimeRecoveryBanner locale={locale} />
       <div className={css.sidebarCol}>
         {/* Render-site slot call with live concession output: a closed
             sidebar keeps the mounted slot at the compact-rail width, and the

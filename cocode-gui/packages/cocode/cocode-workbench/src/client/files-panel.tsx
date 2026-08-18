@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react"
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type MouseEvent as ReactMouseEvent, type ReactNode } from "react"
 import { Button, Menu, Modal, writeClipboard } from "@deepseek-ai/dsh-client-ui-primitives"
 import type { WorkbenchPanelProps } from "./model.ts"
 import { workbenchRequest } from "./runtime-api.ts"
@@ -16,6 +16,7 @@ import {
   FILE_SELECT_PREVIOUS_COMMAND, setActiveFileShortcutTarget,
 } from "./file-shortcuts.ts"
 import { ChevronIcon, FileGlyph, FolderGlyph, SearchIcon } from "./icons.tsx"
+import { localeRevision, subscribeLocale, t } from "./locales.ts"
 import css from "./panels.module.css"
 
 /** `git.status` 返回的一条变更记录；同一路径的暂存态与工作区态是两条。 */
@@ -76,6 +77,7 @@ function gitMap(root: string, entries: readonly GitEntry[]): Readonly<Record<str
 }
 
 export function FilesPanel(props: WorkbenchPanelProps) {
+  useSyncExternalStore(subscribeLocale, localeRevision, localeRevision)
   const sessionId = props.scope.sessionId
   const cwdHint = props.scope.cwd
   const [cwd, setCwd] = useState("")
@@ -367,9 +369,9 @@ export function FilesPanel(props: WorkbenchPanelProps) {
     <span className={css.treeIcon} data-dir={isDir || undefined}>{isDir ? <FolderGlyph size={14} /> : <FileGlyph size={14} />}</span>
     <input
       autoFocus
-      aria-label={draft?.mode === "rename" ? "新名称" : isDir ? "文件夹名" : "文件名"}
+      aria-label={draft?.mode === "rename" ? t("files.name") : isDir ? t("files.folderName") : t("files.name")}
       value={draft?.name ?? ""}
-      placeholder={isDir ? "文件夹名" : "文件名"}
+      placeholder={isDir ? t("files.folderName") : t("files.name")}
       onChange={event => setDraft(current => current === undefined ? current : { ...current, name: event.target.value })}
       onKeyDown={event => { if (event.key === "Escape") setDraft(undefined) }}
       onBlur={() => { void submitDraft() }}
@@ -425,9 +427,9 @@ export function FilesPanel(props: WorkbenchPanelProps) {
     <div className={css.treeSearch}>
       <SearchIcon size={14} />
       <input
-        aria-label="筛选文件"
+        aria-label={t("files.filterLabel")}
         value={filter}
-        placeholder="筛选文件…"
+        placeholder={t("files.filter")}
         onChange={event => setFilter(event.target.value)}
       />
       <Menu
@@ -437,14 +439,14 @@ export function FilesPanel(props: WorkbenchPanelProps) {
         portal
         compact
         items={[
-          { id: "file", label: "新建文件" },
-          { id: "folder", label: "新建文件夹" },
+          { id: "file", label: t("files.newFile") },
+          { id: "folder", label: t("files.newFolder") },
         ]}
         onSelect={id => {
           setNewOpen(false)
           startCreate(selected !== undefined && expanded.has(selected) ? selected : cwd, id === "folder" ? "folder" : "file")
         }}
-        anchor={<button type="button" className={css.treeNew} aria-label="新建" aria-haspopup="menu" aria-expanded={newOpen} onClick={() => setNewOpen(open => !open)}>+</button>}
+        anchor={<button type="button" className={css.treeNew} aria-label={t("files.new")} aria-haspopup="menu" aria-expanded={newOpen} onClick={() => setNewOpen(open => !open)}>+</button>}
       />
     </div>
     {error !== undefined && <div className={css.treeError}>{error}</div>}
@@ -453,15 +455,15 @@ export function FilesPanel(props: WorkbenchPanelProps) {
       tabIndex={0}
       className={css.tree}
       role="tree"
-      aria-label="工作区文件"
+      aria-label={t("files.workspaceLabel")}
       onFocus={() => setTreeFocused(true)}
       onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setTreeFocused(false) }}
       onContextMenu={event => { if (cwd !== "") openMenu(event, root) }}
     >
       {pending[cwd] && roots.length === 0
-        ? <div className={css.treeEmpty}>加载中…</div>
+        ? <div className={css.treeEmpty}>{t("files.loading")}</div>
         : roots.length === 0 && draft === undefined
-          ? <div className={css.treeEmpty}>此目录为空</div>
+          ? <div className={css.treeEmpty}>{t("files.empty")}</div>
           : renderBranch(cwd, 0)}
     </div>
     <Menu
@@ -481,11 +483,11 @@ export function FilesPanel(props: WorkbenchPanelProps) {
     <Modal
       open={removal !== undefined}
       onClose={() => setRemoval(undefined)}
-      title={removal?.isDir === true ? "删除文件夹" : "删除文件"}
-      description={removal === undefined ? "" : `将删除 ${removal.name}，${removal.isDir ? "其中的所有内容都会一并移除，" : ""}此操作不可撤销。`}
+      title={removal?.isDir === true ? t("files.deleteFolder") : t("files.delete")}
+      description={removal === undefined ? "" : t("files.deleteDescription", { name: removal.name, contents: removal.isDir ? t("files.contentsRemoved") : "" })}
       footer={<>
-        <Button variant="outline" onClick={() => setRemoval(undefined)}>取消</Button>
-        <Button variant="primary" className={css.treeDangerAction} onClick={() => { if (removal !== undefined) void remove(removal) }}>删除</Button>
+        <Button variant="outline" onClick={() => setRemoval(undefined)}>{t("files.cancel")}</Button>
+        <Button variant="primary" className={css.treeDangerAction} onClick={() => { if (removal !== undefined) void remove(removal) }}>{t("files.delete")}</Button>
       </>}
     />
   </div>

@@ -1,5 +1,5 @@
 import type { MenuEntry } from "@deepseek-ai/dsh-client-ui-primitives"
-import { revealLabel } from "./locales.ts"
+import { revealLabel, t } from "./locales.ts"
 
 /** Every command the file tree context menu can emit. */
 export type FileCommand =
@@ -21,22 +21,22 @@ export function fileMenuEntries(target: { readonly isDir: boolean; readonly isRo
   const entries: MenuEntry[] = []
   if (!target.isDir) {
     entries.push(
-      { id: "open", label: "打开" },
-      { id: "addToChat", label: "添加到聊天" },
+      { id: "open", label: t("files.open") },
+      { id: "addToChat", label: t("files.addToChat") },
       { type: "separator", id: "sep-open" },
     )
   }
-  entries.push({ id: "newFile", label: "新建文件" }, { id: "newFolder", label: "新建文件夹" })
-  if (target.isDir) entries.push({ id: "refresh", label: "刷新" })
+  entries.push({ id: "newFile", label: t("files.newFile") }, { id: "newFolder", label: t("files.newFolder") })
+  if (target.isDir) entries.push({ id: "refresh", label: t("files.refresh") })
   entries.push({ type: "separator", id: "sep-new" })
-  if (!target.isRoot) entries.push({ id: "copy", label: "复制" }, { id: "cut", label: "剪切" })
-  entries.push({ id: "paste", label: "粘贴", disabled: !target.canPaste })
+  if (!target.isRoot) entries.push({ id: "copy", label: t("files.copy") }, { id: "cut", label: t("files.cut") })
+  entries.push({ id: "paste", label: t("files.paste"), disabled: !target.canPaste })
   entries.push({ type: "separator", id: "sep-clipboard" })
   if (!target.isRoot) {
-    entries.push({ id: "rename", label: "重命名" }, { id: "delete", label: "删除", danger: true }, { type: "separator", id: "sep-edit" })
+    entries.push({ id: "rename", label: t("files.rename") }, { id: "delete", label: t("files.delete"), danger: true }, { type: "separator", id: "sep-edit" })
   }
-  entries.push({ id: "copyPath", label: "复制路径" })
-  if (!target.isRoot) entries.push({ id: "copyRelativePath", label: "复制相对路径" })
+  entries.push({ id: "copyPath", label: t("files.copyPath") })
+  if (!target.isRoot) entries.push({ id: "copyRelativePath", label: t("files.copyRelativePath") })
   entries.push({ id: "reveal", label: revealLabel() })
   return entries
 }

@@ -3,7 +3,7 @@ import { Menu, Tooltip, type MenuEntry } from "@deepseek-ai/dsh-client-ui-primit
 import type { WorkbenchController } from "./controller.ts"
 import type { WorkbenchDock, WorkbenchPanelDescriptor, WorkbenchPanelInstance, WorkbenchPanelProps, WorkbenchSplitNode } from "./model.ts"
 import { bindWorkbenchCwd } from "./runtime-api.ts"
-import { t } from "./locales.ts"
+import { localeRevision, subscribeLocale, t } from "./locales.ts"
 import css from "./workbench.module.css"
 import { CloseIcon, FileGlyph, fileTypeIcon, PanelBottomIcon, PanelRightIcon, PlusIcon } from "./icons.tsx"
 
@@ -310,6 +310,7 @@ function SplitDivider(props: { node: Extract<WorkbenchSplitNode, { kind: "split"
 }
 
 export function DockSurface({ controller, dock, visible, sessionId, sessions, useSessions, addFileToChat }: DockSurfaceProps) {
+  useSyncExternalStore(subscribeLocale, localeRevision, localeRevision)
   const snapshot = useSyncExternalStore(controller.subscribe, controller.snapshot, controller.snapshot)
   const cwd = useSessions?.(state => sessionId === undefined ? undefined : state.byId[sessionId]?.cwd)
   // Bound during render so the first child fetch (useEffect) already carries

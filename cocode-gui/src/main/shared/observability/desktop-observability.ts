@@ -5,6 +5,7 @@ import { resolveCocodeLogLayout } from "@cocode-agency/host-supervisor"
 import { DesktopLogger } from "../logging/desktop-logger"
 import { createDiagnosticsService, type DiagnosticsService } from "./diagnostics-service"
 import { ResourceMonitor } from "./resource-monitor"
+import type { ApplicationLocale } from "../locale/application-locale"
 
 export interface DesktopObservability {
 	readonly logger: DesktopLogger
@@ -13,7 +14,7 @@ export interface DesktopObservability {
 	readonly dispose: () => void
 }
 
-export function createDesktopObservability(): DesktopObservability {
+export function createDesktopObservability(locale?: ApplicationLocale): DesktopObservability {
 	const logLayout = resolveLogDirectory()
 	const logger = new DesktopLogger({
 		directory: logLayout.root,
@@ -41,6 +42,7 @@ export function createDesktopObservability(): DesktopObservability {
 		logLayout,
 		buildId: process.env.COCODE_BUILD_ID?.trim() || undefined,
 		resources,
+		locale,
 	})
 	resources.start()
 	const removers: Array<() => void> = []

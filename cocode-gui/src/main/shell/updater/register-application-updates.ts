@@ -14,6 +14,7 @@ import {
 	type ApplicationUpdateConfig,
 } from "./application-update-config"
 import { resolveUpdateIntervalMilliseconds } from "./update-interval"
+import type { ApplicationLocale } from "../../shared/locale/application-locale"
 
 export interface ApplicationUpdateLifecycle {
 	readonly requestQuitForUpdate: (installUpdate: () => void) => boolean
@@ -23,6 +24,7 @@ export type ApplicationUpdateRegistration = ApplicationUpdateCoordinator
 
 export function registerApplicationUpdates(
 	lifecycle: ApplicationUpdateLifecycle,
+	locale?: ApplicationLocale,
 ): ApplicationUpdateRegistration {
 	let config: ApplicationUpdateConfig
 	try {
@@ -50,13 +52,19 @@ export function registerApplicationUpdates(
 		void dialog
 			.showMessageBox({
 				type: "info",
-				buttons: ["立即重启", "稍后"],
+				buttons: locale?.get() === "en" ? ["Restart Now", "Later"] : ["立即重启", "稍后"],
 				defaultId: 0,
 				cancelId: 1,
 				noLink: true,
-				title: "Cocode Desktop 更新",
-				message: `新版本 ${releaseName || "已下载"}`,
-				detail: "重启后将自动安装更新。重启前会安全停止 DSH 运行时并关闭本地数据库。",
+				title: locale?.get() === "en" ? "Cocode Desktop Update" : "Cocode Desktop 更新",
+				message:
+					locale?.get() === "en"
+						? `New version ${releaseName || "downloaded"}`
+						: `新版本 ${releaseName || "已下载"}`,
+				detail:
+					locale?.get() === "en"
+						? "The update will install after restart. DSH runtime and the local database will stop safely first."
+						: "重启后将自动安装更新。重启前会安全停止 DSH 运行时并关闭本地数据库。",
 			})
 			.then(({ response }) => {
 				if (response !== 0) return
@@ -74,8 +82,8 @@ export function registerApplicationUpdates(
 		version: app.getVersion(),
 		updater: autoUpdater as unknown as ApplicationUpdateEventSource,
 		onStateChange: () => undefined,
-		onLatest: showLatestVersionDialog,
-		onError: handleUpdateError,
+		onLatest: (version) => showLatestVersionDialog(version, locale),
+		onError: (error) => handleUpdateError(error, locale),
 		onDownloaded: promptForUpdate,
 	})
 
@@ -186,34 +194,38 @@ function createInactiveRegistration(): ApplicationUpdateRegistration {
 	}
 }
 
-function showLatestVersionDialog(version: string): void {
+function showLatestVersionDialog(version: string, locale?: ApplicationLocale): void {
+	const english = locale?.get() === "en"
 	void dialog
 		.showMessageBox({
 			type: "info",
 			noLink: true,
-			title: "检查更新",
-			message: "当前版本已经是最新",
-			detail: `当前版本：v${version}`,
+			title: english ? "Check for Updates" : "检查更新",
+			message: english ? "You're up to date" : "当前版本已经是最新",
+			detail: english ? `Current version: v${version}` : `当前版本：v${version}`,
 		})
 		.catch((error: unknown) => {
 			console.error("Failed to show the latest-version dialog:", error)
 		})
 }
 
-function showUpdateErrorDialog(): void {
+function showUpdateErrorDialog(locale?: ApplicationLocale): void {
+	const english = locale?.get() === "en"
 	void dialog
 		.showMessageBox({
 			type: "error",
 			noLink: true,
-			title: "检查更新失败",
-			message: "检查更新失败，请稍后重试",
+			title: english ? "Update Check Failed" : "检查更新失败",
+			message: english
+				? "Couldn't check for updates. Try again later."
+				: "检查更新失败，请稍后重试",
 		})
 		.catch((error: unknown) => {
 			console.error("Failed to show the update-error dialog:", error)
 		})
 }
 
-function handleUpdateError(error: Error): void {
+function handleUpdateError(error: Error, locale?: ApplicationLocale): void {
 	console.error("Application update check failed:", error)
-	showUpdateErrorDialog()
+	showUpdateErrorDialog(locale)
 }

@@ -7,7 +7,8 @@ const MAX_CHARS = 20_000
 
 /** Default truncation footer; the owner passes a localized formatter. */
 function defaultTruncatedLabel(total: number): string {
-  return `… 已截断，共 ${total} 字符`
+  const chinese = typeof document !== 'undefined' && document.documentElement.lang.toLowerCase().startsWith('zh')
+  return chinese ? `… 已截断，共 ${total} 字符` : `… Truncated · ${total} characters`
 }
 
 export function JsonBlock({ label, payload, defaultOpen = false, truncatedLabel = defaultTruncatedLabel }: {
