@@ -121,6 +121,10 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  /* Keep collapsed provider cards on the same 22px content row as Cocode Nut.
+     The 28px dense action capsules remain visually centered and may extend
+     3px into the card's vertical padding without increasing the row height. */
+  height: 22px;
   margin-left: auto;
 }
 
