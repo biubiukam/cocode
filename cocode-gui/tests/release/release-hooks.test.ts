@@ -85,6 +85,16 @@ test("preserves non-feed Windows ARM64 manual installers", () => {
 	assert.deepEqual(selected?.artifacts, result.artifacts)
 })
 
+test("separates Windows Authenticode PowerShell statements", async () => {
+	const hooks = (await import("../../scripts/release/release-hooks")) as {
+		buildWindowsAuthenticodeVerificationScript?: () => string
+	}
+	assert.equal(typeof hooks.buildWindowsAuthenticodeVerificationScript, "function")
+	const script = hooks.buildWindowsAuthenticodeVerificationScript?.() ?? ""
+	assert.match(script, /\$env:VERIFY_FILE;\s+if/)
+	assert.doesNotMatch(script, /\$env:VERIFY_FILE\s+if/)
+})
+
 test("skips files while searching for the packaged macOS app", () => {
 	const root = mkdtempSync(path.join(os.tmpdir(), "cocode-release-hooks-"))
 	try {

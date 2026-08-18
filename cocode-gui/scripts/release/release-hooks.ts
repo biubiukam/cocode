@@ -251,14 +251,18 @@ export function selectGitHubReleaseArtifacts(
 	})
 }
 
-function verifyWindowsFile(file: string): { Subject?: string; Thumbprint?: string } {
-	const script = [
+export function buildWindowsAuthenticodeVerificationScript(): string {
+	return [
 		"$signature = Get-AuthenticodeSignature -LiteralPath $env:VERIFY_FILE",
 		"if ($signature.Status -ne 'Valid') { throw \"Invalid Authenticode signature: $env:VERIFY_FILE\" }",
 		"$certificate = $signature.SignerCertificate",
 		'if ($null -eq $certificate) { throw "Signer certificate is missing: $env:VERIFY_FILE" }',
 		"[PSCustomObject]@{ Subject=$certificate.Subject; Thumbprint=$certificate.Thumbprint; Status=$signature.Status } | ConvertTo-Json -Compress",
-	].join(" ")
+	].join("; ")
+}
+
+function verifyWindowsFile(file: string): { Subject?: string; Thumbprint?: string } {
+	const script = buildWindowsAuthenticodeVerificationScript()
 	const output = execFileSync(
 		"powershell.exe",
 		["-NoProfile", "-NonInteractive", "-Command", script],
