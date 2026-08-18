@@ -6,6 +6,8 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const require = createRequire(import.meta.url)
+const DSH_COMMANDS = new Set(['web', 'plugin'])
+const DSH_ROOT_OPTIONS = new Set(['--patch', '--dump-config', '--dump-default-config'])
 
 export function parseCliArgs(args) {
   const options = { command: 'tui', commandArgs: [], force: false, json: false, help: false, version: false }
@@ -24,9 +26,21 @@ export function parseCliArgs(args) {
       if (value === '--runtime-channel') options.runtimeChannel = next
       continue
     }
+    if (DSH_COMMANDS.has(value) || DSH_ROOT_OPTIONS.has(value)) {
+      options.command = 'dsh'
+      const sharedProfile = options.profile && !remaining.includes('--profile')
+        ? ['--profile', options.profile]
+        : []
+      options.commandArgs = value === 'plugin'
+        ? [value, ...sharedProfile, ...remaining]
+        : value === 'web'
+          ? [value, ...remaining]
+          : [...sharedProfile, value, ...remaining]
+      break
+    }
     if (value === '--gui' || value === 'gui') { options.command = 'gui'; options.commandArgs = remaining; break }
     if (value === '--tui' || value === 'tui') { options.command = 'tui'; options.commandArgs = remaining; break }
-    if (value === 'dsh') { options.command = 'dsh'; options.commandArgs = remaining; break }
+    if (value === 'dsh') throw new Error('The `cocode dsh ...` form is no longer supported. Use `cocode web ...` or `cocode plugin ...`.')
     if (value === '--doctor' || value === 'doctor') { options.command = 'doctor'; options.commandArgs = remaining; break }
     if (value === '--stop-host' || value === 'stop-host') { options.command = 'host-stop'; options.commandArgs = remaining; break }
     if (value === 'status') { options.command = 'host-status'; options.commandArgs = remaining; break }
@@ -185,5 +199,5 @@ export function stagedPaths(scriptUrl) {
 }
 
 export function usage(version) {
-  return `Cocode ${version}\n\nUsage: cocode <command> [options]\n\nCommands:\n  gui [args...]              Open Cocode GUI\n  tui [args...]              Open Cocode TUI (default)\n  dsh [args...]              Run the bundled DSH CLI\n  host status [--json]       Show the shared Host status\n  host stop [--force]        Stop the Host and Supervisor\n  doctor                     Check TUI and Host prerequisites\n  version                    Show the installed Cocode version\n\nOptions:\n  -h, --help                 Show this help\n  -v, --version              Show the installed version\n  -f, --force                Stop Host even when clients still hold leases\n      --json                 Print machine-readable status\n      --dsh-home <path>      Select the shared DSH home\n      --profile <name>       Select the DSH profile\n      --runtime-channel <c>  Select stable, preview, or dev runtime\n\nEnvironment:\n  COCODE_GUI_EXECUTABLE      Explicit GUI executable path\n  COCODE_GUI_PATH            Alias for COCODE_GUI_EXECUTABLE\n  COCODE_DSH_CLI_ENTRY       Explicit bundled DSH CLI entry path\n`
+  return `Cocode ${version}\n\nUsage: cocode <command> [options]\n\nCommands:\n  gui [args...]              Open Cocode GUI\n  tui [args...]              Open Cocode TUI (default)\n  web [args...]              Run the bundled DSH web profile\n  plugin [args...]           Manage bundled DSH profile plugins\n  host status [--json]       Show the shared Host status\n  host stop [--force]        Stop the Host and Supervisor\n  doctor                     Check TUI and Host prerequisites\n  version                    Show the installed Cocode version\n\nDSH-compatible options:\n      --patch <path>         Apply an extra DSH patch overlay\n      --dump-config          Print the composed DSH profile tree\n      --dump-default-config  Print the default DSH profile tree\n\nCocode options:\n  -h, --help                 Show this help\n  -v, --version              Show the installed version\n  -f, --force                Stop Host even when clients still hold leases\n      --json                 Print machine-readable status\n      --dsh-home <path>      Select the shared DSH home\n      --profile <name>       Select the DSH profile\n      --runtime-channel <c>  Select stable, preview, or dev runtime\n\nEnvironment:\n  COCODE_GUI_EXECUTABLE      Explicit GUI executable path\n  COCODE_GUI_PATH            Alias for COCODE_GUI_EXECUTABLE\n  COCODE_DSH_CLI_ENTRY       Explicit bundled DSH CLI entry path\n`
 }

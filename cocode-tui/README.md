@@ -56,7 +56,8 @@ cocode [options] [command]
 | `cocode host stop` | Stop the shared Host when no client is using it |
 | `cocode host stop --force` | Stop it even when leases are still held |
 | `cocode gui` | Open the installed Cocode desktop client |
-| `cocode dsh [args...]` | Run the bundled DSH CLI and forward all arguments |
+| `cocode web [args...]` | Run the bundled DSH web profile |
+| `cocode plugin [args...]` | Manage bundled DSH profile plugins |
 | `cocode --version` | Print the installed version |
 | `cocode --help` | Print the complete CLI help |
 
@@ -65,12 +66,14 @@ Scope options can be used before a command:
 ```sh
 cocode --dsh-home ~/.dsh --profile web
 cocode --runtime-channel preview doctor
-cocode dsh plugin --profile web add dshmarket
-cocode dsh --version
+cocode plugin --profile web add dshmarket
+cocode --profile web --dump-config
+cocode web --help
 ```
 
-Arguments after `cocode dsh` are passed to the bundled DSH CLI unchanged, so a
-separate `dsh` installation is not required.
+DSH-compatible commands and options are passed to the bundled DSH CLI unchanged,
+so a separate `dsh` installation is not required. Cocode owns `--help` and
+`--version`; use `cocode web --help` for the web profile help.
 
 The same values can be supplied through `DSH_HOME`, `DSH_PROFILE`, and
 `COCODE_RUNTIME_CHANNEL`.

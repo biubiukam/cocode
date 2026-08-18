@@ -32,15 +32,31 @@ describe('cocode CLI', () => {
     })
   })
 
-  it('treats dsh as a passthrough command and preserves its flags', () => {
-    expect(parseCliArgs(['dsh', 'plugin', '--profile', 'web', 'add', 'dshmarket'])).toMatchObject({
+  it('rejects the removed dsh wrapper and preserves direct DSH commands', () => {
+    expect(() => parseCliArgs(['dsh', 'plugin', '--profile', 'web', 'add', 'dshmarket'])).toThrow(
+      'The `cocode dsh ...` form is no longer supported.',
+    )
+    expect(parseCliArgs(['plugin', '--profile', 'web', 'add', 'dshmarket'])).toMatchObject({
       command: 'dsh',
       commandArgs: ['plugin', '--profile', 'web', 'add', 'dshmarket'],
     })
-    expect(parseCliArgs(['--profile', 'web', 'dsh', 'plugin', '--profile', 'preview'])).toMatchObject({
+    expect(parseCliArgs(['--profile', 'web', 'plugin', 'add', 'dshmarket'])).toMatchObject({
       command: 'dsh',
       profile: 'web',
-      commandArgs: ['plugin', '--profile', 'preview'],
+      commandArgs: ['plugin', '--profile', 'web', 'add', 'dshmarket'],
+    })
+    expect(parseCliArgs(['web', '--help'])).toMatchObject({
+      command: 'dsh',
+      commandArgs: ['web', '--help'],
+    })
+    expect(parseCliArgs(['--patch', './extra.yml', 'web'])).toMatchObject({
+      command: 'dsh',
+      commandArgs: ['--patch', './extra.yml', 'web'],
+    })
+    expect(parseCliArgs(['--profile', 'web', '--dump-config'])).toMatchObject({
+      command: 'dsh',
+      profile: 'web',
+      commandArgs: ['--profile', 'web', '--dump-config'],
     })
   })
 
