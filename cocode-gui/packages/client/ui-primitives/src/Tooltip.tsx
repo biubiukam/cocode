@@ -9,7 +9,7 @@
 // without a portal.
 
 import { cloneElement, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { FocusEvent, FocusEventHandler, MouseEvent, MouseEventHandler, MutableRefObject, ReactElement, Ref } from 'react'
+import type { FocusEvent, FocusEventHandler, MouseEvent, MouseEventHandler, MutableRefObject, PointerEvent, PointerEventHandler, ReactElement, Ref } from 'react'
 import css from './Tooltip.module.css'
 
 /** Bubble placement relative to the anchor. */
@@ -20,6 +20,9 @@ interface AnchorProps {
   ref?: Ref<HTMLElement> | undefined
   onMouseEnter?: MouseEventHandler | undefined
   onMouseLeave?: MouseEventHandler | undefined
+  onPointerDown?: PointerEventHandler | undefined
+  onPointerUp?: PointerEventHandler | undefined
+  onPointerCancel?: PointerEventHandler | undefined
   onClick?: MouseEventHandler | undefined
   onFocus?: FocusEventHandler | undefined
   onBlur?: FocusEventHandler | undefined
@@ -97,6 +100,10 @@ export function Tooltip({ label, side = 'right', delayMs = 0, disabled = false, 
     return () => { window.removeEventListener('resize', fit) }
   }, [placement, pos, resolvedLabel, side])
   const showTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // A mouse click focuses a button before its click handler runs. Remember
+  // that pointer activation so the focus event does not briefly open the
+  // tooltip before dismissAfterActivation() gets a chance to close it.
+  const pointerActivation = useRef(false)
   // Hover and focus are independent triggers: the bubble hides only after
   // BOTH clear (hovering away from a focused anchor must not drop it).
   const triggers = useRef({ hover: false, focus: false })
@@ -159,8 +166,34 @@ export function Tooltip({ label, side = 'right', delayMs = 0, disabled = false, 
         ref: mergedRef,
         onMouseEnter: (e: MouseEvent<HTMLElement>) => { children.props.onMouseEnter?.(e); triggers.current.hover = true; showAfterHoverDelay() },
         onMouseLeave: (e: MouseEvent<HTMLElement>) => { children.props.onMouseLeave?.(e); triggers.current.hover = false; cancelShow(); setPos(null) },
-        onClick: (e: MouseEvent<HTMLElement>) => { children.props.onClick?.(e); dismissAfterActivation() },
-        onFocus: (e: FocusEvent<HTMLElement>) => { children.props.onFocus?.(e); triggers.current.focus = true; cancelShow(); show() },
+        onPointerDown: (e: PointerEvent<HTMLElement>) => {
+          children.props.onPointerDown?.(e)
+          pointerActivation.current = true
+        },
+        onPointerUp: (e: PointerEvent<HTMLElement>) => {
+          children.props.onPointerUp?.(e)
+          pointerActivation.current = false
+        },
+        onPointerCancel: (e: PointerEvent<HTMLElement>) => {
+          children.props.onPointerCancel?.(e)
+          pointerActivation.current = false
+        },
+        onClick: (e: MouseEvent<HTMLElement>) => {
+          children.props.onClick?.(e)
+          pointerActivation.current = false
+          dismissAfterActivation()
+        },
+        onFocus: (e: FocusEvent<HTMLElement>) => {
+          children.props.onFocus?.(e)
+          if (pointerActivation.current) {
+            pointerActivation.current = false
+            triggers.current.focus = false
+            return
+          }
+          triggers.current.focus = true
+          cancelShow()
+          show()
+        },
         onBlur: (e: FocusEvent<HTMLElement>) => { children.props.onBlur?.(e); triggers.current.focus = false; hide() },
       })}
       {pos !== null && (
