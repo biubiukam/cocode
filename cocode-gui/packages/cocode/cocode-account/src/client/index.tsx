@@ -5,8 +5,8 @@ import type { ClientContext } from "@deepseek-ai/dsh-client-runtime/client"
 import type { ConfigurableProviderView, ConnectionHandle } from "@deepseek-ai/dsh-api-remotes/client"
 import type {} from "@deepseek-ai/dsh-api-remotes/client"
 import {
-  IconApiOutline14,
   IconChevronUpOutline14,
+  IconSettingsOutline16,
   IconUserOutline16,
   Menu,
   type MenuEntry,
@@ -284,16 +284,6 @@ function safeMessage(error: unknown): string {
   return message.replace(/ck_[A-Za-z0-9_-]+/g, "[redacted]")
 }
 
-function labelOf(snapshot: AccountSnapshot, wide: boolean): string {
-  const t = copy()
-  if (!wide) return snapshot.phase === "signed-in" ? "C" : t.signIn
-  if (snapshot.phase === "signed-in") return snapshot.profile?.displayName ?? "Cocode"
-  if (snapshot.phase === "signing-in") return t.waiting
-  if (snapshot.phase === "provisioning") return t.provisioning
-  if (snapshot.phase === "error") return t.retry
-  return t.settingsOrSignIn
-}
-
 /**
  * The cocode.agency brand mark: the 'c' glyph of the ASCII wordmark, drawn as
  * half/full cells on a 10x16 grid so it stays pixel-crisp at any size. The
@@ -511,8 +501,13 @@ function AccountAction({ wide, store, providers }: AccountProps): ReturnType<typ
   const busy = snapshot.phase === "signing-in" || snapshot.phase === "provisioning"
   const primary = signedIn
     ? snapshot.profile?.displayName ?? "Cocode"
-    : provider?.name ?? labelOf(snapshot, wide)
-  const secondary = signedIn || provider === null ? null : t.customProvider
+    : snapshot.phase === "signing-in"
+      ? t.waiting
+      : snapshot.phase === "provisioning"
+        ? t.provisioning
+        : snapshot.phase === "error"
+          ? t.retry
+      : t.settingsOrSignIn
   const title = accountError(snapshot) ?? primary
   const entries: MenuEntry[] = signedIn
     ? [
@@ -585,13 +580,12 @@ function AccountAction({ wide, store, providers }: AccountProps): ReturnType<typ
             { className: `${css.avatar} ${signedIn ? css.accountAvatar : css.providerAvatar}` },
             signedIn
               ? initialOf(primary)
-              : createElement(IconApiOutline14, { size: 18 }),
+              : createElement(IconSettingsOutline16, { size: 18 }),
           ),
           wide && createElement(
             "span",
             { className: css.copy },
             createElement("span", { className: css.primary }, primary),
-            secondary === null ? null : createElement("span", { className: css.secondary }, secondary),
           ),
           wide && createElement(IconChevronUpOutline14, { className: css.chevron, size: 14 }),
         ),
