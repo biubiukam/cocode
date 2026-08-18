@@ -11,12 +11,13 @@ import { shellCommandOptions } from "./child-process-options.mjs"
  * @param requiredPaths - files whose presence marks the install as complete.
  */
 export function ensureWorkspaceDependencies({ root, label, requiredPaths }) {
-	if (requiredPaths.every((requiredPath) => existsSync(requiredPath))) return
+	if (requiredPaths.every((requiredPath) => existsSync(requiredPath))) return false
 
-	console.log(`[supervisor-build] installing ${label} dependencies`)
+	console.log(`[workspace-deps] installing ${label} dependencies`)
 	execFileSync(
 		process.platform === "win32" ? "corepack.cmd" : "corepack",
 		["pnpm@10.34.5", "install", "--frozen-lockfile"],
 		shellCommandOptions({ cwd: root, stdio: "inherit" }),
 	)
+	return true
 }

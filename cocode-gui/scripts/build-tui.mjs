@@ -4,12 +4,18 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSyn
 import * as path from "pathe"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { shellCommandOptions } from "./lib/child-process-options.mjs"
+import { ensureWorkspaceDependencies } from "./lib/workspace-dependencies.mjs"
 
 const guiRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const tuiRoot = path.resolve(guiRoot, "../cocode-tui")
 const supervisorRoot = path.resolve(guiRoot, "../cocode-host-supervisor")
 export function buildTui({ output = defaultOutput() } = {}) {
 	if (!existsSync(tuiRoot)) throw new Error(`TUI checkout not found: ${tuiRoot}`)
+	ensureWorkspaceDependencies({
+		root: tuiRoot,
+		label: "@cocode/tui",
+		requiredPaths: [path.join(tuiRoot, "node_modules", "esbuild", "package.json")],
+	})
 
 	const corepack = process.platform === "win32" ? "corepack.cmd" : "corepack"
 	execFileSync(corepack, ["pnpm@10.34.5", "run", "build"], {
