@@ -6,6 +6,7 @@ import type { DiagnosticsApi } from "./diagnostics.contract"
 import type { TuiApi } from "./tui.contract"
 import type { ExternalDshApi, SharedDshApi } from "./external-dsh.contract"
 import type { LocaleApi } from "./locale.contract"
+import type { LocalFilesApi } from "./local-files.contract"
 
 export interface DesktopApi {
 	readonly database: DatabaseApi
@@ -18,4 +19,5 @@ export interface DesktopApi {
 	/** @deprecated Use sharedDsh. */
 	readonly externalDsh: ExternalDshApi
 	readonly locale: LocaleApi
+	readonly localFiles: LocalFilesApi
 }

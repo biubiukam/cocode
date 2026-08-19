@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { CodeBlock, MarkdownText } from "@deepseek-ai/dsh-client-ui-primitives"
 import type { WorkbenchPanelProps } from "./model.ts"
-import { PreviewIcon, ReloadIcon } from "./icons.tsx"
+import { ExternalIcon, PreviewIcon, ReloadIcon } from "./icons.tsx"
+import type { DesktopApi } from "../../../../../src/contracts/ipc/desktop.contract.ts"
 import { State, message, useRemote } from "./panel-state.tsx"
 import { fileUrl, workbenchRequest } from "./runtime-api.ts"
 import { resolveMarkdownImages } from "./markdown-assets.ts"
@@ -134,6 +135,7 @@ function FilePreview(props: WorkbenchPanelProps) {
   const [choice, setChoice] = useState<{ readonly path: string; readonly mode: ViewMode }>()
   const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState<string>()
+  const [openingExternal, setOpeningExternal] = useState(false)
   const [confirmRefresh, setConfirmRefresh] = useState(false)
 
   useEffect(() => {
@@ -191,6 +193,14 @@ function FilePreview(props: WorkbenchPanelProps) {
     ).finally(() => setSaving(false))
   }
 
+  const openWithDefaultApp = (): void => {
+    const api = getDesktopApi()?.localFiles
+    if (api === undefined || openingExternal) return
+    setOpeningExternal(true)
+    setNotice(undefined)
+    void api.open({ path }).catch(error => setNotice(message(error))).finally(() => setOpeningExternal(false))
+  }
+
   const sourceView = <textarea
     className={css.editor}
     value={text}
@@ -219,8 +229,17 @@ function FilePreview(props: WorkbenchPanelProps) {
       case "code":
         return <div className={css.scroll}><CodeBlock code={text} lang={extension} className={css.code} /></div>
       default:
-        return <div className={css.canvas}>
-          <a className={css.download} href={previewFileUrl(sessionId, path, revision)} download>{t("preview.download")}</a>
+        return <div className={css.unsupported}>
+          <PreviewIcon size={28} />
+          <p className={css.unsupportedText}>{t("preview.unsupported")}</p>
+          {getDesktopApi()?.localFiles === undefined
+            ? <p className={css.unavailable}>{t("preview.openUnavailable")}</p>
+            : <button
+              type="button"
+              className={css.externalOpen}
+              disabled={openingExternal}
+              onClick={openWithDefaultApp}
+            ><ExternalIcon size={15} />{t(openingExternal ? "preview.opening" : "preview.openDefault")}</button>}
         </div>
     }
   })()
@@ -257,4 +276,8 @@ function FilePreview(props: WorkbenchPanelProps) {
     {notice !== undefined && !confirmRefresh && <div className={css.notice}>{notice}</div>}
     <ModeCrossfade mode={mode} path={path} source={sourceView} preview={previewView} />
   </div>
+}
+
+function getDesktopApi(): DesktopApi | undefined {
+  return (window as Window & { readonly desktopApi?: DesktopApi }).desktopApi
 }

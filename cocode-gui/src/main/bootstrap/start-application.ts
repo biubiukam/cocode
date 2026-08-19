@@ -46,6 +46,10 @@ import {
 	registerSharedDshIpc,
 	unregisterSharedDshIpc,
 } from "../contexts/dsh-runtime/presentation/ipc/register-external-dsh-ipc"
+import {
+	registerLocalFilesIpc,
+	unregisterLocalFilesIpc,
+} from "../contexts/local-files/presentation/ipc/register-local-files-ipc"
 
 export const startApplication = (): void => {
 	const squirrelEvent = detectSquirrelEvent()
@@ -63,6 +67,7 @@ export const startApplication = (): void => {
 	registerLocaleIpc(locale)
 	const unregisterElectronObservers = registerElectronObservers(observability.logger)
 	registerDiagnosticsIpc(observability.diagnostics, observability.logger)
+	registerLocalFilesIpc()
 
 	let databaseModule: DatabaseModule | null = null
 	let dshRuntime: DshRuntimeProcess | null = null
@@ -177,6 +182,7 @@ export const startApplication = (): void => {
 			try {
 				unregisterLocaleIpc()
 				unregisterDiagnosticsIpc()
+				unregisterLocalFilesIpc()
 				unregisterTuiIpc()
 				tuiLauncher = null
 				unregisterShortcutsIpc()

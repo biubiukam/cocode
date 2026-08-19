@@ -259,7 +259,10 @@ export const zh = {
   "preview.truncated": "内容过长 · 只读",
   "preview.readOnly": "只读",
   "preview.pickFile": "请从「文件」中选择一个文件",
-  "preview.download": "下载文件",
+  "preview.unsupported": "Cocode 暂不支持预览此文件",
+  "preview.openDefault": "使用默认应用打开",
+  "preview.opening": "正在打开…",
+  "preview.openUnavailable": "请在桌面客户端中使用系统默认应用打开",
 
   "terminal.noSession": "请先打开一个会话",
   "terminal.connecting": "正在启动 Shell…",
@@ -529,7 +532,10 @@ export const en: Record<WorkbenchKey, string> = {
   "preview.truncated": "Truncated · read only",
   "preview.readOnly": "Read only",
   "preview.pickFile": "Choose a file from Files",
-  "preview.download": "Download file",
+  "preview.unsupported": "Cocode can’t preview this file yet",
+  "preview.openDefault": "Open with default app",
+  "preview.opening": "Opening…",
+  "preview.openUnavailable": "Use the desktop app to open it with your system’s default app",
 
   "terminal.noSession": "Open a session first",
   "terminal.connecting": "Starting the shell…",
