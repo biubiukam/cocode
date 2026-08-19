@@ -232,7 +232,7 @@ function RecentGroupHeader({
           if (id === 'archive-read-sessions') onArchive()
         }}
         portal
-        align="end"
+        align="start"
         anchor={(
           <button
             type="button"
