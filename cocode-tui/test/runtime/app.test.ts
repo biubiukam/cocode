@@ -18,6 +18,31 @@ import type {
 import { createTuiApp } from '../../src/runtime/app.ts'
 import { P0_CAPABILITIES } from '../../src/runtime/capabilities.ts'
 
+function reasoningCatalog(): TuiModelCatalog {
+  return {
+    groups: [
+      {
+        id: 'p1',
+        name: 'Provider 1',
+        models: [
+          {
+            id: 'm1',
+            name: 'Model 1',
+            reasoning: {
+              efforts: [
+                { id: 'high', name: 'High' },
+                { id: 'max', name: 'Max' },
+              ],
+              defaultEffort: 'high',
+            },
+          },
+        ],
+      },
+    ],
+    failures: [],
+  }
+}
+
 function fakeRuntime(): TuiRuntime & {
   prompts: { sessionId: string; text: string }[]
   promptBlocks: { sessionId: string; blocks: { type: string; [key: string]: unknown }[]; mode: TuiPromptMode }[]
@@ -35,7 +60,12 @@ function fakeRuntime(): TuiRuntime & {
   cancelError?: Error
   failRestartModels: Set<string>
   modelCatalog: TuiModelCatalog
-  selectModel?: (sessionId: string, provider: string, model: string) => Promise<{ provider: string; model: string } | undefined>
+  selectModel?: (
+    sessionId: string,
+    provider: string,
+    model: string,
+    reasoningEffort?: string,
+  ) => Promise<{ provider: string; model: string; reasoningEffort?: string } | undefined>
   modelListError?: Error
   commands: TuiCommandDescriptor[]
   executedCommands: { sessionId: string; line: string }[]
@@ -1184,6 +1214,197 @@ describe('TuiApp', () => {
     expect(app.snapshot().header.sessionId).not.toBe('s1')
     expect(runtime.opens).toEqual([])
     expect(persistedModels).toEqual([{ provider: 'p2', model: 'm2' }])
+  })
+
+  it('opens an effort picker from /effort when the model advertises levels', async () => {
+    const runtime = fakeRuntime()
+    runtime.modelCatalog = reasoningCatalog()
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p1',
+      model: 'm1',
+      sessionId: 's1',
+      capabilities: { ...P0_CAPABILITIES, modelList: true },
+    })
+    await app.start()
+    app.dispatch({ type: 'command', line: '/effort' })
+    await expect.poll(() => app.snapshot().effortPicker?.open).toBe(true)
+    expect(app.snapshot().effortPicker?.items.map((item) => item.effort)).toEqual(['high', 'max'])
+  })
+
+  it('applies /effort through session.selectModel and shows the level on the header', async () => {
+    const runtime = fakeRuntime()
+    runtime.modelCatalog = reasoningCatalog()
+    const selections: {
+      sessionId: string
+      provider: string
+      model: string
+      reasoningEffort?: string
+    }[] = []
+    runtime.selectModel = async (sessionId, provider, model, reasoningEffort) => {
+      selections.push({ sessionId, provider, model, reasoningEffort })
+      return {
+        provider,
+        model,
+        ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
+      }
+    }
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p1',
+      model: 'm1',
+      sessionId: 's1',
+      capabilities: { ...P0_CAPABILITIES, modelList: true },
+    })
+    await app.start()
+    app.dispatch({ type: 'command', line: '/effort max' })
+    await expect.poll(() => app.snapshot().header.reasoningEffort).toBe('Max')
+    expect(selections).toEqual([
+      { sessionId: 's1', provider: 'p1', model: 'm1', reasoningEffort: 'max' },
+    ])
+    expect(runtime.restarts).toEqual([])
+    expect(app.snapshot().header.sessionId).toBe('s1')
+  })
+
+  it('clears an inherited effort with /effort auto', async () => {
+    const runtime = fakeRuntime()
+    runtime.modelCatalog = reasoningCatalog()
+    const selections: Array<string | undefined> = []
+    runtime.selectModel = async (_sessionId, provider, model, reasoningEffort) => {
+      selections.push(reasoningEffort)
+      return { provider, model }
+    }
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p1',
+      model: 'm1',
+      sessionId: 's1',
+      capabilities: { ...P0_CAPABILITIES, modelList: true },
+    })
+    await app.start()
+    app.dispatch({ type: 'command', line: '/effort auto' })
+    await expect.poll(() => app.snapshot().agent).toBe('idle')
+    expect(selections).toEqual([undefined])
+    expect(app.snapshot().header.reasoningEffort).toBe('High')
+  })
+
+  it('asks for effort after /model confirms a model that advertises levels', async () => {
+    const runtime = fakeRuntime()
+    runtime.modelCatalog = {
+      groups: [
+        {
+          id: 'p2',
+          name: 'Provider 2',
+          models: [
+            {
+              id: 'm2',
+              name: 'Model 2',
+              reasoning: {
+                efforts: [
+                  { id: 'high', name: 'High' },
+                  { id: 'max', name: 'Max' },
+                ],
+                defaultEffort: 'high',
+              },
+            },
+          ],
+        },
+      ],
+      failures: [],
+    }
+    const selections: {
+      provider: string
+      model: string
+      reasoningEffort?: string
+    }[] = []
+    runtime.selectModel = async (_sessionId, provider, model, reasoningEffort) => {
+      selections.push({ provider, model, reasoningEffort })
+      return {
+        provider,
+        model,
+        ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
+      }
+    }
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p1',
+      model: 'm1',
+      sessionId: 's1',
+      capabilities: { ...P0_CAPABILITIES, modelList: true },
+    })
+    await app.start()
+    app.dispatch({ type: 'command', line: '/model' })
+    await expect.poll(() => app.snapshot().modelPicker?.open).toBe(true)
+    app.dispatch({ type: 'model.confirm' })
+    await expect.poll(() => app.snapshot().effortPicker?.open).toBe(true)
+    expect(app.snapshot().header.provider).toBe('p1')
+    expect(app.snapshot().header.model).toBe('m1')
+    expect(selections).toEqual([])
+    app.dispatch({ type: 'effort.confirm' })
+    await expect.poll(() => app.snapshot().header.provider).toBe('p2')
+    expect(app.snapshot().header.model).toBe('m2')
+    expect(app.snapshot().header.reasoningEffort).toBe('High')
+    expect(selections).toEqual([{ provider: 'p2', model: 'm2', reasoningEffort: 'high' }])
+    expect(app.snapshot().effortPicker?.open).not.toBe(true)
+  })
+
+  it('notices when /effort is used on a model without reasoning levels', async () => {
+    const runtime = fakeRuntime()
+    runtime.modelCatalog = {
+      groups: [{ id: 'p1', name: 'P1', models: [{ id: 'm1', name: 'M1' }] }],
+      failures: [],
+    }
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p1',
+      model: 'm1',
+      sessionId: 's1',
+      capabilities: { ...P0_CAPABILITIES, modelList: true },
+    })
+    await app.start()
+    app.dispatch({ type: 'command', line: '/effort' })
+    await expect.poll(() => app.snapshot().notice?.message).toMatch(/reasoning effort|推理强度/)
+    expect(app.snapshot().effortPicker?.open).not.toBe(true)
+  })
+
+  it('ignores a second effort confirm while the first is applying', async () => {
+    const runtime = fakeRuntime()
+    runtime.modelCatalog = reasoningCatalog()
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const selections: Array<string | undefined> = []
+    runtime.selectModel = async (_sessionId, provider, model, reasoningEffort) => {
+      await gate
+      selections.push(reasoningEffort)
+      return {
+        provider,
+        model,
+        ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
+      }
+    }
+    const app = createTuiApp({
+      runtime,
+      cwd: '/tmp',
+      provider: 'p1',
+      model: 'm1',
+      sessionId: 's1',
+      capabilities: { ...P0_CAPABILITIES, modelList: true },
+    })
+    await app.start()
+    app.dispatch({ type: 'command', line: '/effort' })
+    await expect.poll(() => app.snapshot().effortPicker?.open).toBe(true)
+    app.dispatch({ type: 'effort.confirm' })
+    app.dispatch({ type: 'effort.confirm' })
+    release()
+    await expect.poll(() => app.snapshot().agent).toBe('idle')
+    expect(selections).toEqual(['high'])
   })
 
   it('selects a model in the current session when the runtime supports it', async () => {

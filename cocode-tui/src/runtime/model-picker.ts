@@ -77,3 +77,13 @@ export function visibleModelItems(state: ModelPickerState): ModelPickerItem[] {
   }
   return items
 }
+
+export function findCatalogModel(
+  catalog: TuiModelCatalog,
+  providerId: string,
+  modelId: string,
+): TuiModel | undefined {
+  return catalog.groups
+    .find((group) => group.id === providerId)
+    ?.models.find((model) => model.id === modelId)
+}

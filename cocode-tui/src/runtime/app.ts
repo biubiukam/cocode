@@ -16,6 +16,7 @@ import type {
   TuiImageInput,
   TuiPluginEntry,
   TuiWorkspaceEnsureResult,
+  TuiModelCatalog,
 } from '@cocode/tui-connection'
 import type {
   ExternalDshReadSource,
@@ -104,11 +105,20 @@ import {
 import {
   closeModelPicker,
   createModelPicker,
+  findCatalogModel,
   moveModelSelection,
   selectedModel,
   setModelQuery,
   type ModelPickerState,
 } from './model-picker.ts'
+import {
+  beginEffortChange,
+  closeEffortPicker,
+  createEffortPicker,
+  moveEffortSelection,
+  selectedEffort,
+  type EffortPickerState,
+} from './effort-picker.ts'
 import {
   beginPermissionChange,
   closePermissionPicker,
@@ -244,6 +254,9 @@ export type TuiAction =
   | { type: 'model.confirm' }
   | { type: 'model.input.close' }
   | { type: 'model.input.submit'; model: string }
+  | { type: 'effort.move'; delta: number }
+  | { type: 'effort.close' }
+  | { type: 'effort.confirm' }
   | { type: 'question.answer'; selected: string[]; custom?: string }
   | {
       type: 'question.navigate'
@@ -315,6 +328,7 @@ export type TuiSnapshot = {
     concurrency: 'single-writer' | 'no-concurrent-writes'
     model: string
     provider: string
+    reasoningEffort?: string
     cwd: string
     branch?: string
   }
@@ -377,6 +391,7 @@ export type TuiSnapshot = {
   skillsPicker?: SkillsPickerState
   pluginPicker?: PluginPickerState
   modelPicker?: ModelPickerState
+  effortPicker?: EffortPickerState
   permissionPicker?: PermissionPickerState
   modelInputOpen: boolean
   skills: readonly SkillEntry[]
@@ -428,6 +443,8 @@ export type TuiCommandCtx = {
   showSkillsPicker?: () => void
   showPlugins?: (args: string) => void
   showModelPicker?: () => void
+  showEffortPicker?: () => void
+  setEffort?: (value: string) => void
   showRewindPicker?: () => void
   showUsage?: () => void
   copyLatestAssistant?: () => void
@@ -547,6 +564,9 @@ class TuiAppImpl implements TuiApp {
   private skillsPicker: SkillsPickerState | undefined
   private pluginPicker: PluginPickerState | undefined
   private modelPicker: ModelPickerState | undefined
+  private effortPicker: EffortPickerState | undefined
+  private modelCatalog: TuiModelCatalog | undefined
+  private reasoningEffort: string | undefined
   private permissionPicker: PermissionPickerState | undefined
   private modelInputOpen = false
   private skills: SkillEntry[] = []
@@ -701,6 +721,7 @@ class TuiAppImpl implements TuiApp {
     const telemetry = this.telemetry.snapshot()
     const sessionState = this.sessionState.snapshot()
     const assemblerStats = this.assembler.stats()
+    const reasoningEffort = this.displayedReasoningEffort()
     return {
       header: {
         product: 'Cocode',
@@ -711,6 +732,7 @@ class TuiAppImpl implements TuiApp {
         concurrency: this.externalSession?.concurrency ?? 'single-writer',
         model: this.model,
         provider: this.provider,
+        ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
         cwd: this.externalSession?.cwd ?? this.cwd,
         branch: this.workspaceBranch,
       },
@@ -808,6 +830,7 @@ class TuiAppImpl implements TuiApp {
       skillsPicker: this.skillsPicker,
       pluginPicker: this.pluginPicker,
       modelPicker: this.modelPicker,
+      effortPicker: this.effortPicker,
       permissionPicker: this.permissionPicker,
       modelInputOpen: this.modelInputOpen,
       skills: this.skills,
@@ -1167,7 +1190,25 @@ class TuiAppImpl implements TuiApp {
         if (this.modelPicker === undefined) return
         const selected = selectedModel(this.modelPicker)
         this.modelPicker = closeModelPicker(this.modelPicker)
-        if (selected !== undefined) void this.switchModel(selected.providerId, selected.model.id)
+        if (selected === undefined) {
+          this.emit()
+          return
+        }
+        const reasoning = selected.model.reasoning
+        if (reasoning !== undefined && reasoning.efforts.length > 0) {
+          this.effortPicker = createEffortPicker({
+            providerId: selected.providerId,
+            modelId: selected.model.id,
+            efforts: reasoning.efforts,
+            ...(reasoning.defaultEffort === undefined ? {} : { defaultEffort: reasoning.defaultEffort }),
+            ...(selected.providerId === this.provider && selected.model.id === this.model
+              ? { current: this.reasoningEffort ?? reasoning.defaultEffort }
+              : { current: reasoning.defaultEffort }),
+          })
+          this.emit()
+          return
+        }
+        void this.switchModel(selected.providerId, selected.model.id)
         this.emit()
         return
       }
@@ -1178,6 +1219,21 @@ class TuiAppImpl implements TuiApp {
       case 'model.input.submit':
         this.modelInputOpen = false
         this.setModel(action.model)
+        return
+      case 'effort.move':
+        if (this.effortPicker !== undefined) {
+          this.effortPicker = moveEffortSelection(this.effortPicker, action.delta)
+          this.emit()
+        }
+        return
+      case 'effort.close':
+        if (this.effortPicker !== undefined) {
+          this.effortPicker = closeEffortPicker(this.effortPicker)
+          this.emit()
+        }
+        return
+      case 'effort.confirm':
+        void this.confirmEffortPicker()
         return
       case 'question.answer':
         this.questions.answer(action.selected, action.custom)
@@ -1460,6 +1516,12 @@ class TuiAppImpl implements TuiApp {
       },
       showModelPicker: () => {
         void this.openModelPicker()
+      },
+      showEffortPicker: () => {
+        void this.openEffortPicker()
+      },
+      setEffort: (value) => {
+        this.setEffort(value)
       },
       showRewindPicker: () => {
         this.openRewindPicker()
@@ -2485,6 +2547,7 @@ class TuiAppImpl implements TuiApp {
       } else {
         this.modelInputOpen = false
         this.modelPicker = createModelPicker(catalog, this.provider, this.model)
+        this.modelCatalog = catalog
         this.notice =
           catalog.failures.length === 0
             ? undefined
@@ -2497,10 +2560,11 @@ class TuiAppImpl implements TuiApp {
     this.emit()
   }
 
-  private async switchModel(provider: string, model: string): Promise<void> {
+  private async switchModel(provider: string, model: string, reasoningEffort?: string): Promise<void> {
     if (this.rejectExternalWrite()) return
     const previousProvider = this.provider
     const previous = this.model
+    const previousEffort = this.reasoningEffort
     this.clearQueuedPrompts()
     this.agent = 'starting'
     this.notice = {
@@ -2509,12 +2573,19 @@ class TuiAppImpl implements TuiApp {
     }
     this.emit()
     try {
-      const selected = await this.runtime.selectModel?.(this.sessionId, provider, model)
+      const selected = await this.runtime.selectModel?.(
+        this.sessionId,
+        provider,
+        model,
+        reasoningEffort,
+      )
       if (selected !== undefined) {
         // The Host's session.selectModel implementation saves the accepted
         // selection as the deployment default. Do not write settings again here.
         this.provider = selected.provider
         this.model = selected.model
+        this.reasoningEffort = selected.reasoningEffort
+          ?? this.catalogModel(selected.provider, selected.model)?.reasoning?.defaultEffort
         await this.refreshSessionControls()
         await this.loadSkills()
         await this.loadCommands()
@@ -2522,7 +2593,7 @@ class TuiAppImpl implements TuiApp {
         this.agent = 'idle'
         this.notice = {
           tone: 'info',
-          message: text(this.locale, 'modelChanged', { model: selected.model }),
+          message: this.effortChangeNotice(previousProvider, previous, previousEffort),
         }
         this.emit()
         return
@@ -2531,6 +2602,8 @@ class TuiAppImpl implements TuiApp {
       await this.persistModelBestEffort(provider, model)
       this.provider = provider
       this.model = model
+      this.reasoningEffort = reasoningEffort
+        ?? this.catalogModel(provider, model)?.reasoning?.defaultEffort
       this.runtimeName = info.name
       this.refreshRuntimeCapabilities()
       // A session agent captures its provider/model when it is created. Reopening
@@ -2559,6 +2632,7 @@ class TuiAppImpl implements TuiApp {
         })
         this.provider = previousProvider
         this.model = previous
+        this.reasoningEffort = previousEffort
         this.runtimeName = info.name
         this.refreshRuntimeCapabilities()
         const resumed = await this.resumeSessionAfterRestart(this.sessionId)
@@ -2579,6 +2653,134 @@ class TuiAppImpl implements TuiApp {
         this.notice = { tone: 'error', message: startErrorMessage(restoreError) }
       }
     }
+    this.emit()
+  }
+
+  private catalogModel(provider: string, model: string) {
+    return this.modelCatalog === undefined
+      ? undefined
+      : findCatalogModel(this.modelCatalog, provider, model)
+  }
+
+  private effortDisplayName(provider: string, model: string, effort: string): string {
+    return this.catalogModel(provider, model)?.reasoning?.efforts.find((item) => item.id === effort)?.name
+      ?? effort
+  }
+
+  private displayedReasoningEffort(): string | undefined {
+    const effort = this.reasoningEffort ?? this.telemetry.snapshot().reasoningEffort
+    if (effort === undefined || effort === '') return undefined
+    return this.effortDisplayName(this.provider, this.model, effort)
+  }
+
+  private effortChangeNotice(
+    previousProvider: string,
+    previousModel: string,
+    previousEffort: string | undefined,
+  ): string {
+    const effort = this.displayedReasoningEffort()
+    if (
+      this.provider === previousProvider
+      && this.model === previousModel
+      && effort !== undefined
+      && this.reasoningEffort !== previousEffort
+    ) {
+      return text(this.locale, 'effortChanged', { effort })
+    }
+    return text(this.locale, 'modelChanged', { model: this.model })
+  }
+
+  private async loadModelCatalog(): Promise<TuiModelCatalog | undefined> {
+    if (!this.capabilities.modelList || this.runtime.listModels === undefined) return undefined
+    try {
+      const catalog = await this.runtime.listModels()
+      this.modelCatalog = catalog
+      return catalog
+    } catch {
+      return undefined
+    }
+  }
+
+  private async openEffortPicker(): Promise<void> {
+    if (this.rejectExternalWrite()) return
+    if (this.agent === 'running' || this.agent === 'starting') {
+      this.notice = { tone: 'info', message: text(this.locale, 'modelBusy') }
+      this.emit()
+      return
+    }
+    const catalog = await this.loadModelCatalog()
+    const model = catalog === undefined
+      ? undefined
+      : findCatalogModel(catalog, this.provider, this.model)
+    const reasoning = model?.reasoning
+    if (reasoning === undefined || reasoning.efforts.length === 0) {
+      this.notice = { tone: 'info', message: text(this.locale, 'effortEmpty') }
+      this.emit()
+      return
+    }
+    this.effortPicker = createEffortPicker({
+      providerId: this.provider,
+      modelId: this.model,
+      efforts: reasoning.efforts,
+      ...(reasoning.defaultEffort === undefined ? {} : { defaultEffort: reasoning.defaultEffort }),
+      current: this.reasoningEffort ?? reasoning.defaultEffort,
+    })
+    this.emit()
+  }
+
+  private setEffort(value: string): void {
+    if (this.rejectExternalWrite()) return
+    if (this.agent === 'running' || this.agent === 'starting') {
+      this.notice = { tone: 'info', message: text(this.locale, 'modelBusy') }
+      this.emit()
+      return
+    }
+    const level = value.trim().toLowerCase()
+    if (level === '') {
+      void this.openEffortPicker()
+      return
+    }
+    void this.applyEffort(level)
+  }
+
+  private async applyEffort(level: string): Promise<void> {
+    await this.loadModelCatalog()
+    if (level === 'auto' || level === 'default') {
+      await this.switchModel(this.provider, this.model)
+      return
+    }
+    const model = this.catalogModel(this.provider, this.model)
+    const reasoning = model?.reasoning
+    if (reasoning !== undefined && reasoning.efforts.length === 0) {
+      this.notice = { tone: 'info', message: text(this.locale, 'effortEmpty') }
+      this.emit()
+      return
+    }
+    const effort = reasoning?.efforts.find(
+      (item) => item.id.toLowerCase() === level || item.name.toLowerCase() === level,
+    )?.id
+    if (reasoning !== undefined && effort === undefined) {
+      this.notice = { tone: 'info', message: text(this.locale, 'effortUsage') }
+      this.emit()
+      return
+    }
+    await this.switchModel(this.provider, this.model, effort ?? level)
+  }
+
+  private async confirmEffortPicker(): Promise<void> {
+    if (this.rejectExternalWrite()) return
+    const picker = this.effortPicker
+    if (picker === undefined || picker.open !== true || picker.pending !== undefined) return
+    const choice = selectedEffort(picker)
+    if (choice === undefined) {
+      this.effortPicker = closeEffortPicker(picker)
+      this.emit()
+      return
+    }
+    this.effortPicker = beginEffortChange(picker, choice.effort)
+    this.emit()
+    await this.switchModel(picker.providerId, picker.modelId, choice.effort)
+    this.effortPicker = closeEffortPicker(this.effortPicker ?? picker)
     this.emit()
   }
 
@@ -3402,6 +3604,7 @@ class TuiAppImpl implements TuiApp {
     this.permissionMode = 'manual'
     this.supportedPermissionModes = ['manual']
     this.permissionPicker = undefined
+    this.effortPicker = undefined
     this.planMode = false
     this.checklist = undefined
   }

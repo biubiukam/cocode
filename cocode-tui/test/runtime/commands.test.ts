@@ -27,6 +27,7 @@ describe('commands', () => {
       'theme',
       'lang',
       'model',
+      'effort',
       'rewind',
       'thinking',
       'tokens',
@@ -173,6 +174,22 @@ describe('commands', () => {
     expect(opened).toEqual(['model', 'models'])
   })
 
+  it('/effort opens the picker or applies a level', () => {
+    const opened: string[] = []
+    const levels: string[] = []
+    const registry = createBuiltinCommands()
+    registry.find('effort', P0_CAPABILITIES)?.run(
+      commandCtx({ showEffortPicker: () => opened.push('effort') }),
+      '',
+    )
+    registry.find('effort', P0_CAPABILITIES)?.run(
+      commandCtx({ setEffort: (value) => levels.push(value) }),
+      'high',
+    )
+    expect(opened).toEqual(['effort'])
+    expect(levels).toEqual(['high'])
+  })
+
   it('/compact sends a prompt-path request', () => {
     const actions: TuiAction[] = []
     const command = createBuiltinCommands().find('compact', P0_CAPABILITIES)
@@ -240,6 +257,8 @@ function commandCtx(
     setLocale: (value: string) => void
     setModel: (value: string) => void
     showModelPicker: () => void
+    showEffortPicker: () => void
+    setEffort: (value: string) => void
     showRewindPicker: () => void
     showUsage: () => void
     copyLatestAssistant: () => void
@@ -258,6 +277,8 @@ function commandCtx(
     setLocale: overrides.setLocale,
     setModel: overrides.setModel,
     showModelPicker: overrides.showModelPicker,
+    showEffortPicker: overrides.showEffortPicker,
+    setEffort: overrides.setEffort,
     showRewindPicker: overrides.showRewindPicker,
     showUsage: overrides.showUsage,
     copyLatestAssistant: overrides.copyLatestAssistant,

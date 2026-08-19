@@ -209,6 +209,7 @@ describe('chat layout rows', () => {
     ['review', 8],
     ['action-menu', 8],
     ['model', 8],
+    ['effort', 8],
   ] as const)('budgets the %s overlay independently', (kind, rows) => {
     const layout = calculateChatLayout({
       viewport: { columns: 120, rows: 80 },

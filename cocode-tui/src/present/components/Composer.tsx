@@ -25,6 +25,7 @@ export function Composer(props: {
   planModeAvailable: boolean
   provider: string
   model: string
+  reasoningEffort?: string
   locale: UiLocale
   maxRows?: number
   maxColumns?: number
@@ -44,6 +45,7 @@ export function Composer(props: {
     locale: props.locale,
     provider: props.provider,
     model: props.model,
+    reasoningEffort: props.reasoningEffort,
     columns: props.maxColumns,
   })
   const titleColor = !composer.mask && props.planMode ? theme.accent : theme.accent
@@ -112,7 +114,7 @@ export function Composer(props: {
                   underline={!composer.disabled}
                   wrap="truncate-end"
                 >
-                  {props.model}
+                  {header.modelLabel ?? props.model}
                 </Text>
               </Box>
             </>

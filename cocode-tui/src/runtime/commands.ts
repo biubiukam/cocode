@@ -120,6 +120,11 @@ export function createBuiltinCommands(): CommandRegistry {
     if (value === '') ctx.showModelPicker?.()
     else ctx.setModel?.(value)
   })
+  localWithInput('effort', 'Set reasoning effort for the current model', '<level>', (ctx, args) => {
+    const value = args.trim()
+    if (value === '') ctx.showEffortPicker?.()
+    else ctx.setEffort?.(value)
+  }, '设置当前模型的推理强度')
   registry.register({
     name: 'rewind',
     summary: 'Rewind the conversation to a previous message',

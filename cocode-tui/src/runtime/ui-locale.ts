@@ -116,6 +116,15 @@ export type UiTextKey =
   | 'modelCatalogUnavailable'
   | 'modelCatalogFailed'
   | 'modelCatalogPartial'
+  | 'effortTitle'
+  | 'effortHint'
+  | 'effortCurrent'
+  | 'effortEmpty'
+  | 'effortUnavailable'
+  | 'effortChanged'
+  | 'effortUsage'
+  | 'effortApplying'
+  | 'effortDefault'
   | 'resumeTitle'
   | 'resumeHint'
   | 'resumeQuery'
@@ -426,6 +435,15 @@ const TEXT: Record<UiLocale, Record<UiTextKey, string>> = {
     modelCatalogUnavailable: 'This runtime has no model catalog; enter a model id manually.',
     modelCatalogFailed: 'Could not load model catalog',
     modelCatalogPartial: 'Some providers could not be listed.',
+    effortTitle: 'Reasoning effort',
+    effortHint: '↑↓ select · enter apply · esc close',
+    effortCurrent: 'current: {effort}',
+    effortEmpty: 'This model provides no reasoning effort levels.',
+    effortUnavailable: 'Could not change reasoning effort',
+    effortChanged: 'Reasoning effort set to {effort}.',
+    effortUsage: 'Use /effort <level>, /effort auto, or /effort.',
+    effortApplying: 'Applying…',
+    effortDefault: 'Default',
     resumeTitle: 'Recent sessions',
     resumeHint: 'type to filter · ↑↓ select · enter choose · esc close',
     resumeQuery: 'filter: {query}',
@@ -735,6 +753,15 @@ const TEXT: Record<UiLocale, Record<UiTextKey, string>> = {
     modelCatalogUnavailable: '当前 runtime 不提供模型目录，请手动输入模型名称。',
     modelCatalogFailed: '模型目录加载失败',
     modelCatalogPartial: '部分 provider 无法列出模型。',
+    effortTitle: '推理强度',
+    effortHint: '↑↓ 选择 · 回车应用 · Esc 关闭',
+    effortCurrent: '当前：{effort}',
+    effortEmpty: '当前模型未提供推理强度档位。',
+    effortUnavailable: '无法更改推理强度',
+    effortChanged: '推理强度已设为 {effort}。',
+    effortUsage: '使用 /effort <档位>、/effort auto，或 /effort 打开选择器。',
+    effortApplying: '正在应用…',
+    effortDefault: '默认',
     resumeTitle: '最近会话',
     resumeHint: '输入关键词过滤 · ↑↓ 选择 · 回车确认 · Esc 关闭',
     resumeQuery: '筛选：{query}',

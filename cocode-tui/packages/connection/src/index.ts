@@ -27,6 +27,8 @@ export type {
   TuiSessionOpenResult,
   TuiWorkspaceEnsureResult,
   TuiModel,
+  TuiModelReasoning,
+  TuiModelReasoningEffort,
   TuiModelProviderGroup,
   TuiModelCatalogFailure,
   TuiModelCatalog,

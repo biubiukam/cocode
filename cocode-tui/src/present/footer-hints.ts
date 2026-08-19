@@ -16,6 +16,7 @@ export type FooterOverlay =
   | 'plugins'
   | 'model'
   | 'modelInput'
+  | 'effort'
   | 'question'
   | 'approval'
   | 'review'
@@ -247,6 +248,12 @@ function overlayCandidates(overlay: FooterOverlay, confirming: boolean): readonl
         fixed('confirm', 'footerConfirm', 95, 'primary'),
         fixed('cancel', 'footerCancel', 90, 'secondary'),
         fixed('search', 'footerSearch', 50, 'secondary'),
+      ]
+    case 'effort':
+      return [
+        fixed('select', 'footerSelect', 100, 'navigation'),
+        fixed('confirm', 'footerConfirm', 95, 'primary'),
+        fixed('cancel', 'footerCancel', 90, 'secondary'),
       ]
     case 'plugins':
       return [

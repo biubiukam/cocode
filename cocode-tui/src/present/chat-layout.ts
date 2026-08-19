@@ -6,6 +6,7 @@ import { RESUME_WINDOW_SIZE } from '../runtime/resume-picker.ts'
 import { REWIND_WINDOW_SIZE } from '../runtime/rewind-picker.ts'
 import { SKILLS_WINDOW_SIZE } from '../runtime/skills-picker.ts'
 import { PERMISSION_PICKER_WINDOW_SIZE } from '../runtime/permission-picker.ts'
+import { EFFORT_PICKER_WINDOW_SIZE } from '../runtime/effort-picker.ts'
 import { listWindowStart } from './list-window.ts'
 import {
   compactColumns,
@@ -38,6 +39,7 @@ export type ChatOverlayKind =
   | 'skills'
   | 'plugins'
   | 'permission'
+  | 'effort'
   | 'question'
   | 'approval'
   | 'review'
@@ -88,6 +90,8 @@ export type ChatLayoutInput = {
   pluginStatus?: boolean
   permissionItems?: number
   permissionSelected?: number
+  effortItems?: number
+  effortSelected?: number
   questionRows?: number
   approvalRows?: number
   reviewRows?: number
@@ -256,6 +260,12 @@ function legacyOverlays(input: ChatLayoutInput): ChatOverlayInput[] {
       rows: permissionRows(input.permissionItems, input.permissionSelected),
     })
   }
+  if (input.effortItems !== undefined) {
+    overlays.push({
+      kind: 'effort',
+      rows: effortRows(input.effortItems, input.effortSelected),
+    })
+  }
   if (input.questionRows !== undefined) {
     overlays.push({ kind: 'question', rows: questionRows(input.questionRows) })
   }
@@ -288,6 +298,7 @@ const OVERLAY_PRIORITY: readonly ChatOverlayKind[] = [
   'skills',
   'plugins',
   'permission',
+  'effort',
   'model',
   'quit',
   'action-menu',
@@ -395,6 +406,15 @@ function permissionRows(items: number | undefined, selected = 0): number {
   const count = nonNegativeInteger(items)
   const visible = Math.max(1, Math.min(count, PERMISSION_PICKER_WINDOW_SIZE))
   const start = listWindowStart(selected, count, PERMISSION_PICKER_WINDOW_SIZE)
+  const indicators = optionalRow(start > 0) + optionalRow(count - start - visible > 0)
+  return visible + indicators + 6
+}
+
+function effortRows(items: number | undefined, selected = 0): number {
+  if (items === undefined) return 0
+  const count = nonNegativeInteger(items)
+  const visible = Math.max(1, Math.min(count, EFFORT_PICKER_WINDOW_SIZE))
+  const start = listWindowStart(selected, count, EFFORT_PICKER_WINDOW_SIZE)
   const indicators = optionalRow(start > 0) + optionalRow(count - start - visible > 0)
   return visible + indicators + 6
 }

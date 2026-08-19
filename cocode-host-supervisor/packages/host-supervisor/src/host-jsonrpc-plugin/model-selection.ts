@@ -3,11 +3,18 @@ import {
   type ModelSelection,
   type ModelSelectionRef,
 } from "@deepseek-ai/dsh-agent";
+import type { ReasoningEffortId } from "@deepseek-ai/dsh-llm";
 import type { Agent } from "./types.js";
 
 type AgentWithContext = Agent & { ctx?: unknown };
 
 const selections = new WeakMap<Agent, ModelSelectionRef>();
+
+export function brandReasoningEffort(value: unknown): ReasoningEffortId | undefined {
+  return typeof value === "string" && value.trim() !== ""
+    ? (value as ReasoningEffortId)
+    : undefined;
+}
 
 export function installAgentModelSelection(
   agent: Agent,
@@ -25,7 +32,11 @@ export function installAgentModelSelection(
       if (picked !== undefined) return picked;
       const session = agent.session as Agent["session"] & {
         requestHeader?: () => {
-          config?: { provider?: unknown; model?: unknown };
+          config?: {
+            provider?: unknown;
+            model?: unknown;
+            reasoningEffort?: unknown;
+          };
         };
       };
       const logged = session.requestHeader?.()?.config;
@@ -33,7 +44,12 @@ export function installAgentModelSelection(
         typeof logged?.provider === "string" &&
         typeof logged.model === "string"
       ) {
-        return { provider: logged.provider, model: logged.model };
+        const reasoningEffort = brandReasoningEffort(logged.reasoningEffort);
+        return {
+          provider: logged.provider,
+          model: logged.model,
+          ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
+        };
       }
       const configured = agent.options as Agent["options"] & {
         agentOptions?: { provider?: unknown; model?: unknown };
