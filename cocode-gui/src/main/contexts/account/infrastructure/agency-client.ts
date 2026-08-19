@@ -41,7 +41,11 @@ type AgencyProfile = {
 	}
 }
 
-export type AgencyModel = { readonly id: string; readonly name: string }
+export type AgencyModel = {
+	readonly id: string
+	readonly name: string
+	readonly reasoningEfforts?: Readonly<Record<string, string>>
+}
 export type CreatedApiKey = { readonly secret: string; readonly id: string; readonly name: string }
 export type AgencyAccountUsage = {
 	readonly plan: string
@@ -282,18 +286,29 @@ export class AgencyClient {
 
 	async models(apiKey: string): Promise<AgencyModel[]> {
 		if (!/^ck_[A-Za-z0-9_-]+$/.test(apiKey)) throw new Error("invalid Cocode Nut API key")
-		const response = await this.request<{ data?: { id?: string; name?: string }[] }>(
-			"/v1/me/models",
-			{ method: "GET", token: apiKey },
-		)
+		const response = await this.request<{
+			data?: { id?: string; name?: string; reasoning_efforts?: Record<string, string> }[]
+		}>("/v1/me/models", { method: "GET", token: apiKey })
 		if (response.status !== 200)
 			throw new AgencyHttpError("could not list hosted models", response.status)
 		const models = (response.value.data ?? [])
 			.filter(
-				(row): row is { id: string; name?: string } =>
-					typeof row.id === "string" && row.id !== "",
+				(
+					row,
+				): row is {
+					id: string
+					name?: string
+					reasoning_efforts?: Record<string, string>
+				} => typeof row.id === "string" && row.id !== "",
 			)
-			.map((row) => ({ id: row.id, name: row.name?.trim() || row.id }))
+			.map((row) => ({
+				id: row.id,
+				name: row.name?.trim() || row.id,
+				...(row.reasoning_efforts !== undefined &&
+				Object.keys(row.reasoning_efforts).length > 0
+					? { reasoningEfforts: row.reasoning_efforts }
+					: {}),
+			}))
 		return [...new Map(models.map((model) => [model.id, model])).values()]
 	}
 

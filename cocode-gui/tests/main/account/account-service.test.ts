@@ -223,7 +223,15 @@ test("an active reserved provider without a managed route is a conflict", async 
 
 test("reconciles a pre-existing reserved cloud credential", async () => {
 	const identity = new MemoryVault(validIdentity())
-	const { client, createdKeys } = agency()
+	const { client, createdKeys } = agency({
+		models: async () => [
+			{
+				id: "cloud-model",
+				name: "Cloud Model",
+				reasoningEfforts: { high: "high", max: "max" },
+			},
+		],
+	})
 	let route: Record<string, unknown> | undefined
 	const writes: string[] = []
 	const dsh = {
@@ -283,6 +291,11 @@ test("reconciles a pre-existing reserved cloud credential", async () => {
 	assert.equal(snapshot.cloud.status, "ready")
 	assert.deepEqual(createdKeys, ["ck_test"])
 	assert.deepEqual(writes, ["credential:set", "route:set"])
+	assert.deepEqual((route?.models as unknown[] | undefined)?.[0], {
+		id: "cloud-model",
+		name: "Cloud Model",
+		reasoningEfforts: { high: "high", max: "max" },
+	})
 })
 
 test("reuses a ready device cloud route without minting another API key", async () => {
@@ -445,7 +458,10 @@ test("paid sign-in switches a custom default and the open session onto Nut Flash
 		{ op: "unset", path: ["reasoningEffort"] },
 	])
 	assert.deepEqual(selected, [
-		{ sessionId: "blank-open", selection: { provider: "cocode-nut", model: "deepseek-v4-flash" } },
+		{
+			sessionId: "blank-open",
+			selection: { provider: "cocode-nut", model: "deepseek-v4-flash" },
+		},
 	])
 })
 
@@ -960,7 +976,10 @@ test("sign out drops the managed provider even when default restoration fails", 
 				{
 					ns: "llm-pi-ai",
 					revision: 9,
-					value: route === undefined ? { providers: {} } : { providers: { "cocode-nut": route } },
+					value:
+						route === undefined
+							? { providers: {} }
+							: { providers: { "cocode-nut": route } },
 				},
 			],
 		}),
@@ -1269,7 +1288,10 @@ test("a queued cleanup that keeps failing cannot strand the account", async () =
 				{
 					ns: "llm-pi-ai",
 					revision: route === undefined ? 1 : 2,
-					value: route === undefined ? { providers: {} } : { providers: { "cocode-nut": route } },
+					value:
+						route === undefined
+							? { providers: {} }
+							: { providers: { "cocode-nut": route } },
 				},
 			],
 		}),

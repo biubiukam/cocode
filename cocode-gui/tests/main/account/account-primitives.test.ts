@@ -256,6 +256,34 @@ test("Agency client never sends a non-ck value to the model catalog", async () =
 	}
 })
 
+test("Agency client preserves hosted reasoning effort metadata", async () => {
+	const originalFetch = globalThis.fetch
+	globalThis.fetch = (async () =>
+		new Response(
+			JSON.stringify({
+				data: [
+					{
+						id: "deepseek-v4-flash",
+						name: "DeepSeek V4 Flash",
+						reasoning_efforts: { high: "high", max: "max" },
+					},
+				],
+			}),
+			{ status: 200 },
+		)) as typeof fetch
+	try {
+		assert.deepEqual(await new AgencyClient("https://cocode.agency").models("ck_test"), [
+			{
+				id: "deepseek-v4-flash",
+				name: "DeepSeek V4 Flash",
+				reasoningEfforts: { high: "high", max: "max" },
+			},
+		])
+	} finally {
+		globalThis.fetch = originalFetch
+	}
+})
+
 test("Agency client calculates rolling account usage from credit and usage windows", async () => {
 	const originalFetch = globalThis.fetch
 	const requests: string[] = []

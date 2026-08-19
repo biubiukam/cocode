@@ -225,17 +225,20 @@ function routeIsCurrent(
 	)
 }
 
-function cloudRouteValue(
-	baseURL: string,
-	models: readonly { readonly id: string; readonly name: string }[],
-): Record<string, unknown> {
+function cloudRouteValue(baseURL: string, models: readonly AgencyModel[]): Record<string, unknown> {
 	return {
 		displayName: "Cocode Nut",
 		api: CLOUD_API,
 		baseURL,
 		apiKeyEnv: CLOUD_CREDENTIAL,
 		retryPolicy: { mode: "normal", maxRetries: CLOUD_MAX_RETRIES },
-		models: models.map((model) => ({ id: model.id, name: model.name })),
+		models: models.map((model) => ({
+			id: model.id,
+			name: model.name,
+			...(model.reasoningEfforts === undefined
+				? {}
+				: { reasoningEfforts: model.reasoningEfforts }),
+		})),
 	}
 }
 
