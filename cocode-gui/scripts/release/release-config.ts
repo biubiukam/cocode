@@ -3,10 +3,8 @@ import * as path from "pathe"
 import { loadEnvFile } from "node:process"
 import type { MakerDMGConfig } from "@electron-forge/maker-dmg"
 import type { MakerMSIXConfig } from "@electron-forge/maker-msix"
-import type { MakerSquirrelConfig } from "@electron-forge/maker-squirrel"
 import type { OsxSignOptions } from "@electron/packager"
 import type { NotaryToolCredentials } from "@electron/notarize/lib/types"
-import type { SignToolOptions as CjsSignToolOptions } from "@electron/windows-sign/dist/cjs/types"
 import type { SignToolOptions } from "@electron/windows-sign/dist/esm/types"
 
 export type ReleasePlatform = "darwin" | "win32"
@@ -402,29 +400,6 @@ export function createDmgConfig(environment = process.env): MakerDMGConfig {
 	}
 }
 
-export function createSquirrelConfig(
-	packageVersion: string,
-	environment = process.env,
-	windowsSignOptions?: ReturnType<typeof createWindowsSignOptions>,
-): MakerSquirrelConfig {
-	const arch = environment.RELEASE_ARCH ?? process.arch
-	if (arch !== "x64" && arch !== "arm64")
-		throw new Error(`Unsupported Squirrel architecture: ${arch}.`)
-	const segment = arch === "x64" ? "win32-x64" : "win32-arm64"
-	const artifactRoot = `Cocode-Desktop-${packageVersion}-${segment}`
-	return {
-		noMsi: false,
-		noDelta: false,
-		setupIcon: resolveReleasePath(
-			environment.WINDOWS_ICON_PATH?.trim() || "resources/icons/cocode.ico",
-			"WINDOWS_ICON_PATH",
-		),
-		setupExe: `${artifactRoot}-Setup.exe`,
-		setupMsi: `${artifactRoot}-Setup.msi`,
-		windowsSign: windowsSignOptions as unknown as CjsSignToolOptions | undefined,
-	}
-}
-
 export function createMsixConfig(
 	packageVersion: string,
 	environment = process.env,
@@ -442,7 +417,7 @@ export function createMsixConfig(
 		environment.WINDOWS_MSIX_PACKAGE_DISPLAY_NAME?.trim() ||
 		environment.RELEASE_DESCRIPTION?.trim() ||
 		"Cocode Desktop"
-	return {
+	const config: MakerMSIXConfig = {
 		packageName: `Cocode-Desktop-${packageVersion}-win32-${arch}`,
 		manifestVariables: {
 			packageIdentity,
@@ -455,8 +430,18 @@ export function createMsixConfig(
 			packageVersion: resolveMsixPackageVersion(packageVersion),
 			targetArch: arch,
 		},
-		windowsSignOptions: windowsSignOptions as unknown as MakerMSIXConfig["windowsSignOptions"],
 	}
+	// electron-windows-msix only understands PFX paths. Hook-based service signing
+	// looks like "no certificate", so the maker tries to mint a self-signed cert
+	// with pwsh.exe. Disable that path and sign the finished .msix afterwards.
+	if (windowsSignOptions?.certificateFile) {
+		return {
+			...config,
+			windowsSignOptions:
+				windowsSignOptions as unknown as MakerMSIXConfig["windowsSignOptions"],
+		}
+	}
+	return { ...config, sign: false }
 }
 
 export function resolveMsixPackageVersion(packageVersion: string): string {

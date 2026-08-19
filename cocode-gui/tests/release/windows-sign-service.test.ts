@@ -31,6 +31,7 @@ interface SigningServiceModule {
 		credentialValue: string,
 		config: SigningServiceConfig,
 	): Promise<SigningServiceResult>
+	signingTemporaryPath(filePath: string): string
 }
 
 const localRequire = createRequire(path.resolve("tests/release/windows-sign-service.test.ts"))
@@ -39,6 +40,7 @@ const {
 	isWindowsApplicationExecutable,
 	requestSignature,
 	shouldSubmitWindowsFileForSigning,
+	signingTemporaryPath,
 } = localRequire(
 	"../../scripts/release/windows-sign-service.cjs",
 ) as SigningServiceModule
@@ -75,6 +77,14 @@ test("limits remote signing to Magic-compatible executables and required package
 
 test("does not call the signing service for excluded application files", async () => {
 	await assert.doesNotReject(() => windowsSignHook("/tmp/native.node"))
+})
+
+test("keeps the original extension on signing temp files", () => {
+	assert.match(signingTemporaryPath("C:/out/Cocode.exe"), /\/\.Cocode\.cocode-signing-\d+-\d+\.exe$/)
+	assert.match(
+		signingTemporaryPath("C:/out/Cocode-Desktop-1.0.1-win32-x64.msix"),
+		/\/\.Cocode-Desktop-1\.0\.1-win32-x64\.cocode-signing-\d+-\d+\.msix$/,
+	)
 })
 
 test("uses SIGN_CERTIFICATE from the environment before Credential Manager", async () => {

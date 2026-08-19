@@ -3,7 +3,6 @@ import test from "node:test"
 import {
 	createMacNotarizeOptions,
 	createMsixConfig,
-	createSquirrelConfig,
 	createWindowsSignOptions,
 	requireReleaseCredentials,
 	resolveGitHubReleaseRepository,
@@ -54,21 +53,6 @@ test("requires complete signing credentials", () => {
 	assert.throws(() => createMacNotarizeOptions({ APPLE_API_KEY: "key" }))
 })
 
-test("generates architecture-safe Squirrel names", () => {
-	assert.equal(
-		createSquirrelConfig("1.2.3", { RELEASE_ARCH: "x64" }).setupExe,
-		"Cocode-Desktop-1.2.3-win32-x64-Setup.exe",
-	)
-	assert.equal(
-		createSquirrelConfig("1.2.3", { RELEASE_ARCH: "arm64" }).setupExe,
-		"Cocode-Desktop-1.2.3-win32-arm64-Setup.exe",
-	)
-	assert.equal(
-		createSquirrelConfig("1.2.3", { RELEASE_ARCH: "arm64" }).setupMsi,
-		"Cocode-Desktop-1.2.3-win32-arm64-Setup.msi",
-	)
-})
-
 test("uses the main repository for every release architecture", () => {
 	const environment = {
 		GITHUB_REPOSITORY: "acme/cocode",
@@ -88,6 +72,8 @@ test("creates architecture-safe MSIX configuration", () => {
 		WINDOWS_MSIX_PACKAGE_DISPLAY_NAME: "Cocode Desktop",
 	})
 	assert.equal(config.packageName, "Cocode-Desktop-1.2.3-win32-arm64")
+	assert.equal(config.sign, false)
+	assert.equal(config.windowsSignOptions, undefined)
 	assert.deepEqual(config.manifestVariables, {
 		packageIdentity: "CocodeDesktop",
 		publisher: "CN=Cocode Contributors",
@@ -107,6 +93,27 @@ test("creates architecture-safe MSIX configuration", () => {
 			WINDOWS_MSIX_PACKAGE_ID: "invalid_identity",
 		}),
 	)
+})
+
+test("does not ask the MSIX maker to mint a self-signed certificate", () => {
+	const unsigned = createMsixConfig("1.2.3", { RELEASE_ARCH: "x64" })
+	assert.equal(unsigned.sign, false)
+	assert.equal(unsigned.windowsSignOptions, undefined)
+
+	const service = createWindowsSignOptions({
+		WINDOWS_SIGN_MODE: "service",
+		WINDOWS_SIGN_SERVICE_URL: "https://signing.example.test",
+	})
+	const hooked = createMsixConfig("1.2.3", { RELEASE_ARCH: "x64" }, service)
+	assert.equal(hooked.sign, false)
+	assert.equal(hooked.windowsSignOptions, undefined)
+
+	const pfx = createMsixConfig("1.2.3", { RELEASE_ARCH: "x64" }, {
+		certificateFile: "C:\\certificate.pfx",
+		certificatePassword: "secret",
+	})
+	assert.equal(pfx.sign, undefined)
+	assert.equal(pfx.windowsSignOptions?.certificateFile, "C:\\certificate.pfx")
 })
 
 test("requires a dedicated installer signing identity for PKG releases", () => {

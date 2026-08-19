@@ -247,17 +247,24 @@ function inspectAuthenticode(filePath, environment = process.env) {
 	if (process.platform !== "win32") throw new Error("Authenticode verification requires Windows.")
 	const script = [
 		"$s = Get-AuthenticodeSignature -LiteralPath $env:VERIFY_FILE",
-		"if ($s.Status -ne 'Valid') { throw \"Invalid Authenticode signature\" }",
+		'if ($s.Status -ne \'Valid\') { throw "Invalid Authenticode signature ($($s.Status)): $($s.StatusMessage)" }',
 		"$c = $s.SignerCertificate",
 		'if ($null -eq $c) { throw "Signer certificate is missing" }',
-		"[PSCustomObject]@{ Subject=$c.Subject; Thumbprint=$c.Thumbprint; Status=$s.Status } | ConvertTo-Json -Compress",
+		"$subjectUtf8 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes([string]$c.Subject))",
+		"[PSCustomObject]@{ SubjectUtf8=$subjectUtf8; Thumbprint=$c.Thumbprint; Status=[string]$s.Status } | ConvertTo-Json -Compress",
 	].join("; ")
 	const output = execFileSync(
 		"powershell.exe",
 		["-NoProfile", "-NonInteractive", "-Command", script],
 		{ env: { ...environment, VERIFY_FILE: filePath }, encoding: "utf8" },
 	).trim()
-	const result = JSON.parse(output)
+	const parsed = JSON.parse(output)
+	const result = {
+		...parsed,
+		Subject: parsed.SubjectUtf8
+			? Buffer.from(parsed.SubjectUtf8, "base64").toString("utf8")
+			: parsed.Subject,
+	}
 	const expectedSubject = environment.WINDOWS_SIGN_CERTIFICATE_SUBJECT?.trim()
 	const expectedThumbprint = normalizeThumbprint(environment.WINDOWS_SIGN_CERTIFICATE_SHA1)
 	if (expectedSubject && result.Subject !== expectedSubject)
@@ -267,6 +274,17 @@ function inspectAuthenticode(filePath, environment = process.env) {
 	return result
 }
 
+function signingTemporaryPath(filePath) {
+	const extension = path.extname(filePath)
+	const stem = path.basename(filePath, extension)
+	// Keep the original extension. Get-AuthenticodeSignature uses it to pick a
+	// verifier; a .tmp suffix makes signed MSIX/MSI look unsigned or unknown.
+	return path.join(
+		path.dirname(filePath),
+		`.${stem}.cocode-signing-${process.pid}-${Date.now()}${extension}`,
+	)
+}
+
 function ledgerDirectory(environment = process.env) {
 	return path.resolve(
 		environment.WINDOWS_SIGN_LEDGER_DIR?.trim() ||
@@ -274,27 +292,25 @@ function ledgerDirectory(environment = process.env) {
 	)
 }
 
-function ledgerPath(filePath, environment = process.env) {
-	const identity = createHash("sha256").update(path.resolve(filePath)).digest("hex")
-	return path.join(ledgerDirectory(environment), `${identity}.json`)
+// Entries are keyed by file content, not by path: @electron/packager signs the
+// application inside a temporary staging directory and only afterwards moves it
+// to the Forge output directory, and makers rename their artifacts after signing.
+function ledgerPath(contentSha256, environment = process.env) {
+	return path.join(ledgerDirectory(environment), `${contentSha256}.json`)
 }
 
-async function writeLedger(filePath, entry, environment = process.env) {
+async function writeLedger(contentSha256, entry, environment = process.env) {
 	const directory = ledgerDirectory(environment)
 	await mkdir(directory, { recursive: true })
-	const target = ledgerPath(filePath, environment)
+	const target = ledgerPath(contentSha256, environment)
 	const temporary = `${target}.${process.pid}.${Date.now()}.tmp`
-	await writeFile(
-		temporary,
-		`${JSON.stringify({ filePath: path.resolve(filePath), ...entry })}\n`,
-		"utf8",
-	)
+	await writeFile(temporary, `${JSON.stringify(entry)}\n`, "utf8")
 	await rename(temporary, target)
 }
 
-async function readLedger(filePath, environment = process.env) {
+async function readLedger(contentSha256, environment = process.env) {
 	try {
-		return JSON.parse(await readFile(ledgerPath(filePath, environment), "utf8"))
+		return JSON.parse(await readFile(ledgerPath(contentSha256, environment), "utf8"))
 	} catch (error) {
 		if (error && error.code === "ENOENT") return undefined
 		throw error
@@ -329,7 +345,7 @@ async function signFile(filePath, options = {}) {
 	const input = await readFile(filePath)
 	const inputSha256 = createHash("sha256").update(input).digest("hex")
 	try {
-		const existing = await readLedger(filePath, environment)
+		const existing = await readLedger(inputSha256, environment)
 		if (existing?.status === "signed" && existing.outputSha256 === inputSha256) {
 			const signature = inspectAuthenticode(filePath, environment)
 			return { inputSha256, outputSha256: inputSha256, signature, skipped: true }
@@ -340,10 +356,7 @@ async function signFile(filePath, options = {}) {
 			environment,
 		)
 		const result = await requestSignature(filePath, credential, config)
-		const temporary = path.join(
-			path.dirname(filePath),
-			`.${path.basename(filePath)}.cocode-signing-${process.pid}-${Date.now()}.tmp`,
-		)
+		const temporary = signingTemporaryPath(filePath)
 		await writeFile(temporary, result.signed)
 		let signature
 		try {
@@ -355,8 +368,9 @@ async function signFile(filePath, options = {}) {
 		}
 		const outputSha256 = createHash("sha256").update(result.signed).digest("hex")
 		await writeLedger(
-			filePath,
+			outputSha256,
 			{
+				filePath: path.resolve(filePath),
 				inputSha256,
 				outputSha256,
 				signerSubject: signature.Subject,
@@ -368,8 +382,9 @@ async function signFile(filePath, options = {}) {
 		return { inputSha256, outputSha256, signature }
 	} catch (error) {
 		await writeLedger(
-			filePath,
+			inputSha256,
 			{
+				filePath: path.resolve(filePath),
 				inputSha256,
 				status: "failed",
 				error: error instanceof Error ? error.message : String(error),
@@ -394,4 +409,5 @@ module.exports = {
 	replaceFileAtomically,
 	shouldSubmitWindowsFileForSigning,
 	signFile,
+	signingTemporaryPath,
 }

@@ -1,8 +1,8 @@
 import { execFileSync } from "node:child_process"
 import { createHash } from "node:crypto"
 import {
-	copyFileSync,
 	existsSync,
+	mkdirSync,
 	readdirSync,
 	readFileSync,
 	renameSync,
@@ -27,9 +27,10 @@ import {
 
 interface WindowsSigningPolicy {
 	isWindowsApplicationExecutable(filePath: string): boolean
+	signFile(filePath: string): Promise<unknown>
 }
 
-const { isWindowsApplicationExecutable } = windowsSigningService as WindowsSigningPolicy
+const { isWindowsApplicationExecutable, signFile } = windowsSigningService as WindowsSigningPolicy
 
 export function normalizeArtifactNames(makeResults: readonly ForgeMakeResult[]): ForgeMakeResult[] {
 	return makeResults.map((result) => {
@@ -117,7 +118,12 @@ export async function verifyPackagedApplication(packageResult: {
 	if (files.length === 0)
 		throw new Error(`No Windows executable artifacts found under ${packagePath}.`)
 	verifyWindowsSigningLedger(files)
-	for (const file of files) verifyWindowsFile(file)
+	let signerSubject: string | undefined
+	for (const file of files) {
+		const signature = verifyWindowsFile(file)
+		signerSubject ??= signature.Subject
+	}
+	assertMsixPublisherMatchesSigner(signerSubject)
 }
 
 export async function notarizeFinalMacArtifacts(
@@ -166,6 +172,19 @@ export function addMacPkgArtifact(makeResults: readonly ForgeMakeResult[]): Forg
 	)
 }
 
+export async function signWindowsPackageArtifacts(
+	makeResults: readonly ForgeMakeResult[],
+): Promise<void> {
+	if (resolveWindowsSignMode() !== "service") return
+	const packages = makeResults
+		.flatMap((result) => result.artifacts)
+		.filter((artifact) => artifact.toLowerCase().endsWith(".msix"))
+	for (const file of packages) {
+		if (!existsSync(file)) throw new Error(`Forge artifact is missing: ${file}`)
+		await signFile(path.resolve(file))
+	}
+}
+
 export function verifyMadeArtifacts(makeResults: readonly ForgeMakeResult[]): void {
 	if (!isReleaseSigningRequired()) return
 	const target = resolveReleaseTarget()
@@ -188,20 +207,15 @@ export function verifyMadeArtifacts(makeResults: readonly ForgeMakeResult[]): vo
 				process.platform === "win32"
 			)
 				verifyWindowsFile(artifact)
-			if (
-				target.platform === "win32" &&
-				artifact.toLowerCase().endsWith(".nupkg") &&
-				process.platform === "win32"
-			)
-				verifyWindowsNupkg(artifact)
 		}
 		if (target.platform === "win32" && process.platform === "win32") {
-			if (result.artifacts.some((artifact) => path.basename(artifact) === "RELEASES"))
-				verifyWindowsReleaseMetadata(result.artifacts)
-			for (const artifact of result.artifacts) {
-				if (artifact.toLowerCase().endsWith(".msix"))
-					verifyWindowsMsix(artifact, target.arch, result.packageJSON.version)
-			}
+			const packages = result.artifacts.filter((artifact) =>
+				artifact.toLowerCase().endsWith(".msix"),
+			)
+			if (packages.length === 0)
+				throw new Error(`No MSIX artifact was generated for ${result.platform}/${result.arch}.`)
+			for (const artifact of packages)
+				verifyWindowsMsix(artifact, target.arch, result.packageJSON.version)
 		}
 	}
 }
@@ -234,12 +248,12 @@ export function appendChecksumManifest(makeResults: readonly ForgeMakeResult[]):
 	]
 }
 
-/** Keep the x64 Squirrel legacy feed, but publish ARM64 through the shared MSIX channel. */
+/** Windows GitHub releases ship MSIX only; omit leftover Squirrel feed files. */
 export function selectGitHubReleaseArtifacts(
 	makeResults: readonly ForgeMakeResult[],
 ): ForgeMakeResult[] {
 	return makeResults.map((result) => {
-		if (result.platform !== "win32" || result.arch !== "arm64")
+		if (result.platform !== "win32")
 			return { ...result, artifacts: [...result.artifacts] }
 		return {
 			...result,
@@ -257,7 +271,8 @@ export function buildWindowsAuthenticodeVerificationScript(): string {
 		"if ($signature.Status -ne 'Valid') { throw \"Invalid Authenticode signature: $env:VERIFY_FILE\" }",
 		"$certificate = $signature.SignerCertificate",
 		'if ($null -eq $certificate) { throw "Signer certificate is missing: $env:VERIFY_FILE" }',
-		"[PSCustomObject]@{ Subject=$certificate.Subject; Thumbprint=$certificate.Thumbprint; Status=$signature.Status } | ConvertTo-Json -Compress",
+		"$subjectUtf8 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes([string]$certificate.Subject))",
+		"[PSCustomObject]@{ SubjectUtf8=$subjectUtf8; Thumbprint=$certificate.Thumbprint; Status=[string]$signature.Status } | ConvertTo-Json -Compress",
 	].join("; ")
 }
 
@@ -271,7 +286,7 @@ function verifyWindowsFile(file: string): { Subject?: string; Thumbprint?: strin
 			encoding: "utf8",
 		},
 	).trim()
-	const signature = JSON.parse(output) as { Subject?: string; Thumbprint?: string }
+	const signature = decodeAuthenticodeOutput(output)
 	const expectedSubject = process.env.WINDOWS_SIGN_CERTIFICATE_SUBJECT?.trim()
 	const expectedThumbprint = normalizeThumbprint(process.env.WINDOWS_SIGN_CERTIFICATE_SHA1)
 	if (expectedSubject && signature.Subject !== expectedSubject)
@@ -281,53 +296,49 @@ function verifyWindowsFile(file: string): { Subject?: string; Thumbprint?: strin
 	return signature
 }
 
+function decodeAuthenticodeOutput(output: string): { Subject?: string; Thumbprint?: string } {
+	const parsed = JSON.parse(output) as {
+		SubjectUtf8?: string
+		Subject?: string
+		Thumbprint?: string
+	}
+	return {
+		Subject: parsed.SubjectUtf8
+			? Buffer.from(parsed.SubjectUtf8, "base64").toString("utf8")
+			: parsed.Subject,
+		Thumbprint: parsed.Thumbprint,
+	}
+}
+
+function assertMsixPublisherMatchesSigner(signerSubject: string | undefined): void {
+	const publisher = process.env.WINDOWS_MSIX_PUBLISHER?.trim()
+	if (!publisher || !signerSubject) return
+	const expected = normalizeMsixPublisher(publisher)
+	if (expected === signerSubject) return
+	throw new Error(
+		`WINDOWS_MSIX_PUBLISHER must exactly match the signing certificate subject.\n  WINDOWS_MSIX_PUBLISHER=${expected}\n  certificate subject=${signerSubject}`,
+	)
+}
+
 function verifyWindowsSigningLedger(files: readonly string[]): void {
 	if (resolveWindowsSignMode() !== "service") return
 	const ledgerDir = resolveWindowsSignLedgerDir()
 	for (const file of files) {
-		const ledgerPath = path.join(
-			ledgerDir,
-			`${createHash("sha256").update(path.resolve(file)).digest("hex")}.json`,
-		)
+		const digest = createHash("sha256").update(readFileSync(file)).digest("hex")
+		const ledgerPath = path.join(ledgerDir, `${digest}.json`)
 		if (!existsSync(ledgerPath))
 			throw new Error(`Windows signing ledger entry is missing: ${file}`)
 		const entry = JSON.parse(readFileSync(ledgerPath, "utf8")) as {
-			filePath?: string
 			inputSha256?: string
 			outputSha256?: string
 			status?: string
 		}
 		if (
-			entry.filePath !== path.resolve(file) ||
 			entry.status !== "signed" ||
 			!isSha256(entry.inputSha256) ||
-			!isSha256(entry.outputSha256) ||
-			createHash("sha256").update(readFileSync(file)).digest("hex") !== entry.outputSha256
+			entry.outputSha256 !== digest
 		)
 			throw new Error(`Windows signing ledger entry is invalid: ${file}`)
-	}
-}
-
-function verifyWindowsReleaseMetadata(artifacts: readonly string[]): void {
-	const releases = artifacts.find((artifact) => path.basename(artifact) === "RELEASES")
-	if (!releases) throw new Error("Squirrel RELEASES metadata is missing.")
-	const rows = readFileSync(releases, "utf8")
-		.split(/\r?\n/)
-		.map((line) => line.trim())
-		.filter(Boolean)
-	if (rows.length === 0) throw new Error("Squirrel RELEASES metadata is empty.")
-	for (const row of rows) {
-		const [expectedSha1, fileName, expectedSize, ...rest] = row.split(/\s+/)
-		if (rest.length > 0 || !/^[a-f0-9]{40}$/i.test(expectedSha1) || !fileName)
-			throw new Error(`Invalid Squirrel RELEASES row: ${row}`)
-		const artifact = path.join(path.dirname(releases), fileName)
-		if (!existsSync(artifact))
-			throw new Error(`RELEASES references a missing file: ${fileName}`)
-		if (expectedSize && Number(expectedSize) !== statSync(artifact).size)
-			throw new Error(`RELEASES size mismatch: ${fileName}`)
-		const actualSha1 = createHash("sha1").update(readFileSync(artifact)).digest("hex")
-		if (actualSha1.toLowerCase() !== expectedSha1.toLowerCase())
-			throw new Error(`RELEASES hash mismatch: ${fileName}`)
 	}
 }
 
@@ -336,23 +347,14 @@ function verifyWindowsMsix(file: string, arch: string, version: unknown): void {
 	const signature = verifyWindowsFile(file)
 	const directory = mkdtempSync(path.join(os.tmpdir(), "cocode-msix-"))
 	try {
-		const archive = path.join(directory, "package.zip")
-		const expanded = path.join(directory, "expanded")
-		copyFileSync(file, archive)
-		execFileSync(
-			"powershell.exe",
-			[
-				"-NoProfile",
-				"-NonInteractive",
-				"-Command",
-				"$ErrorActionPreference='Stop'; Expand-Archive -LiteralPath $env:MSIX_ARCHIVE -DestinationPath $env:MSIX_DIR -Force",
-			],
-			{
-				env: { ...process.env, MSIX_ARCHIVE: archive, MSIX_DIR: expanded },
-				stdio: "inherit",
-			},
-		)
-		const manifest = readFileSync(path.join(expanded, "AppxManifest.xml"), "utf8")
+		const [manifestPath] = extractWindowsArchiveEntries({
+			archivePath: file,
+			destination: directory,
+			mode: "named",
+			names: ["AppxManifest.xml"],
+		})
+		if (!manifestPath) throw new Error(`MSIX manifest is missing: ${file}`)
+		const manifest = readFileSync(manifestPath, "utf8")
 		const identity = manifest.match(/<Identity\b[^>]*\/?>/i)?.[0]
 		const packageIdentity = decodeXmlAttribute(identity?.match(/\bName="([^"]+)"/i)?.[1])
 		const publisher = decodeXmlAttribute(identity?.match(/\bPublisher="([^"]+)"/i)?.[1])
@@ -375,9 +377,13 @@ function verifyWindowsMsix(file: string, arch: string, version: unknown): void {
 			throw new Error(`MSIX architecture mismatch: ${file}`)
 		if (packageVersion !== resolveMsixPackageVersion(String(version)))
 			throw new Error(`MSIX version mismatch: ${file}`)
-		const executablePath = path.join(expanded, executable.replaceAll("\\", path.sep))
-		if (!existsSync(executablePath))
-			throw new Error(`MSIX executable entry is missing: ${executable}`)
+		const [executablePath] = extractWindowsArchiveEntries({
+			archivePath: file,
+			destination: directory,
+			mode: "named",
+			names: [executable.replaceAll("\\", "/")],
+		})
+		if (!executablePath) throw new Error(`MSIX executable entry is missing: ${executable}`)
 		const expectedPublisher = process.env.WINDOWS_MSIX_PUBLISHER?.trim()
 		if (expectedPublisher && normalizeMsixPublisher(expectedPublisher) !== publisher)
 			throw new Error(`MSIX publisher mismatch: ${file}`)
@@ -392,25 +398,79 @@ function isSha256(value: string | undefined): value is string {
 	return Boolean(value && /^[a-f0-9]{64}$/i.test(value))
 }
 
-function verifyWindowsNupkg(file: string): void {
-	const directory = mkdtempSync(path.join(os.tmpdir(), "cocode-nupkg-"))
-	try {
-		execFileSync(
-			"powershell.exe",
-			[
-				"-NoProfile",
-				"-NonInteractive",
-				"-Command",
-				"$ErrorActionPreference='Stop'; Expand-Archive -LiteralPath $env:NUPKG_FILE -DestinationPath $env:NUPKG_DIR -Force",
-			],
-			{ env: { ...process.env, NUPKG_FILE: file, NUPKG_DIR: directory }, stdio: "inherit" },
+// Expand-Archive unpacks every entry and keeps zip-relative paths. The
+// packaged dsh-runtime has tens of thousands of files, some longer than
+// MAX_PATH once extracted under %TEMP%. Verification only needs executables
+// and AppxManifest.xml, extracted to short names via ZipFile.OpenRead.
+export function extractWindowsArchiveEntries(options: {
+	readonly archivePath: string
+	readonly destination: string
+	readonly mode: "executables" | "named"
+	readonly names?: readonly string[]
+}): string[] {
+	if (process.platform !== "win32")
+		throw new Error("Windows archive extraction requires PowerShell.")
+	const archivePath = path.resolve(options.archivePath)
+	const destination = path.resolve(options.destination)
+	if (!existsSync(archivePath)) throw new Error(`Archive is missing: ${archivePath}`)
+	mkdirSync(destination, { recursive: true })
+	const script = [
+		"$ErrorActionPreference = 'Stop'",
+		"Add-Type -AssemblyName System.IO.Compression.FileSystem",
+		"New-Item -ItemType Directory -Path $env:ZIP_DIR -Force | Out-Null",
+		"$wanted = @()",
+		"if ($env:ZIP_ENTRIES_FILE) {",
+		"  $wanted = @(Get-Content -LiteralPath $env:ZIP_ENTRIES_FILE -Encoding UTF8 | ForEach-Object { $_.Trim().Replace('\\','/') } | Where-Object { $_ })",
+		"}",
+		"$zip = [IO.Compression.ZipFile]::OpenRead($env:ZIP_FILE)",
+		"try {",
+		"  $index = 0",
+		"  foreach ($entry in $zip.Entries) {",
+		"    if ($entry.FullName.EndsWith('/')) { continue }",
+		"    $name = $entry.FullName.Replace('\\','/')",
+		"    $include = $false",
+		"    if ($env:ZIP_MODE -eq 'executables') {",
+		"      $include = $name -like '*.exe'",
+		"    } else {",
+		"      foreach ($want in $wanted) { if ($name -eq $want) { $include = $true; break } }",
+		"    }",
+		"    if (-not $include) { continue }",
+		"    $leaf = [IO.Path]::GetFileName($entry.FullName)",
+		"    if ([string]::IsNullOrWhiteSpace($leaf)) { $leaf = 'entry' }",
+		"    $target = Join-Path $env:ZIP_DIR ('{0:D4}-{1}' -f $index, $leaf)",
+		"    [IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $target, $true)",
+		"    Write-Output $target",
+		"    $index++",
+		"  }",
+		"} finally { $zip.Dispose() }",
+	].join("\n")
+	const env: NodeJS.ProcessEnv = {
+		...process.env,
+		ZIP_FILE: archivePath,
+		ZIP_DIR: destination,
+		ZIP_MODE: options.mode,
+	}
+	let entriesFile: string | undefined
+	if (options.mode === "named") {
+		entriesFile = path.join(destination, ".cocode-zip-entries.txt")
+		writeFileSync(
+			entriesFile,
+			(options.names ?? []).map((name) => name.replaceAll("\\", "/")).join("\n"),
 		)
-		const files = collectFiles(directory).filter(isWindowsApplicationExecutable)
-		if (files.length === 0)
-			throw new Error(`No signed Windows executables found inside ${file}.`)
-		for (const candidate of files) verifyWindowsFile(candidate)
+		env.ZIP_ENTRIES_FILE = entriesFile
+	}
+	try {
+		const output = execFileSync(
+			"powershell.exe",
+			["-NoProfile", "-NonInteractive", "-Command", script],
+			{ env, encoding: "utf8" },
+		)
+		return output
+			.split(/\r?\n/)
+			.map((line) => line.trim())
+			.filter((line) => line && existsSync(line))
 	} finally {
-		rmSync(directory, { recursive: true, force: true })
+		if (entriesFile) rmSync(entriesFile, { force: true })
 	}
 }
 

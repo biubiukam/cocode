@@ -5,7 +5,6 @@ import { existsSync, readdirSync } from "node:fs"
 import fs from "node:fs/promises"
 import path from "node:path"
 import { MakerMSIX } from "@electron-forge/maker-msix"
-import { MakerSquirrel } from "@electron-forge/maker-squirrel"
 import { MakerZIP } from "@electron-forge/maker-zip"
 import { MakerDeb } from "@electron-forge/maker-deb"
 import { MakerRpm } from "@electron-forge/maker-rpm"
@@ -17,7 +16,6 @@ import {
 	createMacNotarizeOptions,
 	createMacSignOptions,
 	createMsixConfig,
-	createSquirrelConfig,
 	createWindowsSignOptions,
 	loadReleaseEnvironment,
 	resolveGitHubReleaseRepository,
@@ -31,6 +29,7 @@ import {
 	normalizeArtifactNames,
 	prepareMacDmgDependencies,
 	selectGitHubReleaseArtifacts,
+	signWindowsPackageArtifacts,
 	verifyMadeArtifacts,
 	verifyPackagedApplication,
 } from "./scripts/release/release-hooks"
@@ -139,6 +138,7 @@ const config: ForgeConfig = {
 		postMake: async (_config, makeResults) => {
 			const normalized = normalizeArtifactNames(addMacPkgArtifact(makeResults))
 			await notarizeFinalMacArtifacts(normalized)
+			await signWindowsPackageArtifacts(normalized)
 			verifyMadeArtifacts(normalized)
 			const result = appendChecksumManifest(selectGitHubReleaseArtifacts(normalized))
 			cleanupWindowsSignLedger()
@@ -157,10 +157,6 @@ const config: ForgeConfig = {
 		ignoreModules: ["node-pty"],
 	},
 	makers: [
-		new MakerSquirrel(
-			createSquirrelConfig(packageMetadata.version, process.env, windowsSignOptions),
-			["win32"],
-		),
 		new MakerMSIX(createMsixConfig(packageMetadata.version, process.env, windowsSignOptions), [
 			"win32",
 		]),
