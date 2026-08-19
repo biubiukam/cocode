@@ -34,7 +34,11 @@ const EMPTY_LOCALE = { active: 'zh' }
 const EMPTY_SUBSCRIBE = (): (() => void) => () => {}
 const EMPTY_GET_SNAPSHOT = (): { active: string } => EMPTY_LOCALE
 
-function RuntimeRecoveryBanner({ locale }: { locale?: LayoutLocale }) {
+function RuntimeRecoveryBanner({ locale, centerStart, centerWidth }: {
+  locale?: LayoutLocale
+  centerStart: number
+  centerWidth: number
+}) {
   const [detail, setDetail] = useState<RuntimeRecoveryDetail | null>(null)
   // LocaleRuntime exposes methods that read its private state through `this`.
   // Passing those methods directly to React loses the receiver and crashes the
@@ -91,7 +95,15 @@ function RuntimeRecoveryBanner({ locale }: { locale?: LayoutLocale }) {
   }
   const english = localeSnapshot.active === 'en'
   return (
-    <div className={css.recoveryBanner} role={failed ? 'alert' : 'status'} aria-live="polite">
+    <div
+      className={css.recoveryBanner}
+      role={failed ? 'alert' : 'status'}
+      aria-live="polite"
+      style={{
+        left: centerStart + centerWidth / 2,
+        maxWidth: Math.max(0, centerWidth - 32),
+      }}
+    >
       <span>
         {failed
           ? english
@@ -298,7 +310,7 @@ export function AppFrame({
       data-workbench-bottom-collapsed={bottom === 0 || undefined}
       data-dragging={dragging || undefined}
     >
-      <RuntimeRecoveryBanner locale={locale} />
+      <RuntimeRecoveryBanner locale={locale} centerStart={cols.sidebar} centerWidth={cols.center} />
       <div className={css.sidebarCol}>
         {/* Render-site slot call with live concession output: a closed
             sidebar keeps the mounted slot at the compact-rail width, and the

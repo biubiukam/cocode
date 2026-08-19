@@ -224,7 +224,7 @@
 
 .recoveryBanner {
   position: absolute;
-  top: 8px;
+  top: calc(var(--dsh-shell-header-height) + 8px);
   left: 50%;
   z-index: 40;
   display: flex;
@@ -248,8 +248,21 @@
   border: 0;
   border-radius: 5px;
   padding: 3px 8px;
-  background: var(--cocode-accent);
+  background: var(--dsw-alias-button-primary-fill);
   color: var(--dsw-alias-label-primary-foreground);
   cursor: pointer;
   font: inherit;
+}
+
+.recoveryBanner button:hover {
+  background: var(--dsw-alias-button-primary-hover);
+}
+
+.recoveryBanner button + button {
+  background: var(--dsw-alias-button-tool-bar-fill);
+  color: var(--dsw-alias-label-primary);
+}
+
+.recoveryBanner button + button:hover {
+  background: var(--dsw-alias-button-tool-bar-hover);
 }
