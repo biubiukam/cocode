@@ -1,6 +1,11 @@
 import { createHash, randomBytes } from "node:crypto"
 import { shell } from "electron"
-import type { AccountProfile, AccountSnapshot } from "../../../../contracts/ipc/account.contract"
+import type {
+	AccountMessageFeedback,
+	AccountMessageFeedbackList,
+	AccountProfile,
+	AccountSnapshot,
+} from "../../../../contracts/ipc/account.contract"
 import {
 	DEFAULT_MODEL_NAMESPACE,
 	type DefaultSelection,
@@ -95,6 +100,21 @@ type AccountAgency = {
 		readonly fiveHourResetAt?: string
 		readonly weekResetAt?: string
 	}>
+	listMessageFeedback(accessToken: string, sessionId: string): Promise<AccountMessageFeedbackList>
+	putMessageFeedback(
+		accessToken: string,
+		input: {
+			sessionId: string
+			messageId: string
+			rating: "positive" | "negative"
+			note?: string
+		},
+	): Promise<AccountMessageFeedback>
+	deleteMessageFeedback(
+		accessToken: string,
+		sessionId: string,
+		messageId: string,
+	): Promise<{ deleted: true }>
 	revokeApiKey(accessToken: string, keyId: string): Promise<void>
 	revoke(refreshToken: string): Promise<void>
 }
@@ -433,6 +453,26 @@ export class AccountService {
 			return
 		}
 		await this.performSignOut()
+	}
+
+	async listMessageFeedback(sessionId: string): Promise<AccountMessageFeedbackList> {
+		const state = await this.requireSignedInState()
+		return this.agency.listMessageFeedback(state.accessToken, sessionId)
+	}
+
+	async putMessageFeedback(input: {
+		sessionId: string
+		messageId: string
+		rating: "positive" | "negative"
+		note?: string
+	}): Promise<AccountMessageFeedback> {
+		const state = await this.requireSignedInState()
+		return this.agency.putMessageFeedback(state.accessToken, input)
+	}
+
+	async deleteMessageFeedback(sessionId: string, messageId: string): Promise<{ deleted: true }> {
+		const state = await this.requireSignedInState()
+		return this.agency.deleteMessageFeedback(state.accessToken, sessionId, messageId)
 	}
 
 	/**
@@ -1159,6 +1199,15 @@ export class AccountService {
 		})
 		await this.refreshTask
 		return (await this.identity.read()) ?? state
+	}
+
+	private async requireSignedInState(): Promise<IdentityState> {
+		await this.ensureLoaded()
+		const state = await this.identity.read()
+		if (state === undefined || this.snapshotValue.phase !== "signed-in")
+			throw new InvalidIdentityError()
+		this.assertIdentityOrigin(state)
+		return this.ensureIdentityAccess(state)
 	}
 
 	private async ensureIdentityAccess(state: IdentityState): Promise<IdentityState> {

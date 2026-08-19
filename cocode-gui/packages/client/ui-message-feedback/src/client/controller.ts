@@ -165,6 +165,12 @@ export class MessageFeedbackController implements HostObservable<MessageFeedback
     return this.mutate(() => this.refresh(), { seed: false })
   }
 
+  /** Forget data owned by the previous account without destroying slot bindings. */
+  reset(): void {
+    if (this.disposed) return
+    this.publish(INITIAL_VIEW)
+  }
+
   /**
    * Create or replace feedback for one message, comparing against the version
    * this controller last observed.

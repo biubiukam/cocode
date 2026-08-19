@@ -12,6 +12,7 @@ import {
 import type { MessageFeedbackRating } from '@deepseek-ai/dsh-message-feedback/types'
 import type { MessageFeedbackActionProps } from './slots.ts'
 import css from './MessageFeedbackActions.module.css'
+import { subscribeAccount } from './account.ts'
 
 /**
  * One message's feedback controls.
@@ -20,6 +21,8 @@ import css from './MessageFeedbackActions.module.css'
  * @returns the rating buttons, plus the note editor while it is open.
  */
 export function MessageFeedbackActions({ messageId, ensure, rate, toggle, clearNote, useFeedback, t }: MessageFeedbackActionProps) {
+  const [signedIn, setSignedIn] = useState(false)
+  useEffect(() => subscribeAccount(setSignedIn), [])
   const item = useFeedback(view => view.items.get(messageId))
   const loadFailed = useFeedback(view => view.status === 'error')
   const rating = item?.rating
@@ -84,6 +87,8 @@ export function MessageFeedbackActions({ messageId, ensure, rate, toggle, clearN
   const likeLabel = rating === 'positive' ? t('action.likeActive') : t('action.like')
   const dislikeLabel = rating === 'negative' ? t('action.dislikeActive') : t('action.dislike')
 
+  if (!signedIn) return null
+
   return (
     <>
       <Tooltip label={likeLabel} side="bottom">
@@ -129,6 +134,7 @@ export function MessageFeedbackActions({ messageId, ensure, rate, toggle, clearN
             placeholder={t('note.placeholder')}
             value={draft}
             rows={2}
+			maxLength={8192}
             onChange={(event) => { setDraft(event.target.value) }}
           />
           <button

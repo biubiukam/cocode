@@ -2,6 +2,8 @@ import { ipcRenderer } from "electron"
 import {
 	accountChannels,
 	type AccountApi,
+	type AccountMessageFeedback,
+	type AccountMessageFeedbackList,
 	type AccountSnapshot,
 } from "../../contracts/ipc/account.contract"
 import { parseAccountSnapshot } from "../../contracts/schemas/account.schema"
@@ -24,4 +26,21 @@ export const accountBridge: AccountApi = {
 	cancelSignIn: () => ipcRenderer.invoke(accountChannels.cancelSignIn) as Promise<void>,
 	signOut: () => ipcRenderer.invoke(accountChannels.signOut) as Promise<void>,
 	onChanged: subscribe,
+	messageFeedback: {
+		list: (sessionId) =>
+			ipcRenderer.invoke(
+				accountChannels.messageFeedbackList,
+				sessionId,
+			) as Promise<AccountMessageFeedbackList>,
+		put: (input) =>
+			ipcRenderer.invoke(
+				accountChannels.messageFeedbackPut,
+				input,
+			) as Promise<AccountMessageFeedback>,
+		delete: (sessionId, messageId) =>
+			ipcRenderer.invoke(accountChannels.messageFeedbackDelete, {
+				sessionId,
+				messageId,
+			}) as Promise<{ readonly deleted: true }>,
+	},
 }
