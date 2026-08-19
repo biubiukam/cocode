@@ -15,6 +15,7 @@ import { parseDshRuntimeBootstrap } from "../../../../contracts/schemas/dsh-runt
 import { extractDshBootManifest, extractDshThemePreference } from "./dsh-runtime-bootstrap"
 import { assertRequiredCocodeWebEndpoints } from "./dsh-runtime-health"
 import { resolveCocodeDshHome, resolveCocodeHome } from "./dsh-home"
+import { fetchDshRuntimeRequest } from "./dsh-runtime-request"
 import {
 	createHostSupervisorClient,
 	resolveHostRuntimeEnv,
@@ -170,33 +171,40 @@ export class DshRuntimeProcess {
 		for (const [name, value] of request.headers) {
 			if (FORWARDED_REQUEST_HEADERS.has(name.toLowerCase())) headers.append(name, value)
 		}
-		let response: Response
-		try {
-			response = await fetch(target, {
-				method: request.method,
-				headers,
-				body:
-					request.method === "GET" || request.method === "HEAD"
-						? undefined
-						: request.body,
-				signal,
-			})
-		} catch (error) {
-			if (request.method === "POST" && !signal.aborted) {
-				throw new Error(
-					`OUTCOME_UNKNOWN: DSH runtime did not confirm whether the mutation was accepted (${errorMessage(
-						error,
-					)}).`,
-				)
-			}
-			throw error
-		}
+		const response = await fetchDshRuntimeRequest({
+			target,
+			method: request.method,
+			headers,
+			body: request.method === "GET" || request.method === "HEAD" ? undefined : request.body,
+			signal,
+			onTransportFailure: (error) => this.recoverAfterTransportFailure(error),
+		})
 		return {
 			status: response.status,
 			statusText: response.statusText,
 			headers: [...response.headers.entries()],
 			body: new Uint8Array(await response.arrayBuffer()),
 		}
+	}
+
+	/**
+	 * A failed loopback fetch is direct evidence that the managed Host endpoint is no longer
+	 * reachable. Start the same deduplicated recovery used by the streaming transport, while
+	 * leaving the failed request to settle normally: POST requests must never be replayed because
+	 * the Host may have accepted the mutation before the connection disappeared.
+	 */
+	private recoverAfterTransportFailure(error: unknown): void {
+		const endpointGeneration = this.endpointGeneration
+		this.logger?.log("warn", "dsh.runtime.transport.failed", {
+			error,
+			attributes: { endpointGeneration },
+		})
+		void this.recover("host_unreachable", endpointGeneration).catch((recoveryError) => {
+			this.logger?.log("error", "dsh.runtime.recovery.request.failed", {
+				error: recoveryError,
+				attributes: { endpointGeneration, source: "http-proxy" },
+			})
+		})
 	}
 
 	public async recover(

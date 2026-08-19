@@ -37,7 +37,12 @@ export function CommitModelRow() {
     }
   }, [])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    const refreshAfterRuntimeRecovery = (): void => { void load() }
+    void load()
+    window.addEventListener("cocode:dsh-runtime-rebound", refreshAfterRuntimeRecovery)
+    return () => window.removeEventListener("cocode:dsh-runtime-rebound", refreshAfterRuntimeRecovery)
+  }, [load])
 
   const select = async (id: string): Promise<void> => {
     const option = models?.options.find(candidate => optionId(candidate) === id)
