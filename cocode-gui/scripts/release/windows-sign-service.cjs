@@ -93,7 +93,7 @@ function configFromEnvironment(environment = process.env) {
 			environment.RELEASE_DESCRIPTION?.trim() ||
 			"Cocode Desktop",
 		website: environment.WINDOWS_SIGN_WEBSITE?.trim() || environment.RELEASE_HOMEPAGE?.trim(),
-		timeoutMs: positiveInteger(environment.WINDOWS_SIGN_TIMEOUT_MS, 30_000),
+		timeoutMs: positiveInteger(environment.WINDOWS_SIGN_TIMEOUT_MS, 1_200_000),
 		retryCount: positiveInteger(environment.WINDOWS_SIGN_RETRY_COUNT, 2),
 	}
 }

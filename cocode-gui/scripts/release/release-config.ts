@@ -297,7 +297,7 @@ export function resolveWindowsSignServiceOptions(
 		hashAlgorithm: "sha256",
 		timeoutMs: parsePositiveEnvironmentInteger(
 			environment.WINDOWS_SIGN_TIMEOUT_MS,
-			30_000,
+			1_200_000,
 			"WINDOWS_SIGN_TIMEOUT_MS",
 		),
 		retryCount: parsePositiveEnvironmentInteger(
