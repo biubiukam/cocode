@@ -26,6 +26,8 @@ export interface WorkbenchPanelInstance {
   readonly dock: WorkbenchDock
   readonly paneId?: string
   readonly target?: WorkbenchTarget
+  /** Monotonic token used by panel-local actions that need to invalidate data. */
+  readonly refreshToken?: number
 }
 
 export interface WorkbenchScope {
@@ -100,6 +102,7 @@ export interface WorkbenchService {
   open(type: string, options?: OpenPanelOptions): string | undefined
   close(instanceId: string, sessionId?: string): void
   closeMany(instanceIds: readonly string[], sessionId?: string): void
+  refresh(instanceId: string, sessionId?: string): void
   activate(instanceId: string, sessionId?: string): void
   move(instanceId: string, dock: WorkbenchDock, sessionId?: string): void
   focusPane(paneId: string, sessionId?: string): void

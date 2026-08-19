@@ -259,6 +259,19 @@ export class WorkbenchController implements WorkbenchService {
     this.#publish()
   }
 
+  /** Ask a panel to reload its external content without changing its tab identity. */
+  refresh(instanceId: string, sessionId?: string): void {
+    const key = sessionKey(sessionId ?? this.#sessionId)
+    const current = normalizeSession(this.#sessions[key] ?? EMPTY_SESSION, key)
+    const instance = current.instances.find(candidate => candidate.id === instanceId)
+    if (instance === undefined) return
+    const instances = current.instances.map(candidate => candidate.id === instanceId
+      ? { ...candidate, refreshToken: (candidate.refreshToken ?? 0) + 1 }
+      : candidate)
+    this.#sessions[key] = { ...current, instances }
+    this.#publish()
+  }
+
   activate(instanceId: string, sessionId?: string): void {
     const key = sessionKey(sessionId ?? this.#sessionId)
     const current = normalizeSession(this.#sessions[key] ?? EMPTY_SESSION, key)

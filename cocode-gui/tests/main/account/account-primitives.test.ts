@@ -380,3 +380,87 @@ test("Agency client revokes the machine API key with the account token", async (
 		globalThis.fetch = originalFetch
 	}
 })
+
+test("Agency message feedback uses the authenticated account API without exposing the token in the body", async () => {
+	const originalFetch = globalThis.fetch
+	const requests: Array<{
+		url: string
+		method: string | undefined
+		authorization: string | null
+		body: unknown
+	}> = []
+	globalThis.fetch = (async (input, init) => {
+		requests.push({
+			url: String(input),
+			method: init?.method,
+			authorization: new Headers(init?.headers).get("authorization"),
+			body: init?.body === undefined ? undefined : JSON.parse(String(init.body)),
+		})
+		if (init?.method === "PUT") {
+			return new Response(
+				JSON.stringify({
+					session_id: "s/1",
+					message_id: "m?1",
+					rating: "negative",
+					note: "<script>alert(1)</script>",
+					created_at: "2026-08-19T12:00:00Z",
+					updated_at: "2026-08-19T12:00:00Z",
+				}),
+				{ status: 200 },
+			)
+		}
+		if (init?.method === "DELETE")
+			return new Response(JSON.stringify({ deleted: true }), { status: 200 })
+		return new Response(JSON.stringify({ data: [] }), { status: 200 })
+	}) as typeof fetch
+	try {
+		const client = new AgencyClient("https://cocode.agency")
+		await client.listMessageFeedback("account-token", "s/1")
+		await client.putMessageFeedback("account-token", {
+			sessionId: "s/1",
+			messageId: "m?1",
+			rating: "negative",
+			note: "<script>alert(1)</script>",
+		})
+		await client.deleteMessageFeedback("account-token", "s/1", "m?1")
+
+		assert.equal(
+			requests[0]?.url,
+			"https://cocode.agency/v1/me/message-feedback?session_id=s%2F1",
+		)
+		assert.equal(
+			requests[2]?.url,
+			"https://cocode.agency/v1/me/message-feedback?session_id=s%2F1&message_id=m%3F1",
+		)
+		for (const request of requests) {
+			assert.equal(request.authorization, "Bearer account-token")
+			assert.doesNotMatch(JSON.stringify(request.body) ?? "", /account-token/)
+		}
+		assert.deepEqual(requests[1]?.body, {
+			session_id: "s/1",
+			message_id: "m?1",
+			rating: "negative",
+			note: "<script>alert(1)</script>",
+		})
+	} finally {
+		globalThis.fetch = originalFetch
+	}
+})
+
+test("Agency message feedback reports non-success responses", async () => {
+	const originalFetch = globalThis.fetch
+	globalThis.fetch = (async () =>
+		new Response(JSON.stringify({ code: "feedback_invalid" }), { status: 422 })) as typeof fetch
+	try {
+		await assert.rejects(
+			new AgencyClient("https://cocode.agency").putMessageFeedback("account-token", {
+				sessionId: "s-1",
+				messageId: "m-1",
+				rating: "positive",
+			}),
+			/could not save message feedback/,
+		)
+	} finally {
+		globalThis.fetch = originalFetch
+	}
+})

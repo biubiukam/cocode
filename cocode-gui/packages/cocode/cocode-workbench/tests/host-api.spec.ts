@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "pathe"
 import { describe, expect, it } from "vitest"
+import htmlToDocx from "html-to-docx"
 import { createWorkbenchApi } from "../src/host-api.ts"
 import type { SandboxMode, WorkbenchContext } from "../src/host-types.ts"
 
@@ -95,6 +96,69 @@ describe("Cocode Workbench host API", () => {
     const result = await invoke(route, "fs.write", { sessionId: "s1", path: "note.txt", content: "new" })
     expect(result.value?.value).toMatchObject({ written: true })
     await expect(readFile(path, "utf8")).resolves.toBe("new")
+  })
+
+  it("previews and edits a Word document without a remote service", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "cocode-workbench-word-"))
+    const path = join(cwd, "report.docx")
+    const fixture = await htmlToDocx("<h1>Weekly report</h1><table><tr><th>Team</th><th>Status</th></tr><tr><td>GUI</td><td>Ready</td></tr></table>")
+    await writeFile(path, Buffer.isBuffer(fixture) ? fixture : Buffer.from(await fixture.arrayBuffer()))
+    const route = createWorkbenchApi(context(cwd))
+
+    const preview = await invoke(route, "word.read", { sessionId: "s1", path: "report.docx" })
+    expect(preview.status).toBe(200)
+    expect(preview.value?.value).toMatchObject({ kind: "word", writable: true })
+    expect((preview.value?.value as { html?: string }).html).toContain("Weekly report")
+
+    const save = await invoke(route, "word.write", { sessionId: "s1", path: "report.docx", html: "<h1>Edited report</h1><p><strong>Saved</strong> in Cocode.</p>" })
+    expect(save.status).toBe(200)
+    expect(save.value?.value).toMatchObject({ written: true })
+
+    const reread = await invoke(route, "word.read", { sessionId: "s1", path: "report.docx" })
+    expect((reread.value?.value as { html?: string }).html).toMatch(/Edited\s+report/)
+    expect((reread.value?.value as { html?: string }).html).toContain("Saved")
+  })
+
+  it("round-trips rich Word formatting instead of flattening it to plain text", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "cocode-workbench-rich-word-"))
+    const path = join(cwd, "rich.docx")
+    const fixture = await htmlToDocx(
+      `<h1>Rich title</h1>
+       <p style="text-align:center;color:#c62828;font-size:18pt"><strong><em><u>Styled text</u></em></strong> <sub>2</sub><sup>+</sup></p>
+       <blockquote>Quoted paragraph</blockquote>
+       <ol style="list-style-type:upper-roman"><li>First</li><li>Second</li></ol>
+       <table><thead><tr><th>Header</th></tr></thead><tbody><tr><td style="background-color:#eee;border:1px solid #000">Cell</td></tr></tbody></table>
+       <div class="page-break" style="page-break-after:always"></div><pre>code sample</pre>`,
+      null,
+      { pageSize: { width: 11906, height: 16838 }, margins: { top: 1440, right: 1440, bottom: 1440, left: 1440 }, font: "Arial", fontSize: 21, lang: "zh-CN" },
+    )
+    await writeFile(path, Buffer.isBuffer(fixture) ? fixture : Buffer.from(await fixture.arrayBuffer()))
+    const route = createWorkbenchApi(context(cwd))
+
+    const preview = await invoke(route, "word.read", { sessionId: "s1", path: "rich.docx" })
+    const html = (preview.value?.value as { html?: string }).html ?? ""
+    expect(html).toContain("Rich title")
+    expect(html).toContain("<ol")
+    expect(html).toContain("<table")
+    expect(html).toContain('width="602"')
+    expect(html).toContain("border: 1px solid #000000")
+    expect(html).toContain("line-height: 100%")
+    expect(html).toContain("<sub>")
+    expect(html).toContain("<sup>")
+
+    const save = await invoke(route, "word.write", {
+      sessionId: "s1",
+      path: "rich.docx",
+      html: `<h2>Edited rich title</h2><p style="color:#c62828;text-align:right"><strong><u>Saved style</u></strong></p><ul><li>Bullet</li></ul><div class="page-break" style="page-break-after:always"></div><pre>Saved code</pre>`,
+    })
+    expect(save.status).toBe(200)
+
+    const reread = await invoke(route, "word.read", { sessionId: "s1", path: "rich.docx" })
+    const edited = (reread.value?.value as { html?: string }).html ?? ""
+    expect(edited).toMatch(/Edited\s+rich\s+title/)
+    expect(edited).toMatch(/Saved\s+style/)
+    expect(edited).toContain("<ul>")
+    expect(edited).toContain("Saved code")
   })
 
   it("uses the caller-supplied cwd when the session is not live", async () => {

@@ -6,6 +6,7 @@ import { bindWorkbenchCwd } from "./runtime-api.ts"
 import { localeRevision, subscribeLocale, t } from "./locales.ts"
 import css from "./workbench.module.css"
 import { CloseIcon, FileGlyph, fileTypeIcon, PanelBottomIcon, PanelRightIcon, PlusIcon } from "./icons.tsx"
+import { baseName } from "../paths.ts"
 
 interface SessionListSlice {
   readonly byId: Readonly<Record<string, { readonly cwd?: string } | undefined>>
@@ -43,6 +44,18 @@ function useDenseTabs(count: number): readonly [RefObject<HTMLDivElement>, boole
 
 function panelTitle(descriptor: WorkbenchPanelDescriptor): string {
   return typeof descriptor.title === "function" ? descriptor.title() : descriptor.title
+}
+
+/** Preview tabs identify the open file; other tabs identify their panel. */
+function tabTitle(descriptor: WorkbenchPanelDescriptor | undefined, instance: WorkbenchPanelInstance): string {
+  if (descriptor?.id === "preview" && instance.target?.path !== undefined) return baseName(instance.target.path)
+  return descriptor === undefined ? instance.title : panelTitle(descriptor)
+}
+
+function isFilePreview(instance: WorkbenchPanelInstance | undefined): boolean {
+  if (instance?.type !== "preview" || instance.target?.path === undefined) return false
+  const data = instance.target.data
+  return data === undefined || data === null || typeof data !== "object" || (data as { readonly kind?: unknown }).kind !== "diff"
 }
 
 function panelIcon(descriptor: WorkbenchPanelDescriptor | undefined): ReactNode {
@@ -212,7 +225,10 @@ function Pane(props: {
     if (newPane !== undefined) props.controller.moveToPane(draggedId, newPane)
   }
   const menuIndex = paneInstances.findIndex(instance => instance.id === tabMenu?.id)
+  const menuInstance = paneInstances.find(instance => instance.id === tabMenu?.id)
+  const canRefresh = isFilePreview(menuInstance)
   const tabMenuItems: readonly MenuEntry[] = [
+    ...(canRefresh ? [{ id: "refresh", label: t("preview.refresh") } satisfies MenuEntry] : []),
     { id: "close", label: "Close" },
     { id: "closeOthers", label: "Close Others", disabled: paneInstances.length <= 1 },
     { id: "closeRight", label: "Close to the Right", disabled: menuIndex < 0 || menuIndex >= paneInstances.length - 1 },
@@ -234,6 +250,7 @@ function Pane(props: {
       if (newPane !== undefined) props.controller.moveToPane(id, newPane)
     }
     const actions: Record<string, () => void> = {
+      refresh: () => props.controller.refresh(id),
       close: () => props.controller.close(id),
       closeOthers: () => props.controller.closeMany(ids.filter(candidate => candidate !== id)),
       closeRight: () => props.controller.closeMany(ids.slice(menuIndex + 1)),
@@ -255,7 +272,7 @@ function Pane(props: {
       }}>
         {paneInstances.map(instance => {
           const descriptor = props.snapshot.catalog.find(item => item.id === instance.type)
-          const title = descriptor === undefined ? instance.title : panelTitle(descriptor)
+          const title = tabTitle(descriptor, instance)
           return <Tab key={instance.id} instance={instance} title={title} icon={tabIcon(descriptor, instance)} active={instance.id === activeId} activate={() => props.controller.activate(instance.id)} close={() => props.controller.close(instance.id)} drop={(draggedId, beforeId) => props.controller.moveToPane(draggedId, props.node.id, beforeId)} contextMenu={(x, y) => {
             props.controller.activate(instance.id)
             setTabMenu({ id: instance.id, x, y })

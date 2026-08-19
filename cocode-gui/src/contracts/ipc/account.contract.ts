@@ -4,6 +4,9 @@ export const accountChannels = {
 	cancelSignIn: "account:cancel-sign-in",
 	signOut: "account:sign-out",
 	changed: "account:changed",
+	messageFeedbackList: "account:message-feedback-list",
+	messageFeedbackPut: "account:message-feedback-put",
+	messageFeedbackDelete: "account:message-feedback-delete",
 } as const
 
 export type AccountPhase = "signed-out" | "signing-in" | "provisioning" | "signed-in" | "error"
@@ -42,6 +45,17 @@ export type AccountSnapshot = {
 	}
 }
 
+export type AccountMessageFeedback = {
+	readonly session_id: string
+	readonly message_id: string
+	readonly rating: "positive" | "negative"
+	readonly note?: string | null
+	readonly created_at?: string
+	readonly updated_at?: string
+}
+
+export type AccountMessageFeedbackList = { readonly data: readonly AccountMessageFeedback[] }
+
 export type AccountApi = {
 	readonly snapshot: () => Promise<AccountSnapshot>
 	readonly signIn: () => Promise<AccountSnapshot>
@@ -49,4 +63,17 @@ export type AccountApi = {
 	readonly cancelSignIn: () => Promise<void>
 	readonly signOut: () => Promise<void>
 	readonly onChanged: (listener: (snapshot: AccountSnapshot) => void) => () => void
+	readonly messageFeedback: {
+		readonly list: (sessionId: string) => Promise<AccountMessageFeedbackList>
+		readonly put: (input: {
+			sessionId: string
+			messageId: string
+			rating: "positive" | "negative"
+			note?: string
+		}) => Promise<AccountMessageFeedback>
+		readonly delete: (
+			sessionId: string,
+			messageId: string,
+		) => Promise<{ readonly deleted: true }>
+	}
 }

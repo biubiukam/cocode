@@ -54,6 +54,15 @@ export type AgencyAccountUsage = {
 	readonly weekResetAt?: string
 }
 
+export type AgencyMessageFeedback = {
+	readonly session_id: string
+	readonly message_id: string
+	readonly rating: "positive" | "negative"
+	readonly note?: string | null
+	readonly created_at?: string
+	readonly updated_at?: string
+}
+
 type AgencyModelCredit = {
 	readonly plan?: string
 	readonly ends_at?: string
@@ -392,6 +401,63 @@ export class AgencyClient {
 		})
 		if (response.status !== 200 && response.status !== 204 && response.status !== 404)
 			throw new AgencyHttpError("could not revoke Cocode device key", response.status)
+	}
+
+	async listMessageFeedback(
+		accessToken: string,
+		sessionId: string,
+	): Promise<{ readonly data: readonly AgencyMessageFeedback[] }> {
+		const response = await this.request<{ readonly data?: readonly AgencyMessageFeedback[] }>(
+			`/v1/me/message-feedback?session_id=${encodeURIComponent(sessionId)}`,
+			{ method: "GET", token: accessToken },
+		)
+		if (response.status !== 200 || !Array.isArray(response.value.data))
+			throw new AgencyHttpError("could not load message feedback", response.status)
+		return { data: response.value.data }
+	}
+
+	async putMessageFeedback(
+		accessToken: string,
+		input: {
+			readonly sessionId: string
+			readonly messageId: string
+			readonly rating: "positive" | "negative"
+			readonly note?: string
+		},
+	): Promise<AgencyMessageFeedback> {
+		const response = await this.request<AgencyMessageFeedback>("/v1/me/message-feedback", {
+			method: "PUT",
+			token: accessToken,
+			body: {
+				session_id: input.sessionId,
+				message_id: input.messageId,
+				rating: input.rating,
+				...(input.note === undefined ? {} : { note: input.note }),
+			},
+		})
+		if (
+			response.status !== 200 ||
+			typeof response.value !== "object" ||
+			response.value === null
+		)
+			throw new AgencyHttpError("could not save message feedback", response.status)
+		return response.value
+	}
+
+	async deleteMessageFeedback(
+		accessToken: string,
+		sessionId: string,
+		messageId: string,
+	): Promise<{ readonly deleted: true }> {
+		const response = await this.request<{ readonly deleted?: boolean }>(
+			`/v1/me/message-feedback?session_id=${encodeURIComponent(
+				sessionId,
+			)}&message_id=${encodeURIComponent(messageId)}`,
+			{ method: "DELETE", token: accessToken },
+		)
+		if (response.status !== 200 || response.value.deleted !== true)
+			throw new AgencyHttpError("could not delete message feedback", response.status)
+		return { deleted: true }
 	}
 
 	async revoke(refreshToken: string): Promise<void> {

@@ -8,6 +8,7 @@ import { applyBrowserHost } from "./browser/host.ts"
 import { absolutePath, assertWritable, canWrite, readablePath, sessionCwd, writablePath } from "./file-access.ts"
 import { gitDispatch } from "./git-api.ts"
 import { searchWorkspace } from "./fs-search.ts"
+import { readWordDocument, writeWordDocument } from "./word-document.ts"
 
 const exec = promisify(execFile)
 const MAX_FILE_BYTES = 4 * 1024 * 1024
@@ -138,6 +139,18 @@ async function fileWrite(ctx: WorkbenchContext, payload: Record<string, unknown>
   return { written: true, bytes: Buffer.byteLength(content, "utf8") }
 }
 
+async function wordRead(ctx: WorkbenchContext, payload: Record<string, unknown>) {
+  const path = readablePath(ctx, payload, "path")
+  return readWordDocument(path, canWrite(ctx, payload, path))
+}
+
+async function wordWrite(ctx: WorkbenchContext, payload: Record<string, unknown>) {
+  const path = writablePath(ctx, payload, "path")
+  const html = payload.html
+  if (typeof html !== "string") throw new Error("word.write requires HTML content")
+  return writeWordDocument(path, html)
+}
+
 async function fileMkdir(ctx: WorkbenchContext, payload: Record<string, unknown>) {
   const path = writablePath(ctx, payload, "path")
   await mkdir(path)
@@ -210,6 +223,8 @@ async function dispatch(ctx: WorkbenchContext, method: string, payload: Record<s
     case "fs.search": return searchWorkspace(ctx, payload)
     case "fs.read": return fileRead(ctx, payload)
     case "fs.write": return fileWrite(ctx, payload)
+    case "word.read": return wordRead(ctx, payload)
+    case "word.write": return wordWrite(ctx, payload)
     case "fs.mkdir": return fileMkdir(ctx, payload)
     case "fs.rename": return fileRename(ctx, payload)
     case "fs.copy": return fileCopy(ctx, payload)

@@ -16,6 +16,25 @@ export function registerAccountIpc(account: AccountService, logger?: DesktopLogg
 	ipcMain.handle(accountChannels.signOut, () =>
 		invoke(logger, "account.sign-out", () => account.signOut(), true),
 	)
+	ipcMain.handle(accountChannels.messageFeedbackList, (_event, sessionId: unknown) =>
+		invoke(logger, "account.message-feedback-list", () =>
+			account.listMessageFeedback(requireIdentifier(sessionId)),
+		),
+	)
+	ipcMain.handle(accountChannels.messageFeedbackPut, (_event, input: unknown) =>
+		invoke(logger, "account.message-feedback-put", () =>
+			account.putMessageFeedback(parseFeedbackInput(input)),
+		),
+	)
+	ipcMain.handle(accountChannels.messageFeedbackDelete, (_event, input: unknown) =>
+		invoke(logger, "account.message-feedback-delete", () => {
+			const value = recordOf(input)
+			return account.deleteMessageFeedback(
+				requireIdentifier(value?.sessionId),
+				requireIdentifier(value?.messageId),
+			)
+		}),
+	)
 	account.onChanged((snapshot) => {
 		logger?.log("debug", "account.state.changed", {
 			attributes: { phase: snapshot.phase, cloudStatus: snapshot.cloud.status },
@@ -31,6 +50,56 @@ export function unregisterAccountIpc(): void {
 	ipcMain.removeHandler(accountChannels.signIn)
 	ipcMain.removeHandler(accountChannels.cancelSignIn)
 	ipcMain.removeHandler(accountChannels.signOut)
+	ipcMain.removeHandler(accountChannels.messageFeedbackList)
+	ipcMain.removeHandler(accountChannels.messageFeedbackPut)
+	ipcMain.removeHandler(accountChannels.messageFeedbackDelete)
+}
+
+function recordOf(value: unknown): Record<string, unknown> | undefined {
+	return typeof value === "object" && value !== null && !Array.isArray(value)
+		? (value as Record<string, unknown>)
+		: undefined
+}
+
+function requireIdentifier(value: unknown): string {
+	if (
+		typeof value !== "string" ||
+		value.trim() === "" ||
+		value.length > 256 ||
+		/[\u0000-\u001f\u007f]/u.test(value)
+	)
+		throw new Error("invalid message feedback identifier")
+	return value
+}
+
+function parseFeedbackInput(value: unknown): {
+	sessionId: string
+	messageId: string
+	rating: "positive" | "negative"
+	note?: string
+} {
+	const record = recordOf(value)
+	const rating = record?.rating
+	const note = record?.note
+	if (rating !== "positive" && rating !== "negative")
+		throw new Error("invalid message feedback rating")
+	if (note !== undefined) requireNote(note)
+	return {
+		sessionId: requireIdentifier(record?.sessionId),
+		messageId: requireIdentifier(record?.messageId),
+		rating,
+		...(typeof note === "string" ? { note } : {}),
+	}
+}
+
+function requireNote(value: unknown): asserts value is string {
+	if (typeof value !== "string") throw new Error("invalid message feedback note")
+	if (new TextEncoder().encode(value).byteLength > 8192)
+		throw new Error("message feedback note is too long")
+	if (value.trim() === "") throw new Error("message feedback note must not be blank")
+	if (/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(value)) {
+		throw new Error("message feedback note contains unsupported control characters")
+	}
 }
 
 function invoke<T>(

@@ -160,4 +160,16 @@ describe("WorkbenchController", () => {
     expect(new Set([file, staged, worktree]).size).toBe(3)
     expect(controller.snapshot().session.instances).toHaveLength(3)
   })
+
+  it("refreshes a tab without changing its identity", () => {
+    const { controller } = harness()
+    controller.registerPanel({ id: "preview", title: "Preview", defaultDock: "right", render: () => null })
+    controller.setSession("s1")
+    const id = controller.open("preview", { target: { path: "/ws/report.docx" } })!
+    expect(controller.snapshot().session.instances[0]?.refreshToken).toBeUndefined()
+    controller.refresh(id)
+    expect(controller.snapshot().session.instances[0]).toMatchObject({ id, refreshToken: 1 })
+    controller.refresh(id)
+    expect(controller.snapshot().session.instances[0]?.refreshToken).toBe(2)
+  })
 })

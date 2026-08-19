@@ -18,15 +18,6 @@
   background: var(--dsw-alias-bg-layer-1);
 }
 
-.name {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--dsw-alias-label-primary);
-  font: var(--dsw-font-xxs-12);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .flag {
   flex: none;
   padding: 0 7px;
@@ -41,37 +32,6 @@
 
 .spacer {
   flex: 1;
-}
-
-.refresh {
-  display: inline-flex;
-  width: 28px;
-  height: 28px;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 0;
-  border-radius: 7px;
-  color: var(--dsw-alias-label-secondary);
-  background: transparent;
-  cursor: pointer;
-  transition: background-color 160ms ease, color 160ms ease;
-}
-
-.refresh:hover:not(:disabled) {
-  color: var(--dsw-alias-label-primary);
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-
-.refresh:disabled {
-  opacity: 0.35;
-  cursor: default;
-}
-
-.refresh:focus-visible {
-  outline: 2px solid var(--dsw-alias-interactive-bg-hover-accent);
-  outline-offset: 2px;
 }
 
 .modes {
@@ -394,4 +354,183 @@
 .externalOpen:disabled {
   opacity: 0.6;
   cursor: default;
+}
+
+.wordToolbarShell {
+  display: flex;
+  flex: none;
+  align-items: center;
+  min-height: 38px;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+  background: var(--dsw-alias-bg-layer-1);
+}
+
+.wordToolbar {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 38px;
+  overflow-x: auto;
+}
+
+.wordTool {
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--dsw-alias-label-primary);
+  background: transparent;
+  font: var(--dsw-font-xxs-12);
+}
+
+.wordFormatSelect {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.wordFormatSelectWrap {
+  position: relative;
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.wordFormatSelectWrap:hover { background: var(--dsw-alias-interactive-bg-hover); }
+.wordFormatSelectWrap:focus-within {
+  outline: 2px solid var(--dsw-alias-interactive-bg-hover-accent);
+  outline-offset: 1px;
+}
+.wordFormatChevron { pointer-events: none; }
+
+.wordTool {
+  display: inline-flex;
+  min-width: 28px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 7px;
+  cursor: pointer;
+}
+
+.colorRed,
+.colorYellow {
+  width: 12px;
+  height: 3px;
+  margin-left: 2px;
+  align-self: flex-end;
+  border-radius: 2px;
+}
+
+.colorRed { background: #c62828; }
+.colorYellow { background: #fff2a8; }
+
+.wordTool:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.wordTool:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.wordSave {
+  z-index: 2;
+  flex: none;
+  background: var(--dsw-alias-bg-layer-1);
+}
+
+.wordSave:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.wordTool[data-active] {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-fill-l2);
+  box-shadow: inset 0 0 0 1px var(--dsw-alias-border-l2);
+}
+
+.wordTool:focus-visible {
+  outline: 2px solid var(--dsw-alias-interactive-bg-hover-accent);
+  outline-offset: 1px;
+}
+
+.wordDivider {
+  width: 1px;
+  height: 18px;
+  margin: 0 3px;
+  flex: none;
+  background: var(--dsw-alias-border-l2);
+}
+
+.wordScroll {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  padding: 20px;
+  background: var(--dsw-alias-bg-base);
+}
+
+.wordPage {
+  box-sizing: border-box;
+  width: min(100%, 794px);
+  min-height: 1123px;
+  margin: 0 auto;
+  /* A4 + the 2.54cm default Word/LO text margins. Keeping this in CSS px
+     gives the same 602px content width as the DOCX's 15.92cm table width at
+     the browser's 96dpi CSS reference. */
+  padding: 96px;
+  color: #1f2328;
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 16%), 0 12px 36px rgb(0 0 0 / 12%);
+  font: 15px/1.65 Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+  overflow-wrap: anywhere;
+  outline: none;
+}
+
+.wordPage:focus {
+  box-shadow: 0 0 0 2px var(--dsw-alias-interactive-bg-hover-accent), 0 12px 36px rgb(0 0 0 / 12%);
+}
+
+.wordPage :where(h1, h2, h3, h4, h5, h6) {
+  margin: 1.2em 0 0.55em;
+  color: #111827;
+  line-height: 1.3;
+}
+
+.wordPage :where(h1) { font-size: 2em; }
+.wordPage :where(h2) { font-size: 1.55em; }
+.wordPage :where(h3) { font-size: 1.25em; }
+.wordPage :where(h4) { font-size: 1.1em; }
+.wordPage :where(h5, h6) { font-size: 1em; }
+.wordPage :where(p) { margin: 0 0 0.8em; }
+.wordPage :where(ul) { margin: 0 0 0.8em; padding-left: 1.8em; list-style: disc; }
+.wordPage :where(ol) { margin: 0 0 0.8em; padding-left: 1.8em; list-style: decimal; }
+.wordPage :where(img) { max-width: 100%; height: auto; }
+.wordPage :where(a) { color: #0969da; text-decoration: underline; }
+.wordPage :where(blockquote) { margin: 1em 0; padding-left: 1em; border-left: 3px solid #d0d7de; color: #57606a; }
+.wordPage :where(pre, code, kbd) { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.wordPage :where(pre) { overflow: auto; padding: 10px 12px; border-radius: 6px; background: #f6f8fa; white-space: pre-wrap; }
+.wordPage :where(mark) { padding: 0 2px; background: #fff2a8; }
+.wordPage :where(.caption) { color: #57606a; font-size: 0.9em; text-align: center; }
+.wordPage :where(.page-break) { height: 0; margin: 0; border: 0; break-after: page; page-break-after: always; }
+.wordPage :where([title="header"], [title="footer"]) { color: #57606a; font-size: 0.86em; }
+.wordPage :where([title="header"]) { margin-bottom: 24px; border-bottom: 1px solid #d0d7de; }
+.wordPage :where([title="footer"]) { margin-top: 24px; border-top: 1px solid #d0d7de; }
+.wordPage :where(table) { width: auto; max-width: 100%; margin: 1em auto; border-collapse: collapse; table-layout: auto; }
+.wordPage :where(th, td) { min-width: 48px; padding: 7px 9px; border: 1px solid #d0d7de; vertical-align: top; }
+.wordPage :where(th) { background: #f6f8fa; font-weight: 600; }
+
+@media (max-width: 680px) {
+  .wordScroll { padding: 10px; }
+  .wordPage { min-height: calc(100% - 2px); padding: 36px 30px 56px; }
 }
