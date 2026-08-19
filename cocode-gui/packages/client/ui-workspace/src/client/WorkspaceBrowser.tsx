@@ -12,7 +12,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import clsx from 'clsx'
 import {
-  Button, IconCloseFill14, IconPersonalizationOutline16,
+  Button, IconArchiveOutline20, IconCloseFill14, IconEllipsisOutline16,
+  IconPersonalizationOutline16,
   IconProjectAddOutline16, IconSearchOutline16, Menu, Modal, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import {
@@ -194,6 +195,64 @@ function ViewOptionsMenu({ groupBy, orderBy, onGroupPick, onOrderPick, t }: {
   )
 }
 
+/** Recent chats section header: title toggles the group, ellipsis owns its actions. */
+function RecentGroupHeader({
+  expanded, disabled, pending, onToggle, onArchive, t,
+}: {
+  expanded: boolean
+  disabled: boolean
+  pending: boolean
+  onToggle: () => void
+  onArchive: () => void
+  t: WorkspaceBrowserProps['t']
+}) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const closeMenu = () => { setMenuOpen(false) }
+  return (
+    <div className={css.recentGroupHeader}>
+      <button
+        type="button"
+        className={css.recentGroupToggle}
+        aria-expanded={expanded}
+        onClick={onToggle}
+      >
+        {t('group.recent')}
+      </button>
+      <Menu
+        open={menuOpen}
+        onClose={closeMenu}
+        items={[{
+          id: 'archive-read-sessions',
+          label: pending ? t('menu.archiveReadSessions.pending') : t('menu.archiveReadSessions'),
+          icon: <IconArchiveOutline20 size={16} />,
+          disabled,
+        }]}
+        onSelect={(id) => {
+          closeMenu()
+          if (id === 'archive-read-sessions') onArchive()
+        }}
+        portal
+        align="end"
+        anchor={(
+          <button
+            type="button"
+            className={css.recentGroupMenu}
+            aria-label={t('actions.recent.aria')}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            onClick={(event) => {
+              event.stopPropagation()
+              setMenuOpen(open => !open)
+            }}
+          >
+            <IconEllipsisOutline16 />
+          </button>
+        )}
+      />
+    </div>
+  )
+}
+
 /** In-flight root-row drag: source identity plus the current insert marker. */
 interface DragState {
   /** Workspace id, or {@link UNGROUPED_KEY} for the browser-local loose-session account. */
@@ -358,8 +417,8 @@ function SessionTree({
       ...(sessionOrderByAccount[UNGROUPED_KEY] === undefined
         ? {}
         : { ungroupedOrder: sessionOrderByAccount[UNGROUPED_KEY] }),
-    }),
-    [list, orderedWorkspaces, archivedSessionIds, expandedGroups, sessionOrderByAccount],
+    }).map(group => group.workspaceId === undefined ? { ...group, label: t('group.recent') } : group),
+    [list, orderedWorkspaces, archivedSessionIds, expandedGroups, sessionOrderByAccount, t],
   )
   const now = Date.now()
   const commitSessionDrag = (activeDrag: DragState, over: NonNullable<DragState['over']>): void => {
@@ -482,43 +541,52 @@ function SessionTree({
                   dropWorkspace(workspaceGroupHalf(e))
                 }}
             >
-              <ProjectRowItem
-                group={group}
-                t={t}
-                onToggle={() => {
-                  if (group.expanded) {
-                    setExpandedSessionGroups(keys => keys.filter(key => key !== group.key))
-                  }
-                  setGroupExpanded(group.key, !group.expanded)
-                }}
-                onCreate={() => {
-                  if (group.workspaceId !== undefined) {
-                    setGroupExpanded(group.key, true)
-                    startSession(group.workspaceId)
-                  }
-                }}
-                drag={workspaceDragProps}
-                actions={{
-                  ...(group.workspaceId === undefined ? {} : {
-                    rename: () => {
-                      /* v8 ignore next -- narrowing guard: the actions object exists only for real-workspace groups. */
-                      if (group.workspaceId !== undefined) onRenameRequest(group.workspaceId, group.label)
-                    },
-                  }),
-                  archiveReadSessions: () => {
-                    void archiveReadGroupSessions(group.key, group.archivableSessionIds)
-                  },
-                  archiveReadSessionsDisabled: group.archivableSessionIds.length === 0
-                    || archivingGroupKeys.has(group.key),
-                  archiveReadSessionsPending: archivingGroupKeys.has(group.key),
-                  ...(group.workspaceId === undefined ? {} : {
-                    delete: () => {
-                      /* v8 ignore next -- narrowing guard: the actions object exists only for real-workspace groups. */
-                      if (group.workspaceId !== undefined) onDeleteRequest(group.workspaceId, group.label)
-                    },
-                  }),
-                }}
-              />
+              {workspaceId === undefined
+                ? (
+                  <RecentGroupHeader
+                    expanded={group.expanded}
+                    disabled={group.archivableSessionIds.length === 0
+                      || archivingGroupKeys.has(group.key)}
+                    pending={archivingGroupKeys.has(group.key)}
+                    onToggle={() => {
+                      if (group.expanded) {
+                        setExpandedSessionGroups(keys => keys.filter(key => key !== group.key))
+                      }
+                      setGroupExpanded(group.key, !group.expanded)
+                    }}
+                    onArchive={() => {
+                      void archiveReadGroupSessions(group.key, group.archivableSessionIds)
+                    }}
+                    t={t}
+                  />
+                )
+                : (
+                  <ProjectRowItem
+                    group={group}
+                    t={t}
+                    onToggle={() => {
+                      if (group.expanded) {
+                        setExpandedSessionGroups(keys => keys.filter(key => key !== group.key))
+                      }
+                      setGroupExpanded(group.key, !group.expanded)
+                    }}
+                    onCreate={() => {
+                      setGroupExpanded(group.key, true)
+                      startSession(workspaceId)
+                    }}
+                    drag={workspaceDragProps}
+                    actions={{
+                      rename: () => { onRenameRequest(workspaceId, group.label) },
+                      archiveReadSessions: () => {
+                        void archiveReadGroupSessions(group.key, group.archivableSessionIds)
+                      },
+                      archiveReadSessionsDisabled: group.archivableSessionIds.length === 0
+                        || archivingGroupKeys.has(group.key),
+                      archiveReadSessionsPending: archivingGroupKeys.has(group.key),
+                      delete: () => { onDeleteRequest(workspaceId, group.label) },
+                    }}
+                  />
+                )}
               {(expandedSessionGroups.includes(group.key)
                 ? group.sessions
                 : group.sessions.slice(0, COLLAPSED_SESSION_LIMIT)

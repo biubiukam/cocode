@@ -9,14 +9,17 @@
  * packages/client/AGENTS.md.
  */
 import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import { createSnapshotStore, type ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
+import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { WorkspaceBrowserInjected, WorkspacePickerInjected } from './contract/slots.ts'
 import { createWorkspaceViewStore } from './stores.ts'
 import { WorkspaceBrowser } from './WorkspaceBrowser.tsx'
 import { WorkspacePicker } from './WorkspacePicker.tsx'
+import { WorkspaceStorageRow, type WorkspaceStorageState } from './WorkspaceStorageRow.tsx'
 import { en, zh, type WorkspaceKey } from './locales.ts'
+import { WORKSPACE_SETTINGS_NAMESPACE, type WorkspaceSettings } from '../storage-settings.ts'
 
 export type {
   DirectoryFlowOwnerProps, DirectoryFlowSlotName, DirectoryPickingHooks, DirectoryPickingInjected,
@@ -42,7 +45,7 @@ const NS = 'workspace'
  * provides a waitable service. apply therefore depends on each slot
  * declaration through `slots.inject()` instead of assuming order.
  */
-export const inject = ['slots', 'sessions', 'workspaces', 'locale']
+export const inject = ['slots', 'sessions', 'workspaces', 'locale', 'settingsScope']
 
 /**
  * Register the browser and picker once their slot declarations are on the
@@ -52,6 +55,23 @@ export const inject = ['slots', 'sessions', 'workspaces', 'locale']
  */
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-workspace: dictionaries')
+
+  const storageScope = ctx.settingsScope.bind<WorkspaceSettings>({ namespace: WORKSPACE_SETTINGS_NAMESPACE })
+  const storageStore = createSnapshotStore<WorkspaceStorageState>({
+    path: '', status: 'loading', writable: false,
+  })
+  const syncStorage = (): void => {
+    const snapshot = storageScope.getSnapshot()
+    const path = snapshot.value?.defaultStoragePath ?? ''
+    storageStore.set({ path, status: snapshot.status, writable: snapshot.writable })
+    ctx.workspaces.configureDefaultStorage(path)
+  }
+  ctx.effect(() => {
+    const off = storageScope.subscribe(syncStorage)
+    syncStorage()
+    void storageScope.load()
+    return off
+  }, 'ui-workspace: default storage settings')
 
   const searchSessions: WorkspaceBrowserInjected['searchSessions'] = async (query, signal) => {
     const result = await ctx.sessions.search(query, signal)
@@ -126,4 +146,19 @@ export function apply(ctx: ClientContext): void {
     },
     WorkspacePicker,
   ))
+  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
+    name: 'settings.general.item',
+    id: 'workspace-storage',
+    order: 10,
+    locale: NS,
+    inject: () => ({
+      hooks: { storage: storageStore },
+      pickDirectory: () => ctx.workspaces.pickDirectory(),
+      setStoragePath: async (path: string) => {
+        storageStore.set({ path, status: 'ready', writable: true })
+        ctx.workspaces.configureDefaultStorage(path)
+        await storageScope.set('defaultStoragePath', path)
+      },
+    }),
+  }, WorkspaceStorageRow))
 }

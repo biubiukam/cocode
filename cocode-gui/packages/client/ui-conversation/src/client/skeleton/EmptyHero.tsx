@@ -9,7 +9,7 @@ import type { ReactNode, RefObject } from 'react'
 import clsx from 'clsx'
 import type { LogoPreference } from '@deepseek-ai/dsh-client-ui-theme/client'
 import {
-  FishLogo, IconChevronDownOutline14, IconFolderClose16, IconFolderOpen16,
+  FishLogo, IconChevronDownOutline14, IconCloseFill14, IconFolderClose16, IconFolderOpen16,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { workspaceTitleOf } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConversationSlotProps } from '../contract/slots.ts'
@@ -38,31 +38,47 @@ export function workspaceLabel(cwd: string): string {
  * @param props.label - chip label (see {@link workspaceLabel}); omitted → placeholder.
  * @param props.menuOpen - menu expansion echo.
  * @param props.onClick - menu toggle.
+ * @param props.onClear - clear the project selection and start a normal chat.
  * @returns the chip button element.
  */
-export function WorkspaceChip({ buttonRef, label, menuOpen = false, onClick, t }: {
+export function WorkspaceChip({ buttonRef, label, menuOpen = false, onClick, onClear, t }: {
   buttonRef?: RefObject<HTMLButtonElement>
   label?: string | undefined
   menuOpen?: boolean
   onClick?: () => void
+  onClear?: (() => void) | undefined
   t: HeroTranslate
 }) {
   return (
-    <button
-      ref={buttonRef}
-      type="button"
-      className={css.workspace}
-      aria-label={t('hero.chooseWorkspace')}
-      aria-haspopup="menu"
-      aria-expanded={menuOpen}
-      onClick={onClick}
-    >
-      {label === undefined
-        ? <IconFolderClose16 className={css.folder} size={16} />
-        : <IconFolderOpen16 className={css.folder} size={16} />}
-      <span className={css.workspaceLabel}>{label ?? t('hero.chooseWorkspace')}</span>
-      <IconChevronDownOutline14 className={css.chevron} size={12} />
-    </button>
+    <span className={clsx(css.workspaceWrap, onClear !== undefined && css.workspaceWrapClearable)}>
+      <button
+        ref={buttonRef}
+        type="button"
+        className={css.workspace}
+        aria-label={t('hero.chooseWorkspace')}
+        aria-haspopup="menu"
+        aria-expanded={menuOpen}
+        onClick={onClick}
+      >
+        <span className={css.iconAction}>
+          {label === undefined
+            ? <IconFolderClose16 className={css.folder} size={16} />
+            : <IconFolderOpen16 className={css.folder} size={16} />}
+        </span>
+        <span className={css.workspaceLabel}>{label ?? t('hero.chooseWorkspace')}</span>
+        <IconChevronDownOutline14 className={css.chevron} size={12} />
+      </button>
+      {onClear !== undefined && (
+        <button
+          type="button"
+          className={css.workspaceClear}
+          aria-label={t('hero.clearWorkspace')}
+          onClick={onClear}
+        >
+          <IconCloseFill14 className={css.clearIcon} size={12} />
+        </button>
+      )}
+    </span>
   )
 }
 

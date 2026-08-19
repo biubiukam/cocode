@@ -49,6 +49,7 @@ export function ConversationRoot({
 
   const [pickerOpen, setPickerOpen] = useState(false)
   const [workspaceSelection, setWorkspaceSelection] = useState<WorkspaceSelection | undefined>()
+  const [workspaceError, setWorkspaceError] = useState<string | undefined>()
   const pickerAnchor = useRef<HTMLButtonElement>(null)
   const scrollBodyRef = useRef<HTMLDivElement>(null)
   const scrollbarLingerRef = useRef<number | undefined>(undefined)
@@ -143,7 +144,7 @@ export function ConversationRoot({
       ? undefined
       : sessionWorkspace?.title
         ?? (workspaces.phase === 'ready' || cwd === undefined || cwd === ''
-          ? undefined
+          ? t('hero.defaultWorkspace')
           : workspaceLabel(cwd)))
 
   const heroWorkspaceRow = (
@@ -154,6 +155,16 @@ export function ConversationRoot({
           label={chipTitle}
           menuOpen={pickerOpen}
           onClick={() => { setPickerOpen(open => !open) }}
+          onClear={sessionWorkspace !== undefined || workspaceSelection !== undefined
+            ? () => {
+              setPickerOpen(false)
+              setWorkspaceSelection(undefined)
+              setWorkspaceError(undefined)
+              void selectWorkspace().catch((reason: unknown) => {
+                setWorkspaceError(workspaceSelectionError(reason))
+              })
+            }
+            : undefined}
           t={t}
         />
         {renderSlot('conversation.hero.workspace', {
@@ -162,6 +173,7 @@ export function ConversationRoot({
           selectedId: workspaceSelection?.workspaceId ?? sessionWorkspace?.workspaceId,
           onPick: (workspaceId) => {
             setPickerOpen(false)
+            setWorkspaceError(undefined)
             const picked = workspaces.items.find(workspace => workspace.workspaceId === workspaceId)
             const label = picked === undefined
               ? workspaceId
@@ -176,9 +188,9 @@ export function ConversationRoot({
           onClose: () => { setPickerOpen(false) },
         })}
       </div>
-      {workspaceSelection?.error !== undefined && (
+      {(workspaceSelection?.error ?? workspaceError) !== undefined && (
         <div className={css.heroWorkspaceError} role="alert">
-          {t('workspace.selectFailed', { message: workspaceSelection.error })}
+          {t('workspace.selectFailed', { message: workspaceSelection?.error ?? workspaceError ?? '' })}
         </div>
       )}
     </div>

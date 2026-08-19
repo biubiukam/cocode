@@ -58,7 +58,8 @@ test("new sessions stay in the selected workspace before host frames arrive", as
 	const first = await runtime.connectWorkspace(workspaceId)
 
 	assert.deepEqual(
-		runtime.list.getSnapshot().items.find(item => item.workspaceId === workspaceId)?.sessionIds,
+		runtime.list.getSnapshot().items.find((item) => item.workspaceId === workspaceId)
+			?.sessionIds,
 		[first],
 	)
 	assert.equal(sessionsList.getSnapshot().byId[first]?.cwd, workspacePath)
@@ -66,4 +67,81 @@ test("new sessions stay in the selected workspace before host frames arrive", as
 	const second = await runtime.connectWorkspace(workspaceId)
 	assert.equal(second, first)
 	assert.equal(createdCount, 1)
+})
+
+test("new session without a project workspace creates an ungrouped chat", async () => {
+	const api = {
+		workspace: {
+			list: async () => ({
+				result: {
+					ok: true as const,
+					value: { items: [], archivedSessionIds: [] as string[] },
+				},
+			}),
+		},
+	}
+	const sessionsList = createSnapshotStore({
+		ids: [] as string[],
+		byId: {} as Record<string, { id: string; blank: boolean; updatedAt: number }>,
+		current: undefined as string | undefined,
+		phase: "ready" as const,
+	})
+	let opened: string | undefined
+	const sessions: SessionsPort = {
+		list: sessionsList,
+		async create({ workspaceId }) {
+			assert.equal(workspaceId, undefined)
+			const sessionId = "session-ungrouped"
+			sessionsList.update((draft) => {
+				draft.ids = [sessionId]
+				draft.byId[sessionId] = { id: sessionId, blank: true, updatedAt: Date.now() }
+			})
+			return sessionId
+		},
+		open: (sessionId) => {
+			opened = sessionId
+		},
+		clear: () => {},
+	}
+	const runtime = new WorkspaceRuntime(new Context(), api as never, sessions)
+
+	await runtime.refresh()
+	runtime.startSession()
+	await new Promise((resolve) => setImmediate(resolve))
+
+	assert.equal(opened, "session-ungrouped")
+})
+
+test("ordinary chats use the configured default storage path", async () => {
+	const api = {
+		workspace: {
+			list: async () => ({
+				result: {
+					ok: true as const,
+					value: { items: [], archivedSessionIds: [] as string[] },
+				},
+			}),
+		},
+	}
+	const sessionsList = createSnapshotStore({
+		ids: [] as string[],
+		byId: {} as Record<string, { id: string; blank: boolean; updatedAt: number }>,
+		current: undefined as string | undefined,
+		phase: "ready" as const,
+	})
+	let receivedCwd: string | undefined
+	const sessions: SessionsPort = {
+		list: sessionsList,
+		async create({ cwd }) {
+			receivedCwd = cwd
+			return "session-default"
+		},
+		open: () => {},
+		clear: () => {},
+	}
+	const runtime = new WorkspaceRuntime(new Context(), api as never, sessions)
+
+	runtime.configureDefaultStorage("/tmp/recent-cocode")
+	assert.equal(await runtime.connectDefaultSession(), "session-default")
+	assert.equal(receivedCwd, "/tmp/recent-cocode")
 })

@@ -20,6 +20,10 @@ export interface IWorkspaces {
    * @returns the connected session id.
    */
   connectWorkspace(workspaceId: WorkspaceId): Promise<SessionId>
+  /** Create a normal chat session outside every project Workspace. */
+  connectDefaultSession(): Promise<SessionId>
+  /** Update the directory used for future ungrouped chat sessions. */
+  configureDefaultStorage(path: string | undefined): void
   /**
    * The New Session flow: connect the explicit, current-Session, or recent
    * Workspace and open the resulting session; failures surface on the session

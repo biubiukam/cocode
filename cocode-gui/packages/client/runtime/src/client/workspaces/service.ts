@@ -55,6 +55,8 @@ export class WorkspaceRuntime implements IWorkspaces {
   private readonly manager: WorkspaceManager
   /** In-flight blank-session creates keyed by workspace (connectWorkspace coalescing). */
   private readonly connecting = new Map<WorkspaceId, Promise<SessionId>>()
+  /** User-configured directory for sessions that do not belong to a project. */
+  private defaultStoragePath: string | undefined
   /** Guards the runtime-owned one-shot initial-selection subscription. */
   private initialSelectionStarted = false
 
@@ -125,12 +127,27 @@ export class WorkspaceRuntime implements IWorkspaces {
     return attempt
   }
 
+  /** Create one ordinary chat session without attaching it to a project Workspace. */
+  connectDefaultSession(): Promise<SessionId> {
+    return this.sessions.create(this.defaultStoragePath === undefined
+      ? {}
+      : { cwd: this.defaultStoragePath })
+  }
+
+  /** Set the directory used by future ordinary chat sessions. */
+  configureDefaultStorage(path: string | undefined): void {
+    const trimmed = path?.trim()
+    this.defaultStoragePath = trimmed === undefined || trimmed === '' ? undefined : trimmed
+  }
+
   /**
    * Follow the first complete Workspace/Session baseline and select a default
    * session exactly once. A restored current session wins; otherwise the most
-   * recent Workspace is connected (reusing or creating its blank session).
+   * recent Workspace is connected (reusing or creating its blank session),
    * Later explicit clears stay cleared instead of retriggering this startup
-   * policy. A failed connect may retry on the next baseline projection.
+   * policy. When no project Workspace exists, create one ungrouped session so
+   * the app opens like an ordinary chat. A failed connect may retry on the next
+   * baseline projection.
    * @returns disposer for the baseline subscription; late work cannot navigate after disposal.
    */
   startInitialSelection(): () => void {
@@ -146,12 +163,15 @@ export class WorkspaceRuntime implements IWorkspaces {
       if (!workspace.baselinesReady) return
       const current = this.sessions.list.getSnapshot().current
       const target = workspace.recentWorkspaceId
-      if (current !== undefined || target === undefined) {
+      if (current !== undefined) {
         state = 'done'
         return
       }
       state = 'connecting'
-      void this.connectWorkspace(target).then(
+      const create = target === undefined
+        ? this.connectDefaultSession()
+        : this.connectWorkspace(target)
+      void create.then(
         (sessionId) => {
           if (disposed) return
           if (this.sessions.list.getSnapshot().current === undefined) {
@@ -178,10 +198,9 @@ export class WorkspaceRuntime implements IWorkspaces {
    * The shared New Session action behind the shell entry points (sidebar
    * button, workspace browser): resolve the target Workspace — explicit wins,
    * then the current Session's Workspace, then the recent-Workspace
-   * projection — connect its blank session and navigate there; with no
-   * Workspace at all, clear the selection into the New Session view state.
-   * Connect failures are non-fatal (console diagnostics; the current view
-   * stays usable).
+   * projection — connect its blank session and navigate there. With no
+   * project Workspace, create and open an ungrouped session instead,
+   * preserving the ordinary-chat entry point.
    * @param workspaceId - explicit target Workspace for scoped actions.
    */
   startSession(workspaceId?: WorkspaceId): void {
@@ -191,11 +210,10 @@ export class WorkspaceRuntime implements IWorkspaces {
       ? undefined
       : workspace.items.find(item => item.sessionIds.includes(current))?.workspaceId
     const target = workspaceId ?? currentWorkspaceId ?? workspace.recentWorkspaceId
-    if (target === undefined) {
-      this.sessions.clear()
-      return
-    }
-    void this.connectWorkspace(target).then(
+    const create = target === undefined
+      ? this.connectDefaultSession()
+      : this.connectWorkspace(target)
+    void create.then(
       (sessionId) => { this.sessions.open(sessionId) },
       (reason: unknown) => { console.warn('new session failed:', reason) },
     )
