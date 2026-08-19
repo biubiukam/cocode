@@ -6,6 +6,10 @@
   display: flex;
   width: 100%;
   min-width: 0;
+  /* Keep the account trigger on the same baseline as the composer's bottom
+     toolbar. The sidebar shell has a smaller bottom inset than the input
+     card's toolbar, so the wide footer needs one shared 8px spacer. */
+  margin-bottom: 8px;
 }
 
 .actionRootRail {
