@@ -56,6 +56,10 @@
      correct, while very long chats no longer keep every subtree hot. */
   content-visibility: auto;
   contain: layout paint style;
+  /* Assistant action rows optically align their 16px glyphs with prose by
+     bleeding the 28px hit target 6px left. Keep paint containment for long
+     transcripts, but include that intentional bleed in the clip edge. */
+  overflow-clip-margin: 6px;
   contain-intrinsic-size: auto 120px;
 }
 
