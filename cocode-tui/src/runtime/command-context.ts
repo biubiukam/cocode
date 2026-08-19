@@ -28,6 +28,8 @@ export type CommandContextOptions = {
   setLocale?: TuiCommandCtx['setLocale']
   setModel?: TuiCommandCtx['setModel']
   showModelPicker?: TuiCommandCtx['showModelPicker']
+  showEffortPicker?: TuiCommandCtx['showEffortPicker']
+  setEffort?: TuiCommandCtx['setEffort']
   showRewindPicker?: TuiCommandCtx['showRewindPicker']
   showUsage?: TuiCommandCtx['showUsage']
   locale?: UiLocale
@@ -71,6 +73,8 @@ export type AppCommandContextOptions = {
   setLocale?: TuiCommandCtx['setLocale']
   setModel?: TuiCommandCtx['setModel']
   showModelPicker?: TuiCommandCtx['showModelPicker']
+  showEffortPicker?: TuiCommandCtx['showEffortPicker']
+  setEffort?: TuiCommandCtx['setEffort']
   showRewindPicker?: TuiCommandCtx['showRewindPicker']
   showUsage?: TuiCommandCtx['showUsage']
   locale: UiLocale
@@ -104,6 +108,8 @@ export function createCommandContext(options: CommandContextOptions): TuiCommand
     setLocale: options.setLocale,
     setModel: options.setModel,
     showModelPicker: options.showModelPicker,
+    showEffortPicker: options.showEffortPicker,
+    setEffort: options.setEffort,
     showRewindPicker: options.showRewindPicker,
     showUsage: options.showUsage,
     exportTranscript: async () => {
@@ -190,6 +196,8 @@ export function createAppCommandContext(options: AppCommandContextOptions): TuiC
     setLocale: options.setLocale,
     setModel: options.setModel,
     showModelPicker: options.showModelPicker,
+    showEffortPicker: options.showEffortPicker,
+    setEffort: options.setEffort,
     showRewindPicker: options.showRewindPicker,
     showUsage: options.showUsage,
     locale: options.locale,

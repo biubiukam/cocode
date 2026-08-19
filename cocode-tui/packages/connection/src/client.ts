@@ -35,6 +35,8 @@ import type {
   TuiModelCatalog,
   TuiModelCatalogFailure,
   TuiModelProviderGroup,
+  TuiModelReasoning,
+  TuiModelReasoningEffort,
   TuiModelSelection,
   TuiImageAttachmentRef,
   TuiImageInput,
@@ -385,10 +387,16 @@ class SdkTuiRuntime implements TuiRuntime {
     sessionId: string,
     provider: string,
     model: string,
+    reasoningEffort?: string,
   ): Promise<TuiModelSelection | undefined> {
     const client = this.requireClient()
     try {
-      const result = await client.request('session.selectModel', { sessionId, provider, model })
+      const result = await client.request('session.selectModel', {
+        sessionId,
+        provider,
+        model,
+        ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
+      })
       if (!isRecord(result) || !isRecord(result.selected)) {
         throw new Error(`session.selectModel returned an invalid result: ${JSON.stringify(result)}`)
       }
@@ -396,7 +404,14 @@ class SdkTuiRuntime implements TuiRuntime {
       if (typeof selected.provider !== 'string' || typeof selected.model !== 'string') {
         throw new Error(`session.selectModel returned an invalid selection: ${JSON.stringify(result)}`)
       }
-      return { provider: selected.provider, model: selected.model }
+      if (selected.reasoningEffort !== undefined && typeof selected.reasoningEffort !== 'string') {
+        throw new Error(`session.selectModel returned an invalid selection: ${JSON.stringify(result)}`)
+      }
+      return {
+        provider: selected.provider,
+        model: selected.model,
+        ...(typeof selected.reasoningEffort === 'string' ? { reasoningEffort: selected.reasoningEffort } : {}),
+      }
     } catch (error) {
       if (isUnsupportedMethodError(error)) return undefined
       throw error
@@ -912,6 +927,7 @@ export function parseModelCatalogResult(value: unknown): TuiModelCatalog {
           id: model.id,
           name: model.name,
           ...(model.description === undefined ? {} : { description: model.description }),
+          ...parseModelReasoning(model.reasoning),
         }
       }),
     }
@@ -928,6 +944,37 @@ export function parseModelCatalogResult(value: unknown): TuiModelCatalog {
     return { id: failure.id, name: failure.name, message: failure.message }
   })
   return { groups, failures }
+}
+
+function parseModelReasoning(value: unknown): { reasoning: TuiModelReasoning } | Record<string, never> {
+  if (value === undefined) return {}
+  if (!isRecord(value) || !Array.isArray(value.efforts)) {
+    throw new Error('model/list returned an invalid model entry')
+  }
+  if (value.defaultEffort !== undefined && typeof value.defaultEffort !== 'string') {
+    throw new Error('model/list returned an invalid model entry')
+  }
+  const efforts: TuiModelReasoningEffort[] = value.efforts.map((effort) => {
+    if (
+      !isRecord(effort) ||
+      typeof effort.id !== 'string' ||
+      typeof effort.name !== 'string' ||
+      (effort.description !== undefined && typeof effort.description !== 'string')
+    ) {
+      throw new Error('model/list returned an invalid model entry')
+    }
+    return {
+      id: effort.id,
+      name: effort.name,
+      ...(effort.description === undefined ? {} : { description: effort.description }),
+    }
+  })
+  return {
+    reasoning: {
+      efforts,
+      ...(value.defaultEffort === undefined ? {} : { defaultEffort: value.defaultEffort }),
+    },
+  }
 }
 
 function parseApprovalRequest(params: Record<string, unknown>): TuiApprovalRequest {

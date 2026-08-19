@@ -18,8 +18,21 @@ describe('composer header layout', () => {
       hint: 'tab switch mode',
       compact: false,
       showRoute: true,
+      modelLabel: 'm1',
       modelStartColumn: 29,
       modelEndColumn: 31,
+    })
+  })
+
+  it('includes the current reasoning effort in the clickable model label', () => {
+    expect(composerHeaderLayout({ ...base, reasoningEffort: 'high', columns: 120 })).toEqual({
+      title: 'Build',
+      hint: 'tab switch mode',
+      compact: false,
+      showRoute: true,
+      modelLabel: 'm1 · high',
+      modelStartColumn: 29,
+      modelEndColumn: 38,
     })
   })
 
@@ -29,6 +42,7 @@ describe('composer header layout', () => {
       hint: 'tab switch mode',
       compact: true,
       showRoute: true,
+      modelLabel: 'm1',
       modelStartColumn: 9,
       modelEndColumn: 11,
     })

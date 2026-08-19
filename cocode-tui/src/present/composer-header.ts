@@ -13,6 +13,7 @@ export type ComposerHeaderLayout = {
   hint: string
   compact: boolean
   showRoute: boolean
+  modelLabel?: string
   modelStartColumn?: number
   modelEndColumn?: number
 }
@@ -25,6 +26,7 @@ export function composerHeaderLayout(options: {
   locale: UiLocale
   provider: string
   model: string
+  reasoningEffort?: string
   columns?: number
 }): ComposerHeaderLayout {
   const title = options.composer.mask
@@ -41,12 +43,16 @@ export function composerHeaderLayout(options: {
     : ''
   const columns = Math.max(1, Math.trunc(options.columns ?? 80))
   const hintWidth = stringWidth(hint)
+  const modelLabel =
+    options.reasoningEffort === undefined || options.reasoningEffort === ''
+      ? options.model
+      : `${options.model}${COMPOSER_META_SEPARATOR}${options.reasoningEffort}`
   const fullRouteWidth =
     stringWidth(title) +
     stringWidth(COMPOSER_META_SEPARATOR) +
     stringWidth(options.provider) +
     stringWidth(COMPOSER_ROUTE_SEPARATOR) +
-    stringWidth(options.model)
+    stringWidth(modelLabel)
   const compact =
     columns < COMPACT_COLUMNS || fullRouteWidth + hintWidth + 1 > Math.max(1, columns - 4)
 
@@ -60,7 +66,7 @@ export function composerHeaderLayout(options: {
   const modelStartColumn = CONTENT_START_COLUMN + stringWidth(title) + stringWidth(routePrefix)
   const hintStartColumn = columns - hintWidth + 1
   const modelEndColumn = Math.min(
-    modelStartColumn + stringWidth(options.model),
+    modelStartColumn + stringWidth(modelLabel),
     hintStartColumn,
   )
 
@@ -69,6 +75,7 @@ export function composerHeaderLayout(options: {
     hint,
     compact,
     showRoute: true,
+    modelLabel,
     ...(!options.composer.disabled && modelEndColumn > modelStartColumn
       ? { modelStartColumn, modelEndColumn }
       : {}),

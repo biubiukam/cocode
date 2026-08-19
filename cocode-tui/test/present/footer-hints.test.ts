@@ -67,7 +67,7 @@ describe('resolveFooterHints', () => {
   it('keeps every overlay isolated from main chat hints', () => {
     const overlays: readonly FooterOverlay[] = [
       'slash', 'file', 'history', 'resume', 'sessionTree', 'queue', 'checklist',
-      'rewind', 'fork', 'skills', 'plugins', 'model', 'modelInput', 'question',
+      'rewind', 'fork', 'skills', 'plugins', 'model', 'modelInput', 'effort', 'question',
       'approval', 'review', 'help', 'commandPalette', 'messageActions',
     ]
     for (const activeOverlay of overlays) {

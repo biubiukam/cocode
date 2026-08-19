@@ -166,10 +166,22 @@ export type TuiWorkspaceEnsureResult =
       reason: string
     }
 
+export type TuiModelReasoningEffort = {
+  id: string
+  name: string
+  description?: string
+}
+
+export type TuiModelReasoning = {
+  efforts: TuiModelReasoningEffort[]
+  defaultEffort?: string
+}
+
 export type TuiModel = {
   id: string
   name: string
   description?: string
+  reasoning?: TuiModelReasoning
 }
 
 export type TuiModelProviderGroup = {
@@ -192,6 +204,7 @@ export type TuiModelCatalog = {
 export type TuiModelSelection = {
   provider: string
   model: string
+  reasoningEffort?: string
 }
 
 export type TuiLaunch = {
@@ -313,7 +326,12 @@ export type TuiRuntime = {
   listSessions?(cwd?: string): Promise<TuiSessionSummary[]>
   ensureWorkspace?(sessionId: string, approved?: boolean): Promise<TuiWorkspaceEnsureResult>
   listModels?(): Promise<TuiModelCatalog>
-  selectModel?(sessionId: string, provider: string, model: string): Promise<TuiModelSelection | undefined>
+  selectModel?(
+    sessionId: string,
+    provider: string,
+    model: string,
+    reasoningEffort?: string,
+  ): Promise<TuiModelSelection | undefined>
   saveImages?(images: readonly TuiImageInput[]): Promise<TuiImageAttachmentRef[]>
   permissionMode?(
     sessionId: string,

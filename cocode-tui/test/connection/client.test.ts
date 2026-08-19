@@ -325,7 +325,18 @@ describe('runtime capability negotiation', () => {
           {
             id: 'provider-a',
             name: 'Provider A',
-            models: [{ id: 'model-a', name: 'Model A', description: 'Primary model' }],
+            models: [{
+              id: 'model-a',
+              name: 'Model A',
+              description: 'Primary model',
+              reasoning: {
+                defaultEffort: 'high',
+                efforts: [
+                  { id: 'high', name: 'High' },
+                  { id: 'max', name: 'Max', description: 'Slowest' },
+                ],
+              },
+            }],
           },
         ],
         failures: [{ id: 'provider-b', name: 'Provider B', message: 'offline' }],
@@ -335,7 +346,18 @@ describe('runtime capability negotiation', () => {
         {
           id: 'provider-a',
           name: 'Provider A',
-          models: [{ id: 'model-a', name: 'Model A', description: 'Primary model' }],
+          models: [{
+            id: 'model-a',
+            name: 'Model A',
+            description: 'Primary model',
+            reasoning: {
+              defaultEffort: 'high',
+              efforts: [
+                { id: 'high', name: 'High' },
+                { id: 'max', name: 'Max', description: 'Slowest' },
+              ],
+            },
+          }],
         },
       ],
       failures: [{ id: 'provider-b', name: 'Provider B', message: 'offline' }],

@@ -98,7 +98,8 @@ TUI 仍然要求真实 TTY；管道、重定向和 CI 环境不会进入交互�
 - 在消息选择模式按 `c` 可复制当前消息；也可以使用 `/copy` 复制最近一条 assistant 回复。复制依次尝试 macOS `pbcopy`、Windows `clip.exe`，以及 Linux 的 `wl-copy`、`xclip`、`xsel`；命令不可用时只显示提示，不影响会话。
 - `/focus` 切换本地「最近一轮」视图。开启后，对话区只显示最近一条用户消息及其后续节点，状态栏显示「聚焦：最近一轮」。它只改变界面投影，不修改 `/clear`、`/resume`、`/rewind`、导出或持久化 session log 的语义；再次执行可恢复完整会话视图。
 - `/lang zh` 或 `/lang en` 立即切换界面语言；未指定时启动语言由 `COCODE_LANG`、`LANG` 等环境变量决定。
-- `/model` 和 `/models` 无参数时打开模型选择器；`/model <model-id>` 直接切换当前 provider 下的模型。选择器可以同时切换 provider 和 model；如果重启后的 runtime 支持持久会话重新打开，TUI 会恢复当前 session 上下文，否则才创建新 session。失败会尝试恢复原 provider/model。旧 runtime 没有模型目录时仍可手动输入 model id。
+- `/model` 和 `/models` 无参数时打开模型选择器；`/model <model-id>` 直接切换当前 provider 下的模型。选择器可以同时切换 provider 和 model；如果重启后的 runtime 支持持久会话重新打开，TUI 会恢复当前 session 上下文，否则才创建新 session。失败会尝试恢复原 provider/model。旧 runtime 没有模型目录时仍可手动输入 model id。选中带推理档位的模型后会进入第二步选择强度。
+- `/effort` 无参数时打开当前模型的推理强度选择器；`/effort <档位>` 直接设置 Host 目录中的档位；`/effort auto` 或 `/effort default` 回到模型默认档。档位列表来自 Host，TUI 不写死 low/medium/high。当前档位显示在 Composer 标题的模型名后面。`/thinking` 仍只控制 thinking 显示，不改变推理强度。
 - 思考内容在流式生成期间默认展开，回复完成后自动收起为摘要；`Ctrl+O` 可保持完整思考内容和工具输入输出展开。
 - 对话运行中，状态栏会显示「思考中…」。即使下一段流式输出暂时没有到达，也能和空闲状态区分开。状态栏还会显示最近一次 assistant 的输入/输出 token，以及 wire 已报告的当前子代理活动。收到可选事件后，还会显示解码 TPS、缓存命中率、上下文窗口占用比例、推理等级、当前工作状态、紧凑的上下文分段（`S/P/A/T/X` 分别表示系统、输入、回复、思考和工具）、待办进度、目标阶段和当前 agent preset。分段数值按文本长度估算，不代表 provider 的计费数据。
 - runtime 支持计划模式时，输入区空闲状态按 `Tab` 可在 `Build` 与 `Plan` 之间切换；Slash 命令和 `@` 文件选择器打开时，`Tab` 仍用于移动选项。
@@ -156,8 +157,10 @@ TUI 仍然要求真实 TTY；管道、重定向和 CI 环境不会进入交互�
 | `/lang zh` / `/lang en`        | 切换中英文界面                                                       |
 | `/model`                      | 打开模型选择器                                                         |
 | `/models`                     | 打开模型选择器                                                         |
-| `/redraw`                     | 在不清除会话内容的情况下重绘界面                                     |
 | `/model <model-id>`            | 直接切换当前 provider 下的模型；支持持久会话时保留当前 session        |
+| `/effort`                      | 打开当前模型的推理强度选择器                                           |
+| `/effort <档位>`               | 设置当前模型的推理强度；`auto` / `default` 回到模型默认档             |
+| `/redraw`                     | 在不清除会话内容的情况下重绘界面                                     |
 | `/thinking`                    | 切换 thinking 和完整工具详情显示                                     |
 | `/tokens` / `/cost`            | 查看最近一次 token、缓存和 context 用量                              |
 | `/resume`                      | 打开当前工作区的 session 选择器并回放选中会话                        |

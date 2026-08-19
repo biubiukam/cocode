@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { basename, resolve } from "node:path";
 import { realpath } from "node:fs/promises";
 import { CompanionTransport } from "./transport.js";
-import { installAgentModelSelection } from "./model-selection.js";
+import { installAgentModelSelection, brandReasoningEffort } from "./model-selection.js";
 import type {
   Agent,
   AgentHandle,
@@ -153,6 +153,14 @@ type LoaderEntry = {
 type LoaderService = {
   entries(): Iterable<LoaderEntry>;
 };
+type LlmModelReasoning = {
+  efforts: readonly {
+    id: string;
+    name: string;
+    description?: string;
+  }[];
+  defaultEffort?: string;
+};
 type LlmService = {
   resolveCallConfig?: (config: {
     provider: string;
@@ -165,6 +173,7 @@ type LlmService = {
       name?: string;
       description?: string;
       inputModalities?: readonly string[];
+      reasoning?: LlmModelReasoning;
     }[]
   >;
   resolveModelInfo?: (
@@ -172,10 +181,15 @@ type LlmService = {
     model: string,
   ) => Promise<{
     inputModalities?: readonly string[];
+    reasoning?: LlmModelReasoning;
   }>;
 };
 type AgentDefaultModelService = {
-  saveSelection(selection: { provider: string; model: string }): Promise<void>;
+  saveSelection(selection: {
+    provider: string;
+    model: string;
+    reasoningEffort?: string;
+  }): Promise<void>;
 };
 type AttachmentService = {
   imageLimits: {
@@ -252,6 +266,51 @@ type ApprovalOutcome =
   | "rejected"
   | "cancelled"
   | "unavailable";
+
+function catalogReasoning(
+  reasoning: LlmModelReasoning | undefined,
+): LlmModelReasoning | undefined {
+  if (reasoning === undefined || !Array.isArray(reasoning.efforts))
+    return undefined;
+  const efforts = reasoning.efforts.flatMap((effort) => {
+    if (typeof effort.id !== "string" || typeof effort.name !== "string")
+      return [];
+    return [
+      {
+        id: effort.id,
+        name: effort.name,
+        ...(effort.description === undefined
+          ? {}
+          : { description: effort.description }),
+      },
+    ];
+  });
+  if (efforts.length === 0) return undefined;
+  return {
+    efforts,
+    ...(typeof reasoning.defaultEffort === "string"
+      ? { defaultEffort: reasoning.defaultEffort }
+      : {}),
+  };
+}
+
+function catalogModel(
+  model: {
+    id: string;
+    name?: string;
+    description?: string;
+    reasoning?: LlmModelReasoning;
+  },
+  resolvedReasoning?: LlmModelReasoning,
+): Record<string, unknown> {
+  const reasoning = catalogReasoning(model.reasoning ?? resolvedReasoning);
+  return {
+    id: model.id,
+    name: model.name ?? model.id,
+    ...(model.description === undefined ? {} : { description: model.description }),
+    ...(reasoning === undefined ? {} : { reasoning }),
+  };
+}
 
 /** Cocode-owned stdio gateway. It consumes Harness services without importing Harness runtime packages. */
 export class TuiCompanionGateway {
@@ -986,13 +1045,18 @@ export class TuiCompanionGateway {
         groups.push({
           id: provider.id,
           name,
-          models: models.map((model) => ({
-            id: model.id,
-            name: model.name ?? model.id,
-            ...(model.description === undefined
-              ? {}
-              : { description: model.description }),
-          })),
+          models: await Promise.all(
+            models.map(async (model) => {
+              const resolved =
+                model.reasoning === undefined &&
+                service.resolveModelInfo !== undefined
+                  ? await service.resolveModelInfo(provider.id, model.id).catch(
+                      () => undefined,
+                    )
+                  : undefined;
+              return catalogModel(model, resolved?.reasoning);
+            }),
+          ),
         });
       } catch (error) {
         failures.push({
@@ -1009,7 +1073,10 @@ export class TuiCompanionGateway {
     sessionId: string;
     provider: string;
     model: string;
-  }): Promise<{ selected: { provider: string; model: string } }> {
+    reasoningEffort?: string;
+  }): Promise<{
+    selected: { provider: string; model: string; reasoningEffort?: string };
+  }> {
     this.assertInitialized();
     if (params.sessionId.trim() === "")
       throw new Error("session.selectModel requires a session id");
@@ -1025,9 +1092,11 @@ export class TuiCompanionGateway {
       provider: params.provider,
       model: params.model,
     });
+    const reasoningEffort = brandReasoningEffort(params.reasoningEffort);
     const selected = {
       provider: resolved.provider,
       model: resolved.model,
+      ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
     };
     await this.assertModelSupportsSessionImages(record.handle.agent, selected);
     installAgentModelSelection(record.handle.agent, {
@@ -1045,7 +1114,7 @@ export class TuiCompanionGateway {
       // The live session has already switched; a persistence failure must not
       // force the TUI to create a replacement session.
     }
-    return { selected: { provider: selected.provider, model: selected.model } };
+    return { selected };
   }
 
   async respondQuestion(
@@ -1168,7 +1237,12 @@ export class TuiCompanionGateway {
       case "cocode/session/selectModel":
       case "session.selectModel":
         return this.selectModel(
-          params as { sessionId: string; provider: string; model: string },
+          params as {
+            sessionId: string;
+            provider: string;
+            model: string;
+            reasoningEffort?: string;
+          },
         );
       case "cocode/attachment/saveImages":
         return this.saveImages(params);

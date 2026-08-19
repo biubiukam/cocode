@@ -30,6 +30,7 @@ import { SkillsPicker } from './components/SkillsPicker.tsx'
 import { PluginsPicker } from './components/PluginsPicker.tsx'
 import { CommandArgumentMenu } from './components/CommandArgumentMenu.tsx'
 import { PermissionPicker } from './components/PermissionPicker.tsx'
+import { EffortPicker } from './components/EffortPicker.tsx'
 import {
   noticeRows,
   StatusLine,
@@ -90,6 +91,7 @@ import {
   visiblePlugins,
 } from '../runtime/plugin-picker.ts'
 import { PERMISSION_PICKER_WINDOW_SIZE } from '../runtime/permission-picker.ts'
+import { EFFORT_PICKER_WINDOW_SIZE } from '../runtime/effort-picker.ts'
 import {
   MODEL_PICKER_WINDOW_SIZE,
   visibleModelItems,
@@ -285,6 +287,7 @@ export function Chat(props: {
   const modelOverlayOpen = modelPickerOpen || modelInputOpen
   const quitConfirmationOpen = snap.quitConfirmation
   const permissionOpen = snap.permissionPicker?.open === true
+  const effortOpen = snap.effortPicker?.open === true
   const questionOpen = snap.question !== undefined
   const approvalOpen = snap.approval?.open === true
   const reviewOpen = snap.reviewPicker?.open === true
@@ -297,6 +300,7 @@ export function Chat(props: {
     !skillsOpen &&
     !pluginOpen &&
     !permissionOpen &&
+    !effortOpen &&
     !resumeOpen &&
     !sessionTreeOpen &&
     !queueOpen &&
@@ -318,6 +322,7 @@ export function Chat(props: {
     !skillsOpen &&
     !pluginOpen &&
     !permissionOpen &&
+    !effortOpen &&
     !resumeOpen &&
     !sessionTreeOpen &&
     !queueOpen &&
@@ -344,6 +349,7 @@ export function Chat(props: {
     !skillsOpen &&
     !pluginOpen &&
     !permissionOpen &&
+    !effortOpen &&
     !resumeOpen &&
     !sessionTreeOpen &&
     !queueOpen &&
@@ -391,13 +397,15 @@ export function Chat(props: {
                                 ? 'modelInput'
                                 : modelPickerOpen
                                   ? 'model'
-                                  : snap.helpOpen
-                                    ? 'help'
-                                    : slashOpen
-                                      ? 'slash'
-                                      : fileOpen
-                                        ? 'file'
-                                        : undefined
+                                  : effortOpen
+                                    ? 'effort'
+                                    : snap.helpOpen
+                                      ? 'help'
+                                      : slashOpen
+                                        ? 'slash'
+                                        : fileOpen
+                                          ? 'file'
+                                          : undefined
   const historyItems = useMemo(
     () => searchHistory(snap.history, historyQuery, 8),
     [historyQuery, snap.history],
@@ -598,6 +606,8 @@ export function Chat(props: {
     permissionSelected: permissionOpen
       ? snap.permissionPicker?.selected
       : undefined,
+    effortItems: effortOpen ? snap.effortPicker?.items.length : undefined,
+    effortSelected: effortOpen ? snap.effortPicker?.selected : undefined,
     questionRows:
       snap.question === undefined
         ? undefined
@@ -653,6 +663,7 @@ export function Chat(props: {
     locale: snap.locale,
     provider: snap.header.provider,
     model: snap.header.model,
+    reasoningEffort: snap.header.reasoningEffort,
     columns: mainColumns,
   })
   const composerMetadataRow = contentOverlayStartRow + layout.rows.overlay
@@ -861,6 +872,7 @@ export function Chat(props: {
           skillsOpen ||
           pluginOpen ||
           permissionOpen ||
+          effortOpen ||
           commandArgumentOpen ||
           resumeOpen ||
           sessionTreeOpen ||
@@ -941,6 +953,35 @@ export function Chat(props: {
           })
           if (event.action === 'press')
             app.dispatch({ type: 'permission.confirm' })
+        }
+        return
+      }
+      if (effortOpen && snap.effortPicker !== undefined) {
+        if (!insidePopup || event.button !== 0) return
+        const state = snap.effortPicker
+        const windowSize = pickerWindowSize(
+          layout.overlayRows,
+          EFFORT_PICKER_WINDOW_SIZE,
+          6,
+        )
+        const start = listWindowStart(
+          state.selected,
+          state.items.length,
+          windowSize,
+        )
+        const index = listItemIndexAtRow({
+          row: hitRow,
+          itemStartRow: popupStartRow + 3 + Number(start > 0),
+          itemCount: state.items.length,
+          selectedIndex: state.selected,
+          windowSize,
+        })
+        if (index !== undefined) {
+          app.dispatch({
+            type: 'effort.move',
+            delta: index - state.selected,
+          })
+          if (event.action === 'press') app.dispatch({ type: 'effort.confirm' })
         }
         return
       }
@@ -1628,6 +1669,21 @@ export function Chat(props: {
       return
     }
     if (modelInputOpen) return
+    if (effortOpen) {
+      if (key.escape) {
+        app.dispatch({ type: 'effort.close' })
+        return
+      }
+      if (key.upArrow || key.downArrow) {
+        app.dispatch({ type: 'effort.move', delta: key.upArrow ? -1 : 1 })
+        return
+      }
+      if (key.return) {
+        app.dispatch({ type: 'effort.confirm' })
+        return
+      }
+      return
+    }
     if (permissionOpen) {
       if (key.escape) {
         app.dispatch({ type: 'permission.close' })
@@ -1705,6 +1761,7 @@ export function Chat(props: {
       !skillsOpen &&
       !pluginOpen &&
       !permissionOpen &&
+      !effortOpen &&
       !resumeOpen &&
       !sessionTreeOpen &&
       !queueOpen &&
@@ -2427,6 +2484,13 @@ export function Chat(props: {
           maxRows={layout.overlayRows}
         />
       ) : null}
+      {effortOpen && snap.effortPicker !== undefined ? (
+        <EffortPicker
+          state={snap.effortPicker}
+          locale={snap.locale}
+          maxRows={layout.overlayRows}
+        />
+      ) : null}
       {modelPickerOpen && snap.modelPicker !== undefined ? (
         <ModelPicker
           state={snap.modelPicker}
@@ -2597,6 +2661,7 @@ export function Chat(props: {
           planModeAvailable={snap.capabilities.planMode}
           provider={snap.header.provider}
           model={snap.header.model}
+          reasoningEffort={snap.header.reasoningEffort}
           locale={snap.locale}
           maxRows={layout.composerInputRows}
           maxColumns={mainColumns}

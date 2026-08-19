@@ -75,6 +75,7 @@ function createContext(options = {}) {
               id: 'deepseek-v4-flash',
               name: 'DeepSeek V4 Flash',
               inputModalities: options.inputModalities ?? ['text'],
+              ...options.listedModel,
             }]
           },
           async resolveModelInfo(_provider, model) {
@@ -538,6 +539,75 @@ test('keeps the current model when the new model cannot handle session images', 
   })), {
     provider: 'deepseek-official',
     model: 'deepseek-v4-flash',
+  })
+})
+
+test('includes adapter reasoning metadata in the model catalog', async () => {
+  const reasoning = {
+    defaultEffort: 'high',
+    efforts: [
+      { id: 'high', name: 'High' },
+      { id: 'max', name: 'Max', description: 'Slowest' },
+    ],
+  }
+  const { ctx } = createContext({
+    listedModel: { reasoning },
+    resolveModelInfo: async () => ({
+      inputModalities: ['text'],
+      reasoning,
+    }),
+  })
+  const gateway = createGateway(ctx)
+  await initialize(gateway)
+
+  assert.deepEqual(await gateway.handleRequest('model/list'), {
+    groups: [
+      {
+        id: 'deepseek-official',
+        name: 'DeepSeek',
+        models: [
+          {
+            id: 'deepseek-v4-flash',
+            name: 'DeepSeek V4 Flash',
+            reasoning,
+          },
+        ],
+      },
+    ],
+    failures: [],
+  })
+})
+
+test('applies reasoning effort to the live session model selection', async () => {
+  const { ctx, created } = createContext()
+  const gateway = createGateway(ctx)
+  await initialize(gateway)
+  await gateway.prompt({ sessionId: 's1', contentBlocks: [{ type: 'text', text: 'hello' }] })
+
+  assert.deepEqual(await gateway.handleRequest('session.selectModel', {
+    sessionId: 's1',
+    provider: 'deepseek-official',
+    model: 'deepseek-v4-reasoner',
+    reasoningEffort: 'max',
+  }), {
+    selected: {
+      provider: 'deepseek-official',
+      model: 'deepseek-v4-reasoner',
+      reasoningEffort: 'max',
+    },
+  })
+
+  const assemble = created[0].ctx.listeners.get('system-prompt/assemble')
+  const request = created[0].ctx.listeners.get('agent/request')
+  await assemble({}, {}, async () => ({ variables: {} }))
+  assert.deepEqual(await request({}, async () => ({
+    provider: 'deepseek-official',
+    model: 'deepseek-v4-flash',
+    reasoningEffort: 'high',
+  })), {
+    provider: 'deepseek-official',
+    model: 'deepseek-v4-reasoner',
+    reasoningEffort: 'max',
   })
 })
 
