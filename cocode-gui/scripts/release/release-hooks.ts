@@ -204,7 +204,14 @@ export async function finalizeBuilderArtifacts(context: BuildResult): Promise<st
 						return signature
 					}
 				: undefined
-		const inventory = writeWindowsPeSigningInventory({ outDir: context.outDir, inspect })
+		const inventory = writeWindowsPeSigningInventory({
+			outDir: context.outDir,
+			excludeRoots: [
+				process.env.COCODE_RUNTIME_ARTIFACT_ROOT,
+				process.env.COCODE_TUI_ARTIFACT_ROOT,
+			].filter((root): root is string => Boolean(root)).map((root) => path.resolve(root)),
+			inspect,
+		})
 		additional.push(inventory)
 		const installer = selectUpdateArtifact(target.platform, finalizedArtifacts)
 		windowsSignature = inspect ? inspect(installer) : undefined
@@ -325,14 +332,18 @@ export function verifyArchitectureUpdateMetadata(metadataFile: string, artifact:
 
 export function writeWindowsPeSigningInventory(options: {
 	readonly outDir: string
+	readonly excludeRoots?: readonly string[]
 	readonly inspect?: (file: string) => { Subject?: string; Thumbprint?: string }
 }): string {
+	const excludedRoots = (options.excludeRoots ?? []).map((root) => path.resolve(root))
 	const files = collectFiles(options.outDir)
-		.filter(
-			(file) =>
+		.filter((file) => {
+			if (excludedRoots.some((root) => isPathWithin(root, file))) return false
+			return (
 				[".exe", ".node", ".dll"].includes(path.extname(file).toLowerCase()) ||
-				shouldSubmitWindowsFileForSigning(file),
-		)
+				shouldSubmitWindowsFileForSigning(file)
+			)
+		})
 		.sort((left, right) => left.localeCompare(right))
 		.map((file) => {
 			const extension = path.extname(file).toLowerCase()
@@ -738,6 +749,11 @@ function collectFiles(root: string): string[] {
 		const file = path.join(root, entry.name)
 		return entry.isDirectory() ? collectFiles(file) : [file]
 	})
+}
+
+function isPathWithin(root: string, candidate: string): boolean {
+	const relative = path.relative(path.resolve(root), path.resolve(candidate))
+	return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative))
 }
 
 function findFirstByExtension(root: string, extension: string): string | undefined {
