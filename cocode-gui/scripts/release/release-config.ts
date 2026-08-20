@@ -312,10 +312,6 @@ export function createWindowsSignOptions(
 		if (!existsSync(adapterPath))
 			throw new Error(`Windows signing adapter does not exist: ${adapterPath}`)
 		const publisherName = environment.WINDOWS_SIGN_CERTIFICATE_SUBJECT?.trim()
-		if (isReleaseSigningRequired(environment) && !publisherName)
-			throw new Error(
-				"WINDOWS_SIGN_CERTIFICATE_SUBJECT is required for signed Windows releases.",
-			)
 		return {
 			sign: adapterPath,
 			signingHashAlgorithms: ["sha256"],
