@@ -5,8 +5,13 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { endpointFor, descriptorPath, leaseDirectory, lockPath, scopePath } from './paths.js'
 import { resolveCocodeLogLayout } from './observability.js'
-import { listenLineServer } from './ipc.js'
-import { isLeaseActive, type LeaseRecord } from './lifecycle.js'
+import { listenLineServer, writeLineFrame } from './ipc.js'
+import {
+  createLeaseRecord,
+  HOST_ACQUIRE_ABANDONED_MESSAGE,
+  isLeaseActive,
+  type LeaseRecord,
+} from './lifecycle.js'
 import { canonicalizeScope, HOST_PROTOCOL_REVISION, hostKey, isHostDescriptorCompatible, leaseId as makeLeaseId, LEASE_TTL_MS, SUPERVISOR_BUILD_REVISION, SUPERVISOR_PROTOCOL_REVISION, type AcquireHostRequest, type HostDescriptor, type HostScope } from './protocol.js'
 import { mergeHostRuntimeEnv, prepareRuntimeSlot } from './runtime.js'
 import { HostLogger } from './logging.js'
@@ -110,6 +115,10 @@ class SupervisorService {
   private accept(socket: net.Socket): void {
     let buffer = ''
     let chain = Promise.resolve()
+    const connection = new AbortController()
+    const onError = (): void => {
+      if (!socket.destroyed) socket.destroy()
+    }
     const onLine = (chunk: Buffer | string) => {
       buffer += chunk.toString()
       for (;;) {
@@ -118,28 +127,37 @@ class SupervisorService {
         const line = buffer.slice(0, newline).trim()
         buffer = buffer.slice(newline + 1)
         if (!line) continue
-        chain = chain.then(() => this.handleRaw(socket, line)).catch(() => undefined)
+        chain = chain.then(() => this.handleRaw(socket, line, connection.signal)).catch(() => undefined)
       }
     }
     socket.on('data', onLine)
-    socket.once('close', () => socket.off('data', onLine))
+    socket.on('error', onError)
+    socket.once('close', () => {
+      connection.abort()
+      socket.off('data', onLine)
+      socket.off('error', onError)
+    })
   }
 
-  private async handleRaw(socket: net.Socket, line: string): Promise<void> {
+  private async handleRaw(socket: net.Socket, line: string, signal: AbortSignal): Promise<void> {
     let frame: { id?: number; method?: string; params?: Record<string, unknown> }
     try { frame = JSON.parse(line) } catch { return }
     if (typeof frame.id !== 'number' || typeof frame.method !== 'string') return
     try {
-      const result = await this.handle(frame.method, frame.params ?? {})
-      socket.write(`${JSON.stringify({ jsonrpc: '2.0', id: frame.id, result })}\n`)
+      const result = await this.handle(frame.method, frame.params ?? {}, signal)
+      writeLineFrame(socket, { jsonrpc: '2.0', id: frame.id, result })
     } catch (error) {
-      socket.write(`${JSON.stringify({ jsonrpc: '2.0', id: frame.id, error: { code: -32000, message: error instanceof Error ? error.message : String(error) } })}\n`)
+      writeLineFrame(socket, {
+        jsonrpc: '2.0',
+        id: frame.id,
+        error: { code: -32000, message: error instanceof Error ? error.message : String(error) },
+      })
     }
   }
 
-  private async handle(method: string, params: Record<string, unknown>): Promise<unknown> {
+  private async handle(method: string, params: Record<string, unknown>, signal: AbortSignal): Promise<unknown> {
     switch (method) {
-      case 'acquire': return this.acquire(params as unknown as AcquireRequest)
+      case 'acquire': return this.acquire(params as unknown as AcquireRequest, signal)
       case 'renew': return this.renew(String(params.leaseId))
       case 'release': return this.release(String(params.leaseId))
       case 'status': return this.status()
@@ -153,7 +171,7 @@ class SupervisorService {
     }
   }
 
-  private async acquire(request: AcquireRequest): Promise<{ leaseId: string; expiresAt: string; descriptor: HostDescriptor }> {
+  private async acquire(request: AcquireRequest, signal: AbortSignal): Promise<{ leaseId: string; expiresAt: string; descriptor: HostDescriptor }> {
     this.cleanupLeases()
     this.logger.log('debug', 'host.lease.acquire.started', { clientKind: request.clientKind, hostKey: hostKey(this.scope), requiredServices: request.requiredServices.join(',') })
     const requestedScope = canonicalizeScope(request.scope)
@@ -174,13 +192,23 @@ class SupervisorService {
       }
     }
     const id = makeLeaseId()
-    const expiresAt = new Date(Date.now() + LEASE_TTL_MS).toISOString()
-    const record = { leaseId: id, clientKind: request.clientKind, pid: Number.isInteger(request.clientPid) ? Number(request.clientPid) : process.ppid, createdAt: new Date().toISOString(), expiresAt }
+    const record = createLeaseRecord({
+      leaseId: id,
+      clientKind: request.clientKind,
+      clientPid: request.clientPid,
+      fallbackPid: process.ppid,
+      signal,
+    })
+    if (record === undefined) {
+      this.logger.log('info', 'host.lease.acquire.abandoned', { clientKind: request.clientKind })
+      if (this.host && this.leases.size === 0) this.armIdleShutdown()
+      throw new Error(HOST_ACQUIRE_ABANDONED_MESSAGE)
+    }
     this.leases.set(id, record)
     this.persistLease(record)
     if (this.host?.idleTimer) { clearTimeout(this.host.idleTimer); delete this.host.idleTimer }
     this.logger.log('info', 'host.lease.acquired', { clientKind: request.clientKind, leaseId: shortId(id), leaseCount: this.leases.size })
-    return { leaseId: id, expiresAt, descriptor: this.host!.descriptor }
+    return { leaseId: id, expiresAt: record.expiresAt, descriptor: this.host!.descriptor }
   }
 
   private async startHost(request: AcquireHostRequest): Promise<void> {

@@ -29,6 +29,7 @@ import { displayError, formatError, TuiError } from '../errors/index.ts'
 import { agencyOrigin } from './origin.ts'
 import { accountHome as defaultAccountHome, defaultHomeContext, dshHome as defaultDshHome, sharedDshHome as defaultSharedDshHome } from './paths.ts'
 import { apiKeyEnvFor, channelAvailability, resolveAuth, saveByokKey } from './resolve.ts'
+import { tuiClientIdentity } from './client-identity.ts'
 import {
   captureCloudSettings,
   patchCloudRoute,
@@ -425,7 +426,8 @@ class AuthStoreImpl implements AuthStore {
     this.emit()
     try {
       const origin = agencyOrigin(this.env)
-      const authorization = await startDeviceAuthorization(origin, this.client, poll.signal)
+      const clientIdentity = await tuiClientIdentity(this.accountHome, this.env)
+      const authorization = await startDeviceAuthorization(origin, this.client, poll.signal, clientIdentity)
       this.ensureCurrent(operation)
       this.snap = {
         phase: 'device',
@@ -490,7 +492,7 @@ class AuthStoreImpl implements AuthStore {
             personalKeyName: existing.personalKeyName ?? KEY_NAME,
           }
         } else {
-          const minted = await mintPersonalKey(origin, account.accessToken, this.client, poll.signal)
+          const minted = await mintPersonalKey(origin, account.accessToken, this.client, poll.signal, clientIdentity)
           this.ensureCurrent(operation)
           secret = minted.secret
           account = {

@@ -11,6 +11,19 @@ export type SupervisorClientOptions = {
   nodeExecutable?: string
   serviceEntry?: string
   startupTimeoutMs?: number
+  acquireTimeoutMs?: number
+}
+
+const DEFAULT_SUPERVISOR_STARTUP_TIMEOUT_MS = 60_000
+const DEFAULT_HOST_ACQUIRE_TIMEOUT_MS = 180_000
+
+export function resolveSupervisorClientTimeouts(
+  options: Pick<SupervisorClientOptions, 'startupTimeoutMs' | 'acquireTimeoutMs'> = {},
+): { startupTimeoutMs: number; acquireTimeoutMs: number } {
+  return {
+    startupTimeoutMs: options.startupTimeoutMs ?? DEFAULT_SUPERVISOR_STARTUP_TIMEOUT_MS,
+    acquireTimeoutMs: options.acquireTimeoutMs ?? DEFAULT_HOST_ACQUIRE_TIMEOUT_MS,
+  }
 }
 
 /** The stale Host is stopped first, so its Supervisor only has to unwind itself. */
@@ -39,8 +52,11 @@ export function canReuseOlderSupervisor(
 
 export class LocalHostSupervisorClient implements HostSupervisorClient {
   private readonly activeLeases = new Map<string, { peer: LinePeer; timer: NodeJS.Timeout }>()
+  private readonly timeouts: ReturnType<typeof resolveSupervisorClientTimeouts>
 
-  constructor(private readonly options: SupervisorClientOptions = {}) {}
+  constructor(private readonly options: SupervisorClientOptions = {}) {
+    this.timeouts = resolveSupervisorClientTimeouts(options)
+  }
 
   async acquire(request: AcquireHostRequest): Promise<HostLease> {
     const scope = canonicalizeScope(request.scope)
@@ -50,11 +66,15 @@ export class LocalHostSupervisorClient implements HostSupervisorClient {
     const peer = await this.connectOrStart(directory, request)
     let result: { leaseId: string; expiresAt: string; descriptor: HostDescriptor }
     try {
-      result = await peer.request<{ leaseId: string; expiresAt: string; descriptor: HostDescriptor }>('acquire', {
-        ...request,
-        scope,
-        clientPid: process.pid,
-      })
+      result = await peer.request<{ leaseId: string; expiresAt: string; descriptor: HostDescriptor }>(
+        'acquire',
+        {
+          ...request,
+          scope,
+          clientPid: process.pid,
+        },
+        this.timeouts.acquireTimeoutMs,
+      )
     } catch (error) {
       peer.close()
       throw error
@@ -183,7 +203,7 @@ export class LocalHostSupervisorClient implements HostSupervisorClient {
       env: { ...process.env, COCODE_SUPERVISOR_STATE_DIR: directory },
     })
     child.unref()
-    const deadline = Date.now() + (this.options.startupTimeoutMs ?? 15_000)
+    const deadline = Date.now() + this.timeouts.startupTimeoutMs
     let lastError: unknown
     while (Date.now() < deadline) {
       try { return await openLineConnection(endpoint) } catch (error) { lastError = error; await new Promise((resolve) => setTimeout(resolve, 100)) }
