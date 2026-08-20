@@ -23,6 +23,7 @@ const MAX_OUTPUT_TOKENS = 512
 /** 生成超时。用户在等一个输入框被填上，拖过这个时长不如让他自己写。 */
 const TIMEOUT_MS = 45_000
 const THINKING_OFF = ReasoningEffortId("off")
+const COCODE_NUT_PROVIDERS = new Set(["cocode-nut", "cocode-cloud"])
 
 const SYSTEM_PROMPT = [
   "You write git commit messages from a diff.",
@@ -59,8 +60,8 @@ export async function listModelOptions(llm: LlmRuntime): Promise<readonly ModelO
 }
 
 /**
- * 决定这次请求实际打到哪个模型：用户指定的优先，其次是默认模型在任意 provider 上
- * 的落点，最后退到目录里的第一个模型。三级回退保证换了登录方式也不会失灵。
+ * 决定这次请求实际打到哪个模型：用户指定的优先；自动选择时优先账号提供的
+ * Cocode Nut，再找其他 provider 上的同名模型，最后退到目录里的第一个模型。
  */
 export async function resolveCommitRoute(
   llm: LlmRuntime,
@@ -76,7 +77,16 @@ export async function resolveCommitRoute(
   // provider 与 model 都指明且确实存在时照办；模型目录只是 advisory，找不到就继续回退。
   if (preferred !== "" && has(preferred, wanted)) return { provider: preferred, model: wanted }
 
-  const carrier = catalog.find(entry => entry.models.some(item => item.id === wanted))
+  // A signed-in Cocode account exposes its hosted route alongside local or
+  // user-configured providers. For the default Flash model, the hosted route
+  // must win even when another provider happens to be registered first;
+  // otherwise a local/provider quota error can mask the account allowance.
+  const carrier = [...catalog]
+    .sort((left, right) => (
+      Number(!COCODE_NUT_PROVIDERS.has(left.provider))
+      - Number(!COCODE_NUT_PROVIDERS.has(right.provider))
+    ))
+    .find(entry => entry.models.some(item => item.id === wanted))
   if (carrier !== undefined) return { provider: carrier.provider, model: wanted }
 
   const first = catalog.find(entry => entry.models.length > 0)

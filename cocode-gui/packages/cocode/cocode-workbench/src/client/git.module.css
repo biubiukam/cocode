@@ -274,7 +274,7 @@
 .notice {
   display: flex;
   flex: none;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
   padding: 6px 8px;
   border-bottom: 1px solid var(--dsw-alias-border-l2);
