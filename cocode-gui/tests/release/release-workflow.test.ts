@@ -83,4 +83,32 @@ test("keeps local and release builds from implicitly publishing to GitHub", () =
 	assert.match(scripts.publish ?? "", /--publish always/)
 	const buildRelease = readFileSync(path.join(repoRoot, "cocode-gui/scripts/release/build-release.ts"), "utf8")
 	assert.match(buildRelease, /\["--publish", "never"\]/)
+	assert.doesNotMatch(buildRelease, /RELEASE_PUBLISH/)
+})
+
+test("prepares target-native Windows dependencies before building release assets", () => {
+	const buildRelease = readFileSync(
+		path.join(repoRoot, "cocode-gui/scripts/release/build-release.ts"),
+		"utf8",
+	)
+	const installAppDeps = buildRelease.indexOf("install-app-deps")
+	const runtimeBuild = buildRelease.indexOf('"build:runtime"')
+
+	assert.ok(installAppDeps >= 0)
+	assert.ok(runtimeBuild > installAppDeps)
+	assert.match(buildRelease, /--platform=win32/)
+	assert.match(buildRelease, /`--arch=\$\{target\.arch\}`/)
+	assert.match(buildRelease, /cleanWindowsNativeBuildOutputs/)
+})
+
+test("configures signed Windows updates and the Cocode NSIS include", () => {
+	const builderConfig = readFileSync(
+		path.join(repoRoot, "cocode-gui/electron-builder.config.ts"),
+		"utf8",
+	)
+
+	assert.match(builderConfig, /verifyUpdateCodeSignature:\s*Boolean\(windowsSign\)/)
+	assert.match(builderConfig, /include:\s*path\.resolve\("resources\/installer\.nsh"\)/)
+	assert.match(builderConfig, /deleteAppDataOnUninstall:\s*false/)
+	assert.match(builderConfig, /windows-cli-installer\.ps1/)
 })

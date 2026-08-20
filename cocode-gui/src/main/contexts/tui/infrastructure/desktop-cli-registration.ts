@@ -174,7 +174,8 @@ export class DesktopCliRegistrationService {
 		let changed = false
 		for (const candidate of this.options.resolveCandidates()) {
 			const existing = await readExistingShim(candidate.shimPath)
-			if (existing !== undefined && isManagedShim(existing.contents)) {
+			if (existing !== undefined && !isManagedShim(existing.contents)) continue
+			if (existing !== undefined) {
 				await unlink(candidate.shimPath)
 				changed = true
 			}
@@ -406,6 +407,43 @@ function normalizePathForComparison(value: string): string {
 	return process.platform === "win32" ? normalized.toLowerCase() : normalized
 }
 
+function normalizeWindowsPathForComparison(value: string): string {
+	return path.win32
+		.normalize(value.trim().replace(/^"|"$/g, ""))
+		.replace(/[\\/]+$/, "")
+		.toLowerCase()
+}
+
+export function addWindowsPathEntry(
+	current: string,
+	directory: string,
+): { readonly value: string; readonly changed: boolean } {
+	const normalized = normalizeWindowsPathForComparison(directory)
+	const exists = current
+		.split(";")
+		.some((entry) => normalizeWindowsPathForComparison(entry) === normalized)
+	if (exists) return { value: current, changed: false }
+	return {
+		value: current ? `${current}${current.endsWith(";") ? "" : ";"}${directory}` : directory,
+		changed: true,
+	}
+}
+
+export function removeWindowsPathEntry(
+	current: string,
+	directory: string,
+): { readonly value: string; readonly changed: boolean } {
+	const normalized = normalizeWindowsPathForComparison(directory)
+	const entries = current.split(";")
+	const retained = entries.filter(
+		(entry) => normalizeWindowsPathForComparison(entry) !== normalized,
+	)
+	return {
+		value: retained.join(";"),
+		changed: retained.length !== entries.length,
+	}
+}
+
 function isMissingFileError(error: unknown): boolean {
 	return typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT"
 }
@@ -441,23 +479,16 @@ export function createWindowsPersistentPathStore(): {
 		update: async (directory, operation) => {
 			if (process.platform !== "win32") return
 			const current = await thisPathFromRegistry()
-			const entries = current.split(path.delimiter).filter(Boolean)
-			const normalized = normalizePathForComparison(directory)
+			const normalized = normalizeWindowsPathForComparison(directory)
 			const statePath = windowsCliStatePath()
 			const state = await readWindowsCliState(statePath)
 			const owned = new Set(state.ownedDirectories)
 			if (operation === "remove" && !owned.has(normalized)) return
-			if (
-				operation === "add" &&
-				entries.some((entry) => normalizePathForComparison(entry) === normalized)
-			) {
-				return
-			}
-			const retained = entries.filter(
-				(entry) => normalizePathForComparison(entry) !== normalized,
-			)
-			const next = operation === "add" ? [...retained, directory] : retained
-			if (next.join(path.delimiter) === current) {
+			const result =
+				operation === "add"
+					? addWindowsPathEntry(current, directory)
+					: removeWindowsPathEntry(current, directory)
+			if (!result.changed) {
 				owned.delete(normalized)
 				await writeWindowsCliState(statePath, { ownedDirectories: [...owned] })
 				return
@@ -470,7 +501,7 @@ export function createWindowsPersistentPathStore(): {
 				"/t",
 				"REG_EXPAND_SZ",
 				"/d",
-				next.join(path.delimiter),
+				result.value,
 				"/f",
 			])
 			if (operation === "add") owned.add(normalized)

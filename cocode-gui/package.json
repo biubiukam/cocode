@@ -50,6 +50,8 @@
 		"release:mac:arm64": "tsx scripts/release/build-release.ts --platform darwin --arch arm64",
 		"release:win:x64": "tsx scripts/release/build-release.ts --platform win32 --arch x64",
 		"release:win:arm64": "tsx scripts/release/build-release.ts --platform win32 --arch arm64",
+		"release:win:bundle": "node scripts/release/windows-release-bundle.mjs assemble",
+		"release:win:verify-bundle": "node scripts/release/windows-release-bundle.mjs verify",
 		"publish": "corepack pnpm@10.34.5 run prepare:release-assets && electron-vite build && electron-builder --config electron-builder.config.ts --publish always",
 		"test": "tsx --test \"tests/**/*.test.ts\"",
 		"lint": "oxlint --deny-warnings src scripts tests",

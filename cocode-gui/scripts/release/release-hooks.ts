@@ -16,6 +16,7 @@ import os from "node:os"
 import { Arch, type AfterPackContext, type BuildResult } from "electron-builder"
 import { notarize } from "@electron/notarize"
 import * as path from "pathe"
+import { parse as parseYaml } from "yaml"
 import packageMetadata from "../../package.json"
 import { verifyPackagedStartupAssets } from "./verify-packaged-startup-assets.mjs"
 import {
@@ -36,11 +37,13 @@ import {
 
 interface WindowsSigningPolicy {
 	inspectAuthenticode(filePath: string): { Subject?: string; Thumbprint?: string }
+	shouldSubmitWindowsFileForSigning(filePath: string): boolean
 }
 
 const requireFromHere = createRequire(path.resolve("scripts/release/release-hooks.ts"))
 const windowsSigningService = requireFromHere("./windows-sign-service.cjs") as WindowsSigningPolicy
-const { inspectAuthenticode } = windowsSigningService as WindowsSigningPolicy
+const { inspectAuthenticode, shouldSubmitWindowsFileForSigning } =
+	windowsSigningService as WindowsSigningPolicy
 
 export interface ReleaseArtifactSet {
 	readonly platform: ReleasePlatform
@@ -168,6 +171,29 @@ export async function finalizeBuilderArtifacts(context: BuildResult): Promise<st
 		})
 		additional.push(pkgPath)
 	}
+	const finalizedArtifacts = [...artifacts, ...additional]
+	verifyBuilderArtifacts({
+		platform: target.platform,
+		arch: target.arch,
+		version: packageMetadata.version,
+		artifacts: finalizedArtifacts,
+	})
+
+	let windowsSignature: { Subject?: string; Thumbprint?: string } | undefined
+	if (target.platform === "win32") {
+		const inspect =
+			process.platform === "win32" && isReleaseSigningRequired()
+				? (file: string) => {
+						const signature = verifyWindowsFile(file)
+						verifyWindowsSigningLedger([file])
+						return signature
+					}
+				: undefined
+		const inventory = writeWindowsPeSigningInventory({ outDir: context.outDir, inspect })
+		additional.push(inventory)
+		const installer = selectUpdateArtifact(target.platform, finalizedArtifacts)
+		windowsSignature = inspect ? inspect(installer) : undefined
+	}
 
 	const updateMetadata = writeArchitectureUpdateMetadata({
 		outDir: context.outDir,
@@ -177,15 +203,25 @@ export async function finalizeBuilderArtifacts(context: BuildResult): Promise<st
 		artifacts: [...artifacts, ...additional],
 	})
 	additional.push(...updateMetadata)
-
-	verifyBuilderArtifacts({
-		platform: target.platform,
-		arch: target.arch,
-		version: packageMetadata.version,
-		artifacts: [...artifacts, ...additional],
-	})
+	const updateArtifact = selectUpdateArtifact(target.platform, finalizedArtifacts)
+	for (const metadata of updateMetadata) {
+		verifyArchitectureUpdateMetadata(metadata, updateArtifact)
+	}
 	const checksum = appendChecksumManifest(context.outDir, [...artifacts, ...additional])
 	additional.push(checksum)
+	if (target.platform === "win32") {
+		const evidence = writeWindowsReleaseEvidenceManifest({
+			outDir: context.outDir,
+			arch: target.arch,
+			version: packageMetadata.version,
+			installer: updateArtifact,
+			metadataFiles: updateMetadata,
+			hostArch: process.arch,
+			createdAt: new Date().toISOString(),
+			signature: windowsSignature,
+		})
+		additional.push(evidence)
+	}
 	cleanupWindowsSignLedger()
 	return additional
 }
@@ -249,6 +285,91 @@ export function writeArchitectureUpdateMetadata(options: {
 	const files = [canonical, requestedAlias].map((name) => path.join(options.outDir, name))
 	for (const file of files) writeFileSync(file, metadata)
 	return files
+}
+
+export function verifyArchitectureUpdateMetadata(metadataFile: string, artifact: string): void {
+	const metadata = parseYaml(readFileSync(metadataFile, "utf8")) as {
+		files?: Array<{ url?: string; sha512?: string }>
+		path?: string
+		sha512?: string
+	}
+	const expectedFile = path.basename(artifact)
+	const expectedSha512 = createHash("sha512").update(readFileSync(artifact)).digest("base64")
+	const firstFile = metadata.files?.[0]
+	if (
+		metadata.path !== expectedFile ||
+		firstFile?.url !== expectedFile ||
+		metadata.sha512 !== expectedSha512 ||
+		firstFile?.sha512 !== expectedSha512
+	) {
+		throw new Error(
+			`Updater metadata does not match the final signed artifact: ${metadataFile}`,
+		)
+	}
+}
+
+export function writeWindowsPeSigningInventory(options: {
+	readonly outDir: string
+	readonly inspect?: (file: string) => { Subject?: string; Thumbprint?: string }
+}): string {
+	const files = collectFiles(options.outDir)
+		.filter((file) => [".exe", ".node", ".dll"].includes(path.extname(file).toLowerCase()))
+		.sort((left, right) => left.localeCompare(right))
+		.map((file) => {
+			const extension = path.extname(file).toLowerCase()
+			const required = shouldSubmitWindowsFileForSigning(file)
+			const signature = required && options.inspect ? options.inspect(file) : undefined
+			return {
+				path: path.relative(options.outDir, file).replaceAll("\\", "/"),
+				extension,
+				signing: required ? "required" : "excluded",
+				...(signature
+					? { subject: signature.Subject, thumbprint: signature.Thumbprint, status: "Valid" }
+					: {}),
+			}
+		})
+	const inventoryPath = path.join(options.outDir, "windows-pe-signing-inventory.json")
+	writeFileSync(
+		inventoryPath,
+		`${JSON.stringify({ schemaVersion: 1, policy: { required: [".exe", ".node"], excluded: [".dll"] }, files }, null, 2)}\n`,
+	)
+	return inventoryPath
+}
+
+export function writeWindowsReleaseEvidenceManifest(options: {
+	readonly outDir: string
+	readonly arch: ReleaseArchitecture
+	readonly version: string
+	readonly installer: string
+	readonly metadataFiles: readonly string[]
+	readonly hostArch: string
+	readonly createdAt: string
+	readonly signature?: { Subject?: string; Thumbprint?: string }
+}): string {
+	const installer = readFileSync(options.installer)
+	const manifestPath = path.join(options.outDir, "release-manifest.json")
+	const manifest = {
+		schemaVersion: 1,
+		product: "Cocode",
+		version: options.version,
+		target: { platform: "win32", arch: options.arch },
+		build: { hostArch: options.hostArch, createdAt: options.createdAt },
+		artifact: {
+			file: path.basename(options.installer),
+			sha256: createHash("sha256").update(installer).digest("hex"),
+			sha512: createHash("sha512").update(installer).digest("base64"),
+		},
+		signature: options.signature
+			? {
+					status: "Valid",
+					subject: options.signature.Subject,
+					thumbprint: options.signature.Thumbprint,
+				}
+			: { status: "Unsigned" },
+		metadata: options.metadataFiles.map((file) => path.basename(file)),
+	}
+	writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
+	return manifestPath
 }
 
 export function appendChecksumManifest(outDir: string, artifacts: readonly string[]): string {

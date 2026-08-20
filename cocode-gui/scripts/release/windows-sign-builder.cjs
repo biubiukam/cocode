@@ -1,8 +1,22 @@
+const { existsSync } = require("node:fs")
 const path = require("node:path")
-const { shouldSubmitWindowsFileForSigning, signFile } = require("./windows-sign-service.cjs")
+const { signFile } = require("./windows-sign-service.cjs")
 
-module.exports = async function windowsSignBuilder(configuration) {
-	const filePath = path.resolve(configuration.path)
-	if (!shouldSubmitWindowsFileForSigning(filePath)) return
-	await signFile(filePath)
+function createWindowsSigner(sign = signFile) {
+	return async function windowsSigner(configuration) {
+		if (!configuration?.path) {
+			throw new Error("electron-builder signing task is missing configuration.path")
+		}
+		if (!path.isAbsolute(configuration.path)) {
+			throw new Error("electron-builder signing task requires an absolute path")
+		}
+		if (!existsSync(configuration.path)) {
+			throw new Error(`electron-builder signing file does not exist: ${configuration.path}`)
+		}
+		await sign(configuration.path)
+	}
 }
+
+const windowsSignBuilder = createWindowsSigner()
+module.exports = windowsSignBuilder
+module.exports.createWindowsSigner = createWindowsSigner

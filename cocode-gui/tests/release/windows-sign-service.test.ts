@@ -34,6 +34,12 @@ interface SigningServiceModule {
 	signingTemporaryPath(filePath: string): string
 }
 
+interface WindowsSignerModule {
+	createWindowsSigner(
+		sign?: (filePath: string) => Promise<unknown>,
+	): (configuration: { path?: string }) => Promise<void>
+}
+
 const localRequire = createRequire(path.resolve("tests/release/windows-sign-service.test.ts"))
 const {
 	getCredential,
@@ -44,9 +50,9 @@ const {
 } = localRequire(
 	"../../scripts/release/windows-sign-service.cjs",
 ) as SigningServiceModule
-const windowsSignBuilder = localRequire("../../scripts/release/windows-sign-builder.cjs") as (
-	configuration: { path: string },
-) => Promise<void>
+const { createWindowsSigner } = localRequire(
+	"../../scripts/release/windows-sign-builder.cjs",
+) as WindowsSignerModule
 
 test("limits remote signing to Magic-compatible executables and required package containers", () => {
 	assert.equal(typeof isWindowsApplicationExecutable, "function")
@@ -56,13 +62,10 @@ test("limits remote signing to Magic-compatible executables and required package
 		assert.equal(isWindowsApplicationExecutable(file), true, file)
 		assert.equal(shouldSubmitWindowsFileForSigning(file), true, file)
 	}
-	for (const file of ["Cocode-Setup.msi"]) {
-		assert.equal(isWindowsApplicationExecutable(file), false, file)
-		assert.equal(shouldSubmitWindowsFileForSigning(file), true, file)
-	}
 	assert.equal(isWindowsApplicationExecutable("better-sqlite3.node"), true)
 	assert.equal(shouldSubmitWindowsFileForSigning("better-sqlite3.node"), true)
 	for (const file of [
+		"Cocode-Setup.msi",
 		"native.dll",
 		"driver.sys",
 		"boot.efi",
@@ -76,8 +79,29 @@ test("limits remote signing to Magic-compatible executables and required package
 	}
 })
 
-test("does not call the signing service for excluded Builder files", async () => {
-	await assert.doesNotReject(() => windowsSignBuilder({ path: "/tmp/readme.txt" }))
+test("Magic-compatible Builder adapter forwards the exact absolute file path", async () => {
+	const root = mkdtempSync(path.join(os.tmpdir(), "cocode-sign-adapter-test-"))
+	try {
+		const file = path.join(root, "Cocode.exe")
+		writeFileSync(file, "unsigned")
+		const calls: string[] = []
+		const signer = createWindowsSigner(async (filePath) => {
+			calls.push(filePath)
+		})
+
+		await signer({ path: file })
+		assert.deepEqual(calls, [file])
+	} finally {
+		rmSync(root, { recursive: true, force: true })
+	}
+})
+
+test("Builder adapter rejects missing, relative, and nonexistent file paths", async () => {
+	const signer = createWindowsSigner(async () => undefined)
+
+	await assert.rejects(() => signer({}), /missing configuration\.path/)
+	await assert.rejects(() => signer({ path: "Cocode.exe" }), /absolute path/)
+	await assert.rejects(() => signer({ path: path.resolve("missing-Cocode.exe") }), /does not exist/)
 })
 
 test("keeps the original extension on signing temp files", () => {

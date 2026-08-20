@@ -39,6 +39,7 @@ export interface WindowsSignServiceOptions {
 export interface WindowsBuilderSignOptions {
 	readonly sign: string
 	readonly signingHashAlgorithms: ["sha256"]
+	readonly rfc3161TimeStampServer: string
 	readonly publisherName?: string
 }
 
@@ -89,7 +90,6 @@ const RELEASE_KEYS = new Set([
 	"RELEASE_ARCH",
 	"RELEASE_REQUIRE_SIGNING",
 	"RELEASE_REQUIRE_NATIVE_ARCH_MATCH",
-	"RELEASE_PUBLISH",
 	"RELEASE_OUTPUT_DIR",
 	"COCODE_RUNTIME_ARTIFACT_ROOT",
 	"COCODE_TUI_ARTIFACT_ROOT",
@@ -322,6 +322,8 @@ export function createWindowsSignOptions(
 		return {
 			sign: adapterPath,
 			signingHashAlgorithms: ["sha256"],
+			rfc3161TimeStampServer:
+				environment.WINDOWS_TIMESTAMP_SERVER?.trim() || "http://timestamp.digicert.com",
 			...(publisherName ? { publisherName } : {}),
 		}
 	}

@@ -94,6 +94,13 @@ const config: Configuration = {
 		icon: process.env.WINDOWS_ICON_PATH?.trim() || path.join(iconRoot, "cocode.ico"),
 		signtoolOptions: windowsSign ?? null,
 		signExts: [".exe", ".node"],
+		verifyUpdateCodeSignature: Boolean(windowsSign),
+		extraResources: [
+			{
+				from: path.resolve("resources/windows-cli-installer.ps1"),
+				to: "windows-cli-installer.ps1",
+			},
+		],
 	},
 	nsis: {
 		oneClick: true,
@@ -101,6 +108,8 @@ const config: Configuration = {
 		allowElevation: false,
 		createDesktopShortcut: true,
 		createStartMenuShortcut: true,
+		deleteAppDataOnUninstall: false,
+		include: path.resolve("resources/installer.nsh"),
 		artifactName: `Cocode-\${version}-${target.arch}.\${ext}`,
 	},
 }

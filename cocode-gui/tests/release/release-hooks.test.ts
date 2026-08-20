@@ -17,7 +17,10 @@ import {
 	buildWindowsAuthenticodeVerificationScript,
 	findMacAppWithTui,
 	verifyBuilderApplicationEntrypoints,
+	verifyArchitectureUpdateMetadata,
 	writeArchitectureUpdateMetadata,
+	writeWindowsPeSigningInventory,
+	writeWindowsReleaseEvidenceManifest,
 } from "../../scripts/release/release-hooks"
 import {
 	copyProductionDependencyClosure,
@@ -74,7 +77,92 @@ test("writes isolated Windows updater metadata for each architecture", () => {
 			const metadata = readFileSync(file, "utf8")
 			assert.match(metadata, /url: "Cocode-1\.2\.3-x64\.exe"/)
 			assert.doesNotMatch(metadata, /arm64/)
+			assert.doesNotThrow(() => verifyArchitectureUpdateMetadata(file, installer))
 		}
+		writeFileSync(installer, "installer-modified-after-metadata")
+		assert.throws(
+			() => verifyArchitectureUpdateMetadata(files[0] as string, installer),
+			/does not match the final signed artifact/,
+		)
+	} finally {
+		rmSync(root, { recursive: true, force: true })
+	}
+})
+
+test("writes a Windows PE inventory with explicit required and excluded signing scope", () => {
+	const root = mkdtempSync(path.join(os.tmpdir(), "cocode-pe-inventory-"))
+	try {
+		const executable = path.join(root, "Cocode.exe")
+		const nativeAddon = path.join(root, "resources", "better-sqlite3.node")
+		const library = path.join(root, "resources", "libvips.dll")
+		writeFixture(executable, createPeFixture())
+		writeFixture(nativeAddon, createPeFixture())
+		writeFixture(library, createPeFixture())
+		const inspected: string[] = []
+		const inventoryPath = writeWindowsPeSigningInventory({
+			outDir: root,
+			inspect: (file) => {
+				inspected.push(file)
+				return { Subject: "CN=Cocode", Thumbprint: "AABB" }
+			},
+		})
+
+		assert.deepEqual(inspected.sort(), [executable, nativeAddon].sort())
+		const inventory = JSON.parse(readFileSync(inventoryPath, "utf8")) as {
+			files: Array<{ path: string; signing: string; extension: string }>
+		}
+		assert.deepEqual(
+			inventory.files.map(({ path: file, signing, extension }) => ({ file, signing, extension })),
+			[
+				{ file: "Cocode.exe", signing: "required", extension: ".exe" },
+				{ file: "resources/better-sqlite3.node", signing: "required", extension: ".node" },
+				{ file: "resources/libvips.dll", signing: "excluded", extension: ".dll" },
+			],
+		)
+	} finally {
+		rmSync(root, { recursive: true, force: true })
+	}
+})
+
+test("writes Windows release evidence from the final signed installer", () => {
+	const root = mkdtempSync(path.join(os.tmpdir(), "cocode-release-evidence-"))
+	try {
+		const installer = path.join(root, "Cocode-1.2.3-arm64.exe")
+		const metadata = path.join(root, "latest-arm64.yml")
+		writeFileSync(installer, "final-signed-installer")
+		writeFileSync(metadata, "metadata")
+		const manifestPath = writeWindowsReleaseEvidenceManifest({
+			outDir: root,
+			arch: "arm64",
+			version: "1.2.3",
+			installer,
+			metadataFiles: [metadata],
+			hostArch: "arm64",
+			createdAt: "2026-08-20T10:00:00.000Z",
+			signature: { Subject: "CN=Cocode", Thumbprint: "AABBCC" },
+		})
+		const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as Record<string, any>
+
+		assert.equal(manifest.version, "1.2.3")
+		assert.deepEqual(manifest.target, { platform: "win32", arch: "arm64" })
+		assert.equal("gitCommit" in manifest, false)
+		assert.equal(manifest.build.hostArch, "arm64")
+		assert.equal(manifest.build.createdAt, "2026-08-20T10:00:00.000Z")
+		assert.equal(manifest.artifact.file, "Cocode-1.2.3-arm64.exe")
+		assert.equal(
+			manifest.artifact.sha256,
+			createHash("sha256").update("final-signed-installer").digest("hex"),
+		)
+		assert.equal(
+			manifest.artifact.sha512,
+			createHash("sha512").update("final-signed-installer").digest("base64"),
+		)
+		assert.deepEqual(manifest.signature, {
+			status: "Valid",
+			subject: "CN=Cocode",
+			thumbprint: "AABBCC",
+		})
+		assert.deepEqual(manifest.metadata, ["latest-arm64.yml"])
 	} finally {
 		rmSync(root, { recursive: true, force: true })
 	}

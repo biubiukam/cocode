@@ -1,4 +1,6 @@
 import assert from "node:assert/strict"
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import os from "node:os"
 import * as path from "pathe"
 import test from "node:test"
 import {
@@ -10,6 +12,7 @@ import {
 	resolveMacCliInstallPath,
 	resolveMacInstallerSigningIdentity,
 	resolveReleaseTarget,
+	validateReleaseEnvFile,
 	resolveWindowsSignMode,
 	resolveWindowsSignServiceOptions,
 } from "../../scripts/release/release-config"
@@ -33,6 +36,17 @@ test("uses one GitHub repository for every architecture", () => {
 		name: "cocode",
 	})
 	assert.throws(() => resolveGitHubReleaseRepository({ GITHUB_REPOSITORY: "invalid" }))
+})
+
+test("rejects the removed RELEASE_GIT_COMMIT environment variable", () => {
+	const root = mkdtempSync(path.join(os.tmpdir(), "cocode-release-env-"))
+	const file = path.join(root, ".env.release")
+	try {
+		writeFileSync(file, "RELEASE_GIT_COMMIT=0123456789abcdef\n")
+		assert.throws(() => validateReleaseEnvFile(file), /uses unknown key RELEASE_GIT_COMMIT/)
+	} finally {
+		rmSync(root, { recursive: true, force: true })
+	}
 })
 
 test("creates strict macOS signing options with per-file entitlement inputs", () => {
@@ -129,12 +143,22 @@ test("uses the electron-builder adapter for team-service Windows signing", () =>
 		WINDOWS_SIGN_MODE: "service",
 		WINDOWS_SIGN_SERVICE_URL: "https://signing.example.test",
 		WINDOWS_SIGN_CERTIFICATE_SUBJECT: "Cocode Agency, Inc.",
+		WINDOWS_TIMESTAMP_SERVER: "https://timestamp.example.test",
 	})
 	assert.deepEqual(options, {
 		sign: path.resolve("scripts/release/windows-sign-builder.cjs"),
 		signingHashAlgorithms: ["sha256"],
+		rfc3161TimeStampServer: "https://timestamp.example.test",
 		publisherName: "Cocode Agency, Inc.",
 	})
+})
+
+test("defaults Windows service signing to the Magic RFC3161 timestamp server", () => {
+	const options = createWindowsSignOptions({
+		WINDOWS_SIGN_MODE: "service",
+		WINDOWS_SIGN_SERVICE_URL: "https://signing.example.test",
+	})
+	assert.equal(options?.rfc3161TimeStampServer, "http://timestamp.digicert.com")
 })
 
 test("requires the Windows certificate subject for signed service releases", () => {

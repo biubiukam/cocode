@@ -45,8 +45,11 @@ if (target.arch !== process.arch)
 	)
 requireReleaseCredentials(target, environment)
 
-const iconStatus = runPnpm(["run", "generate:mac-icons"])
-if (iconStatus !== 0) throw new Error(`macOS icon generation exited with code ${String(iconStatus)}.`)
+if (target.platform === "darwin") {
+	const iconStatus = runPnpm(["run", "generate:mac-icons"])
+	if (iconStatus !== 0)
+		throw new Error(`macOS icon generation exited with code ${String(iconStatus)}.`)
+}
 
 if (target.platform === "win32" && resolveWindowsSignMode(environment) === "service") {
 	rmSync(environment.WINDOWS_SIGN_LEDGER_DIR, { recursive: true, force: true })
@@ -59,6 +62,22 @@ if (target.platform === "win32" && resolveWindowsSignMode(environment) === "serv
 	if (credentialCheck.error) throw credentialCheck.error
 	if (credentialCheck.status !== 0)
 		throw new Error("Windows signing service credential preflight failed.")
+}
+
+if (target.platform === "win32") {
+	cleanWindowsNativeBuildOutputs()
+	const nativeDependencyStatus = runPnpm([
+		"exec",
+		"electron-builder",
+		"install-app-deps",
+		"--platform=win32",
+		`--arch=${target.arch}`,
+	])
+	if (nativeDependencyStatus !== 0) {
+		throw new Error(
+			`Windows ${target.arch} native dependency preparation exited with code ${String(nativeDependencyStatus)}.`,
+		)
+	}
 }
 
 const runtimeStatus = runPnpm([
@@ -79,8 +98,6 @@ if (viteStatus !== 0) throw new Error(`Electron Vite build exited with code ${St
 
 const builderPlatform = target.platform === "darwin" ? "--mac" : "--win"
 const builderArch = target.arch === "arm64" ? "--arm64" : "--x64"
-const publish =
-	environment.RELEASE_PUBLISH === "1" ? ["--publish", "always"] : ["--publish", "never"]
 process.exitCode = runPnpm([
 	"exec",
 	"electron-builder",
@@ -88,8 +105,14 @@ process.exitCode = runPnpm([
 	builderArch,
 	"--config",
 	"electron-builder.config.ts",
-	...publish,
+	...["--publish", "never"],
 ])
+
+function cleanWindowsNativeBuildOutputs(): void {
+	for (const relativePath of ["node_modules/better-sqlite3/build", "node_modules/keytar/build"]) {
+		rmSync(path.resolve(relativePath), { recursive: true, force: true })
+	}
+}
 
 function runPnpm(args: readonly string[]): number {
 	const command = process.platform === "win32" ? "corepack.cmd" : "corepack"
