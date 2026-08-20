@@ -38,11 +38,12 @@ import {
 interface WindowsSigningPolicy {
 	inspectAuthenticode(filePath: string): { Subject?: string; Thumbprint?: string }
 	shouldSubmitWindowsFileForSigning(filePath: string): boolean
+	signFile(filePath: string): Promise<unknown>
 }
 
 const requireFromHere = createRequire(path.resolve("scripts/release/release-hooks.ts"))
 const windowsSigningService = requireFromHere("./windows-sign-service.cjs") as WindowsSigningPolicy
-const { inspectAuthenticode, shouldSubmitWindowsFileForSigning } =
+const { inspectAuthenticode, shouldSubmitWindowsFileForSigning, signFile } =
 	windowsSigningService as WindowsSigningPolicy
 
 export interface ReleaseArtifactSet {
@@ -105,8 +106,21 @@ export async function stageBuilderApplication(context: AfterPackContext): Promis
 	const nodeExecutable = path.join(resourcesRoot, "cocode-node")
 	await fs.copyFile(process.execPath, nodeExecutable)
 	await fs.chmod(nodeExecutable, 0o755)
+	if (target.platform === "win32" && process.platform === "win32" && isReleaseSigningRequired())
+		await signPackagedWindowsExecutables(resourcesRoot, signFile)
 
 	verifyPackagedRuntimeLayout(context.appOutDir, target)
+}
+
+export async function signPackagedWindowsExecutables(
+	resourcesRoot: string,
+	sign: (filePath: string) => Promise<unknown> = signFile,
+): Promise<string[]> {
+	const files = collectFiles(resourcesRoot)
+		.filter((file) => shouldSubmitWindowsFileForSigning(file))
+		.sort((left, right) => left.localeCompare(right))
+	for (const file of files) await sign(file)
+	return files
 }
 
 export function verifyBuilderApplicationEntrypoints(appRoot: string): void {
@@ -314,7 +328,11 @@ export function writeWindowsPeSigningInventory(options: {
 	readonly inspect?: (file: string) => { Subject?: string; Thumbprint?: string }
 }): string {
 	const files = collectFiles(options.outDir)
-		.filter((file) => [".exe", ".node", ".dll"].includes(path.extname(file).toLowerCase()))
+		.filter(
+			(file) =>
+				[".exe", ".node", ".dll"].includes(path.extname(file).toLowerCase()) ||
+				shouldSubmitWindowsFileForSigning(file),
+		)
 		.sort((left, right) => left.localeCompare(right))
 		.map((file) => {
 			const extension = path.extname(file).toLowerCase()
@@ -332,7 +350,7 @@ export function writeWindowsPeSigningInventory(options: {
 	const inventoryPath = path.join(options.outDir, "windows-pe-signing-inventory.json")
 	writeFileSync(
 		inventoryPath,
-		`${JSON.stringify({ schemaVersion: 1, policy: { required: [".exe"], excluded: [".node", ".dll"] }, files }, null, 2)}\n`,
+		`${JSON.stringify({ schemaVersion: 1, policy: { required: [".exe"], requiredFileNames: ["cocode-node"], excluded: [".node", ".dll"] }, files }, null, 2)}\n`,
 	)
 	return inventoryPath
 }

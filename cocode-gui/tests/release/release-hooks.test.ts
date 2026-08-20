@@ -16,6 +16,7 @@ import {
 	appendChecksumManifest,
 	buildWindowsAuthenticodeVerificationScript,
 	findMacAppWithTui,
+	signPackagedWindowsExecutables,
 	verifyBuilderApplicationEntrypoints,
 	verifyArchitectureUpdateMetadata,
 	writeArchitectureUpdateMetadata,
@@ -93,9 +94,11 @@ test("writes a Windows PE inventory with explicit required and excluded signing 
 	const root = mkdtempSync(path.join(os.tmpdir(), "cocode-pe-inventory-"))
 	try {
 		const executable = path.join(root, "Cocode.exe")
+		const bundledNode = path.join(root, "resources", "cocode-node")
 		const nativeAddon = path.join(root, "resources", "better-sqlite3.node")
 		const library = path.join(root, "resources", "libvips.dll")
 		writeFixture(executable, createPeFixture())
+		writeFixture(bundledNode, createPeFixture())
 		writeFixture(nativeAddon, createPeFixture())
 		writeFixture(library, createPeFixture())
 		const inspected: string[] = []
@@ -107,7 +110,7 @@ test("writes a Windows PE inventory with explicit required and excluded signing 
 			},
 		})
 
-		assert.deepEqual(inspected, [executable])
+		assert.deepEqual(inspected, [bundledNode, executable].sort())
 		const inventory = JSON.parse(readFileSync(inventoryPath, "utf8")) as {
 			files: Array<{ path: string; signing: string; extension: string }>
 		}
@@ -116,9 +119,32 @@ test("writes a Windows PE inventory with explicit required and excluded signing 
 			[
 				{ file: "Cocode.exe", signing: "required", extension: ".exe" },
 				{ file: "resources/better-sqlite3.node", signing: "excluded", extension: ".node" },
+				{ file: "resources/cocode-node", signing: "required", extension: "" },
 				{ file: "resources/libvips.dll", signing: "excluded", extension: ".dll" },
 			],
 		)
+	} finally {
+		rmSync(root, { recursive: true, force: true })
+	}
+})
+
+test("signs Windows executables added under packaged resources afterPack", async () => {
+	const root = mkdtempSync(path.join(os.tmpdir(), "cocode-packaged-signing-"))
+	try {
+		const nestedExecutable = path.join(root, "dsh-runtime", "bin", "rg.exe")
+		const bundledNode = path.join(root, "cocode-node")
+		const excludedLibrary = path.join(root, "dsh-runtime", "bin", "helper.dll")
+		writeFixture(nestedExecutable, createPeFixture())
+		writeFixture(bundledNode, createPeFixture())
+		writeFixture(excludedLibrary, createPeFixture())
+		const signed: string[] = []
+
+		const files = await signPackagedWindowsExecutables(root, async (file) => {
+			signed.push(file)
+		})
+
+		assert.deepEqual(files, [bundledNode, nestedExecutable].sort())
+		assert.deepEqual(signed, [bundledNode, nestedExecutable].sort())
 	} finally {
 		rmSync(root, { recursive: true, force: true })
 	}
@@ -293,13 +319,6 @@ test("verifies the staged Windows runtime and fails on a missing DSH entry", () 
 		const sqlite = path.join(resources, "app", "node_modules", "better-sqlite3", "build", "Release")
 		const sharp = path.join(runtime, "node_modules", "sharp")
 		const sharpNative = path.join(runtime, "node_modules", "@img", "sharp-win32-x64", "lib")
-		const sharpLibvips = path.join(
-			runtime,
-			"node_modules",
-			"@img",
-			"sharp-libvips-win32-x64",
-			"lib",
-		)
 		writeFixture(path.join(resources, "cocode-node"), createPeFixture())
 		writeFixture(path.join(resources, "startup-failure.html"), "<html />")
 		writeFixture(
@@ -350,7 +369,8 @@ test("verifies the staged Windows runtime and fails on a missing DSH entry", () 
 		)
 		writeFixture(path.join(sharp, "package.json"), JSON.stringify({ name: "sharp" }))
 		writeFixture(path.join(sharpNative, "sharp-win32-x64.node"), createPeFixture())
-		writeFixture(path.join(sharpLibvips, "libvips-42.dll"), createPeFixture())
+		writeFixture(path.join(sharpNative, "libvips-42.dll"), createPeFixture())
+		writeFixture(path.join(sharpNative, "libvips-cpp-8.18.3.dll"), createPeFixture())
 
 		const result = verifyPackagedStartupAssets(root, { platform: "win32", arch: "x64" })
 		assert.equal(result.appRoot, path.join(resources, "app"))

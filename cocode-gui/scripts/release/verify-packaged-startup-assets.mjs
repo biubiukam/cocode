@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs"
 import * as path from "pathe"
+import { verifyRequiredWindowsNativePackages } from "../verify-dsh-runtime.mjs"
 
 export function verifyPackagedStartupAssets(packageRoot, { platform, arch } = {}) {
 	if (platform !== "win32") return
@@ -63,6 +64,7 @@ export function verifyPackagedStartupAssets(packageRoot, { platform, arch } = {}
 
 	assertPeArchitecture(path.join(root, "resources", "cocode-node"), arch)
 	assertPeArchitecture(betterSqliteNative, arch)
+	verifyRequiredWindowsNativePackages(runtimeRoot, { platform, arch })
 	verifySharpNatives(runtimeRoot, platform, arch)
 	return { appRoot, runtimeRoot, betterSqliteNative }
 }
@@ -94,16 +96,10 @@ function verifySharpNatives(runtimeRoot, platform, arch) {
 	const sharpNative = findFirstByExtension(sharpNativeRoot, ".node")
 	if (!sharpNative) throw new Error("Packaged sharp native module is missing.")
 	assertPeArchitecture(sharpNative, arch)
-	const libvipsRoot = path.join(
-		runtimeRoot,
-		"node_modules",
-		"@img",
-		`sharp-libvips-${platform}-${arch}`,
-	)
-	assertDirectory(libvipsRoot, `packaged sharp libvips package for ${platform}/${arch}`)
-	const libvips = findFirstByExtension(libvipsRoot, ".dll")
-	if (!libvips) throw new Error("Packaged sharp libvips DLL is missing.")
-	assertPeArchitecture(libvips, arch)
+	const libvips = findRequiredFile(sharpNativeRoot, "libvips-42.dll")
+	for (const library of findAllByExtension(sharpNativeRoot, ".dll"))
+		assertPeArchitecture(library, arch)
+	return { sharpNative, libvips }
 }
 
 function assertDirectory(directory, label) {
@@ -166,6 +162,17 @@ function findFirstByExtension(root, extension) {
 		}
 	}
 	return undefined
+}
+
+function findAllByExtension(root, extension) {
+	if (!existsSync(root) || !statSync(root).isDirectory()) return []
+	const files = []
+	for (const entry of readdirSync(root, { withFileTypes: true })) {
+		const file = path.join(root, entry.name)
+		if (entry.isFile() && entry.name.toLowerCase().endsWith(extension)) files.push(file)
+		if (entry.isDirectory()) files.push(...findAllByExtension(file, extension))
+	}
+	return files
 }
 
 function findTargetNativeAddon(root, platform, arch) {

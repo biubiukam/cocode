@@ -9,15 +9,21 @@ const windowsSignPolicy = require("./windows-sign-policy.json")
 
 const KEYTAR_SERVICE = "cocode-windows-sign"
 const WINDOWS_APPLICATION_EXTENSIONS = new Set(windowsSignPolicy.applicationExtensions)
+const WINDOWS_APPLICATION_FILE_NAMES = new Set(
+	(windowsSignPolicy.applicationFileNames || []).map((name) => String(name).toLowerCase()),
+)
 const WINDOWS_PACKAGE_EXTENSIONS = new Set(windowsSignPolicy.packageExtensions)
 
 function isWindowsApplicationExecutable(filePath) {
-	return WINDOWS_APPLICATION_EXTENSIONS.has(path.extname(filePath).toLowerCase())
+	return (
+		WINDOWS_APPLICATION_EXTENSIONS.has(path.extname(filePath).toLowerCase()) ||
+		WINDOWS_APPLICATION_FILE_NAMES.has(path.basename(filePath).toLowerCase())
+	)
 }
 
 function shouldSubmitWindowsFileForSigning(filePath) {
 	const extension = path.extname(filePath).toLowerCase()
-	return WINDOWS_APPLICATION_EXTENSIONS.has(extension) || WINDOWS_PACKAGE_EXTENSIONS.has(extension)
+	return isWindowsApplicationExecutable(filePath) || WINDOWS_PACKAGE_EXTENSIONS.has(extension)
 }
 
 function base64ToBuffer(value) {

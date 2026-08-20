@@ -2,7 +2,10 @@ import { existsSync, lstatSync, readFileSync, readdirSync, statSync } from "node
 import * as path from "pathe"
 import { fileURLToPath } from "node:url"
 import { hashDirectory, hashJson } from "./runtime-build-helpers.mjs"
-import { findIncompatibleNativePackages } from "./lib/workspace-dependencies.mjs"
+import {
+	findIncompatibleNativePackages,
+	isPackageCompatible,
+} from "./lib/workspace-dependencies.mjs"
 
 export function verifyRuntime(
 	runtimeRoot,
@@ -76,8 +79,65 @@ export function verifyRuntime(
 				", ",
 			)}`,
 		)
+	verifyRequiredWindowsNativePackages(root, { platform, arch })
 	verifyNodePtyNatives(root, platform, arch)
 	return manifest
+}
+
+export function verifyRequiredWindowsNativePackages(
+	root,
+	{ platform = process.platform, arch = process.arch } = {},
+) {
+	if (platform !== "win32") return
+	const requirements = [
+		{
+			base: "koffi",
+			target: `@koromix/koffi-${platform}-${arch}`,
+			extensions: [".node"],
+		},
+		{
+			base: "node-addon-require-builtin",
+			target: `node-addon-require-builtin-${platform}-${arch}-msvc`,
+			extensions: [".node"],
+		},
+		{
+			base: "@vscode/ripgrep",
+			target: `@vscode/ripgrep-${platform}-${arch}`,
+			relativeFiles: ["bin/rg.exe"],
+		},
+	]
+	for (const requirement of requirements) {
+		const baseRoot = packageRoot(root, requirement.base)
+		if (!baseRoot) continue
+		const targetRoot = packageRoot(root, requirement.target)
+		if (!targetRoot)
+			throw new Error(
+				`Required Windows native package is missing for ${platform}/${arch}: ${requirement.target}`,
+			)
+		const manifest = JSON.parse(readFileSync(path.join(targetRoot, "package.json"), "utf8"))
+		if (!isPackageCompatible(manifest, { platform, arch }))
+			throw new Error(
+				`Required Windows native package is incompatible with ${platform}/${arch}: ${requirement.target}`,
+			)
+		for (const relativeFile of requirement.relativeFiles ?? []) {
+			const file = path.join(targetRoot, relativeFile)
+			assertFile(file, `${requirement.target}/${relativeFile}`)
+			assertPeArchitecture(file, arch)
+		}
+		if (requirement.extensions) {
+			const nativeFiles = listPaths(targetRoot).filter((relative) =>
+				requirement.extensions.some((extension) =>
+					relative.toLowerCase().endsWith(extension),
+				),
+			)
+			if (nativeFiles.length === 0)
+				throw new Error(
+					`Required Windows native package has no native binary for ${platform}/${arch}: ${requirement.target}`,
+				)
+			for (const relativeFile of nativeFiles)
+				assertPeArchitecture(path.join(targetRoot, relativeFile), arch)
+		}
+	}
 }
 
 function verifyNoSymlinks(root) {
@@ -123,9 +183,27 @@ function listPaths(root, prefix = "") {
 	})
 }
 
+function packageRoot(root, name) {
+	const candidate = path.join(root, "node_modules", ...name.split("/"))
+	return existsSync(path.join(candidate, "package.json")) ? candidate : undefined
+}
+
 function assertFile(file, label) {
 	if (!existsSync(file) || !statSync(file).isFile())
 		throw new Error(`${label} is missing: ${file}`)
+}
+
+function assertPeArchitecture(file, arch) {
+	const bytes = readFileSync(file)
+	if (bytes.length < 0x40 || bytes.readUInt16LE(0) !== 0x5a4d)
+		throw new Error(`Native runtime file is not a Windows PE image: ${file}`)
+	const peOffset = bytes.readUInt32LE(0x3c)
+	if (peOffset + 6 > bytes.length || bytes.toString("ascii", peOffset, peOffset + 4) !== "PE\0\0")
+		throw new Error(`Native runtime file has no PE header: ${file}`)
+	const machine = bytes.readUInt16LE(peOffset + 4)
+	const expected = arch === "arm64" ? 0xaa64 : 0x8664
+	if (machine !== expected)
+		throw new Error(`Native runtime file architecture mismatch for ${arch}: ${file}`)
 }
 
 const invokedPath = process.argv[1]
