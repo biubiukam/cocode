@@ -76,6 +76,7 @@ export async function stageBuilderApplication(context: AfterPackContext): Promis
 		sourceRoot: process.cwd(),
 		appRoot,
 		dependencies: MAIN_RUNTIME_DEPENDENCIES,
+		target,
 	})
 	verifyProductionDependencyClosure(appRoot, MAIN_RUNTIME_DEPENDENCIES)
 

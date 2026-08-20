@@ -39,7 +39,7 @@ export function verifyPackagedStartupAssets(packageRoot, { platform, arch } = {}
 	const appRoot = resolvePackagedAppRoot(root)
 	const betterSqliteRoot = path.join(appRoot, "node_modules", "better-sqlite3")
 	assertDirectory(betterSqliteRoot, "packaged better-sqlite3")
-	const betterSqliteNative = findFirstByExtension(betterSqliteRoot, ".node")
+	const betterSqliteNative = findTargetNativeAddon(betterSqliteRoot, platform, arch)
 	if (!betterSqliteNative) throw new Error("Packaged better-sqlite3 native module is missing.")
 
 	const ptyRoot = path.join(runtimeRoot, "node_modules", "node-pty")
@@ -154,6 +154,13 @@ function findFirstByExtension(root, extension) {
 		}
 	}
 	return undefined
+}
+
+function findTargetNativeAddon(root, platform, arch) {
+	const targetName = `${platform}-${arch}.node`
+	const target = findFirstByName(root, targetName)
+	if (target) return target
+	return findFirstByExtension(root, ".node")
 }
 
 function assertPeArchitecture(file, arch) {

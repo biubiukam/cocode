@@ -330,12 +330,31 @@ test("verifies the staged Windows runtime and fails on a missing DSH entry", () 
 		for (const name of ["pty.node", "winpty-agent.exe", "conpty.node", "conpty.dll", "OpenConsole.exe"])
 			writeFixture(path.join(pty, name), createPeFixture())
 		writeFixture(path.join(sqlite, "better_sqlite3.node"), createPeFixture())
+		writeFixture(
+			path.join(resources, "app", "node_modules", "better-sqlite3", "prebuilds", "darwin-arm64.node"),
+			Buffer.from("not-a-pe"),
+		)
+		writeFixture(
+			path.join(resources, "app", "node_modules", "better-sqlite3", "prebuilds", "win32-x64.node"),
+			createPeFixture(),
+		)
 		writeFixture(path.join(sharp, "package.json"), JSON.stringify({ name: "sharp" }))
 		writeFixture(path.join(sharpNative, "sharp-win32-x64.node"), createPeFixture())
 		writeFixture(path.join(sharpLibvips, "libvips-42.dll"), createPeFixture())
 
 		const result = verifyPackagedStartupAssets(root, { platform: "win32", arch: "x64" })
 		assert.equal(result.appRoot, path.join(resources, "app"))
+		assert.equal(
+			result.betterSqliteNative,
+			path.join(
+				resources,
+				"app",
+				"node_modules",
+				"better-sqlite3",
+				"prebuilds",
+				"win32-x64.node",
+			),
+		)
 		rmSync(path.join(runtime, "node_modules", "@deepseek-ai", "dsh", "lib", "bin.js"))
 		assert.throws(
 			() => verifyPackagedStartupAssets(root, { platform: "win32", arch: "x64" }),
@@ -376,6 +395,48 @@ test("copies a self-contained production dependency closure without pnpm links",
 		assert.throws(() => verifyProductionDependencyClosure(appRoot, ["missing-runtime"]), /missing-runtime/)
 	} finally {
 		rmSync(root, { recursive: true, force: true })
+	}
+})
+
+test("keeps only the target platform and architecture native prebuild", () => {
+	for (const arch of ["x64", "arm64"] as const) {
+		const root = mkdtempSync(path.join(os.tmpdir(), "cocode-runtime-closure-native-"))
+		try {
+			const source = path.join(root, "source")
+			const appRoot = path.join(root, "app")
+			writePackage(source, "cocode-gui", { dependencies: { "runtime-root": "1.0.0" } })
+			const runtimeRoot = path.join(source, "node_modules", "runtime-root")
+			writePackage(runtimeRoot, "runtime-root")
+			for (const name of [
+				"darwin-arm64.node",
+				"darwin-x64.node",
+				"linux-x64.node",
+				"win32-arm64.node",
+				"win32-x64.node",
+			])
+				writeFixture(path.join(runtimeRoot, "prebuilds", name), "native")
+
+			copyProductionDependencyClosure({
+				sourceRoot: source,
+				appRoot,
+				dependencies: ["runtime-root"],
+				target: { platform: "win32", arch },
+			})
+
+			const prebuilds = path.join(appRoot, "node_modules", "runtime-root", "prebuilds")
+			assert.ok(existsSync(path.join(prebuilds, `win32-${arch}.node`)))
+			for (const name of [
+				"darwin-arm64.node",
+				"darwin-x64.node",
+				"linux-x64.node",
+				"win32-arm64.node",
+				"win32-x64.node",
+			]) {
+				assert.equal(name === `win32-${arch}.node`, existsSync(path.join(prebuilds, name)), name)
+			}
+		} finally {
+			rmSync(root, { recursive: true, force: true })
+		}
 	}
 })
 

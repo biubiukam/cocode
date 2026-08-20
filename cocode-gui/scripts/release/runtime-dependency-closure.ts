@@ -4,11 +4,17 @@ import {
 	existsSync,
 	lstatSync,
 	mkdirSync,
+	readdirSync,
 	readFileSync,
 	realpathSync,
 	rmSync,
 } from "node:fs"
 import { basename, dirname, join } from "node:path"
+
+type NativeStagingTarget = {
+	readonly platform: "darwin" | "win32"
+	readonly arch: "x64" | "arm64"
+}
 
 interface PackageManifest {
 	readonly name?: unknown
@@ -43,6 +49,7 @@ export function copyProductionDependencyClosure(options: {
 	readonly sourceRoot: string
 	readonly appRoot: string
 	readonly dependencies: readonly string[]
+	readonly target?: NativeStagingTarget
 }): readonly string[] {
 	const packages = resolveProductionDependencyClosure(options)
 	const targetModules = join(options.appRoot, "node_modules")
@@ -56,6 +63,7 @@ export function copyProductionDependencyClosure(options: {
 			dereference: true,
 			filter: (source) => basename(source) !== "node_modules",
 		})
+		if (options.target) pruneNativePrebuilds(destination, options.target)
 	}
 
 	for (const record of packages) {
@@ -69,6 +77,38 @@ export function copyProductionDependencyClosure(options: {
 	}
 
 	return packages.map(({ requestedName }) => requestedName)
+}
+
+function pruneNativePrebuilds(root: string, target: NativeStagingTarget): void {
+	if (!existsSync(root) || !lstatSync(root).isDirectory()) return
+	for (const entry of readdirSync(root, { withFileTypes: true })) {
+		const file = join(root, entry.name)
+		if (entry.isDirectory()) {
+			if (entry.name === "prebuilds") {
+				prunePrebuildDirectory(file, target)
+				continue
+			}
+			pruneNativePrebuilds(file, target)
+		}
+	}
+}
+
+function prunePrebuildDirectory(directory: string, target: NativeStagingTarget): void {
+	const expected = `${target.platform}-${target.arch}`
+	for (const entry of readdirSync(directory, { withFileTypes: true })) {
+		const file = join(directory, entry.name)
+		const marker = nativePrebuildMarker(entry.name)
+		if (marker) {
+			if (marker !== expected) rmSync(file, { recursive: true, force: true })
+			continue
+		}
+		if (entry.isDirectory()) pruneNativePrebuilds(file, target)
+	}
+}
+
+function nativePrebuildMarker(name: string): string | undefined {
+	const match = /^(linux(?:musl)?|darwin|win32)-(x64|arm64)(?:\.|$)/i.exec(name)
+	return match ? `${match[1].toLowerCase()}-${match[2].toLowerCase()}` : undefined
 }
 
 export function resolveProductionDependencyClosure(options: {
