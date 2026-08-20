@@ -16,6 +16,7 @@ import { extractDshBootManifest, extractDshThemePreference } from "./dsh-runtime
 import { assertRequiredCocodeWebEndpoints } from "./dsh-runtime-health"
 import { resolveCocodeDshHome, resolveCocodeHome } from "./dsh-home"
 import { fetchDshRuntimeRequest } from "./dsh-runtime-request"
+import { packagedNodeExecutableName } from "../../../../shared/packaged-node-executable"
 import {
 	createHostSupervisorClient,
 	resolveHostRuntimeEnv,
@@ -437,7 +438,10 @@ function resolveSupervisorServiceEntry(): string | undefined {
 function resolveBundledNode(): string | undefined {
 	if (process.env.COCODE_NODE_EXECUTABLE?.trim()) return process.env.COCODE_NODE_EXECUTABLE.trim()
 	if (typeof process.resourcesPath === "string") {
-		const candidate = path.join(process.resourcesPath, "cocode-node")
+		const candidate = path.join(
+			process.resourcesPath,
+			packagedNodeExecutableName(process.platform),
+		)
 		if (existsSync(candidate)) return candidate
 	}
 	if (app.isPackaged) {

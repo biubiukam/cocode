@@ -94,7 +94,7 @@ test("writes a Windows PE inventory with explicit required and excluded signing 
 	const root = mkdtempSync(path.join(os.tmpdir(), "cocode-pe-inventory-"))
 	try {
 		const executable = path.join(root, "Cocode.exe")
-		const bundledNode = path.join(root, "resources", "cocode-node")
+		const bundledNode = path.join(root, "resources", "cocode-node.exe")
 		const nativeAddon = path.join(root, "resources", "better-sqlite3.node")
 		const library = path.join(root, "resources", "libvips.dll")
 		writeFixture(executable, createPeFixture())
@@ -119,7 +119,7 @@ test("writes a Windows PE inventory with explicit required and excluded signing 
 			[
 				{ file: "Cocode.exe", signing: "required", extension: ".exe" },
 				{ file: "resources/better-sqlite3.node", signing: "excluded", extension: ".node" },
-				{ file: "resources/cocode-node", signing: "required", extension: "" },
+				{ file: "resources/cocode-node.exe", signing: "required", extension: ".exe" },
 				{ file: "resources/libvips.dll", signing: "excluded", extension: ".dll" },
 			],
 		)
@@ -158,7 +158,7 @@ test("signs Windows executables added under packaged resources afterPack", async
 	const root = mkdtempSync(path.join(os.tmpdir(), "cocode-packaged-signing-"))
 	try {
 		const nestedExecutable = path.join(root, "dsh-runtime", "bin", "rg.exe")
-		const bundledNode = path.join(root, "cocode-node")
+		const bundledNode = path.join(root, "cocode-node.exe")
 		const excludedLibrary = path.join(root, "dsh-runtime", "bin", "helper.dll")
 		writeFixture(nestedExecutable, createPeFixture())
 		writeFixture(bundledNode, createPeFixture())
@@ -345,7 +345,7 @@ test("verifies the staged Windows runtime and fails on a missing DSH entry", () 
 		const sqlite = path.join(resources, "app", "node_modules", "better-sqlite3", "build", "Release")
 		const sharp = path.join(runtime, "node_modules", "sharp")
 		const sharpNative = path.join(runtime, "node_modules", "@img", "sharp-win32-x64", "lib")
-		writeFixture(path.join(resources, "cocode-node"), createPeFixture())
+		writeFixture(path.join(resources, "cocode-node.exe"), createPeFixture())
 		writeFixture(path.join(resources, "startup-failure.html"), "<html />")
 		writeFixture(
 			path.join(runtime, "runtime-manifest.json"),

@@ -2,10 +2,13 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs"
 import * as path from "pathe"
 import { verifyRequiredWindowsNativePackages } from "../verify-dsh-runtime.mjs"
 
-export function verifyPackagedStartupAssets(packageRoot, { platform, arch } = {}) {
+export function verifyPackagedStartupAssets(
+	packageRoot,
+	{ platform, arch, nodeExecutableName = platform === "win32" ? "cocode-node.exe" : "cocode-node" } = {},
+) {
 	if (platform !== "win32") return
 	const root = path.resolve(packageRoot)
-	assertFile(path.join(root, "resources", "cocode-node"), "packaged cocode-node")
+	assertFile(path.join(root, "resources", nodeExecutableName), `packaged ${nodeExecutableName}`)
 	assertFile(
 		path.join(root, "resources", "startup-failure.html"),
 		"packaged startup failure diagnostic page",
@@ -62,7 +65,7 @@ export function verifyPackagedStartupAssets(packageRoot, { platform, arch } = {}
 			assertPeArchitecture(nativeFile, arch)
 	}
 
-	assertPeArchitecture(path.join(root, "resources", "cocode-node"), arch)
+	assertPeArchitecture(path.join(root, "resources", nodeExecutableName), arch)
 	assertPeArchitecture(betterSqliteNative, arch)
 	verifyRequiredWindowsNativePackages(runtimeRoot, { platform, arch })
 	verifySharpNatives(runtimeRoot, platform, arch)

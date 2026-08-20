@@ -68,7 +68,7 @@ test("limits remote signing to Magic-compatible Windows executables", () => {
 	assert.equal(typeof isWindowsApplicationExecutable, "function")
 	assert.equal(typeof shouldSubmitWindowsFileForSigning, "function")
 
-	for (const file of ["Cocode.exe", "HELPER.EXE", "resources/cocode-node"]) {
+	for (const file of ["Cocode.exe", "HELPER.EXE", "resources/cocode-node.exe"]) {
 		assert.equal(isWindowsApplicationExecutable(file), true, file)
 		assert.equal(shouldSubmitWindowsFileForSigning(file), true, file)
 	}

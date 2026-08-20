@@ -6,6 +6,7 @@ import { spawn } from "node:child_process"
 // eslint-disable-next-line no-restricted-imports
 import path from "node:path"
 import { app } from "electron"
+import { packagedNodeExecutableName } from "../../../../shared/packaged-node-executable"
 import { resolveCocodeDshHome, resolveCocodeHome } from "../../dsh-runtime/infrastructure/dsh-home"
 import type {
 	TuiCommandLineToolResult,
@@ -39,7 +40,8 @@ export class TuiLauncher {
 	public buildInvocation(args: readonly string[] = []): TuiInvocation {
 		const resourcesRoot = resolveResourcesRoot()
 		const executable =
-			process.env.COCODE_NODE_EXECUTABLE?.trim() || path.join(resourcesRoot, "cocode-node")
+			process.env.COCODE_NODE_EXECUTABLE?.trim() ||
+			path.join(resourcesRoot, packagedNodeExecutableName(process.platform))
 		const entry = path.join(resourcesRoot, "tui", "cocode-cli.mjs")
 		const supervisorEntry = path.join(
 			resourcesRoot,

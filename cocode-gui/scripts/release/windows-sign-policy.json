@@ -1,5 +1,5 @@
 {
 	"applicationExtensions": [".exe"],
-	"applicationFileNames": ["cocode-node"],
+	"applicationFileNames": ["cocode-node.exe"],
 	"packageExtensions": []
 }
