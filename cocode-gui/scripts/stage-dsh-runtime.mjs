@@ -12,6 +12,10 @@ import { createHash } from "node:crypto"
 import { createRequire } from "node:module"
 import * as path from "pathe"
 import process from "node:process"
+import {
+	isPackageCompatible,
+	pruneIncompatibleNativePackages,
+} from "./lib/workspace-dependencies.mjs"
 
 const destination = readArgument("--destination")
 if (!destination) {
@@ -39,6 +43,7 @@ materializeDependencyClosure(
 	),
 )
 materializeBundledPlugins(destination)
+pruneIncompatibleNativePackages(destination)
 restoreNodePtyHelper(destination)
 
 const marker = {
@@ -107,6 +112,10 @@ function materializeDependencyClosure(supervisorRoot, destination, additionalRoo
 		const manifestPath = path.join(root, "package.json")
 		const manifest = JSON.parse(readFileSync(manifestPath, "utf8"))
 		if (typeof manifest.name !== "string" || visited.has(manifest.name)) continue
+		if (!isPackageCompatible(manifest))
+			throw new Error(
+				`Cannot stage incompatible runtime package ${manifest.name} for ${process.platform}/${process.arch}.`,
+			)
 		visited.add(manifest.name)
 		if (copy) {
 			const target = path.join(targetModules, ...manifest.name.split("/"))
@@ -114,25 +123,39 @@ function materializeDependencyClosure(supervisorRoot, destination, additionalRoo
 			copyPackageTree(root, target)
 		}
 		const packageRequire = createRequire(manifestPath)
-		const dependencies = {
-			...(manifest.dependencies ?? {}),
-			...(manifest.optionalDependencies ?? {}),
-			...(manifest.peerDependencies ?? {}),
-		}
-		for (const dependency of Object.keys(dependencies)) {
-			try {
-				pending.push({ root: resolvePackageRoot(packageRequire, dependency), copy: true })
-			} catch (error) {
-				if (
-					manifest.optionalDependencies?.[dependency] !== undefined ||
-					manifest.peerDependenciesMeta?.[dependency]?.optional === true
-				)
-					continue
-				throw new Error(
-					`Unable to resolve staged runtime dependency ${dependency} from ${root}: ${String(
-						error,
-					)}`,
-				)
+		const dependencyGroups = [
+			{ names: Object.keys(manifest.dependencies ?? {}), optional: false },
+			{ names: Object.keys(manifest.optionalDependencies ?? {}), optional: true },
+			{
+				names: Object.keys(manifest.peerDependencies ?? {}),
+				optional: false,
+			},
+		]
+		for (const { names, optional } of dependencyGroups) {
+			for (const dependency of names) {
+				try {
+					const dependencyRoot = resolvePackageRoot(packageRequire, dependency)
+					const dependencyManifest = JSON.parse(
+						readFileSync(path.join(dependencyRoot, "package.json"), "utf8"),
+					)
+					const dependencyOptional =
+						optional || manifest.peerDependenciesMeta?.[dependency]?.optional === true
+					if (!isPackageCompatible(dependencyManifest)) {
+						if (dependencyOptional) continue
+						throw new Error(
+							`Runtime dependency ${dependency} is incompatible with ${process.platform}/${process.arch}.`,
+						)
+					}
+					pending.push({ root: dependencyRoot, copy: true })
+				} catch (error) {
+					if (optional || manifest.peerDependenciesMeta?.[dependency]?.optional === true)
+						continue
+					throw new Error(
+						`Unable to resolve staged runtime dependency ${dependency} from ${root}: ${String(
+							error,
+						)}`,
+					)
+				}
 			}
 		}
 	}

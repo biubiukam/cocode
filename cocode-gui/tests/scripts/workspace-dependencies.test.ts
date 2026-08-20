@@ -1,10 +1,14 @@
 import assert from "node:assert/strict"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import * as path from "pathe"
 import test from "node:test"
 import { esbuildPlatformPackagePath } from "../../scripts/build-tui.mjs"
 import {
+	findIncompatibleNativePackages,
+	isPackageCompatible,
+	pruneIncompatibleNativePackages,
+	pruneNativePrebuildDirectories,
 	ensureWindowsNodePtyNatives,
 	ensureWorkspaceDependencies,
 } from "../../scripts/lib/workspace-dependencies.mjs"
@@ -103,6 +107,123 @@ test("repairs missing Windows node-pty native files with the target architecture
 			true,
 		)
 		assert.equal(calls.at(-1)?.env?.npm_config_arch, "arm64")
+	} finally {
+		rmSync(root, { recursive: true, force: true })
+	}
+})
+
+test("prunes node-pty native prebuild directories to the staged target", () => {
+	const root = mkdtempSync(path.join(tmpdir(), "cocode-node-pty-prune-test-"))
+	try {
+		for (const directory of ["darwin-arm64", "darwin-x64", "win32-arm64", "win32-x64"]) {
+			const file = path.join(
+				root,
+				"node_modules",
+				"node-pty",
+				"prebuilds",
+				directory,
+				"pty.node",
+			)
+			mkdirSync(path.dirname(file), { recursive: true })
+			writeFileSync(file, "native")
+		}
+
+		pruneNativePrebuildDirectories(root, { platform: "win32", arch: "x64" })
+
+		assert.equal(
+			existsSync(
+				path.join(root, "node_modules", "node-pty", "prebuilds", "win32-x64", "pty.node"),
+			),
+			true,
+		)
+		for (const directory of ["darwin-arm64", "darwin-x64", "win32-arm64"])
+			assert.equal(
+				existsSync(path.join(root, "node_modules", "node-pty", "prebuilds", directory)),
+				false,
+				directory,
+			)
+	} finally {
+		rmSync(root, { recursive: true, force: true })
+	}
+})
+
+test("prunes incompatible optional native packages and node-pty conpty assets", () => {
+	const root = mkdtempSync(path.join(tmpdir(), "cocode-native-package-prune-test-"))
+	try {
+		const darwinPackage = path.join(root, "node_modules", "@img", "sharp-darwin-arm64")
+		const windowsPackage = path.join(root, "node_modules", "@img", "sharp-win32-x64")
+		const sqlitePrebuilds = path.join(root, "node_modules", "better-sqlite3", "prebuilds")
+		const embeddedNativePackage = path.join(root, "node_modules", "embedded-native")
+		mkdirSync(darwinPackage, { recursive: true })
+		mkdirSync(windowsPackage, { recursive: true })
+		mkdirSync(sqlitePrebuilds, { recursive: true })
+		mkdirSync(embeddedNativePackage, { recursive: true })
+		writeFileSync(
+			path.join(darwinPackage, "package.json"),
+			JSON.stringify({ name: "@img/sharp-darwin-arm64", os: ["darwin"], cpu: ["arm64"] }),
+		)
+		writeFileSync(
+			path.join(windowsPackage, "package.json"),
+			JSON.stringify({ name: "@img/sharp-win32-x64", os: ["win32"], cpu: ["x64"] }),
+		)
+		for (const name of ["darwin-arm64.node", "linux-x64.node", "win32-x64.node"])
+			writeFileSync(path.join(sqlitePrebuilds, name), "native")
+		for (const name of ["index.darwin-arm64.node", "index.win32-x64-msvc.node"])
+			writeFileSync(path.join(embeddedNativePackage, name), "native")
+		for (const directory of ["win10-arm64", "win10-x64"])
+			mkdirSync(
+				path.join(root, "node_modules", "node-pty", "third_party", "conpty", directory),
+				{ recursive: true },
+			)
+
+		pruneIncompatibleNativePackages(root, { platform: "win32", arch: "x64" })
+		assert.deepEqual(
+			findIncompatibleNativePackages(root, { platform: "win32", arch: "x64" }),
+			[],
+		)
+		assert.equal(
+			isPackageCompatible(
+				{ name: "@img/sharp-win32-x64", os: ["win32"], cpu: ["x64"] },
+				{
+					platform: "win32",
+					arch: "x64",
+				},
+			),
+			true,
+		)
+
+		assert.equal(existsSync(darwinPackage), false)
+		assert.equal(existsSync(windowsPackage), true)
+		assert.equal(existsSync(path.join(sqlitePrebuilds, "win32-x64.node")), true)
+		assert.equal(existsSync(path.join(sqlitePrebuilds, "darwin-arm64.node")), false)
+		assert.equal(existsSync(path.join(sqlitePrebuilds, "linux-x64.node")), false)
+		assert.equal(existsSync(path.join(embeddedNativePackage, "index.darwin-arm64.node")), false)
+		assert.equal(
+			existsSync(path.join(embeddedNativePackage, "index.win32-x64-msvc.node")),
+			true,
+		)
+		assert.equal(
+			existsSync(
+				path.join(root, "node_modules", "node-pty", "third_party", "conpty", "win10-x64"),
+			),
+			true,
+		)
+		assert.equal(
+			existsSync(
+				path.join(root, "node_modules", "node-pty", "third_party", "conpty", "win10-arm64"),
+			),
+			false,
+		)
+
+		mkdirSync(
+			path.join(root, "node_modules", "node-pty", "third_party", "conpty", "win10-arm64"),
+			{ recursive: true },
+		)
+		pruneIncompatibleNativePackages(root, { platform: "darwin", arch: "arm64" })
+		assert.equal(
+			existsSync(path.join(root, "node_modules", "node-pty", "third_party", "conpty")),
+			false,
+		)
 	} finally {
 		rmSync(root, { recursive: true, force: true })
 	}

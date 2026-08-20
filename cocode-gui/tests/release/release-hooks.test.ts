@@ -327,8 +327,18 @@ test("verifies the staged Windows runtime and fails on a missing DSH entry", () 
 			)
 			writeFixture(path.join(packageRoot, "lib", "index.js"), "")
 		}
-		for (const name of ["pty.node", "winpty-agent.exe", "conpty.node", "conpty.dll", "OpenConsole.exe"])
+		for (const name of ["pty.node", "winpty-agent.exe", "conpty.node"])
 			writeFixture(path.join(pty, name), createPeFixture())
+		for (const name of ["conpty.dll", "OpenConsole.exe"])
+			writeFixture(path.join(pty, "conpty", name), createPeFixture())
+		writeFixture(
+			path.join(runtime, "node_modules", "node-pty", "prebuilds", "darwin-arm64", "pty.node"),
+			Buffer.from("not-a-pe"),
+		)
+		writeFixture(
+			path.join(runtime, "node_modules", "node-pty", "prebuilds", "win32-x64", "pty.node"),
+			createPeFixture(),
+		)
 		writeFixture(path.join(sqlite, "better_sqlite3.node"), createPeFixture())
 		writeFixture(
 			path.join(resources, "app", "node_modules", "better-sqlite3", "prebuilds", "darwin-arm64.node"),

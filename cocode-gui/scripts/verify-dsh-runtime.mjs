@@ -2,6 +2,7 @@ import { existsSync, lstatSync, readFileSync, readdirSync, statSync } from "node
 import * as path from "pathe"
 import { fileURLToPath } from "node:url"
 import { hashDirectory, hashJson } from "./runtime-build-helpers.mjs"
+import { findIncompatibleNativePackages } from "./lib/workspace-dependencies.mjs"
 
 export function verifyRuntime(
 	runtimeRoot,
@@ -68,6 +69,13 @@ export function verifyRuntime(
 	if (hashDirectory(path.join(root, "node_modules")) !== manifest.dependencyClosureHash)
 		throw new Error("Dependency closure hash mismatch.")
 	verifyNoSymlinks(root)
+	const incompatibleNativePackages = findIncompatibleNativePackages(root, { platform, arch })
+	if (incompatibleNativePackages.length > 0)
+		throw new Error(
+			`Staged runtime contains incompatible native packages for ${platform}/${arch}: ${incompatibleNativePackages.join(
+				", ",
+			)}`,
+		)
 	verifyNodePtyNatives(root, platform, arch)
 	return manifest
 }

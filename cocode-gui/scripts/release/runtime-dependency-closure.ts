@@ -10,6 +10,7 @@ import {
 	rmSync,
 } from "node:fs"
 import { basename, dirname, join } from "node:path"
+import { pruneIncompatibleNativePackages } from "../lib/workspace-dependencies.mjs"
 
 type NativeStagingTarget = {
 	readonly platform: "darwin" | "win32"
@@ -65,6 +66,8 @@ export function copyProductionDependencyClosure(options: {
 		})
 		if (options.target) pruneNativePrebuilds(destination, options.target)
 	}
+	if (options.target)
+		pruneIncompatibleNativePackages(options.appRoot, options.target)
 
 	for (const record of packages) {
 		const destination = packageDestination(targetModules, record.destinationSegments)

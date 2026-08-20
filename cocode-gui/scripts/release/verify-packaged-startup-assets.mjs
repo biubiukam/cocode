@@ -44,14 +44,15 @@ export function verifyPackagedStartupAssets(packageRoot, { platform, arch } = {}
 
 	const ptyRoot = path.join(runtimeRoot, "node_modules", "node-pty")
 	assertDirectory(ptyRoot, "packaged node-pty")
-	const ptyNative = findRequiredFile(ptyRoot, "pty.node")
+	const ptyDirectory = findTargetNodePtyDirectory(ptyRoot, platform, arch)
+	const ptyNative = path.join(ptyDirectory, "pty.node")
 	assertFile(ptyNative, "packaged node-pty pty.node")
 	assertPeArchitecture(ptyNative, arch)
 	if (platform === "win32") {
-		const winptyAgent = findRequiredFile(ptyRoot, "winpty-agent.exe")
-		const conptyNative = findRequiredFile(ptyRoot, "conpty.node")
-		const conptyLibrary = findRequiredFile(ptyRoot, "conpty.dll")
-		const openConsole = findRequiredFile(ptyRoot, "OpenConsole.exe")
+		const winptyAgent = path.join(ptyDirectory, "winpty-agent.exe")
+		const conptyNative = path.join(ptyDirectory, "conpty.node")
+		const conptyLibrary = path.join(ptyDirectory, "conpty", "conpty.dll")
+		const openConsole = path.join(ptyDirectory, "conpty", "OpenConsole.exe")
 		assertFile(winptyAgent, "packaged node-pty winpty agent")
 		assertFile(conptyNative, "packaged node-pty conpty.node")
 		assertFile(conptyLibrary, "packaged node-pty conpty.dll")
@@ -128,6 +129,17 @@ function findRequiredFile(root, name) {
 	const file = findFirstByName(root, name)
 	if (!file) throw new Error(`Packaged native file is missing: ${name}`)
 	return file
+}
+
+function findTargetNodePtyDirectory(root, platform, arch) {
+	const candidates = [
+		path.join(root, "build", "Release"),
+		path.join(root, "build", "Debug"),
+		path.join(root, "prebuilds", `${platform}-${arch}`),
+	]
+	const directory = candidates.find((candidate) => existsSync(path.join(candidate, "pty.node")))
+	if (!directory) throw new Error(`Packaged node-pty pty.node is missing for ${platform}/${arch}.`)
+	return directory
 }
 
 function findFirstByName(root, name) {
