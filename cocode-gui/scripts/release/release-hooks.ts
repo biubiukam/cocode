@@ -18,6 +18,7 @@ import { notarize } from "@electron/notarize"
 import * as path from "pathe"
 import { parse as parseYaml } from "yaml"
 import packageMetadata from "../../package.json"
+import { packagedNodeExecutableName } from "../../src/shared/packaged-node-executable"
 import { verifyPackagedStartupAssets } from "./verify-packaged-startup-assets.mjs"
 import {
 	createMacNotarizeOptions,
@@ -103,7 +104,7 @@ export async function stageBuilderApplication(context: AfterPackContext): Promis
 	await fs.rm(path.join(resourcesRoot, "tui"), { recursive: true, force: true })
 	await fs.cp(tuiArtifact, path.join(resourcesRoot, "tui"), { recursive: true })
 
-	const nodeExecutable = path.join(resourcesRoot, "cocode-node")
+	const nodeExecutable = path.join(resourcesRoot, packagedNodeExecutableName(target.platform))
 	await fs.copyFile(process.execPath, nodeExecutable)
 	await fs.chmod(nodeExecutable, 0o755)
 	if (target.platform === "win32" && process.platform === "win32" && isReleaseSigningRequired())
@@ -361,7 +362,7 @@ export function writeWindowsPeSigningInventory(options: {
 	const inventoryPath = path.join(options.outDir, "windows-pe-signing-inventory.json")
 	writeFileSync(
 		inventoryPath,
-		`${JSON.stringify({ schemaVersion: 1, policy: { required: [".exe"], requiredFileNames: ["cocode-node"], excluded: [".node", ".dll"] }, files }, null, 2)}\n`,
+		`${JSON.stringify({ schemaVersion: 1, policy: { required: [".exe"], requiredFileNames: ["cocode-node.exe"], excluded: [".node", ".dll"] }, files }, null, 2)}\n`,
 	)
 	return inventoryPath
 }
@@ -581,7 +582,7 @@ function verifyPackagedRuntimeLayout(appOutDir: string, target: ReleaseTarget): 
 	const resourcesRoot = resolvePackagedResourcesRoot(appOutDir, target.platform)
 	for (const required of [
 		path.join(resourcesRoot, "startup-failure.html"),
-		path.join(resourcesRoot, "cocode-node"),
+		path.join(resourcesRoot, packagedNodeExecutableName(target.platform)),
 		path.join(resourcesRoot, "dsh-runtime", "runtime-manifest.json"),
 		path.join(resourcesRoot, "tui", "manifest.json"),
 		...MAIN_RUNTIME_DEPENDENCIES.map((dependency) =>
@@ -595,7 +596,10 @@ function verifyPackagedRuntimeLayout(appOutDir: string, target: ReleaseTarget): 
 		MAIN_RUNTIME_DEPENDENCIES,
 	)
 	if (target.platform === "win32") {
-		verifyPackagedStartupAssets(appOutDir, target)
+		verifyPackagedStartupAssets(appOutDir, {
+			...target,
+			nodeExecutableName: packagedNodeExecutableName(target.platform),
+		})
 	}
 }
 

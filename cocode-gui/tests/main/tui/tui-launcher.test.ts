@@ -7,6 +7,7 @@ import os from "node:os"
 import path from "node:path"
 import test from "node:test"
 import { TuiLauncher } from "../../../src/main/contexts/tui/infrastructure/tui-launcher"
+import { packagedNodeExecutableName } from "../../../src/shared/packaged-node-executable"
 
 const ENVIRONMENT_KEYS = [
 	"COCODE_CLI_BIN_DIR",
@@ -116,7 +117,7 @@ function createFixture(): {
 	const bin = path.join(root, "bin")
 	const entry = path.join(resources, "tui", "cocode-cli.mjs")
 	const runtimeEntry = path.join(resources, "tui", "cocode-tui.mjs")
-	const node = path.join(resources, "cocode-node")
+	const node = path.join(resources, packagedNodeExecutableName(process.platform))
 	const supervisor = path.join(
 		resources,
 		"dsh-runtime",
