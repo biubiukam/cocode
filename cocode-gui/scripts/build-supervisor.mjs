@@ -3,7 +3,10 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import * as path from "pathe"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { shellCommandOptions } from "./lib/child-process-options.mjs"
-import { ensureWorkspaceDependencies } from "./lib/workspace-dependencies.mjs"
+import {
+	ensureWindowsNodePtyNatives,
+	ensureWorkspaceDependencies,
+} from "./lib/workspace-dependencies.mjs"
 import { hashFiles, listFiles, sha256File } from "./runtime-build-helpers.mjs"
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
@@ -75,8 +78,13 @@ export function buildSupervisor({ clean = false, manifestPath = defaultManifestP
 		outputFiles.every(
 			(file) => previous.artifacts?.[file] === sha256File(path.join(supervisorRoot, file)),
 		)
+	ensureSupervisorDependencies()
+	ensureWindowsNodePtyNatives({
+		root: supervisorRoot,
+		arch: process.arch,
+		force: process.env.RELEASE_REQUIRE_NATIVE_ARCH_MATCH === "1",
+	})
 	if (!valid) {
-		ensureSupervisorDependencies()
 		console.log("[supervisor-build] building @cocode-agency/host-supervisor")
 		execFileSync(
 			process.platform === "win32" ? "corepack.cmd" : "corepack",
@@ -132,6 +140,7 @@ function ensureSupervisorDependencies() {
 		requiredPaths: [
 			path.join(supervisorRoot, "node_modules", "esbuild", "package.json"),
 			path.join(supervisorRoot, "node_modules", "typescript", "package.json"),
+			path.join(supervisorRoot, "node_modules", "node-pty", "package.json"),
 		],
 	})
 }

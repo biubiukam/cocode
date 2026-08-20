@@ -108,6 +108,7 @@ test("configures signed Windows updates and the Cocode NSIS include", () => {
 	)
 
 	assert.match(builderConfig, /verifyUpdateCodeSignature:\s*Boolean\(windowsSign\)/)
+	assert.doesNotMatch(builderConfig, /signExts/)
 	assert.match(builderConfig, /include:\s*path\.resolve\("resources\/installer\.nsh"\)/)
 	assert.match(builderConfig, /deleteAppDataOnUninstall:\s*false/)
 	assert.match(builderConfig, /windows-cli-installer\.ps1/)

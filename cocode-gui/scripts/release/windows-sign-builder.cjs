@@ -1,6 +1,9 @@
 const { existsSync } = require("node:fs")
 const path = require("node:path")
-const { signFile } = require("./windows-sign-service.cjs")
+const {
+	shouldSubmitWindowsFileForSigning,
+	signFile,
+} = require("./windows-sign-service.cjs")
 
 function createWindowsSigner(sign = signFile) {
 	return async function windowsSigner(configuration) {
@@ -12,6 +15,11 @@ function createWindowsSigner(sign = signFile) {
 		}
 		if (!existsSync(configuration.path)) {
 			throw new Error(`electron-builder signing file does not exist: ${configuration.path}`)
+		}
+		if (!shouldSubmitWindowsFileForSigning(configuration.path)) {
+			throw new Error(
+				`electron-builder provided an unsupported Windows signing file: ${configuration.path}`,
+			)
 		}
 		await sign(configuration.path)
 	}

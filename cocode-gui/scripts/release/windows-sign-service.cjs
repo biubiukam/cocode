@@ -1,6 +1,9 @@
 const { execFileSync } = require("node:child_process")
 const { createHash, webcrypto } = require("node:crypto")
-const { mkdir, readFile, rename, rm, writeFile } = require("node:fs/promises")
+const { createReadStream } = require("node:fs")
+const { mkdir, open, readFile, rename, rm, writeFile } = require("node:fs/promises")
+const FormData = require("form-data")
+const fetch = require("node-fetch")
 const path = require("pathe")
 const windowsSignPolicy = require("./windows-sign-policy.json")
 
@@ -29,7 +32,8 @@ function parseCredential(value) {
 	if (!value || typeof value !== "string")
 		throw new Error("Windows signing credential is missing.")
 	const parts = value.trim().split(":")
-	if (parts.length !== 3) throw new Error("Windows signing credential is invalid.")
+	if (parts.length !== 3 || parts.some((part) => part.length === 0))
+		throw new Error("Windows signing credential is invalid.")
 	const privateKey = base64ToBuffer(parts[1])
 	if (privateKey.byteLength !== 32) throw new Error("Windows signing private key is invalid.")
 	return {
@@ -92,7 +96,6 @@ function configFromEnvironment(environment = process.env) {
 			environment.WINDOWS_SIGN_DESCRIPTION?.trim() ||
 			environment.RELEASE_DESCRIPTION?.trim() ||
 			"Cocode Desktop",
-		website: environment.WINDOWS_SIGN_WEBSITE?.trim() || environment.RELEASE_HOMEPAGE?.trim(),
 		timeoutMs: positiveInteger(environment.WINDOWS_SIGN_TIMEOUT_MS, 1_200_000),
 		retryCount: positiveInteger(environment.WINDOWS_SIGN_RETRY_COUNT, 2),
 	}
@@ -199,24 +202,26 @@ async function requestSignature(filePath, credentialValue, config) {
 		extraSignOptions: {
 			hashType: "sha256",
 			desc: config.description,
-			...(config.website ? { url: config.website } : {}),
 		},
 	}
-	const form = new FormData()
-	form.append("info", JSON.stringify(info))
-	form.append(
+	const formData = new FormData()
+	formData.append("info", JSON.stringify(info))
+	formData.append(
 		"toBeSigned",
-		new Blob([file], { type: "application/octet-stream" }),
-		path.basename(filePath),
+		createReadStream(filePath),
+		{
+			filename: path.basename(filePath),
+			contentType: "application/octet-stream",
+		},
 	)
 	const response = await request(
 		`${config.serviceUrl}/v1/sign`,
 		{
 			method: "POST",
-			headers: { accept: "application/octet-stream" },
-			body: form,
+			headers: { accept: "*/*", ...formData.getHeaders() },
+			body: formData,
 		},
-		config,
+		{ ...config, retryCount: 0 },
 	)
 	const contentType = response.headers.get("content-type") || ""
 	const signed = Buffer.from(await response.arrayBuffer())
@@ -341,6 +346,9 @@ async function signFile(filePath, options = {}) {
 		throw new Error("Service hook cannot run in PFX mode.")
 	if (!path.isAbsolute(filePath))
 		throw new Error("Windows signing hook requires an absolute path.")
+	if (!shouldSubmitWindowsFileForSigning(filePath))
+		throw new Error(`Unsupported Windows signing file: ${filePath}`)
+	await assertWindowsPortableExecutable(filePath)
 	const config = { ...configFromEnvironment(environment), ...(options.config || {}) }
 	const input = await readFile(filePath)
 	const inputSha256 = createHash("sha256").update(input).digest("hex")
@@ -392,6 +400,19 @@ async function signFile(filePath, options = {}) {
 			environment,
 		)
 		throw error
+	}
+}
+
+async function assertWindowsPortableExecutable(filePath) {
+	const handle = await open(filePath, "r")
+	try {
+		const header = Buffer.alloc(2)
+		const { bytesRead } = await handle.read(header, 0, header.length, 0)
+		if (bytesRead !== 2 || header[0] !== 0x4d || header[1] !== 0x5a) {
+			throw new Error(`Signing input is not a Windows PE file: ${filePath}`)
+		}
+	} finally {
+		await handle.close()
 	}
 }
 

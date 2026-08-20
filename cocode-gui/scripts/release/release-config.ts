@@ -30,7 +30,6 @@ export interface WindowsSignServiceOptions {
 	readonly serviceUrl: string
 	readonly credentialTarget: string
 	readonly description: string
-	readonly website?: string
 	readonly hashAlgorithm: "sha256"
 	readonly timeoutMs: number
 	readonly retryCount: number
@@ -273,7 +272,6 @@ export function resolveWindowsSignServiceOptions(
 	} catch {
 		throw new Error(`WINDOWS_SIGN_SERVICE_URL is invalid: ${serviceUrl}`)
 	}
-	const website = environment.WINDOWS_SIGN_WEBSITE?.trim() || environment.RELEASE_HOMEPAGE?.trim()
 	return {
 		serviceUrl: serviceUrl.replace(/\/$/, ""),
 		credentialTarget:
@@ -282,7 +280,6 @@ export function resolveWindowsSignServiceOptions(
 			environment.WINDOWS_SIGN_DESCRIPTION?.trim() ||
 			environment.RELEASE_DESCRIPTION?.trim() ||
 			"Cocode Desktop",
-		...(website ? { website } : {}),
 		hashAlgorithm: "sha256",
 		timeoutMs: parsePositiveEnvironmentInteger(
 			environment.WINDOWS_SIGN_TIMEOUT_MS,

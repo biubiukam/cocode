@@ -331,7 +331,7 @@ export function writeWindowsPeSigningInventory(options: {
 	const inventoryPath = path.join(options.outDir, "windows-pe-signing-inventory.json")
 	writeFileSync(
 		inventoryPath,
-		`${JSON.stringify({ schemaVersion: 1, policy: { required: [".exe", ".node"], excluded: [".dll"] }, files }, null, 2)}\n`,
+		`${JSON.stringify({ schemaVersion: 1, policy: { required: [".exe"], excluded: [".node", ".dll"] }, files }, null, 2)}\n`,
 	)
 	return inventoryPath
 }

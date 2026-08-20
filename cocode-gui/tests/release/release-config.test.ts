@@ -161,7 +161,7 @@ test("defaults Windows service signing to the Magic RFC3161 timestamp server", (
 	assert.equal(options?.rfc3161TimeStampServer, "http://timestamp.digicert.com")
 })
 
-test("requires the Windows certificate subject for signed service releases", () => {
+test("requires a certificate subject for formally signed Windows releases", () => {
 	assert.throws(
 		() =>
 			requireReleaseCredentials(
@@ -173,6 +173,17 @@ test("requires the Windows certificate subject for signed service releases", () 
 				},
 			),
 		/WINDOWS_SIGN_CERTIFICATE_SUBJECT is required/,
+	)
+	assert.doesNotThrow(() =>
+		requireReleaseCredentials(
+			{ platform: "win32", arch: "x64" },
+			{
+				RELEASE_REQUIRE_SIGNING: "1",
+				WINDOWS_SIGN_MODE: "service",
+				WINDOWS_SIGN_SERVICE_URL: "https://signing.example.test",
+				WINDOWS_SIGN_CERTIFICATE_SUBJECT: "Cocode Agency, Inc.",
+			},
+		),
 	)
 })
 
@@ -207,7 +218,7 @@ test("signed Windows releases require the existing team signing service", () => 
 	)
 })
 
-test("validates signing service URL and bounded retry settings", () => {
+test("validates signing service URL and ignores unsupported website sign options", () => {
 	assert.deepEqual(
 		resolveWindowsSignServiceOptions({
 			WINDOWS_SIGN_SERVICE_URL: "https://signing.example.test/",
@@ -221,7 +232,6 @@ test("validates signing service URL and bounded retry settings", () => {
 			serviceUrl: "https://signing.example.test",
 			credentialTarget: "team/windows-sign",
 			description: "Cocode Desktop",
-			website: "https://cocode.example.test",
 			hashAlgorithm: "sha256",
 			timeoutMs: 45000,
 			retryCount: 3,

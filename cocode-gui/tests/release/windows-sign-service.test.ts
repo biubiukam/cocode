@@ -9,6 +9,8 @@ import test from "node:test"
 
 interface SigningServiceConfig {
 	serviceUrl: string
+	description: string
+	website?: string
 	timeoutMs: number
 	retryCount: number
 }
@@ -31,6 +33,13 @@ interface SigningServiceModule {
 		credentialValue: string,
 		config: SigningServiceConfig,
 	): Promise<SigningServiceResult>
+	signFile(
+		filePath: string,
+		options?: {
+			environment?: NodeJS.ProcessEnv
+			credentialProvider?: (target: string) => string | Promise<string>
+		},
+	): Promise<unknown>
 	signingTemporaryPath(filePath: string): string
 }
 
@@ -46,6 +55,7 @@ const {
 	isWindowsApplicationExecutable,
 	requestSignature,
 	shouldSubmitWindowsFileForSigning,
+	signFile,
 	signingTemporaryPath,
 } = localRequire(
 	"../../scripts/release/windows-sign-service.cjs",
@@ -54,7 +64,7 @@ const { createWindowsSigner } = localRequire(
 	"../../scripts/release/windows-sign-builder.cjs",
 ) as WindowsSignerModule
 
-test("limits remote signing to Magic-compatible executables and required package containers", () => {
+test("limits remote signing to Magic-compatible Windows executables", () => {
 	assert.equal(typeof isWindowsApplicationExecutable, "function")
 	assert.equal(typeof shouldSubmitWindowsFileForSigning, "function")
 
@@ -62,9 +72,12 @@ test("limits remote signing to Magic-compatible executables and required package
 		assert.equal(isWindowsApplicationExecutable(file), true, file)
 		assert.equal(shouldSubmitWindowsFileForSigning(file), true, file)
 	}
-	assert.equal(isWindowsApplicationExecutable("better-sqlite3.node"), true)
-	assert.equal(shouldSubmitWindowsFileForSigning("better-sqlite3.node"), true)
 	for (const file of [
+		"better-sqlite3.node",
+		"prebuilds/darwin-x64.node",
+		"prebuilds/darwin-arm64.node",
+		"prebuilds/linux-x64.node",
+		"prebuilds/win32-arm64.node",
 		"Cocode-Setup.msi",
 		"native.dll",
 		"driver.sys",
@@ -104,6 +117,40 @@ test("Builder adapter rejects missing, relative, and nonexistent file paths", as
 	await assert.rejects(() => signer({ path: path.resolve("missing-Cocode.exe") }), /does not exist/)
 })
 
+test("Builder adapter rejects non-executable files before calling the signing service", async () => {
+	const root = mkdtempSync(path.join(os.tmpdir(), "cocode-sign-adapter-test-"))
+	try {
+		const file = path.join(root, "darwin-x64.node")
+		writeFileSync(file, "mach-o")
+		let called = false
+		const signer = createWindowsSigner(async () => {
+			called = true
+		})
+
+		await assert.rejects(() => signer({ path: file }), /unsupported Windows signing file/)
+		assert.equal(called, false)
+	} finally {
+		rmSync(root, { recursive: true, force: true })
+	}
+})
+
+test("rejects a non-PE executable before contacting the signing service", async () => {
+	const root = mkdtempSync(path.join(os.tmpdir(), "cocode-sign-service-test-"))
+	try {
+		const file = path.join(root, "Cocode.exe")
+		writeFileSync(file, "not-a-windows-pe")
+		await assert.rejects(
+			signFile(file, {
+				environment: {},
+				credentialProvider: async () => "unused",
+			}),
+			/not a Windows PE file/,
+		)
+	} finally {
+		rmSync(root, { recursive: true, force: true })
+	}
+})
+
 test("keeps the original extension on signing temp files", () => {
 	assert.match(signingTemporaryPath("C:/out/Cocode.exe"), /\/\.Cocode\.cocode-signing-\d+-\d+\.exe$/)
 	assert.match(
@@ -119,6 +166,32 @@ test("uses SIGN_CERTIFICATE from the environment before Credential Manager", asy
 		})
 		assert.equal(credential, "env-signing-credential")
 	})
+})
+
+test("rejects incomplete Magic three-part credentials before making a request", async () => {
+	const root = mkdtempSync(path.join(os.tmpdir(), "cocode-sign-service-test-"))
+	try {
+		const file = path.join(root, "Cocode.exe")
+		writeFileSync(file, "unsigned-content")
+		const client = await createX25519KeyPair()
+		const privateKey = await privateKeyBase64(client.privateKey)
+		for (const credential of [
+			`:${privateKey}:${Buffer.from("pin").toString("base64")}`,
+			`ignored:${privateKey}:`,
+		]) {
+			await assert.rejects(
+				requestSignature(file, credential, {
+					serviceUrl: "http://127.0.0.1:1",
+					description: "Cocode Desktop",
+					timeoutMs: 100,
+					retryCount: 0,
+				}),
+				/credential is invalid/,
+			)
+		}
+	} finally {
+		rmSync(root, { recursive: true, force: true })
+	}
 })
 
 test("speaks the Magic Desktop challenge and sign protocol", async () => {
@@ -145,11 +218,19 @@ test("speaks the Magic Desktop challenge and sign protocol", async () => {
 				nonce: Buffer.alloc(12, 7).toString("base64"),
 			})
 		},
-		sign: async (_request, body) => {
+		sign: async (request, body) => {
 			requests.push({ path: "/v1/sign", body: body.toString("latin1") })
+			assert.equal(request.headers.accept, "*/*")
+			assert.match(
+				request.headers["content-type"] ?? "",
+				/^multipart\/form-data; boundary=--------------------------/,
+			)
 			const multipart = body.toString("latin1")
 			assert.match(multipart, /name="info"/)
-			assert.match(multipart, /name="toBeSigned"/)
+			assert.match(
+				multipart,
+				/name="toBeSigned"; filename="Cocode\.exe"\r\nContent-Type: application\/octet-stream/,
+			)
 			const infoMatch = multipart.match(/name="info"\r\n\r\n([\s\S]*?)\r\n--/)
 			assert.ok(infoMatch?.[1])
 			const info = JSON.parse(infoMatch[1]) as {
@@ -157,13 +238,17 @@ test("speaks the Magic Desktop challenge and sign protocol", async () => {
 				nonce?: string
 				eePIN?: string
 				sha256?: string
-				extraSignOptions?: { hashType?: string }
+				extraSignOptions?: Record<string, string>
 			}
 			assert.equal(typeof info.publicKey, "string")
 			assert.equal(info.nonce, Buffer.alloc(12, 7).toString("base64"))
 			assert.equal(typeof info.eePIN, "string")
 			assert.equal(info.sha256, createHash("sha256").update("unsigned-content").digest("hex"))
-			assert.equal(info.extraSignOptions?.hashType, "sha256")
+			assert.deepEqual(info.extraSignOptions, {
+				hashType: "sha256",
+				desc: "Cocode Desktop",
+			})
+			assert.match(multipart, /unsigned-content/)
 			return binaryResponse(signedContent)
 		},
 	})
@@ -174,6 +259,8 @@ test("speaks the Magic Desktop challenge and sign protocol", async () => {
 			writeFileSync(file, "unsigned-content")
 			const result = await requestSignature(file, credential, {
 				serviceUrl: httpServer.url,
+				description: "Cocode Desktop",
+				website: "https://cocode.example.test",
 				timeoutMs: 2_000,
 				retryCount: 0,
 			})
@@ -216,11 +303,50 @@ test("retries transient signing service failures and rejects error bodies", asyn
 		await assert.rejects(
 			requestSignature(file, credential, {
 				serviceUrl: httpServer.url,
+				description: "Cocode Desktop",
 				timeoutMs: 2_000,
 				retryCount: 1,
 			}),
 		)
 		assert.equal(challengeAttempts, 2)
+	} finally {
+		await closeServer(httpServer.server)
+	}
+})
+
+test("does not retry a sign request that may already have reached the service", async () => {
+	const client = await createX25519KeyPair()
+	const server = await createX25519KeyPair()
+	const credential = `ignored:${await privateKeyBase64(client.privateKey)}:${Buffer.from(
+		"pin",
+	).toString("base64")}`
+	let signAttempts = 0
+	const httpServer = await createMockServer({
+		challenge: async () =>
+			jsonResponse({
+				publicKey: await publicKeyBase64(server.publicKey),
+				nonce: Buffer.alloc(12).toString("base64"),
+			}),
+		sign: async () => {
+			signAttempts += 1
+			return makeResponse(503, "text/plain", Buffer.from("busy"))
+		},
+	})
+	try {
+		const root = mkdtempSync(path.join(os.tmpdir(), "cocode-sign-service-test-"))
+		const file = path.join(root, "Cocode.exe")
+		writeFileSync(file, "unsigned-content")
+		await assert.rejects(
+			requestSignature(file, credential, {
+				serviceUrl: httpServer.url,
+				description: "Cocode Desktop",
+				timeoutMs: 2_000,
+				retryCount: 3,
+			}),
+			/HTTP 503/,
+		)
+		assert.equal(signAttempts, 1)
+		rmSync(root, { recursive: true, force: true })
 	} finally {
 		await closeServer(httpServer.server)
 	}
@@ -245,6 +371,7 @@ test("fails fast on unauthorized signing service responses", async () => {
 		await assert.rejects(
 			requestSignature(file, credential, {
 				serviceUrl: httpServer.url,
+				description: "Cocode Desktop",
 				timeoutMs: 2_000,
 				retryCount: 3,
 			}),
@@ -283,6 +410,7 @@ test("rejects empty, HTML, and JSON signing responses", async () => {
 			await assert.rejects(
 				requestSignature(file, credential, {
 					serviceUrl: httpServer.url,
+					description: "Cocode Desktop",
 					timeoutMs: 2_000,
 					retryCount: 0,
 				}),

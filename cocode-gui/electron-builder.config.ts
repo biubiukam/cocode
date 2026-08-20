@@ -93,7 +93,6 @@ const config: Configuration = {
 		artifactName: `Cocode-\${version}-${target.arch}.\${ext}`,
 		icon: process.env.WINDOWS_ICON_PATH?.trim() || path.join(iconRoot, "cocode.ico"),
 		signtoolOptions: windowsSign ?? null,
-		signExts: [".exe", ".node"],
 		verifyUpdateCodeSignature: Boolean(windowsSign),
 		extraResources: [
 			{

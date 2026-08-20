@@ -107,7 +107,7 @@ test("writes a Windows PE inventory with explicit required and excluded signing 
 			},
 		})
 
-		assert.deepEqual(inspected.sort(), [executable, nativeAddon].sort())
+		assert.deepEqual(inspected, [executable])
 		const inventory = JSON.parse(readFileSync(inventoryPath, "utf8")) as {
 			files: Array<{ path: string; signing: string; extension: string }>
 		}
@@ -115,7 +115,7 @@ test("writes a Windows PE inventory with explicit required and excluded signing 
 			inventory.files.map(({ path: file, signing, extension }) => ({ file, signing, extension })),
 			[
 				{ file: "Cocode.exe", signing: "required", extension: ".exe" },
-				{ file: "resources/better-sqlite3.node", signing: "required", extension: ".node" },
+				{ file: "resources/better-sqlite3.node", signing: "excluded", extension: ".node" },
 				{ file: "resources/libvips.dll", signing: "excluded", extension: ".dll" },
 			],
 		)
