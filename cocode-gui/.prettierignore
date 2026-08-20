@@ -6,6 +6,7 @@ dist-electron/
 node_modules/
 out/
 release/
+resources/icons/generated/
 docs/
 packages/client/
 packages/cocode/

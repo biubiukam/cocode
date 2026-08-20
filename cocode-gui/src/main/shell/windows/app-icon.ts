@@ -10,7 +10,7 @@ import * as path from "pathe"
 export const resolveAppIcon = (): NativeImage | undefined => {
 	if (app.isPackaged) return undefined
 	const icon = nativeImage.createFromPath(
-		path.join(app.getAppPath(), "resources", "icons", "cocode.png"),
+		path.join(app.getAppPath(), "resources", "icons", "cocode-dock.png"),
 	)
 	return icon.isEmpty() ? undefined : icon
 }

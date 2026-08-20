@@ -45,6 +45,9 @@ if (target.arch !== process.arch)
 	)
 requireReleaseCredentials(target, environment)
 
+const iconStatus = runPnpm(["run", "generate:mac-icons"])
+if (iconStatus !== 0) throw new Error(`macOS icon generation exited with code ${String(iconStatus)}.`)
+
 if (target.platform === "win32" && resolveWindowsSignMode(environment) === "service") {
 	rmSync(environment.WINDOWS_SIGN_LEDGER_DIR, { recursive: true, force: true })
 	mkdirSync(environment.WINDOWS_SIGN_LEDGER_DIR, { recursive: true })

@@ -1,0 +1,52 @@
+{
+  "fill": {
+    "solid": "extended-srgb:0.06667,0.06667,0.07451,1.00000"
+  },
+  "groups": [
+    {
+      "layers": [
+        {
+          "name": "Background",
+          "image-name": "background.svg",
+          "glass": false,
+          "hidden": false,
+          "position": {
+            "scale": 1,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "name": "Foreground",
+          "image-name": "foreground.svg",
+          "glass": false,
+          "hidden": false,
+          "position": {
+            "scale": 1,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "shadow": {
+        "kind": "layer-color",
+        "opacity": 0
+      },
+      "specular": false,
+      "translucency": {
+        "enabled": false,
+        "value": 0
+      }
+    }
+  ],
+  "supported-platforms": {
+    "circles": [
+      "watchOS"
+    ],
+    "squares": "shared"
+  }
+}
