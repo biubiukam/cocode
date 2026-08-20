@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import { patchCredential, readCredentials } from './credentials.ts'
 import { agencyOrigin } from './origin.ts'
 import { readSettings, type ProductSettings } from './settings.ts'
+import { harnessClientIdentity, tuiClientIdentity, type CocodeClientIdentity } from './client-identity.ts'
 import {
   CLOUD_API,
   CLOUD_KEY_REF,
@@ -45,6 +46,7 @@ export async function resolveAuth(input: ResolveInput): Promise<ResolveResult> {
   if (home === undefined) throw new Error('resolveAuth requires dshHome')
   const sharedDshHome = input.sharedDshHome ?? input.dshHome ?? nonempty(env.COCODE_DSH_HOME) ?? join(homedir(), '.dsh')
   const accountHome = input.accountHome ?? nonempty(env.COCODE_HOME) ?? join(homedir(), '.cocode')
+  const clientIdentity = await tuiClientIdentity(accountHome, env)
   const cwd = input.cwd?.trim() || process.cwd()
   const origin = agencyOrigin(env)
   const settings = await readSettings(home)
@@ -63,6 +65,7 @@ export async function resolveAuth(input: ResolveInput): Promise<ResolveResult> {
     cloudModels: input.cloudModels,
     accountHome,
     sharedDshHome,
+    clientIdentity,
   })
   if (preferredReady !== undefined) return preferredReady
 
@@ -78,6 +81,7 @@ export async function resolveAuth(input: ResolveInput): Promise<ResolveResult> {
       cloudModels: input.cloudModels,
       accountHome,
       sharedDshHome,
+      clientIdentity,
     })
     if (byok !== undefined) return byok
   } else if (preferred === DEFAULT_PROVIDER) {
@@ -92,6 +96,7 @@ export async function resolveAuth(input: ResolveInput): Promise<ResolveResult> {
       cloudModels: input.cloudModels,
       accountHome,
       sharedDshHome,
+      clientIdentity,
     })
     if (cloud !== undefined) return cloud
   }
@@ -140,6 +145,7 @@ type ChannelInput = {
   cloudModels?: CloudModel[]
   accountHome?: string
   sharedDshHome: string
+  clientIdentity: CocodeClientIdentity
 }
 
 function tryChannel(
@@ -147,7 +153,7 @@ function tryChannel(
   isPreferred: boolean,
   input: ChannelInput,
 ): { status: 'ready'; auth: ResolvedAuth } | undefined {
-  const { env, home, cwd, origin, settings, credentials, cloudAccount, cloudModels, accountHome, sharedDshHome } = input
+  const { env, home, cwd, origin, settings, credentials, cloudAccount, cloudModels, accountHome, sharedDshHome, clientIdentity } = input
   const providerSettings = settings.providerCredentials[provider]
   const ref = apiKeyEnvFor(provider, providerSettings?.apiKeyEnv)
   const value = ref === undefined ? undefined : nonempty(env[ref]) ?? nonempty(credentials[ref])
@@ -160,7 +166,7 @@ function tryChannel(
   if (value !== undefined && ref !== undefined) {
     const cloudProvider =
       provider === CLOUD_PROVIDER && cloudAccount
-        ? createCloudProvider(origin, model, cloudModels)
+        ? createCloudProvider(origin, model, clientIdentity, cloudModels)
         : undefined
     // Harness credentials-local resolves file-backed refs from $DSH_HOME;
     // only preserve an explicitly inherited env value in the launch env.
@@ -259,6 +265,7 @@ function ready(
 function createCloudProvider(
   origin: string,
   model: string,
+  clientIdentity: CocodeClientIdentity,
   cloudModels?: CloudModel[],
 ): CloudProviderProfile {
   return {
@@ -267,6 +274,7 @@ function createCloudProvider(
     baseURL: `${origin.replace(/\/$/, '')}/v1`,
     apiKeyEnv: CLOUD_KEY_REF,
     retryPolicy: { mode: 'normal', maxRetries: CLOUD_MAX_RETRIES },
+    cocodeClient: harnessClientIdentity(clientIdentity),
     models: cloudModels?.length === 0 || cloudModels === undefined
       ? [{ id: model, name: model }]
       : cloudModels.map((entry) => ({ ...entry })),

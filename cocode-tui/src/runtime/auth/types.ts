@@ -49,6 +49,15 @@ export type CloudProviderProfile = {
   apiKeyEnv: typeof CLOUD_KEY_REF
   retryPolicy: { mode: 'normal'; maxRetries: typeof CLOUD_MAX_RETRIES }
   models: CloudModel[]
+  cocodeClient: {
+    product: 'cocode'
+    surface: 'tui'
+    version: string
+    build: string
+    os: 'darwin' | 'linux' | 'windows'
+    arch: 'arm64' | 'x64'
+    installationId: string
+  }
 }
 
 export type AccountRecord = {

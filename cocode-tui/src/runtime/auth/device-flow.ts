@@ -6,6 +6,7 @@ import { jsonRequest, problemCode } from './agency.ts'
 import { TuiError } from '../errors/index.ts'
 import { normalizeAgencyOrigin, validateVerificationUrl } from './origin.ts'
 import { DEVICE_SCOPES, KEY_NAME, KEY_TTL_DAYS, type CloudModel, type MeProfile } from './types.ts'
+import type { CocodeClientIdentity } from './client-identity.ts'
 
 export type DeviceAuthorization = {
   device_code: string
@@ -37,6 +38,7 @@ export async function startDeviceAuthorization(
   origin: string,
   client: AgencyClient = {},
   signal?: AbortSignal,
+  identity?: CocodeClientIdentity,
 ): Promise<DeviceAuthorization> {
   const safeOrigin = normalizeAgencyOrigin(origin)
   const created = await jsonRequest<DeviceAuthorization>(
@@ -44,9 +46,10 @@ export async function startDeviceAuthorization(
     {
       method: 'POST',
       body: {
-        client_name: 'cocode',
+        client_name: 'Cocode TUI',
         device_label: KEY_NAME,
         scopes: [...DEVICE_SCOPES],
+        ...(identity === undefined ? {} : { client: identity }),
       },
       fetch: client.fetch,
       signal,
@@ -160,6 +163,7 @@ export async function mintPersonalKey(
   accessToken: string,
   client: AgencyClient = {},
   signal?: AbortSignal,
+  identity?: CocodeClientIdentity,
 ): Promise<{ secret: string; id: string }> {
   const created = await jsonRequest<{ secret?: string; id?: string }>(
     `${normalizeAgencyOrigin(origin)}/v1/me/api-keys`,
@@ -170,6 +174,7 @@ export async function mintPersonalKey(
         name: KEY_NAME,
         scopes: ['models:read', 'inference:write'],
         expires_at: new Date(Date.now() + KEY_TTL_DAYS * 86_400_000).toISOString(),
+        ...(identity === undefined ? {} : { managed_client: identity }),
       },
       fetch: client.fetch,
       signal,

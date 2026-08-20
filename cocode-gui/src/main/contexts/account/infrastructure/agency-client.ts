@@ -1,4 +1,5 @@
 import { deviceKeyExpiry, deviceKeyName } from "./device-name"
+import { guiClientIdentity } from "./client-identity"
 
 type AgencyResponse<T> = { readonly status: number; readonly value: T }
 
@@ -151,6 +152,7 @@ export class AgencyClient {
 		readonly state: string
 		readonly codeChallenge: string
 	}): Promise<string> {
+		const client = await guiClientIdentity()
 		const response = await this.request<{ authorization_url?: string }>(
 			"/v1/auth/native/authorizations",
 			{
@@ -158,6 +160,7 @@ export class AgencyClient {
 				body: {
 					client_id: "cocode-desktop",
 					device_label: deviceKeyName(),
+					client,
 					redirect_uri: input.redirectUri,
 					state: input.state,
 					code_challenge: input.codeChallenge,
@@ -255,6 +258,7 @@ export class AgencyClient {
 
 	async createDesktopKey(accessToken: string): Promise<CreatedApiKey> {
 		const name = deviceKeyName()
+		const managedClient = await guiClientIdentity()
 		const response = await this.request<{ secret?: string; id?: string }>("/v1/me/api-keys", {
 			method: "POST",
 			token: accessToken,
@@ -262,6 +266,7 @@ export class AgencyClient {
 				name,
 				scopes: ["models:read", "inference:write"],
 				expires_at: deviceKeyExpiry(),
+				managed_client: managedClient,
 			},
 		})
 		const secret = response.value.secret?.trim()

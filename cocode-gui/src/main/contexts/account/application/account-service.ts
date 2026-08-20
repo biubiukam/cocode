@@ -24,6 +24,7 @@ import {
 import { listenForCallback as createCallbackListener } from "../infrastructure/callback-server"
 import { CleanupPendingStore, type CleanupPendingState } from "../infrastructure/cleanup-pending"
 import { SecureVault } from "../infrastructure/secure-vault"
+import { guiClientIdentity, harnessClientIdentity } from "../infrastructure/client-identity"
 import { SignInCancelledError } from "../infrastructure/sign-in-cancelled-error"
 import { SharedAccountStore } from "../infrastructure/shared-account-store"
 
@@ -215,22 +216,33 @@ function isManagedCloudRoute(
 function routeIsCurrent(
 	route: Record<string, unknown> | undefined,
 	managedRoute: { readonly baseURL: string; readonly apiKeyEnv: string } | undefined,
+	currentClient?: Record<string, string>,
 ): boolean {
 	const retryPolicy = recordOf(route?.retryPolicy)
+	const cocodeClient = recordOf(route?.cocodeClient)
 	return (
 		isManagedCloudRoute(route, managedRoute) &&
 		route?.api === CLOUD_API &&
 		retryPolicy?.mode === "normal" &&
-		retryPolicy.maxRetries === CLOUD_MAX_RETRIES
+		retryPolicy.maxRetries === CLOUD_MAX_RETRIES &&
+		cocodeClient?.product === "cocode" &&
+		cocodeClient.surface === "gui" &&
+		(currentClient === undefined ||
+			Object.entries(currentClient).every(([key, value]) => cocodeClient[key] === value))
 	)
 }
 
-function cloudRouteValue(baseURL: string, models: readonly AgencyModel[]): Record<string, unknown> {
+function cloudRouteValue(
+	baseURL: string,
+	models: readonly AgencyModel[],
+	cocodeClient: Record<string, string>,
+): Record<string, unknown> {
 	return {
 		displayName: "Cocode Nut",
 		api: CLOUD_API,
 		baseURL,
 		apiKeyEnv: CLOUD_CREDENTIAL,
+		cocodeClient,
 		retryPolicy: { mode: "normal", maxRetries: CLOUD_MAX_RETRIES },
 		models: models.map((model) => ({
 			id: model.id,
@@ -737,6 +749,7 @@ export class AccountService {
 			throw new Error("Cocode Nut settings are not writable")
 		const route = routeOf(settings.namespaces)
 		const intendedRoute = { baseURL, apiKeyEnv: CLOUD_CREDENTIAL }
+		const currentClient = harnessClientIdentity(await guiClientIdentity())
 		this.stage = "credentials.describe"
 		const credentials = await this.dsh.describeCredentials([CLOUD_CREDENTIAL])
 		this.stage = "providers"
@@ -760,7 +773,7 @@ export class AccountService {
 		)
 			throw new CloudProviderConflictError()
 		if (
-			routeIsCurrent(route, intendedRoute) &&
+			routeIsCurrent(route, intendedRoute, currentClient) &&
 			existingCredential?.configured === true &&
 			existingProvider?.active === true
 		) {
@@ -794,6 +807,7 @@ export class AccountService {
 		// activation fails after the Agency has created the key, the next retry
 		// must reuse it instead of minting another device key.
 		await this.cloudKey.write(key.secret)
+		const cocodeClient = harnessClientIdentity(await guiClientIdentity())
 		const oldRoute = route === undefined ? undefined : { ...route }
 		try {
 			this.stage = "credentials.set"
@@ -806,7 +820,7 @@ export class AccountService {
 					{
 						op: "set",
 						path: CLOUD_PATH,
-						value: cloudRouteValue(baseURL, models),
+						value: cloudRouteValue(baseURL, models, cocodeClient),
 					},
 				],
 			})
