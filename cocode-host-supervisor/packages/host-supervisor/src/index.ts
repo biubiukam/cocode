@@ -2,7 +2,13 @@ export * from './protocol.js'
 export * from './observability.js'
 export { HostLogger, type HostLoggerOptions } from './logging.js'
 export * from './client.js'
-export { isLeaseActive, type LeaseRecord } from './lifecycle.js'
+export {
+  createLeaseRecord,
+  HOST_ACQUIRE_ABANDONED_MESSAGE,
+  isLeaseActive,
+  type LeaseRecord,
+} from './lifecycle.js'
+export { writeLineFrame, type LineFrameOutput } from './ipc.js'
 export {
   addRuntimePluginDependencies,
   createRuntimePatch,

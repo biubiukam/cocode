@@ -4,6 +4,21 @@ import { once } from 'node:events'
 export type RpcRequest = { id: number; method: string; params?: Record<string, unknown> }
 export type RpcResponse = { id: number; result?: unknown; error?: { code: number; message: string } }
 
+export type LineFrameOutput = NodeJS.WritableStream & {
+  destroyed?: boolean
+  writable?: boolean
+}
+
+export function writeLineFrame(output: LineFrameOutput, frame: unknown): boolean {
+  if (output.destroyed === true || output.writable === false) return false
+  try {
+    output.write(`${JSON.stringify(frame)}\n`)
+    return true
+  } catch {
+    return false
+  }
+}
+
 export function openLineConnection(endpoint: string): Promise<LinePeer> {
   return new Promise((resolve, reject) => {
     const socket = net.createConnection(endpoint)
