@@ -128,6 +128,32 @@ test("writes a Windows PE inventory with explicit required and excluded signing 
 	}
 })
 
+test("excludes runtime and TUI staging artifacts from the final Windows signing inventory", () => {
+	const root = mkdtempSync(path.join(os.tmpdir(), "cocode-pe-inventory-staging-"))
+	try {
+		const installer = path.join(root, "Cocode-1.2.3-x64.exe")
+		const packagedExecutable = path.join(root, "win-unpacked", "Cocode.exe")
+		const runtimeExecutable = path.join(root, "runtime", "node_modules", "@vscode", "ripgrep-win32-x64", "bin", "rg.exe")
+		const tuiExecutable = path.join(root, "tui", "bin", "helper.exe")
+		for (const file of [installer, packagedExecutable, runtimeExecutable, tuiExecutable]) {
+			writeFixture(file, createPeFixture())
+		}
+		const inspected: string[] = []
+		writeWindowsPeSigningInventory({
+			outDir: root,
+			excludeRoots: [path.join(root, "runtime"), path.join(root, "tui")],
+			inspect: (file) => {
+				inspected.push(file)
+				return { Subject: "CN=Cocode", Thumbprint: "AABB" }
+			},
+		})
+
+		assert.deepEqual(inspected, [installer, packagedExecutable].sort())
+	} finally {
+		rmSync(root, { recursive: true, force: true })
+	}
+})
+
 test("signs Windows executables added under packaged resources afterPack", async () => {
 	const root = mkdtempSync(path.join(os.tmpdir(), "cocode-packaged-signing-"))
 	try {
