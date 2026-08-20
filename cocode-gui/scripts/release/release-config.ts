@@ -1,27 +1,10 @@
 import { existsSync, readFileSync } from "node:fs"
-import * as path from "pathe"
 import { loadEnvFile } from "node:process"
-import type { MakerDMGConfig } from "@electron-forge/maker-dmg"
-import type { MakerMSIXConfig } from "@electron-forge/maker-msix"
-import type { OsxSignOptions } from "@electron/packager"
-import type { NotaryToolCredentials } from "@electron/notarize/lib/types"
-import type { SignToolOptions } from "@electron/windows-sign/dist/esm/types"
+import * as path from "pathe"
 
 export type ReleasePlatform = "darwin" | "win32"
 export type ReleaseArchitecture = "x64" | "arm64"
 export type WindowsSignMode = "service" | "pfx"
-
-export interface WindowsSignServiceOptions {
-	readonly serviceUrl: string
-	readonly credentialTarget: string
-	readonly description: string
-	readonly website?: string
-	readonly hashAlgorithm: "sha256"
-	readonly timeoutMs: number
-	readonly retryCount: number
-}
-
-export type MacSignOptions = OsxSignOptions & { readonly continueOnError?: boolean }
 
 export interface ReleaseTarget {
 	readonly platform: ReleasePlatform
@@ -33,6 +16,32 @@ export interface GitHubReleaseRepository {
 	readonly name: string
 }
 
+export interface MacSignOptions {
+	readonly identity: string
+	readonly keychain?: string
+	readonly entitlements: string
+	readonly entitlementsInherit: string
+	readonly hardenedRuntime: true
+	readonly preAutoEntitlements: true
+	readonly strictVerify: true
+}
+
+export interface WindowsSignServiceOptions {
+	readonly serviceUrl: string
+	readonly credentialTarget: string
+	readonly description: string
+	readonly website?: string
+	readonly hashAlgorithm: "sha256"
+	readonly timeoutMs: number
+	readonly retryCount: number
+}
+
+export interface WindowsBuilderSignOptions {
+	readonly sign: string
+	readonly signingHashAlgorithms: ["sha256"]
+	readonly publisherName?: string
+}
+
 const RELEASE_ENV_FILE = ".env.release"
 const RELEASE_KEYS = new Set([
 	"ELECTRON_APP_ID",
@@ -42,16 +51,8 @@ const RELEASE_KEYS = new Set([
 	"ELECTRON_UPDATE_REPOSITORY",
 	"ELECTRON_AUTO_UPDATE",
 	"ELECTRON_UPDATE_INTERVAL",
-	"WINDOWS_MSIX_PACKAGE_ID",
-	"WINDOWS_MSIX_PUBLISHER",
-	"WINDOWS_MSIX_PUBLISHER_DISPLAY_NAME",
-	"WINDOWS_MSIX_PACKAGE_DISPLAY_NAME",
 	"MACOS_ICON_PATH",
 	"WINDOWS_ICON_PATH",
-	"DMG_ICON_PATH",
-	"DMG_BACKGROUND_PATH",
-	"DMG_FORMAT",
-	"DMG_ICON_SIZE",
 	"MAC_SIGNING_IDENTITY",
 	"MAC_INSTALLER_SIGNING_IDENTITY",
 	"MAC_INSTALLER_APP_IDENTIFIER",
@@ -89,21 +90,19 @@ const RELEASE_KEYS = new Set([
 	"RELEASE_REQUIRE_SIGNING",
 	"RELEASE_REQUIRE_NATIVE_ARCH_MATCH",
 	"RELEASE_PUBLISH",
-	"FORGE_OUT_DIR",
+	"RELEASE_OUTPUT_DIR",
 	"COCODE_RUNTIME_ARTIFACT_ROOT",
 	"COCODE_TUI_ARTIFACT_ROOT",
 	"GITHUB_REPOSITORY",
 	"GITHUB_TOKEN",
-	"GITHUB_REF_TYPE",
-	"GITHUB_REF_NAME",
+	"GH_TOKEN",
 ])
 
 export function loadReleaseEnvironment(environment = process.env): string | undefined {
 	const explicit = environment.RELEASE_ENV_FILE?.trim()
 	const selected = explicit ? path.resolve(explicit) : resolveImplicitReleaseEnvFile()
 	if (!selected) return undefined
-	if (!existsSync(selected))
-		throw new Error(`Release environment file does not exist: ${selected}`)
+	if (!existsSync(selected)) throw new Error(`Release environment file does not exist: ${selected}`)
 	validateReleaseEnvFile(selected)
 	loadEnvFile(selected)
 	return selected
@@ -143,12 +142,12 @@ export function resolveGitHubReleaseRepository(environment = process.env): GitHu
 	return parseGitHubReleaseRepository(repository, "GitHub release repository")
 }
 
-function parseGitHubReleaseRepository(repository: string, label: string): GitHubReleaseRepository {
-	const [owner, name, ...rest] = repository.split("/")
-	if (!owner || !name || rest.length > 0 || /\s/.test(repository)) {
-		throw new Error(`${label} must use the owner/name format: ${repository}`)
-	}
-	return { owner, name }
+export function resolveReleasePath(value: string | undefined, label: string): string | undefined {
+	const trimmed = value?.trim()
+	if (!trimmed) return undefined
+	const resolved = path.resolve(trimmed)
+	if (!existsSync(resolved)) throw new Error(`${label} does not exist: ${resolved}`)
+	return resolved
 }
 
 export function isReleaseSigningRequired(environment = process.env): boolean {
@@ -158,17 +157,14 @@ export function isReleaseSigningRequired(environment = process.env): boolean {
 	)
 }
 
-export function resolveReleasePath(value: string | undefined, label: string): string | undefined {
-	const trimmed = value?.trim()
-	if (!trimmed) return undefined
-	const resolved = path.resolve(trimmed)
-	if (!existsSync(resolved)) throw new Error(`${label} does not exist: ${resolved}`)
-	return resolved
-}
-
 export function createMacSignOptions(environment = process.env): MacSignOptions | undefined {
-	const identity = environment.MAC_SIGNING_IDENTITY?.trim()
-	if (!identity) return undefined
+	const configuredIdentity = environment.MAC_SIGNING_IDENTITY?.trim()
+	if (!configuredIdentity) return undefined
+	const identity = configuredIdentity.replace(/^Developer ID Application:\s*/i, "").trim()
+	if (!identity)
+		throw new Error(
+			"MAC_SIGNING_IDENTITY must include the Developer ID Application certificate name.",
+		)
 	const entitlements = resolveReleasePath(
 		environment.MAC_ENTITLEMENTS_PATH ?? "resources/entitlements.mac.plist",
 		"MAC_ENTITLEMENTS_PATH",
@@ -177,19 +173,15 @@ export function createMacSignOptions(environment = process.env): MacSignOptions 
 		environment.MAC_PLUGIN_ENTITLEMENTS_PATH ?? "resources/entitlements.mac.plugin.plist",
 		"MAC_PLUGIN_ENTITLEMENTS_PATH",
 	)
+	if (!entitlements || !pluginEntitlements) return undefined
 	return {
 		identity,
 		keychain: environment.MAC_SIGNING_KEYCHAIN?.trim() || undefined,
+		entitlements,
+		entitlementsInherit: pluginEntitlements,
+		hardenedRuntime: true,
 		preAutoEntitlements: true,
 		strictVerify: true,
-		continueOnError: false,
-		optionsForFile: (filePath) => ({
-			entitlements:
-				filePath.includes("Helper (Plugin).app") || filePath.includes("node-pty")
-					? pluginEntitlements
-					: entitlements,
-			hardenedRuntime: true,
-		}),
 	}
 }
 
@@ -203,7 +195,7 @@ export function resolveMacCliInstallPath(environment = process.env): string {
 
 export function createMacNotarizeOptions(
 	environment = process.env,
-): NotaryToolCredentials | undefined {
+): Record<string, string> | undefined {
 	const apiValues = [
 		environment.APPLE_API_KEY?.trim(),
 		environment.APPLE_API_KEY_ID?.trim(),
@@ -221,8 +213,8 @@ export function createMacNotarizeOptions(
 		}
 	}
 	const profile = environment.APPLE_KEYCHAIN_PROFILE?.trim()
-	const keychain = environment.APPLE_KEYCHAIN?.trim() || undefined
-	if (profile) return { keychainProfile: profile, keychain }
+	const keychain = environment.APPLE_KEYCHAIN?.trim()
+	if (profile) return { keychainProfile: profile, ...(keychain ? { keychain } : {}) }
 	if (keychain) throw new Error("APPLE_KEYCHAIN requires APPLE_KEYCHAIN_PROFILE.")
 	const passwordValues = [
 		environment.APPLE_ID?.trim(),
@@ -251,9 +243,9 @@ export function resolveWindowsSignMode(environment = process.env): WindowsSignMo
 	if (configuredMode) return configuredMode as WindowsSignMode
 	if (isReleaseSigningRequired(environment)) return "service"
 	const configuredFile = environment.WINDOWS_CERTIFICATE_FILE?.trim()
-	const configuredPassword = environment.WINDOWS_CERTIFICATE_PASSWORD
+	const configuredPassword = environment.WINDOWS_CERTIFICATE_PASSWORD?.trim()
 	const configuredParams = environment.WINDOWS_SIGN_WITH_PARAMS?.trim()
-	return configuredFile || configuredPassword !== undefined || configuredParams
+	return configuredFile || configuredPassword || configuredParams
 		? "pfx"
 		: undefined
 }
@@ -277,8 +269,7 @@ export function resolveWindowsSignServiceOptions(
 	if (!serviceUrl) throw new Error("WINDOWS_SIGN_SERVICE_URL is required for service signing.")
 	try {
 		const url = new URL(serviceUrl)
-		if (url.protocol !== "http:" && url.protocol !== "https:")
-			throw new Error("unsupported protocol")
+		if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error("unsupported protocol")
 	} catch {
 		throw new Error(`WINDOWS_SIGN_SERVICE_URL is invalid: ${serviceUrl}`)
 	}
@@ -313,27 +304,31 @@ export function resolveWindowsSignLedgerDir(environment = process.env): string {
 	)
 }
 
-export function createWindowsSignOptions(environment = process.env): SignToolOptions | undefined {
+export function createWindowsSignOptions(
+	environment = process.env,
+): WindowsBuilderSignOptions | undefined {
 	const mode = resolveWindowsSignMode(environment)
 	if (!mode) return undefined
 	if (mode === "service") {
-		const service = resolveWindowsSignServiceOptions(environment)
-		const hookModulePath = path.resolve("scripts/release/windows-sign-hook.cjs")
-		if (!existsSync(hookModulePath))
-			throw new Error(`Windows signing hook does not exist: ${hookModulePath}`)
+		resolveWindowsSignServiceOptions(environment)
+		const adapterPath = path.resolve("scripts/release/windows-sign-builder.cjs")
+		if (!existsSync(adapterPath))
+			throw new Error(`Windows signing adapter does not exist: ${adapterPath}`)
+		const publisherName = environment.WINDOWS_SIGN_CERTIFICATE_SUBJECT?.trim()
+		if (isReleaseSigningRequired(environment) && !publisherName)
+			throw new Error(
+				"WINDOWS_SIGN_CERTIFICATE_SUBJECT is required for signed Windows releases.",
+			)
 		return {
-			hookModulePath,
-			hashes: ["sha256"] as unknown as NonNullable<SignToolOptions["hashes"]>,
-			description: service.description,
-			website: service.website,
-			debug: false,
+			sign: adapterPath,
+			signingHashAlgorithms: ["sha256"],
+			...(publisherName ? { publisherName } : {}),
 		}
 	}
 	const configuredFile = environment.WINDOWS_CERTIFICATE_FILE?.trim()
-	const certificatePassword = environment.WINDOWS_CERTIFICATE_PASSWORD
+	const certificatePassword = environment.WINDOWS_CERTIFICATE_PASSWORD?.trim()
 	const signWithParams = environment.WINDOWS_SIGN_WITH_PARAMS?.trim()
-	const hasPasswordValue = Boolean(certificatePassword)
-	if (!configuredFile && hasPasswordValue) {
+	if (!configuredFile && certificatePassword !== undefined) {
 		throw new Error(
 			"WINDOWS_CERTIFICATE_FILE and WINDOWS_CERTIFICATE_PASSWORD must be provided together.",
 		)
@@ -344,16 +339,7 @@ export function createWindowsSignOptions(environment = process.env): SignToolOpt
 		)
 	}
 	if (!configuredFile && !signWithParams) return undefined
-	const certificateFile = resolveReleasePath(configuredFile, "WINDOWS_CERTIFICATE_FILE")
-	return {
-		certificateFile,
-		certificatePassword,
-		timestampServer:
-			environment.WINDOWS_TIMESTAMP_SERVER?.trim() || "http://timestamp.digicert.com",
-		description: environment.RELEASE_DESCRIPTION?.trim() || "Cocode Desktop",
-		website: environment.RELEASE_HOMEPAGE?.trim() || undefined,
-		signWithParams: signWithParams || undefined,
-	}
+	throw new Error("PFX signing is not part of the electron-builder release path.")
 }
 
 export function requireReleaseCredentials(target: ReleaseTarget, environment = process.env): void {
@@ -366,9 +352,7 @@ export function requireReleaseCredentials(target: ReleaseTarget, environment = p
 				"MAC_INSTALLER_SIGNING_IDENTITY (Developer ID Installer) is required for a signed macOS PKG release.",
 			)
 		if (!createMacNotarizeOptions(environment))
-			throw new Error(
-				"Apple notarization credentials are required for a signed macOS release.",
-			)
+			throw new Error("Apple notarization credentials are required for a signed macOS release.")
 		return
 	}
 	if (resolveWindowsSignMode(environment) !== "service")
@@ -377,98 +361,12 @@ export function requireReleaseCredentials(target: ReleaseTarget, environment = p
 		)
 	if (!createWindowsSignOptions(environment))
 		throw new Error("Windows signing credentials are required for a signed Windows release.")
-	requireWindowsMsixIdentity(environment)
 }
 
-export function requireWindowsMsixIdentity(environment = process.env): void {
-	if (!environment.WINDOWS_MSIX_PACKAGE_ID?.trim())
-		throw new Error("WINDOWS_MSIX_PACKAGE_ID is required for signed Windows releases.")
-	if (!environment.WINDOWS_MSIX_PUBLISHER?.trim())
-		throw new Error("WINDOWS_MSIX_PUBLISHER is required for signed Windows releases.")
-	validateMsixPackageIdentity(environment.WINDOWS_MSIX_PACKAGE_ID)
-}
-
-export function createDmgConfig(environment = process.env): MakerDMGConfig {
-	return {
-		format: (environment.DMG_FORMAT?.trim() as MakerDMGConfig["format"]) || "UDZO",
-		icon: resolveReleasePath(
-			environment.DMG_ICON_PATH?.trim() || "resources/icons/cocode.icns",
-			"DMG_ICON_PATH",
-		),
-		background: resolveReleasePath(environment.DMG_BACKGROUND_PATH, "DMG_BACKGROUND_PATH"),
-		iconSize: parsePositiveInteger(environment.DMG_ICON_SIZE, 96),
+function parseGitHubReleaseRepository(repository: string, label: string): GitHubReleaseRepository {
+	const [owner, name, ...rest] = repository.split("/")
+	if (!owner || !name || rest.length > 0 || /\s/.test(repository)) {
+		throw new Error(`${label} must use the owner/name format: ${repository}`)
 	}
-}
-
-export function createMsixConfig(
-	packageVersion: string,
-	environment = process.env,
-	windowsSignOptions?: ReturnType<typeof createWindowsSignOptions>,
-): MakerMSIXConfig {
-	const arch = environment.RELEASE_ARCH ?? process.arch
-	if (arch !== "x64" && arch !== "arm64")
-		throw new Error(`Unsupported MSIX architecture: ${arch}.`)
-	const packageIdentity = environment.WINDOWS_MSIX_PACKAGE_ID?.trim() || "CocodeDesktop"
-	validateMsixPackageIdentity(packageIdentity)
-	const publisher = normalizeMsixPublisher(
-		environment.WINDOWS_MSIX_PUBLISHER?.trim() || "CN=Cocode Development",
-	)
-	const packageDisplayName =
-		environment.WINDOWS_MSIX_PACKAGE_DISPLAY_NAME?.trim() ||
-		environment.RELEASE_DESCRIPTION?.trim() ||
-		"Cocode Desktop"
-	const config: MakerMSIXConfig = {
-		packageName: `Cocode-Desktop-${packageVersion}-win32-${arch}`,
-		manifestVariables: {
-			packageIdentity,
-			publisher,
-			publisherDisplayName:
-				environment.WINDOWS_MSIX_PUBLISHER_DISPLAY_NAME?.trim() ||
-				publisher.replace(/^CN=/, ""),
-			packageDisplayName,
-			packageDescription: environment.RELEASE_DESCRIPTION?.trim() || packageDisplayName,
-			packageVersion: resolveMsixPackageVersion(packageVersion),
-			targetArch: arch,
-		},
-	}
-	// electron-windows-msix only understands PFX paths. Hook-based service signing
-	// looks like "no certificate", so the maker tries to mint a self-signed cert
-	// with pwsh.exe. Disable that path and sign the finished .msix afterwards.
-	if (windowsSignOptions?.certificateFile) {
-		return {
-			...config,
-			windowsSignOptions:
-				windowsSignOptions as unknown as MakerMSIXConfig["windowsSignOptions"],
-		}
-	}
-	return { ...config, sign: false }
-}
-
-export function resolveMsixPackageVersion(packageVersion: string): string {
-	const match = packageVersion.trim().match(/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/)
-	if (!match) throw new Error(`Invalid MSIX package version: ${packageVersion}`)
-	const segments = match.slice(1).map(Number)
-	if (segments.some((segment) => segment > 65535))
-		throw new Error(`MSIX package version segment exceeds 65535: ${packageVersion}`)
-	return `${segments[0]}.${segments[1]}.${segments[2]}.0`
-}
-
-function normalizeMsixPublisher(value: string): string {
-	return value.startsWith("CN=") ? value : `CN=${value}`
-}
-
-function validateMsixPackageIdentity(value: string | undefined): void {
-	const identity = value?.trim()
-	if (
-		!identity ||
-		identity.length < 3 ||
-		identity.length > 50 ||
-		!/^[A-Za-z0-9.-]+$/.test(identity)
-	)
-		throw new Error(`WINDOWS_MSIX_PACKAGE_ID is invalid: ${value ?? ""}`)
-}
-
-function parsePositiveInteger(value: string | undefined, fallback: number): number {
-	const parsed = Number(value)
-	return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback
+	return { owner, name }
 }

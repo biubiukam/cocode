@@ -1,181 +1,386 @@
 import assert from "node:assert/strict"
-import { execFileSync } from "node:child_process"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { createHash } from "node:crypto"
+import {
+		existsSync,
+		lstatSync,
+		mkdirSync,
+		mkdtempSync,
+		readFileSync,
+		rmSync,
+		writeFileSync,
+	} from "node:fs"
 import os from "node:os"
 import * as path from "pathe"
 import test from "node:test"
-import type { ForgeMakeResult } from "@electron-forge/shared-types"
 import {
-	extractWindowsArchiveEntries,
+	appendChecksumManifest,
+	buildWindowsAuthenticodeVerificationScript,
 	findMacAppWithTui,
-	normalizeArtifactNames,
-	selectGitHubReleaseArtifacts,
+	verifyBuilderApplicationEntrypoints,
+	writeArchitectureUpdateMetadata,
 } from "../../scripts/release/release-hooks"
+import {
+	copyProductionDependencyClosure,
+	verifyProductionDependencyClosure,
+} from "../../scripts/release/runtime-dependency-closure"
+import { verifyPackagedStartupAssets } from "../../scripts/release/verify-packaged-startup-assets.mjs"
 
-test("normalizes macOS DMG, ZIP and PKG artifact names with platform and architecture", () => {
-	const root = mkdtempSync(path.join(os.tmpdir(), "cocode-release-hooks-"))
+test("writes isolated macOS updater metadata for each architecture", () => {
+	const root = mkdtempSync(path.join(os.tmpdir(), "cocode-update-metadata-"))
 	try {
-		const dmg = path.join(root, "Cocode Desktop.dmg")
-		const zip = path.join(root, "Cocode Desktop.zip")
-		const pkg = path.join(root, "Cocode Desktop.pkg")
-		writeFileSync(dmg, "dmg")
-		writeFileSync(zip, "zip")
-		writeFileSync(pkg, "pkg")
-		const result: ForgeMakeResult = {
+		const zip = path.join(root, "Cocode-1.2.3-arm64.zip")
+		writeFileSync(zip, "arm64-zip")
+		const files = writeArchitectureUpdateMetadata({
+			outDir: root,
 			platform: "darwin",
 			arch: "arm64",
-			packageJSON: { version: "1.2.3" },
-			artifacts: [dmg, zip, pkg],
-		}
-		const [normalized] = normalizeArtifactNames([result])
-		assert.deepEqual(normalized?.artifacts, [
-			path.join(root, "Cocode-Desktop-1.2.3-darwin-arm64.dmg"),
-			path.join(root, "Cocode-Desktop-1.2.3-darwin-arm64.zip"),
-			path.join(root, "Cocode-Desktop-1.2.3-darwin-arm64.pkg"),
+			version: "1.2.3",
+			artifacts: [zip],
+		})
+		assert.deepEqual(files, [
+			path.join(root, "arm64-mac.yml"),
+			path.join(root, "latest-mac-arm64.yml"),
 		])
+		const expectedSha512 = createHash("sha512").update("arm64-zip").digest("base64")
+		for (const file of files) {
+			const metadata = readFileSync(file, "utf8")
+			assert.match(metadata, /^version: 1\.2\.3$/m)
+			assert.match(metadata, /url: "Cocode-1\.2\.3-arm64\.zip"/)
+			assert.match(metadata, new RegExp(`sha512: "${expectedSha512}"`))
+			assert.doesNotMatch(metadata, /x64/)
+		}
 	} finally {
 		rmSync(root, { recursive: true, force: true })
 	}
 })
 
-test("normalizes Windows MSIX names by architecture", () => {
+test("writes isolated Windows updater metadata for each architecture", () => {
+	const root = mkdtempSync(path.join(os.tmpdir(), "cocode-update-metadata-"))
+	try {
+		const installer = path.join(root, "Cocode-1.2.3-x64.exe")
+		writeFileSync(installer, "x64-installer")
+		const files = writeArchitectureUpdateMetadata({
+			outDir: root,
+			platform: "win32",
+			arch: "x64",
+			version: "1.2.3",
+			artifacts: [installer],
+		})
+		assert.deepEqual(files, [
+			path.join(root, "x64.yml"),
+			path.join(root, "latest-x64.yml"),
+		])
+		for (const file of files) {
+			const metadata = readFileSync(file, "utf8")
+			assert.match(metadata, /url: "Cocode-1\.2\.3-x64\.exe"/)
+			assert.doesNotMatch(metadata, /arm64/)
+		}
+	} finally {
+		rmSync(root, { recursive: true, force: true })
+	}
+})
+
+test("rejects updater metadata generation without the platform update artifact", () => {
+	const root = mkdtempSync(path.join(os.tmpdir(), "cocode-update-metadata-"))
+	try {
+		const pkg = path.join(root, "Cocode-1.2.3-arm64.pkg")
+		writeFileSync(pkg, "pkg")
+		assert.throws(
+			() =>
+				writeArchitectureUpdateMetadata({
+					outDir: root,
+					platform: "darwin",
+					arch: "arm64",
+					version: "1.2.3",
+					artifacts: [pkg],
+				}),
+			/No ZIP update artifact/,
+		)
+	} finally {
+		rmSync(root, { recursive: true, force: true })
+	}
+})
+
+test("writes one deterministic SHA256 manifest without duplicate artifacts", () => {
+	const root = mkdtempSync(path.join(os.tmpdir(), "cocode-checksums-"))
+	try {
+		const zip = path.join(root, "Cocode.zip")
+		const pkg = path.join(root, "Cocode.pkg")
+		writeFileSync(zip, "zip")
+		writeFileSync(pkg, "pkg")
+		const manifest = appendChecksumManifest(root, [pkg, zip, pkg])
+		assert.equal(manifest, path.join(root, "SHA256SUMS"))
+		const expectedRows = [
+			`${createHash("sha256").update("pkg").digest("hex")}  Cocode.pkg`,
+			`${createHash("sha256").update("zip").digest("hex")}  Cocode.zip`,
+		].sort()
+		assert.equal(readFileSync(manifest, "utf8"), `${expectedRows.join("\n")}\n`)
+	} finally {
+		rmSync(root, { recursive: true, force: true })
+	}
+})
+
+test("finds the packaged macOS App only when the staged TUI is present", () => {
 	const root = mkdtempSync(path.join(os.tmpdir(), "cocode-release-hooks-"))
 	try {
-		const msix = path.join(root, "Cocode.msix")
-		writeFileSync(msix, "msix")
-		const result: ForgeMakeResult = {
-			platform: "win32",
-			arch: "arm64",
-			packageJSON: { version: "1.2.3" },
-			artifacts: [msix],
-		}
-		const [normalized] = normalizeArtifactNames([result])
-		assert.deepEqual(normalized?.artifacts, [
-			path.join(root, "Cocode-Desktop-1.2.3-win32-arm64.msix"),
-		])
+		writeFixture(path.join(root, "README.md"), "not an app")
+		const incompleteApp = path.join(root, "Incomplete.app")
+		mkdirSync(path.join(incompleteApp, "Contents", "Resources"), { recursive: true })
+		const appPath = path.join(root, "nested", "Cocode.app")
+		writeFixture(path.join(appPath, "Contents", "Resources", "tui", "manifest.json"), "{}")
+		assert.equal(findMacAppWithTui(root), appPath)
+		assert.equal(findMacAppWithTui(path.join(root, "README.md")), undefined)
 	} finally {
 		rmSync(root, { recursive: true, force: true })
 	}
 })
 
-test("omits Squirrel feed files from Windows GitHub artifacts", () => {
-	const x64: ForgeMakeResult = {
-		platform: "win32",
-		arch: "x64",
-		packageJSON: { version: "1.2.3" },
-		artifacts: ["/tmp/x64.msix", "/tmp/RELEASES", "/tmp/x64.nupkg"],
+test("accepts the stable Electron main and preload entrypoint names", () => {
+	const root = mkdtempSync(path.join(os.tmpdir(), "cocode-builder-entrypoints-"))
+	try {
+		writeFixture(path.join(root, ".vite", "build", "main.mjs"), "")
+		writeFixture(path.join(root, ".vite", "build", "preload.js"), "")
+
+		assert.doesNotThrow(() => verifyBuilderApplicationEntrypoints(root))
+	} finally {
+		rmSync(root, { recursive: true, force: true })
 	}
-	const arm64: ForgeMakeResult = {
-		platform: "win32",
-		arch: "arm64",
-		packageJSON: { version: "1.2.3" },
-		artifacts: ["/tmp/arm64.msix", "/tmp/RELEASES", "/tmp/arm64.nupkg"],
-	}
-	const [selectedX64, selectedArm64] = selectGitHubReleaseArtifacts([x64, arm64])
-	assert.deepEqual(selectedX64?.artifacts, ["/tmp/x64.msix"])
-	assert.deepEqual(selectedArm64?.artifacts, ["/tmp/arm64.msix"])
 })
 
-test("preserves non-feed Windows ARM64 manual installers", () => {
-	const result: ForgeMakeResult = {
-		platform: "win32",
-		arch: "arm64",
-		packageJSON: { version: "1.2.3" },
-		artifacts: ["/tmp/Cocode-Desktop-1.2.3-win32-arm64-Setup.exe"],
+test("rejects the legacy electron-vite preload filename", () => {
+	const root = mkdtempSync(path.join(os.tmpdir(), "cocode-builder-entrypoints-"))
+	try {
+		const legacyPreload = path.join(root, ".vite", "build", "index.mjs")
+		const expectedPreload = path.join(root, ".vite", "build", "preload.js")
+		writeFixture(path.join(root, ".vite", "build", "main.mjs"), "")
+		writeFixture(legacyPreload, "")
+
+		assert.throws(
+			() => verifyBuilderApplicationEntrypoints(root),
+			(error: unknown) => {
+				assert.ok(error instanceof Error)
+				assert.match(error.message, /wrong name/)
+				assert.match(error.message, new RegExp(escapeRegExp(legacyPreload)))
+				assert.match(error.message, new RegExp(escapeRegExp(expectedPreload)))
+				return true
+			},
+		)
+	} finally {
+		rmSync(root, { recursive: true, force: true })
 	}
-	const [selected] = selectGitHubReleaseArtifacts([result])
-	assert.deepEqual(selected?.artifacts, result.artifacts)
 })
 
-test("separates Windows Authenticode PowerShell statements", async () => {
-	const hooks = (await import("../../scripts/release/release-hooks")) as {
-		buildWindowsAuthenticodeVerificationScript?: () => string
+test("rejects external dependencies in the sandboxed preload bundle", () => {
+	const root = mkdtempSync(path.join(os.tmpdir(), "cocode-builder-entrypoints-"))
+	try {
+		writeFixture(path.join(root, ".vite", "build", "main.mjs"), "")
+		writeFixture(
+			path.join(root, ".vite", "build", "preload.js"),
+			'const electron = require("electron")\nconst zod = require("zod")\n',
+		)
+
+		assert.throws(
+			() => verifyBuilderApplicationEntrypoints(root),
+			/Sandboxed preload bundle contains unsupported external require: zod/,
+		)
+	} finally {
+		rmSync(root, { recursive: true, force: true })
 	}
-	assert.equal(typeof hooks.buildWindowsAuthenticodeVerificationScript, "function")
-	const script = hooks.buildWindowsAuthenticodeVerificationScript?.() ?? ""
+})
+
+test("keeps Windows Authenticode verification statements and UTF-8 certificate subjects", () => {
+	const script = buildWindowsAuthenticodeVerificationScript()
 	assert.match(script, /\$env:VERIFY_FILE;\s+if/)
 	assert.doesNotMatch(script, /\$env:VERIFY_FILE\s+if/)
 	assert.match(script, /SubjectUtf8/)
 	assert.match(script, /UTF8\.GetBytes/)
 })
 
-test("extracts only Windows archive executables to short destination names", async (t) => {
-	if (process.platform !== "win32") {
-		t.skip("Windows archive extraction requires PowerShell")
-		return
-	}
-	const root = mkdtempSync(path.join(os.tmpdir(), "cocode-zip-extract-"))
+test("verifies the staged Windows runtime and fails on a missing DSH entry", () => {
+	const root = mkdtempSync(path.join(os.tmpdir(), "cocode-packaged-assets-"))
 	try {
-		const archive = path.join(root, "package.nupkg")
-		const longName = `lib/net45/${"a".repeat(180)}/skip.txt`
-		writeWindowsTestZip(archive, [
-			{ name: longName, body: "skip" },
-			{ name: "lib/net45/Cocode.exe", body: "mz" },
-			{ name: "AppxManifest.xml", body: "<Identity Name='Cocode' />" },
-		])
-		const extracted = extractWindowsArchiveEntries({
-			archivePath: archive,
-			destination: path.join(root, "exes"),
-			mode: "executables",
-		})
-		assert.equal(extracted.length, 1)
-		assert.match(extracted[0] ?? "", /0000-Cocode\.exe$/)
-		assert.ok((extracted[0]?.length ?? 0) < 260)
-		const named = extractWindowsArchiveEntries({
-			archivePath: archive,
-			destination: path.join(root, "named"),
-			mode: "named",
-			names: ["AppxManifest.xml", "app\\Cocode.exe"],
-		})
-		assert.equal(named.length, 1)
-		assert.match(named[0] ?? "", /AppxManifest\.xml$/)
+		const resources = path.join(root, "resources")
+		const runtime = path.join(resources, "dsh-runtime")
+		const pty = path.join(runtime, "node_modules", "node-pty", "build", "Release")
+		const sqlite = path.join(resources, "app", "node_modules", "better-sqlite3", "build", "Release")
+		const sharp = path.join(runtime, "node_modules", "sharp")
+		const sharpNative = path.join(runtime, "node_modules", "@img", "sharp-win32-x64", "lib")
+		const sharpLibvips = path.join(
+			runtime,
+			"node_modules",
+			"@img",
+			"sharp-libvips-win32-x64",
+			"lib",
+		)
+		writeFixture(path.join(resources, "cocode-node"), createPeFixture())
+		writeFixture(path.join(resources, "startup-failure.html"), "<html />")
+		writeFixture(
+			path.join(runtime, "runtime-manifest.json"),
+			JSON.stringify({
+				platform: "win32",
+				arch: "x64",
+				dsh: { entry: "node_modules/@deepseek-ai/dsh/lib/bin.js" },
+			}),
+		)
+		writeFixture(path.join(runtime, "packages", "host-supervisor", "lib", "bin.js"), "")
+		writeFixture(
+			path.join(runtime, "package.json"),
+			JSON.stringify({ name: "@cocode-agency/host-supervisor" }),
+		)
+		writeFixture(
+			path.join(runtime, "node_modules", "@deepseek-ai", "dsh", "lib", "bin.js"),
+			"",
+		)
+		for (const packageName of ["dsh-host-webserver", "dsh-host-frontend-static"]) {
+			const packageRoot = path.join(runtime, "node_modules", "@deepseek-ai", packageName)
+			writeFixture(
+				path.join(packageRoot, "package.json"),
+				JSON.stringify({ name: `@deepseek-ai/${packageName}` }),
+			)
+			writeFixture(path.join(packageRoot, "lib", "index.js"), "")
+		}
+		for (const name of ["pty.node", "winpty-agent.exe", "conpty.node", "conpty.dll", "OpenConsole.exe"])
+			writeFixture(path.join(pty, name), createPeFixture())
+		writeFixture(path.join(sqlite, "better_sqlite3.node"), createPeFixture())
+		writeFixture(path.join(sharp, "package.json"), JSON.stringify({ name: "sharp" }))
+		writeFixture(path.join(sharpNative, "sharp-win32-x64.node"), createPeFixture())
+		writeFixture(path.join(sharpLibvips, "libvips-42.dll"), createPeFixture())
+
+		const result = verifyPackagedStartupAssets(root, { platform: "win32", arch: "x64" })
+		assert.equal(result.appRoot, path.join(resources, "app"))
+		rmSync(path.join(runtime, "node_modules", "@deepseek-ai", "dsh", "lib", "bin.js"))
+		assert.throws(
+			() => verifyPackagedStartupAssets(root, { platform: "win32", arch: "x64" }),
+			/packaged DSH Web entry is missing/,
+		)
 	} finally {
 		rmSync(root, { recursive: true, force: true })
 	}
 })
 
-function writeWindowsTestZip(
-	file: string,
-	entries: readonly { readonly name: string; readonly body: string }[],
-): void {
-	const spec = path.join(path.dirname(file), "zip-spec.json")
-	writeFileSync(spec, `${JSON.stringify(entries)}\n`)
-	execFileSync(
-		"powershell.exe",
-		[
-			"-NoProfile",
-			"-NonInteractive",
-			"-Command",
-			[
-				"$ErrorActionPreference='Stop'",
-				"Add-Type -AssemblyName System.IO.Compression.FileSystem",
-				"$zip = [IO.Compression.ZipFile]::Open($env:ZIP_OUT, 'Create')",
-				"try {",
-				"  foreach ($item in (Get-Content -LiteralPath $env:ZIP_SPEC -Encoding UTF8 -Raw | ConvertFrom-Json)) {",
-				"    $entry = $zip.CreateEntry($item.name)",
-				"    $bytes = [Text.Encoding]::UTF8.GetBytes([string]$item.body)",
-				"    $stream = $entry.Open()",
-				"    $stream.Write($bytes, 0, $bytes.Length)",
-				"    $stream.Dispose()",
-				"  }",
-				"} finally { $zip.Dispose() }",
-			].join("\n"),
-		],
-		{ env: { ...process.env, ZIP_OUT: file, ZIP_SPEC: spec } },
-	)
+test("copies a self-contained production dependency closure without pnpm links", () => {
+	const root = mkdtempSync(path.join(os.tmpdir(), "cocode-runtime-closure-"))
+	try {
+		const source = path.join(root, "source")
+		const appRoot = path.join(root, "app")
+		writePackage(source, "cocode-gui", { dependencies: { "runtime-root": "1.0.0" } })
+		writePackage(path.join(source, "node_modules", "runtime-root"), "runtime-root", {
+			dependencies: { "runtime-leaf": "1.0.0" },
+			exports: { ".": { import: "./index.js" } },
+		})
+		writePackage(path.join(source, "node_modules", "runtime-leaf"), "runtime-leaf")
+		writeFixture(path.join(appRoot, ".vite", "build", "main.js"), "")
+
+		const copied = copyProductionDependencyClosure({
+			sourceRoot: source,
+			appRoot,
+			dependencies: ["runtime-root"],
+		})
+
+		assert.deepEqual(copied, ["runtime-root", "runtime-leaf"])
+		assert.ok(existsSync(path.join(appRoot, "node_modules", "runtime-root", "package.json")))
+		assert.ok(existsSync(path.join(appRoot, "node_modules", "runtime-leaf", "package.json")))
+		assert.equal(
+			lstatSync(path.join(appRoot, "node_modules", "runtime-root")).isSymbolicLink(),
+			false,
+		)
+		verifyProductionDependencyClosure(appRoot, ["runtime-root"])
+		assert.throws(() => verifyProductionDependencyClosure(appRoot, ["missing-runtime"]), /missing-runtime/)
+	} finally {
+		rmSync(root, { recursive: true, force: true })
+	}
+})
+
+test("preserves nested production dependency versions instead of flattening conflicts", () => {
+	const root = mkdtempSync(path.join(os.tmpdir(), "cocode-runtime-closure-nested-"))
+	try {
+		const source = path.join(root, "source")
+		const appRoot = path.join(root, "app")
+		writePackage(source, "cocode-gui", {
+			dependencies: {
+				"runtime-root": "1.0.0",
+				shared: "2.0.0",
+			},
+		})
+		writePackage(path.join(source, "node_modules", "runtime-root"), "runtime-root", {
+			dependencies: { shared: "1.0.0" },
+		})
+		writePackage(path.join(source, "node_modules", "shared"), "shared", {})
+		writeFileSync(
+			path.join(source, "node_modules", "shared", "package.json"),
+			JSON.stringify({ name: "shared", version: "2.0.0" }),
+		)
+		writePackage(
+			path.join(source, "node_modules", "runtime-root", "node_modules", "shared"),
+			"shared",
+			{},
+		)
+		writeFileSync(
+			path.join(
+				source,
+				"node_modules",
+				"runtime-root",
+				"node_modules",
+				"shared",
+				"package.json",
+			),
+			JSON.stringify({ name: "shared", version: "1.0.0" }),
+		)
+
+		copyProductionDependencyClosure({
+			sourceRoot: source,
+			appRoot,
+			dependencies: ["runtime-root", "shared"],
+		})
+
+		assert.ok(
+			existsSync(
+				path.join(appRoot, "node_modules", "runtime-root", "node_modules", "shared", "package.json"),
+			),
+		)
+		assert.equal(
+			JSON.parse(
+				readFileSync(
+					path.join(appRoot, "node_modules", "runtime-root", "node_modules", "shared", "package.json"),
+					"utf8",
+				),
+			).version,
+			"1.0.0",
+		)
+		assert.equal(
+			JSON.parse(
+				readFileSync(path.join(appRoot, "node_modules", "shared", "package.json"), "utf8"),
+			).version,
+			"2.0.0",
+		)
+	} finally {
+		rmSync(root, { recursive: true, force: true })
+	}
+})
+
+function writeFixture(file: string, contents: string | Buffer): void {
+	mkdirSync(path.dirname(file), { recursive: true })
+	writeFileSync(file, contents)
 }
 
-test("skips files while searching for the packaged macOS app", () => {
-	const root = mkdtempSync(path.join(os.tmpdir(), "cocode-release-hooks-"))
-	try {
-		mkdirSync(path.join(root, "runtime"), { recursive: true })
-		writeFileSync(path.join(root, "runtime", "README.md"), "runtime")
-		const appPath = path.join(root, "Cocode.app")
-		mkdirSync(path.join(appPath, "Contents", "Resources", "tui"), { recursive: true })
-		writeFileSync(path.join(appPath, "Contents", "Resources", "tui", "manifest.json"), "{}")
+function writePackage(
+	root: string,
+	name: string,
+	manifest: { dependencies?: Record<string, string>; exports?: unknown } = {},
+): void {
+	writeFixture(path.join(root, "package.json"), JSON.stringify({ name, version: "1.0.0", ...manifest }))
+	writeFixture(path.join(root, "index.js"), "module.exports = {}\n")
+}
 
-		assert.equal(findMacAppWithTui(root), appPath)
-	} finally {
-		rmSync(root, { recursive: true, force: true })
-	}
-})
+function createPeFixture(): Buffer {
+	const bytes = Buffer.alloc(0x90)
+	bytes.writeUInt16LE(0x5a4d, 0)
+	bytes.writeUInt32LE(0x80, 0x3c)
+	bytes.write("PE\0\0", 0x80, "ascii")
+	bytes.writeUInt16LE(0x8664, 0x84)
+	return bytes
+}
+
+function escapeRegExp(value: string): string {
+	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}

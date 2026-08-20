@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* The local Forge page cannot receive the sidecar's user preference until the
+/* The local Vite page cannot receive the sidecar's user preference until the
    typed bootstrap handshake completes. Keep the document chrome hidden during
    that short interval so a stored dark preference never flashes light before
    startRenderer applies the matching palette. */
@@ -28,6 +28,11 @@ html:not([data-dsh-theme-ready]) {
 	padding: 2rem;
 	font-family: ui-sans-serif, system-ui, sans-serif;
 	color: var(--cocode-foreground, #0a0a0a);
+	-webkit-app-region: drag;
+}
+
+.dsh-desktop-startup-error > * {
+	-webkit-app-region: no-drag;
 }
 
 .dsh-desktop-startup-error h1 {
@@ -39,6 +44,13 @@ html:not([data-dsh-theme-ready]) {
 	max-width: 48rem;
 	margin: 0;
 	color: var(--cocode-muted-foreground, #71717a);
+}
+
+.dsh-desktop-startup-error h1,
+.dsh-desktop-startup-error p {
+	-webkit-user-select: text;
+	user-select: text;
+	cursor: text;
 }
 
 @layer base {

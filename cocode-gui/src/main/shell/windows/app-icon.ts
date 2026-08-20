@@ -2,8 +2,8 @@ import { app, nativeImage, type NativeImage } from "electron"
 import * as path from "pathe"
 
 /**
- * Packaged builds carry the Cocode icon inside the bundle (Forge writes it from
- * `packagerConfig.icon`), but development runs the stock Electron bundle, whose
+ * Packaged builds carry the Cocode icon inside the bundle (electron-builder
+ * writes it from the platform icon configuration), but development runs the stock Electron bundle, whose
  * icon is Electron's own. Loading the same source artwork at runtime keeps the
  * Dock, the task switcher and the window frame on brand while developing.
  */

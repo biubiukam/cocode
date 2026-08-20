@@ -44,7 +44,7 @@ function safeText(value: string, maxLength: number): string {
 		.replace(/((?:https?|wss?):\/\/[^\s?#]+)(?:\?[^\s#]*)?(?:#[^\s]*)?/gi, "$1")
 		.replace(/\bBearer\s+[^\s,;]+/gi, "Bearer [REDACTED]")
 		.replace(
-			/("(?:prompt|content|arguments|tool(?:_name)?|output|token|secret|password|api[-_]?key)"\s*:\s*)"[^"]*"/gi,
+			/("(?:prompt|content|arguments|tool(?:_name)?|output|token|secret|password|api[-_]?key|authorization|cookie|set-cookie)"\s*:\s*)"[^"]*"/gi,
 			'$1"[REDACTED]"',
 		)
 		.replace(
@@ -52,10 +52,10 @@ function safeText(value: string, maxLength: number): string {
 			"[REDACTED]",
 		)
 		.replace(
-			/(\b(?:password|passwd|token|secret|api[-_ ]?key|authorization))\s*[:=]\s*[^\s,;]+/gi,
+			/(\b(?:password|passwd|token|secret|api[-_ ]?key|authorization|cookie|set-cookie))\s*[:=]\s*[^\s,;]+/gi,
 			"$1=[REDACTED]",
 		)
-		.replace(/(?:\/Users\/|\/home\/)[^/\s]+/g, "<user-home>")
-		.replace(/[A-Za-z]:[\\/]Users[\\/][^\\/\s]+/g, "<user-home>")
+		.replace(/(^|[\s"'=([\]])(?:\/Users\/|\/home\/)[^\s]+/g, "$1<user-home>")
+		.replace(/(^|[\s"'=([\]])[A-Za-z]:[\\/]Users[\\/][^\s]+/g, "$1<user-home>")
 		.slice(0, maxLength)
 }

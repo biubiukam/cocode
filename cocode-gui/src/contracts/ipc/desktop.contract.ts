@@ -7,6 +7,7 @@ import type { TuiApi } from "./tui.contract"
 import type { ExternalDshApi, SharedDshApi } from "./external-dsh.contract"
 import type { LocaleApi } from "./locale.contract"
 import type { LocalFilesApi } from "./local-files.contract"
+import type { StartupApi } from "./startup.contract"
 
 export interface DesktopApi {
 	readonly database: DatabaseApi
@@ -20,4 +21,5 @@ export interface DesktopApi {
 	readonly externalDsh: ExternalDshApi
 	readonly locale: LocaleApi
 	readonly localFiles: LocalFilesApi
+	readonly startup: StartupApi
 }

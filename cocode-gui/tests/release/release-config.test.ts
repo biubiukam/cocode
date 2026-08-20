@@ -1,20 +1,20 @@
 import assert from "node:assert/strict"
+import * as path from "pathe"
 import test from "node:test"
 import {
 	createMacNotarizeOptions,
-	createMsixConfig,
+	createMacSignOptions,
 	createWindowsSignOptions,
 	requireReleaseCredentials,
 	resolveGitHubReleaseRepository,
 	resolveMacCliInstallPath,
 	resolveMacInstallerSigningIdentity,
-	resolveMsixPackageVersion,
 	resolveReleaseTarget,
 	resolveWindowsSignMode,
 	resolveWindowsSignServiceOptions,
 } from "../../scripts/release/release-config"
 
-test("resolves only native darwin and win32 targets", () => {
+test("resolves only supported desktop release targets", () => {
 	assert.deepEqual(resolveReleaseTarget({ RELEASE_PLATFORM: "darwin", RELEASE_ARCH: "x64" }), {
 		platform: "darwin",
 		arch: "x64",
@@ -24,9 +24,54 @@ test("resolves only native darwin and win32 targets", () => {
 		arch: "arm64",
 	})
 	assert.throws(() => resolveReleaseTarget({ RELEASE_PLATFORM: "linux", RELEASE_ARCH: "x64" }))
+	assert.throws(() => resolveReleaseTarget({ RELEASE_PLATFORM: "darwin", RELEASE_ARCH: "ia32" }))
 })
 
-test("requires complete signing credentials", () => {
+test("uses one GitHub repository for every architecture", () => {
+	assert.deepEqual(resolveGitHubReleaseRepository({ GITHUB_REPOSITORY: "acme/cocode" }), {
+		owner: "acme",
+		name: "cocode",
+	})
+	assert.throws(() => resolveGitHubReleaseRepository({ GITHUB_REPOSITORY: "invalid" }))
+})
+
+test("creates strict macOS signing options with per-file entitlement inputs", () => {
+	const options = createMacSignOptions({
+		MAC_SIGNING_IDENTITY: "Developer ID Application: Test",
+		MAC_SIGNING_KEYCHAIN: "/tmp/release.keychain-db",
+	})
+	assert.deepEqual(options, {
+		identity: "Test",
+		keychain: "/tmp/release.keychain-db",
+		entitlements: path.resolve("resources/entitlements.mac.plist"),
+		entitlementsInherit: path.resolve("resources/entitlements.mac.plugin.plist"),
+		hardenedRuntime: true,
+		preAutoEntitlements: true,
+		strictVerify: true,
+	})
+	assert.equal(createMacSignOptions({}), undefined)
+})
+
+test("accepts complete Apple notarization credential strategies", () => {
+	assert.deepEqual(
+		createMacNotarizeOptions({
+			APPLE_API_KEY: "key",
+			APPLE_API_KEY_ID: "id",
+			APPLE_API_ISSUER: "issuer",
+		}),
+		{ appleApiKey: "key", appleApiKeyId: "id", appleApiIssuer: "issuer" },
+	)
+	assert.deepEqual(
+		createMacNotarizeOptions({
+			APPLE_KEYCHAIN_PROFILE: "cocode-notary",
+			APPLE_KEYCHAIN: "/tmp/release.keychain-db",
+		}),
+		{ keychainProfile: "cocode-notary", keychain: "/tmp/release.keychain-db" },
+	)
+	assert.throws(() => createMacNotarizeOptions({ APPLE_API_KEY: "key" }))
+})
+
+test("requires Application, Installer and notarization credentials for signed macOS releases", () => {
 	assert.throws(() =>
 		requireReleaseCredentials(
 			{ platform: "darwin", arch: "arm64" },
@@ -36,87 +81,20 @@ test("requires complete signing credentials", () => {
 			},
 		),
 	)
-	assert.throws(() =>
+	assert.doesNotThrow(() =>
 		requireReleaseCredentials(
-			{ platform: "win32", arch: "x64" },
-			{ RELEASE_REQUIRE_SIGNING: "1" },
+			{ platform: "darwin", arch: "arm64" },
+			{
+				RELEASE_REQUIRE_SIGNING: "1",
+				MAC_SIGNING_IDENTITY: "Developer ID Application: Test",
+				MAC_INSTALLER_SIGNING_IDENTITY: "Developer ID Installer: Test",
+				APPLE_KEYCHAIN_PROFILE: "cocode-notary",
+			},
 		),
 	)
-	assert.deepEqual(
-		createMacNotarizeOptions({
-			APPLE_API_KEY: "key",
-			APPLE_API_KEY_ID: "id",
-			APPLE_API_ISSUER: "issuer",
-		}),
-		{ appleApiKey: "key", appleApiKeyId: "id", appleApiIssuer: "issuer" },
-	)
-	assert.throws(() => createMacNotarizeOptions({ APPLE_API_KEY: "key" }))
 })
 
-test("uses the main repository for every release architecture", () => {
-	const environment = {
-		GITHUB_REPOSITORY: "acme/cocode",
-	}
-	assert.deepEqual(resolveGitHubReleaseRepository(environment), {
-		owner: "acme",
-		name: "cocode",
-	})
-})
-
-test("creates architecture-safe MSIX configuration", () => {
-	const config = createMsixConfig("1.2.3", {
-		RELEASE_ARCH: "arm64",
-		WINDOWS_MSIX_PACKAGE_ID: "CocodeDesktop",
-		WINDOWS_MSIX_PUBLISHER: "CN=Cocode Contributors",
-		WINDOWS_MSIX_PUBLISHER_DISPLAY_NAME: "Cocode Contributors",
-		WINDOWS_MSIX_PACKAGE_DISPLAY_NAME: "Cocode Desktop",
-	})
-	assert.equal(config.packageName, "Cocode-Desktop-1.2.3-win32-arm64")
-	assert.equal(config.sign, false)
-	assert.equal(config.windowsSignOptions, undefined)
-	assert.deepEqual(config.manifestVariables, {
-		packageIdentity: "CocodeDesktop",
-		publisher: "CN=Cocode Contributors",
-		publisherDisplayName: "Cocode Contributors",
-		packageDisplayName: "Cocode Desktop",
-		packageDescription: "Cocode Desktop",
-		packageVersion: "1.2.3.0",
-		targetArch: "arm64",
-	})
-	assert.equal(resolveMsixPackageVersion("1.2.3"), "1.2.3.0")
-	assert.throws(() => resolveMsixPackageVersion("1.2.3-beta.1"))
-	assert.throws(() => resolveMsixPackageVersion("01.2.3"))
-	assert.throws(() => resolveMsixPackageVersion("65536.0.0"))
-	assert.throws(() =>
-		createMsixConfig("1.2.3", {
-			RELEASE_ARCH: "x64",
-			WINDOWS_MSIX_PACKAGE_ID: "invalid_identity",
-		}),
-	)
-})
-
-test("does not ask the MSIX maker to mint a self-signed certificate", () => {
-	const unsigned = createMsixConfig("1.2.3", { RELEASE_ARCH: "x64" })
-	assert.equal(unsigned.sign, false)
-	assert.equal(unsigned.windowsSignOptions, undefined)
-
-	const service = createWindowsSignOptions({
-		WINDOWS_SIGN_MODE: "service",
-		WINDOWS_SIGN_SERVICE_URL: "https://signing.example.test",
-	})
-	const hooked = createMsixConfig("1.2.3", { RELEASE_ARCH: "x64" }, service)
-	assert.equal(hooked.sign, false)
-	assert.equal(hooked.windowsSignOptions, undefined)
-
-	const pfx = createMsixConfig("1.2.3", { RELEASE_ARCH: "x64" }, {
-		certificateFile: "C:\\certificate.pfx",
-		certificatePassword: "secret",
-	})
-	assert.equal(pfx.sign, undefined)
-	assert.equal(pfx.windowsSignOptions?.certificateFile, "C:\\certificate.pfx")
-})
-
-test("requires a dedicated installer signing identity for PKG releases", () => {
+test("keeps the custom macOS installer identity and CLI location", () => {
 	assert.equal(
 		resolveMacInstallerSigningIdentity({
 			MAC_SIGNING_IDENTITY: "Developer ID Application: Test",
@@ -136,62 +114,51 @@ test("requires a dedicated installer signing identity for PKG releases", () => {
 	)
 })
 
-test("rejects partial Windows certificate configuration", () => {
-	assert.throws(() => createWindowsSignOptions({ WINDOWS_CERTIFICATE_PASSWORD: "secret" }))
-})
-
 test("treats empty Windows certificate values as unconfigured", () => {
-	assert.equal(
-		createWindowsSignOptions({
-			WINDOWS_CERTIFICATE_FILE: "",
-			WINDOWS_CERTIFICATE_PASSWORD: "",
-		}),
-		undefined,
-	)
+	const environment = {
+		WINDOWS_CERTIFICATE_FILE: "",
+		WINDOWS_CERTIFICATE_PASSWORD: "",
+	}
+	assert.equal(resolveWindowsSignMode(environment), undefined)
+	assert.equal(createWindowsSignOptions(environment), undefined)
 })
 
-test("uses the team signing hook for a signed Windows release", () => {
+test("uses the electron-builder adapter for team-service Windows signing", () => {
 	const options = createWindowsSignOptions({
 		RELEASE_REQUIRE_SIGNING: "1",
 		WINDOWS_SIGN_MODE: "service",
 		WINDOWS_SIGN_SERVICE_URL: "https://signing.example.test",
-		WINDOWS_SIGN_DESCRIPTION: "Cocode Desktop",
-		WINDOWS_SIGN_WEBSITE: "https://cocode.example.test",
+		WINDOWS_SIGN_CERTIFICATE_SUBJECT: "Cocode Agency, Inc.",
 	})
-	assert.ok(options)
-	assert.equal(options?.hashes?.join(","), "sha256")
-	assert.equal(options?.description, "Cocode Desktop")
-	assert.equal(options?.website, "https://cocode.example.test")
-	assert.equal(options?.debug, false)
-	assert.match(options?.hookModulePath ?? "", /windows-sign-hook\.cjs$/)
+	assert.deepEqual(options, {
+		sign: path.resolve("scripts/release/windows-sign-builder.cjs"),
+		signingHashAlgorithms: ["sha256"],
+		publisherName: "Cocode Agency, Inc.",
+	})
 })
 
-test("service mode does not require or consume PFX values", () => {
-	assert.equal(
-		resolveWindowsSignMode({
-			WINDOWS_SIGN_MODE: "service",
-			WINDOWS_CERTIFICATE_FILE: "C:\\ignored\\certificate.pfx",
-			WINDOWS_CERTIFICATE_PASSWORD: "ignored",
-		}),
-		"service",
+test("requires the Windows certificate subject for signed service releases", () => {
+	assert.throws(
+		() =>
+			requireReleaseCredentials(
+				{ platform: "win32", arch: "x64" },
+				{
+					RELEASE_REQUIRE_SIGNING: "1",
+					WINDOWS_SIGN_MODE: "service",
+					WINDOWS_SIGN_SERVICE_URL: "https://signing.example.test",
+				},
+			),
+		/WINDOWS_SIGN_CERTIFICATE_SUBJECT is required/,
 	)
-	assert.doesNotThrow(() =>
+})
+
+test("signed Windows releases require the existing team signing service", () => {
+	assert.throws(() =>
 		requireReleaseCredentials(
 			{ platform: "win32", arch: "x64" },
-			{
-				RELEASE_REQUIRE_SIGNING: "1",
-				WINDOWS_SIGN_MODE: "service",
-				WINDOWS_SIGN_SERVICE_URL: "https://signing.example.test",
-				WINDOWS_CERTIFICATE_FILE: "C:\\ignored\\certificate.pfx",
-				WINDOWS_CERTIFICATE_PASSWORD: "ignored",
-				WINDOWS_MSIX_PACKAGE_ID: "CocodeDesktop",
-				WINDOWS_MSIX_PUBLISHER: "CN=Cocode Contributors",
-			},
+			{ RELEASE_REQUIRE_SIGNING: "1" },
 		),
 	)
-})
-
-test("signed Windows releases reject explicit PFX mode", () => {
 	assert.throws(() =>
 		requireReleaseCredentials(
 			{ platform: "win32", arch: "x64" },
@@ -203,13 +170,26 @@ test("signed Windows releases reject explicit PFX mode", () => {
 			},
 		),
 	)
+	assert.doesNotThrow(() =>
+		requireReleaseCredentials(
+			{ platform: "win32", arch: "arm64" },
+			{
+				RELEASE_REQUIRE_SIGNING: "1",
+				WINDOWS_SIGN_MODE: "service",
+				WINDOWS_SIGN_SERVICE_URL: "https://signing.example.test",
+				WINDOWS_SIGN_CERTIFICATE_SUBJECT: "Cocode Agency, Inc.",
+			},
+		),
+	)
 })
 
-test("validates service URL and bounded retry settings", () => {
+test("validates signing service URL and bounded retry settings", () => {
 	assert.deepEqual(
 		resolveWindowsSignServiceOptions({
 			WINDOWS_SIGN_SERVICE_URL: "https://signing.example.test/",
 			WINDOWS_SIGN_CREDENTIAL_TARGET: "team/windows-sign",
+			WINDOWS_SIGN_DESCRIPTION: "Cocode Desktop",
+			WINDOWS_SIGN_WEBSITE: "https://cocode.example.test",
 			WINDOWS_SIGN_TIMEOUT_MS: "45000",
 			WINDOWS_SIGN_RETRY_COUNT: "3",
 		}),
@@ -217,6 +197,7 @@ test("validates service URL and bounded retry settings", () => {
 			serviceUrl: "https://signing.example.test",
 			credentialTarget: "team/windows-sign",
 			description: "Cocode Desktop",
+			website: "https://cocode.example.test",
 			hashAlgorithm: "sha256",
 			timeoutMs: 45000,
 			retryCount: 3,

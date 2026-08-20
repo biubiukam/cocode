@@ -3,10 +3,8 @@ export type ApplicationUpdateDisabledReason =
 	| "disabled-by-environment"
 	| "unsupported-platform"
 	| "unsupported-architecture"
-	| "legacy-squirrel-package"
 
-export type WindowsPackageFormat = "msix" | "squirrel"
-export type ApplicationUpdateChannel = "macos" | WindowsPackageFormat
+export type ApplicationUpdateChannel = "x64" | "arm64"
 
 export type ApplicationUpdateConfig =
 	| {
@@ -25,7 +23,6 @@ export interface ResolveApplicationUpdateConfigOptions {
 	readonly platform: NodeJS.Platform
 	readonly architecture: string
 	readonly defaultRepository: string
-	readonly windowsStore?: boolean
 	readonly environment?: NodeJS.ProcessEnv
 }
 
@@ -34,7 +31,6 @@ export function resolveApplicationUpdateConfig({
 	platform,
 	architecture,
 	defaultRepository,
-	windowsStore = false,
 	environment = process.env,
 }: ResolveApplicationUpdateConfigOptions): ApplicationUpdateConfig {
 	if (!packaged) return { enabled: false, reason: "development" }
@@ -50,33 +46,19 @@ export function resolveApplicationUpdateConfig({
 	if (platform === "darwin" && architecture !== "x64" && architecture !== "arm64") {
 		return { enabled: false, reason: "unsupported-architecture" }
 	}
-	if (platform === "win32" && !windowsStore && architecture === "arm64") {
-		return { enabled: false, reason: "legacy-squirrel-package" }
-	}
 
 	const repository = environment.ELECTRON_UPDATE_REPOSITORY?.trim() || defaultRepository
 	assertGitHubRepository(repository)
 	const updateInterval = environment.ELECTRON_UPDATE_INTERVAL?.trim() || "10 minutes"
 	assertUpdateInterval(updateInterval)
+	const channel = architecture as ApplicationUpdateChannel
 
 	return {
 		enabled: true,
 		repository,
 		updateInterval,
-		channel: platform === "darwin" ? "macos" : windowsStore ? "msix" : "squirrel",
+		channel,
 	}
-}
-
-export function resolvePublicMsixFeedUrl(
-	repository: string,
-	architecture: "x64" | "arm64",
-	version: string,
-): string {
-	assertGitHubRepository(repository)
-	if (!version.trim()) throw new Error("MSIX update feed version is required.")
-	return `https://update.electronjs.org/${repository}/win32-${architecture}/msix/${encodeURIComponent(
-		version.trim(),
-	)}`
 }
 
 export function resolveGitHubRepositoryFromUrl(repositoryUrl: string): string {

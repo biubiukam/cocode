@@ -14,6 +14,12 @@ class FakeUpdater extends EventEmitter {
 	}
 }
 
+class AsyncRejectingUpdater extends EventEmitter {
+	checkForUpdates(): Promise<void> {
+		return Promise.reject(new Error("network unavailable"))
+	}
+}
+
 test("manual check enters checking and ignores duplicate clicks until a terminal event", () => {
 	const updater = new FakeUpdater()
 	const states: ApplicationUpdateState[] = []
@@ -103,6 +109,25 @@ test("available and downloaded events expose downloading state and the existing 
 	coordinator.dispose()
 })
 
+test("electron-updater downloaded events expose their release name", () => {
+	const updater = new FakeUpdater()
+	const releaseNames: Array<string | undefined> = []
+	const coordinator = createApplicationUpdateCoordinator({
+		enabled: true,
+		version: "1.0.0",
+		updater,
+		onStateChange: () => undefined,
+		onLatest: () => undefined,
+		onError: () => undefined,
+		onDownloaded: (releaseName) => releaseNames.push(releaseName),
+	})
+
+	updater.emit("update-downloaded", { releaseName: "Cocode 1.1.0" })
+
+	assert.deepEqual(releaseNames, ["Cocode 1.1.0"])
+	coordinator.dispose()
+})
+
 test("manual errors restore idle and show a user-facing failure", () => {
 	const updater = new FakeUpdater()
 	const errors: Error[] = []
@@ -123,6 +148,29 @@ test("manual errors restore idle and show a user-facing failure", () => {
 	assert.deepEqual(states, ["checking", "idle"])
 	assert.equal(errors.length, 1)
 	assert.equal(errors[0]?.message, "network unavailable")
+})
+
+test("manual async updater failures restore idle and show a user-facing failure", async () => {
+	const updater = new AsyncRejectingUpdater()
+	const errors: Error[] = []
+	const states: ApplicationUpdateState[] = []
+	const coordinator = createApplicationUpdateCoordinator({
+		enabled: true,
+		version: "1.0.0",
+		updater,
+		onStateChange: (state) => states.push(state),
+		onLatest: () => undefined,
+		onError: (error) => errors.push(error),
+		onDownloaded: () => undefined,
+	})
+
+	coordinator.checkNow()
+	await new Promise<void>((resolve) => setImmediate(resolve))
+
+	assert.deepEqual(states, ["checking", "idle"])
+	assert.equal(errors.length, 1)
+	assert.equal(errors[0]?.message, "network unavailable")
+	coordinator.dispose()
 })
 
 test("disabled registrations do not call the updater", () => {

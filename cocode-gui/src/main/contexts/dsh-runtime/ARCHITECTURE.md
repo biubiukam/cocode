@@ -5,7 +5,7 @@ The DSH runtime is a managed sidecar shipped inside the Electron application. El
 Development and production resolve the independent `@cocode-agency/host-supervisor` runtime. The Supervisor owns an immutable `@deepseek-ai/dsh` npm closure, starts one shared Host per canonical `DSH_HOME + profile + configuration`, and exposes the Host Web endpoint to Electron. Electron never discovers or starts a Harness checkout.
 
 The sidecar owns the existing DSH Web HTTP and WebSocket protocol. Electron loads
-the local Forge Renderer build, while Main reads the sidecar's
+the local Vite Renderer build, while Main reads the sidecar's
 `window.__DSH_BOOT__` manifest and returns it through the narrow `desktopApi.dsh`
 bridge. Local `packages/client/*/lib/client.js` artifacts are emitted under the
 Renderer build's `dsh-client/` tree; non-copied host bundles continue to resolve
@@ -59,7 +59,7 @@ relative to `file://`.
 
 Electron development owns the missing source-build half of that HMR chain.
 `scripts/start-with-dsh-runtime.mjs` starts `scripts/watch-dsh-client.mjs` before
-Forge. The watcher discovers packages declaring `dsh.client.platform: web`,
+the Electron Vite dev process. The watcher discovers packages declaring `dsh.client.platform: web`,
 rebuilds only a missing, stale or changed package's browser bundle from its local
 `src/client` entry, and atomically mirrors the emitted `lib/client.js` into the
 staged sidecar runtime. The sidecar's existing `client-hmr` poller then observes

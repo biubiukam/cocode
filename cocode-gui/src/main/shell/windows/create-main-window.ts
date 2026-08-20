@@ -1,7 +1,8 @@
-import { BrowserWindow, shell } from "electron"
+import { app, BrowserWindow, shell } from "electron"
 import * as path from "pathe"
 import { registerDshWebSocketTransport } from "../security/register-dsh-websocket-transport"
 import { resolveAppIcon } from "./app-icon"
+import { resolveElectronPreloadPath } from "./electron-resource-paths"
 import type { DesktopLogger } from "../../shared/logging/desktop-logger"
 
 /**
@@ -26,6 +27,8 @@ export const createMainWindow = (
 	logger?: DesktopLogger,
 	options: MainWindowOptions = {},
 ): BrowserWindow => {
+	const rendererDevServerUrl = process.env.ELECTRON_RENDERER_URL?.trim()
+	const rendererOrigin = rendererDevServerUrl ? new URL(rendererDevServerUrl).origin : undefined
 	// Windows/Linux take the frame icon from the window itself; macOS uses the Dock image.
 	const windowIcon = process.platform === "darwin" ? undefined : resolveAppIcon()
 	const mainWindow = new BrowserWindow({
@@ -49,7 +52,7 @@ export const createMainWindow = (
 			  }
 			: {}),
 		webPreferences: {
-			preload: path.join(__dirname, "preload.js"),
+			preload: resolveElectronPreloadPath(app.getAppPath()),
 			contextIsolation: true,
 			nodeIntegration: false,
 			sandbox: true,
@@ -58,9 +61,7 @@ export const createMainWindow = (
 	const unregisterDshWebSocketTransport = registerDshWebSocketTransport(
 		mainWindow.webContents.session,
 		new URL(dshRuntimeUrl).origin,
-		MAIN_WINDOW_VITE_DEV_SERVER_URL
-			? new URL(MAIN_WINDOW_VITE_DEV_SERVER_URL).origin
-			: undefined,
+		rendererOrigin,
 	)
 	options.registerRuntimeOriginRebind?.((origin) =>
 		unregisterDshWebSocketTransport.updateRuntimeOrigin(origin),
@@ -88,13 +89,13 @@ export const createMainWindow = (
 		logger?.log("info", "window.ready-to-show", { attributes: { windowId: mainWindow.id } })
 		mainWindow.show()
 	})
-	if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+	if (rendererDevServerUrl) {
 		void mainWindow
-			.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL)
+			.loadURL(rendererDevServerUrl)
 			.catch((error) => logger?.log("error", "window.load.failed", { error }))
 	} else {
 		void mainWindow
-			.loadFile(path.join(__dirname, "../renderer", MAIN_WINDOW_VITE_NAME, "index.html"))
+			.loadFile(path.join(app.getAppPath(), ".vite", "renderer", "main_window", "index.html"))
 			.catch((error) => logger?.log("error", "window.load.failed", { error }))
 	}
 	return mainWindow

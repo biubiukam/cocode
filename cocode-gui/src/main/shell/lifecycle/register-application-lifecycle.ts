@@ -1,11 +1,17 @@
 import { app, BrowserWindow } from "electron"
 import { ApplicationQuitCoordinator } from "./application-quit-coordinator"
 import type { DesktopLogger } from "../../shared/logging/desktop-logger"
+import {
+	createStartupFailure,
+	isStartupFailurePhase,
+	type StartupFailureRecord,
+} from "./startup-failure"
 
 export interface ApplicationLifecycleOptions {
 	readonly createWindow: () => void
 	readonly onReady?: () => void | Promise<void>
 	readonly onBeforeQuit?: () => void | Promise<void>
+	readonly onStartupFailure?: (failure: StartupFailureRecord) => void
 	readonly logger?: DesktopLogger
 }
 
@@ -17,19 +23,58 @@ export const registerApplicationLifecycle = ({
 	createWindow,
 	onReady,
 	onBeforeQuit,
+	onStartupFailure,
 	logger,
 }: ApplicationLifecycleOptions): ApplicationLifecycleController => {
 	const quitCoordinator = new ApplicationQuitCoordinator()
 	let applicationReady = false
+	let startupFailureShown = false
 
 	app.on("ready", () => {
+		const startedAt = Date.now()
 		void (async () => {
 			try {
 				await onReady?.()
-				applicationReady = true
 				createWindow()
+				applicationReady = true
 			} catch (error) {
-				logger?.log("fatal", "app.ready.failed", { error })
+				const candidate =
+					error instanceof Error &&
+					"failure" in error &&
+					typeof error.failure === "object" &&
+					error.failure !== null
+						? (error.failure as StartupFailureRecord)
+						: undefined
+				const failure =
+					candidate &&
+					isStartupFailurePhase(candidate.phase) &&
+					typeof candidate.failureCode === "string" &&
+					typeof candidate.userMessage === "string"
+						? candidate
+						: createStartupFailure("unknown", error)
+				logger?.log("fatal", "app.ready.failed", {
+					error: failure.error ?? error,
+					durationMs: Date.now() - startedAt,
+					attributes: {
+						phase: failure.phase,
+						failureCode: failure.failureCode,
+						platform: process.platform,
+						architecture: process.arch,
+						packaged: app.isPackaged,
+					},
+				})
+				if (onStartupFailure && !startupFailureShown) {
+					startupFailureShown = true
+					try {
+						onStartupFailure(failure)
+					} catch (failureWindowError) {
+						logger?.log("fatal", "startup.failure-handler.failed", {
+							error: failureWindowError,
+						})
+						app.quit()
+					}
+					return
+				}
 				app.quit()
 			}
 		})()
@@ -112,9 +157,21 @@ export const registerApplicationLifecycle = ({
 			app.quit()
 			return true
 		},
+		requestRestart: () => {
+			if (
+				!quitCoordinator.requestCompletion(() => {
+					app.relaunch()
+					app.exit(0)
+				})
+			)
+				return false
+			app.quit()
+			return true
+		},
 	}
 }
 
 export interface ApplicationLifecycleController {
 	readonly requestQuitForUpdate: (installUpdate: () => void) => boolean
+	readonly requestRestart: () => boolean
 }

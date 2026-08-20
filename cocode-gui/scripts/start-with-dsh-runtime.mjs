@@ -1,5 +1,5 @@
 /**
- * Desktop dev runner: DSH client watcher + Electron Forge, under one dev lock.
+ * Desktop dev runner: DSH client watcher + electron-vite, under one dev lock.
  *
  * The lock is taken first, before any build, so a second `pnpm run dev` in this
  * workspace displaces this one instead of racing it. Everything spawned here is
@@ -41,7 +41,7 @@ try {
 	process.exitCode = await run()
 } finally {
 	await children.stopAll()
-	// Electron is a grandchild through Forge and can outlive it, so sweep the
+	// Electron process can outlive electron-vite, so sweep the
 	// workspace once more before releasing the lock to the next runner.
 	await stopStrayElectron()
 	cleanupRuntime(runtime)
@@ -85,13 +85,9 @@ function startElectron() {
 	const electron = children.track(
 		spawn(
 			corepackCommand,
-			[...pinnedPnpmArgs, "exec", "electron-forge", "start"],
+			[...pinnedPnpmArgs, "exec", "electron-vite", "dev"],
 			shellCommandOptions({
-				stdio: [
-					"inherit",
-					"inherit",
-					process.platform === "darwin" ? "pipe" : "inherit",
-				],
+				stdio: ["inherit", "inherit", process.platform === "darwin" ? "pipe" : "inherit"],
 				cwd: workspace,
 				env: {
 					...process.env,

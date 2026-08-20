@@ -1,5 +1,5 @@
-import { app, autoUpdater, dialog } from "electron"
-import { UpdateSourceType, updateElectronApp, type IUpdateElectronApp } from "update-electron-app"
+import { app, dialog } from "electron"
+import electronUpdater from "electron-updater"
 import packageMetadata from "../../../../package.json"
 import {
 	createApplicationUpdateCoordinator,
@@ -10,17 +10,55 @@ import {
 import {
 	resolveApplicationUpdateConfig,
 	resolveGitHubRepositoryFromUrl,
-	resolvePublicMsixFeedUrl,
 	type ApplicationUpdateConfig,
 } from "./application-update-config"
 import { resolveUpdateIntervalMilliseconds } from "./update-interval"
 import type { ApplicationLocale } from "../../shared/locale/application-locale"
+
+const { autoUpdater } = electronUpdater
 
 export interface ApplicationUpdateLifecycle {
 	readonly requestQuitForUpdate: (installUpdate: () => void) => boolean
 }
 
 export type ApplicationUpdateRegistration = ApplicationUpdateCoordinator
+
+export interface ElectronUpdaterFeed {
+	readonly provider: "github"
+	readonly owner: string
+	readonly repo: string
+	readonly channel: "x64" | "arm64"
+}
+
+interface ElectronUpdaterAdapter extends ApplicationUpdateEventSource {
+	autoDownload: boolean
+	autoInstallOnAppQuit: boolean
+	channel: string | null
+	setFeedURL: (options: ElectronUpdaterFeed) => void
+	quitAndInstall: () => void
+}
+
+export function configureElectronUpdater(
+	updater: Pick<
+		ElectronUpdaterAdapter,
+		"autoDownload" | "autoInstallOnAppQuit" | "channel" | "setFeedURL"
+	>,
+	config: Extract<ApplicationUpdateConfig, { enabled: true }>,
+): void {
+	const [owner, repo] = config.repository.split("/")
+	if (!owner || !repo) {
+		throw new Error(`GitHub repository must use the owner/name format: ${config.repository}`)
+	}
+	updater.autoDownload = true
+	updater.autoInstallOnAppQuit = false
+	updater.channel = config.channel
+	updater.setFeedURL({
+		provider: "github",
+		owner,
+		repo,
+		channel: config.channel,
+	})
+}
 
 export function registerApplicationUpdates(
 	lifecycle: ApplicationUpdateLifecycle,
@@ -33,15 +71,21 @@ export function registerApplicationUpdates(
 			platform: process.platform,
 			architecture: process.arch,
 			defaultRepository: resolveGitHubRepositoryFromUrl(packageMetadata.repository.url),
-			windowsStore: process.windowsStore,
 		})
 	} catch (error) {
 		console.error("Automatic updates are disabled because configuration is invalid:", error)
 		return createInactiveRegistration()
 	}
-
 	if (config.enabled === false) {
 		console.info(`Automatic updates are disabled: ${config.reason}.`)
+		return createInactiveRegistration()
+	}
+
+	const updater = autoUpdater as unknown as ElectronUpdaterAdapter
+	try {
+		configureElectronUpdater(updater, config)
+	} catch (error) {
+		console.error("Automatic updates are disabled because the feed is invalid:", error)
 		return createInactiveRegistration()
 	}
 
@@ -68,121 +112,66 @@ export function registerApplicationUpdates(
 			})
 			.then(({ response }) => {
 				if (response !== 0) return
-				lifecycle.requestQuitForUpdate(() => autoUpdater.quitAndInstall())
+				lifecycle.requestQuitForUpdate(() => updater.quitAndInstall())
 			})
-			.catch((error: unknown) => {
-				console.error("Failed to show the downloaded update prompt:", error)
-			})
+			.catch((error: unknown) =>
+				console.error("Failed to show the downloaded update prompt:", error),
+			)
 			.finally(() => {
 				promptOpen = false
 			})
 	}
+
 	const coordinator = createApplicationUpdateCoordinator({
 		enabled: true,
 		version: app.getVersion(),
-		updater: autoUpdater as unknown as ApplicationUpdateEventSource,
+		updater,
 		onStateChange: () => undefined,
 		onLatest: (version) => showLatestVersionDialog(version, locale),
 		onError: (error) => handleUpdateError(error, locale),
 		onDownloaded: promptForUpdate,
 	})
-
-	if (config.channel === "msix") {
-		const msix = registerMsixUpdates(config)
-		return {
-			enabled: true,
-			checkNow: coordinator.checkNow,
-			subscribe: coordinator.subscribe,
-			dispose: () => {
-				msix.dispose()
-				coordinator.dispose()
-			},
-		}
-	}
-
-	let updater: IUpdateElectronApp | null = null
-	updater = updateElectronApp({
-		updateSource: {
-			type: UpdateSourceType.ElectronPublicUpdateService,
-			repo: config.repository,
-		},
-		updateInterval: config.updateInterval,
-		notifyUser: false,
-	})
-
+	const stopAutomaticChecks = startAutomaticUpdateChecks(updater, config.updateInterval)
 	return {
 		enabled: true,
 		checkNow: coordinator.checkNow,
 		subscribe: coordinator.subscribe,
 		dispose: () => {
+			stopAutomaticChecks()
 			coordinator.dispose()
-			updater?.stopUpdates()
-			updater = null
 		},
 	}
 }
 
-function registerMsixUpdates(config: Extract<ApplicationUpdateConfig, { enabled: true }>): {
-	readonly dispose: () => void
-} {
-	const architecture = resolveWindowsUpdateArchitecture(process.arch)
-	const feedUrl = resolvePublicMsixFeedUrl(config.repository, architecture, app.getVersion())
-	console.info(`Registering MSIX automatic updates from ${feedUrl}`)
-	autoUpdater.setFeedURL({ url: feedUrl })
-	let checkInFlight = false
-	const onCheckingForUpdate = () => {
-		checkInFlight = true
-		console.info("Checking for an MSIX application update.")
-	}
-	const onUpdateNotAvailable = () => {
-		checkInFlight = false
-		console.info("No MSIX application update is available.")
-	}
-	const onUpdateAvailable = () => {
-		checkInFlight = true
-		console.info("An MSIX application update is available and is being downloaded.")
-	}
-	const onUpdateDownloaded = () => {
-		checkInFlight = false
-	}
-	const onUpdaterError = (error: Error) => {
-		checkInFlight = false
-		console.error("MSIX automatic update failed:", error)
-	}
-	autoUpdater.on("checking-for-update", onCheckingForUpdate)
-	autoUpdater.on("update-not-available", onUpdateNotAvailable)
-	autoUpdater.on("update-available", onUpdateAvailable)
-	autoUpdater.on("update-downloaded", onUpdateDownloaded)
-	autoUpdater.on("error", onUpdaterError)
-	const checkForUpdates = () => {
-		if (checkInFlight) return
+function startAutomaticUpdateChecks(
+	updater: Pick<ElectronUpdaterAdapter, "checkForUpdates">,
+	interval: string,
+): () => void {
+	const checkForUpdates = (): void => {
 		try {
-			autoUpdater.checkForUpdates()
+			const result = updater.checkForUpdates()
+			if (isPromiseLike(result)) {
+				void result.then(undefined, (error: unknown) =>
+					console.error("Automatic application update check failed:", error),
+				)
+			}
 		} catch (error) {
-			onUpdaterError(error instanceof Error ? error : new Error(String(error)))
+			console.error("Automatic application update check failed:", error)
 		}
 	}
 	checkForUpdates()
-	const timer = setInterval(
-		checkForUpdates,
-		resolveUpdateIntervalMilliseconds(config.updateInterval),
-	)
+	const timer = setInterval(checkForUpdates, resolveUpdateIntervalMilliseconds(interval))
 	timer.unref?.()
-	return {
-		dispose: () => {
-			clearInterval(timer)
-			autoUpdater.removeListener("checking-for-update", onCheckingForUpdate)
-			autoUpdater.removeListener("update-not-available", onUpdateNotAvailable)
-			autoUpdater.removeListener("update-available", onUpdateAvailable)
-			autoUpdater.removeListener("update-downloaded", onUpdateDownloaded)
-			autoUpdater.removeListener("error", onUpdaterError)
-		},
-	}
+	return () => clearInterval(timer)
 }
 
-function resolveWindowsUpdateArchitecture(architecture: string): "x64" | "arm64" {
-	if (architecture === "x64" || architecture === "arm64") return architecture
-	throw new Error(`Unsupported Windows update architecture: ${architecture}`)
+function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+	return (
+		typeof value === "object" &&
+		value !== null &&
+		"then" in value &&
+		typeof (value as { then?: unknown }).then === "function"
+	)
 }
 
 function createInactiveRegistration(): ApplicationUpdateRegistration {
@@ -204,9 +193,9 @@ function showLatestVersionDialog(version: string, locale?: ApplicationLocale): v
 			message: english ? "You're up to date" : "当前版本已经是最新",
 			detail: english ? `Current version: v${version}` : `当前版本：v${version}`,
 		})
-		.catch((error: unknown) => {
-			console.error("Failed to show the latest-version dialog:", error)
-		})
+		.catch((error: unknown) =>
+			console.error("Failed to show the latest-version dialog:", error),
+		)
 }
 
 function showUpdateErrorDialog(locale?: ApplicationLocale): void {
@@ -220,9 +209,7 @@ function showUpdateErrorDialog(locale?: ApplicationLocale): void {
 				? "Couldn't check for updates. Try again later."
 				: "检查更新失败，请稍后重试",
 		})
-		.catch((error: unknown) => {
-			console.error("Failed to show the update-error dialog:", error)
-		})
+		.catch((error: unknown) => console.error("Failed to show the update-error dialog:", error))
 }
 
 function handleUpdateError(error: Error, locale?: ApplicationLocale): void {

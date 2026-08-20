@@ -1,5 +1,6 @@
 import type { DshRuntimeBootstrapDto } from "../../../contracts/ipc/dsh-runtime.contract"
 import { parseDshRuntimeBootstrap } from "../../../contracts/schemas/dsh-runtime.schema"
+import { readJsonResponse } from "./read-json-response"
 
 const WEB_BOOTSTRAP_PATH = "/__cocode/dsh-bootstrap"
 
@@ -7,24 +8,30 @@ export function isDesktopDshBridgeAvailable(): boolean {
 	return window.desktopApi?.dsh !== undefined
 }
 
+function isElectronDesktopRenderer(): boolean {
+	return (
+		typeof __COCODE_ELECTRON_DESKTOP__ !== "undefined" && __COCODE_ELECTRON_DESKTOP__ === true
+	)
+}
+
 export async function loadDshBootstrap(): Promise<DshRuntimeBootstrapDto> {
 	if (isDesktopDshBridgeAvailable()) {
 		return window.desktopApi.dsh.getBootstrap()
 	}
-
-	const response = await fetch(WEB_BOOTSTRAP_PATH, { cache: "no-store" })
-	if (!response.ok) {
-		let detail = `HTTP ${String(response.status)}`
-		try {
-			const payload = (await response.json()) as { error?: string }
-			if (payload.error !== undefined && payload.error.length > 0) detail = payload.error
-		} catch {
-			// Ignore malformed error payloads.
-		}
-		throw new Error(`DSH web bootstrap request failed (${detail}).`)
+	if (isElectronDesktopRenderer()) {
+		throw new Error(
+			"Electron preload bridge is unavailable. The preload script failed to load.",
+		)
 	}
 
-	return parseDshRuntimeBootstrap(await response.json())
+	const response = await fetch(WEB_BOOTSTRAP_PATH, { cache: "no-store" })
+	return parseDshRuntimeBootstrap(
+		await readJsonResponse<{
+			readonly origin: string
+			readonly boot: unknown
+			readonly themePreference: unknown
+		}>(response, "DSH web bootstrap request"),
+	)
 }
 
 /** Desktop rewrites through preload; browser dev proxies DSH routes on the Vite origin. */

@@ -1,4 +1,4 @@
 {
-	"applicationExtensions": [".exe"],
-	"packageExtensions": [".msi", ".msix"]
+	"applicationExtensions": [".exe", ".node"],
+	"packageExtensions": [".msi"]
 }

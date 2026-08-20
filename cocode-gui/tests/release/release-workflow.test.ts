@@ -54,3 +54,33 @@ test("uses oxlint as the GUI lint engine", () => {
 	assert.match(oxlintConfig, /"typescript"/)
 	assert.match(oxlintConfig, /"no-restricted-imports"/)
 })
+
+test("publishing stages fresh runtime and TUI artifacts before electron-builder", () => {
+	const packageJson = JSON.parse(readFileSync(guiPackagePath, "utf8")) as {
+		scripts?: Record<string, string>
+	}
+	const publish = packageJson.scripts?.publish ?? ""
+	const prepare = packageJson.scripts?.["prepare:release-assets"] ?? ""
+
+	assert.match(publish, /prepare:release-assets/)
+	assert.match(prepare, /harden-electron-default-app\.mjs/)
+	assert.match(prepare, /build:runtime/)
+	assert.match(prepare, /--clean/)
+	assert.match(prepare, /build:tui/)
+	assert.match(publish, /electron-vite build/)
+	assert.match(publish, /electron-builder/)
+	assert.ok(publish.indexOf("prepare:release-assets") < publish.indexOf("electron-builder"))
+})
+
+test("keeps local and release builds from implicitly publishing to GitHub", () => {
+	const packageJson = JSON.parse(readFileSync(guiPackagePath, "utf8")) as {
+		scripts?: Record<string, string>
+	}
+	const scripts = packageJson.scripts ?? {}
+
+	assert.match(scripts.package ?? "", /--publish never/)
+	assert.match(scripts.make ?? "", /--publish never/)
+	assert.match(scripts.publish ?? "", /--publish always/)
+	const buildRelease = readFileSync(path.join(repoRoot, "cocode-gui/scripts/release/build-release.ts"), "utf8")
+	assert.match(buildRelease, /\["--publish", "never"\]/)
+})

@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+	<head>
+		<meta charset="UTF-8" />
+		<meta
+			http-equiv="Content-Security-Policy"
+			content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'"
+		/>
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Cocode 启动失败</title>
+		<style>
+			:root {
+				color-scheme: light dark;
+				font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+			}
+			body {
+				margin: 0;
+				min-height: 100vh;
+				display: grid;
+				place-items: center;
+				background: #f7f7f8;
+				color: #18181b;
+			}
+			main {
+				width: min(500px, calc(100vw - 48px));
+				padding: 32px;
+				border: 1px solid #e4e4e7;
+				border-radius: 18px;
+				background: white;
+				box-shadow: 0 18px 60px #00000012;
+			}
+			h1 {
+				margin: 0 0 12px;
+				font-size: 24px;
+			}
+			p {
+				line-height: 1.55;
+				color: #52525b;
+			}
+			dl {
+				display: grid;
+				grid-template-columns: 120px 1fr;
+				gap: 8px 12px;
+				margin: 24px 0;
+				font-size: 13px;
+			}
+			dt {
+				color: #71717a;
+			}
+			dd {
+				margin: 0;
+				overflow-wrap: anywhere;
+				font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+			}
+			.actions {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 10px;
+			}
+			button {
+				border: 1px solid #d4d4d8;
+				border-radius: 9px;
+				padding: 9px 13px;
+				background: white;
+				color: inherit;
+				cursor: pointer;
+			}
+			button.primary {
+				border-color: #18181b;
+				background: #18181b;
+				color: white;
+			}
+			#status {
+				min-height: 1.2em;
+				margin-top: 14px;
+				font-size: 13px;
+				color: #71717a;
+			}
+			@media (prefers-color-scheme: dark) {
+				body {
+					background: #18181b;
+					color: #fafafa;
+				}
+				main {
+					border-color: #3f3f46;
+					background: #27272a;
+					box-shadow: none;
+				}
+				p,
+				dt,
+				#status {
+					color: #a1a1aa;
+				}
+				button {
+					border-color: #52525b;
+					background: #27272a;
+				}
+				button.primary {
+					border-color: #fafafa;
+					background: #fafafa;
+					color: #18181b;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<main>
+			<h1>Cocode 启动失败</h1>
+			<p id="message">Cocode 无法完成启动。错误详情已写入本地诊断日志。</p>
+			<dl>
+				<dt>启动阶段</dt>
+				<dd id="phase">unknown</dd>
+				<dt>错误代码</dt>
+				<dd id="failure-code">STARTUP_FAILED</dd>
+				<dt>版本 / 架构</dt>
+				<dd id="runtime">unknown</dd>
+				<dt>日志目录</dt>
+				<dd id="log-root">%LOCALAPPDATA%\\Cocode\\Logs</dd>
+			</dl>
+			<div class="actions">
+				<button class="primary" id="restart">重启 Cocode</button>
+				<button id="open-logs">打开日志目录</button>
+				<button id="export">导出诊断包</button>
+				<button id="quit">退出</button>
+			</div>
+			<div id="status" role="status"></div>
+		</main>
+		<script>
+			const params = new URLSearchParams(window.location.search)
+			const text = (id, value) => {
+				document.getElementById(id).textContent = value || "unknown"
+			}
+			text("phase", params.get("phaseLabel") || params.get("phase"))
+			text("failure-code", params.get("failureCode"))
+			text("message", params.get("userMessage"))
+			text(
+				"runtime",
+				`${params.get("version") || "unknown"} / ${params.get("platform") || "unknown"} / ${
+					params.get("architecture") || "unknown"
+				}`,
+			)
+			text("log-root", params.get("logRoot"))
+			const status = document.getElementById("status")
+			const setStatus = (value) => {
+				status.textContent = value
+			}
+			document.getElementById("restart").addEventListener("click", async () => {
+				setStatus("正在重启…")
+				try {
+					await window.desktopApi.startup.restart()
+				} catch {
+					setStatus("重启失败，请手动重新打开 Cocode。")
+				}
+			})
+			document.getElementById("open-logs").addEventListener("click", async () => {
+				try {
+					await window.desktopApi.diagnostics.openLogFolder()
+					setStatus("已打开日志目录。")
+				} catch {
+					setStatus("无法打开日志目录。")
+				}
+			})
+			document.getElementById("export").addEventListener("click", async () => {
+				try {
+					const result = await window.desktopApi.diagnostics.exportBundle()
+					setStatus(
+						result.cancelled
+							? "已取消导出。"
+							: `诊断包已保存：${result.fileName || "完成"}`,
+					)
+				} catch {
+					setStatus("无法导出诊断包。")
+				}
+			})
+			document.getElementById("quit").addEventListener("click", async () => {
+				try {
+					await window.desktopApi.startup.quit()
+				} catch {
+					window.close()
+				}
+			})
+		</script>
+	</body>
+</html>

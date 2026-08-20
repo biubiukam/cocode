@@ -6,9 +6,12 @@ import {
 	extractDshThemePreference,
 } from "./src/shared/dsh-runtime/bootstrap-html"
 
-const dshClientRoot = path.resolve(__dirname, "packages/client")
-const cocodeClientRoot = path.resolve(__dirname, "packages/cocode")
-const dshSource = (relativePath: string): string => path.join(__dirname, relativePath)
+// electron-vite resolves this config from the GUI package root. Keep paths
+// independent of CommonJS-only __dirname so the config is also importable as ESM.
+const projectRoot = path.resolve()
+const dshClientRoot = path.join(projectRoot, "packages/client")
+const cocodeClientRoot = path.join(projectRoot, "packages/cocode")
+const dshSource = (relativePath: string): string => path.join(projectRoot, relativePath)
 const localClient = (relativePath: string): string => path.join(dshClientRoot, relativePath)
 const dshClientBundles = findDshClientBundles()
 const dshRuntimeUrl = normalizeRuntimeUrl(process.env.COCODE_DSH_RUNTIME_URL)
@@ -17,14 +20,15 @@ const dshRuntimeUrl = normalizeRuntimeUrl(process.env.COCODE_DSH_RUNTIME_URL)
 export default defineConfig({
 	base: "./",
 	plugins: [dshClientBundlePlugin(), dshWebDevPlugin()],
-	server: dshRuntimeUrl === undefined ? undefined : { proxy: createDshRuntimeProxy(dshRuntimeUrl) },
+	server:
+		dshRuntimeUrl === undefined ? undefined : { proxy: createDshRuntimeProxy(dshRuntimeUrl) },
 	resolve: {
 		alias: [
-			{ find: "@", replacement: path.resolve(__dirname, "src/renderer") },
+			{ find: "@", replacement: path.join(projectRoot, "src/renderer") },
 			{
 				find: /^node:module$/,
-				replacement: path.resolve(
-					__dirname,
+				replacement: path.join(
+					projectRoot,
 					"src/renderer/app/bootstrap/node-module-stub.ts",
 				),
 			},
@@ -120,7 +124,9 @@ function dshWebDevPlugin(): Plugin {
 					const runtimeResponse = await fetch(dshRuntimeUrl)
 					if (!runtimeResponse.ok) {
 						throw new Error(
-							`DSH runtime bootstrap request failed with HTTP ${String(runtimeResponse.status)}.`,
+							`DSH runtime bootstrap request failed with HTTP ${String(
+								runtimeResponse.status,
+							)}.`,
 						)
 					}
 					const html = await runtimeResponse.text()

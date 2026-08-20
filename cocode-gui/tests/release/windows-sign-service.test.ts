@@ -44,8 +44,8 @@ const {
 } = localRequire(
 	"../../scripts/release/windows-sign-service.cjs",
 ) as SigningServiceModule
-const windowsSignHook = localRequire("../../scripts/release/windows-sign-hook.cjs") as (
-	filePath: string,
+const windowsSignBuilder = localRequire("../../scripts/release/windows-sign-builder.cjs") as (
+	configuration: { path: string },
 ) => Promise<void>
 
 test("limits remote signing to Magic-compatible executables and required package containers", () => {
@@ -56,13 +56,14 @@ test("limits remote signing to Magic-compatible executables and required package
 		assert.equal(isWindowsApplicationExecutable(file), true, file)
 		assert.equal(shouldSubmitWindowsFileForSigning(file), true, file)
 	}
-	for (const file of ["Cocode-Setup.msi", "Cocode.msix"]) {
+	for (const file of ["Cocode-Setup.msi"]) {
 		assert.equal(isWindowsApplicationExecutable(file), false, file)
 		assert.equal(shouldSubmitWindowsFileForSigning(file), true, file)
 	}
+	assert.equal(isWindowsApplicationExecutable("better-sqlite3.node"), true)
+	assert.equal(shouldSubmitWindowsFileForSigning("better-sqlite3.node"), true)
 	for (const file of [
 		"native.dll",
-		"better-sqlite3.node",
 		"driver.sys",
 		"boot.efi",
 		"screen.scr",
@@ -75,15 +76,15 @@ test("limits remote signing to Magic-compatible executables and required package
 	}
 })
 
-test("does not call the signing service for excluded application files", async () => {
-	await assert.doesNotReject(() => windowsSignHook("/tmp/native.node"))
+test("does not call the signing service for excluded Builder files", async () => {
+	await assert.doesNotReject(() => windowsSignBuilder({ path: "/tmp/readme.txt" }))
 })
 
 test("keeps the original extension on signing temp files", () => {
 	assert.match(signingTemporaryPath("C:/out/Cocode.exe"), /\/\.Cocode\.cocode-signing-\d+-\d+\.exe$/)
 	assert.match(
-		signingTemporaryPath("C:/out/Cocode-Desktop-1.0.1-win32-x64.msix"),
-		/\/\.Cocode-Desktop-1\.0\.1-win32-x64\.cocode-signing-\d+-\d+\.msix$/,
+		signingTemporaryPath("C:/out/Cocode-Desktop-1.0.1-win32-x64.msi"),
+		/\/\.Cocode-Desktop-1\.0\.1-win32-x64\.cocode-signing-\d+-\d+\.msi$/,
 	)
 })
 

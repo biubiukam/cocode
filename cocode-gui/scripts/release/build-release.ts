@@ -25,11 +25,14 @@ const environment: NodeJS.ProcessEnv = {
 	RELEASE_ARCH: arch,
 	RELEASE_REQUIRE_SIGNING: "1",
 	RELEASE_REQUIRE_NATIVE_ARCH_MATCH: "1",
-	FORGE_OUT_DIR: process.env.FORGE_OUT_DIR ?? `release/${platform}/${arch}`,
+	RELEASE_OUTPUT_DIR: process.env.RELEASE_OUTPUT_DIR ?? `release/${platform}/${arch}`,
 	COCODE_RUNTIME_ARTIFACT_ROOT: runtimeArtifactRoot,
 	COCODE_TUI_ARTIFACT_ROOT: tuiArtifactRoot,
 }
-environment.WINDOWS_SIGN_LEDGER_DIR = path.resolve(environment.FORGE_OUT_DIR, "windows-sign-ledger")
+environment.WINDOWS_SIGN_LEDGER_DIR = path.resolve(
+	environment.RELEASE_OUTPUT_DIR,
+	"windows-sign-ledger",
+)
 delete environment.COREPACK_ROOT
 const target = resolveReleaseTarget(environment)
 if (target.platform !== process.platform)
@@ -65,19 +68,24 @@ const runtimeStatus = runPnpm([
 ])
 if (runtimeStatus !== 0) throw new Error(`Runtime build exited with code ${String(runtimeStatus)}.`)
 
-// Forge verifies the staged TUI while packaging, and `pnpm exec` bypasses the
-// premake lifecycle script that would otherwise build it.
 const tuiStatus = runPnpm(["run", "build:tui", "--", "--output", tuiArtifactRoot])
 if (tuiStatus !== 0) throw new Error(`TUI build exited with code ${String(tuiStatus)}.`)
 
+const viteStatus = runPnpm(["exec", "electron-vite", "build"])
+if (viteStatus !== 0) throw new Error(`Electron Vite build exited with code ${String(viteStatus)}.`)
+
+const builderPlatform = target.platform === "darwin" ? "--mac" : "--win"
+const builderArch = target.arch === "arm64" ? "--arm64" : "--x64"
+const publish =
+	environment.RELEASE_PUBLISH === "1" ? ["--publish", "always"] : ["--publish", "never"]
 process.exitCode = runPnpm([
 	"exec",
-	"electron-forge",
-	"make",
-	"--platform",
-	target.platform,
-	"--arch",
-	target.arch,
+	"electron-builder",
+	builderPlatform,
+	builderArch,
+	"--config",
+	"electron-builder.config.ts",
+	...publish,
 ])
 
 function runPnpm(args: readonly string[]): number {

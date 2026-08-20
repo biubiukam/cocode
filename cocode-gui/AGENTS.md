@@ -23,7 +23,7 @@ When adding or revising agent constraints, prompts or examples in this file:
 
 ## 2. Project baseline
 
-This repository is an Electron Forge + Vite + TypeScript desktop application.
+This repository is an electron-vite + electron-builder + TypeScript desktop application.
 
 - Node.js: `>=22.12.0` (use the version in `.nvmrc` when available).
 - pnpm: `10.34.5` exactly.

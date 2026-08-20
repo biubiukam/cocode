@@ -44,6 +44,20 @@ test("error serializer bounds and cleans thrown values", () => {
 	assert.ok((serialized.stack?.length ?? 0) <= 8_192)
 })
 
+test("error serializer redacts authorization and cookie values", () => {
+	const serialized = serializeError(
+		new Error('Authorization: Bearer secret Cookie: session=private "apiKey":"hidden"'),
+	)
+	assert.doesNotMatch(serialized.message, /secret|private|hidden/)
+})
+
+test("error serializer removes complete Windows user paths", () => {
+	const serialized = serializeError(
+		new Error("cannot open C:\\Users\\alice\\AppData\\Local\\Cocode\\global.db"),
+	)
+	assert.doesNotMatch(serialized.message, /Users|alice|AppData|global\.db/i)
+})
+
 test("rotating sink keeps current file and prunes old files", async () => {
 	const directory = await mkdtemp(path.join(tmpdir(), "cocode-log-sink-"))
 	const sink = new RotatingFileSink({

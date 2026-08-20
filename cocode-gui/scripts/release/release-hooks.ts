@@ -1,268 +1,313 @@
 import { execFileSync } from "node:child_process"
 import { createHash } from "node:crypto"
+import { createRequire } from "node:module"
 import {
 	existsSync,
 	mkdirSync,
-	readdirSync,
+	mkdtempSync,
 	readFileSync,
-	renameSync,
+	readdirSync,
 	rmSync,
 	statSync,
 	writeFileSync,
-	mkdtempSync,
 } from "node:fs"
+import fs from "node:fs/promises"
 import os from "node:os"
-import * as path from "pathe"
-import type { ForgeMakeResult } from "@electron-forge/shared-types"
+import { Arch, type AfterPackContext, type BuildResult } from "electron-builder"
 import { notarize } from "@electron/notarize"
-import windowsSigningService = require("./windows-sign-service.cjs")
+import * as path from "pathe"
+import packageMetadata from "../../package.json"
+import { verifyPackagedStartupAssets } from "./verify-packaged-startup-assets.mjs"
 import {
 	createMacNotarizeOptions,
 	isReleaseSigningRequired,
-	resolveMsixPackageVersion,
 	resolveReleaseTarget,
 	resolveWindowsSignLedgerDir,
 	resolveWindowsSignMode,
+	type ReleaseArchitecture,
+	type ReleasePlatform,
+	type ReleaseTarget,
 } from "./release-config"
+import { MAIN_RUNTIME_DEPENDENCIES } from "./runtime-dependencies"
+import {
+	copyProductionDependencyClosure,
+	verifyProductionDependencyClosure,
+} from "./runtime-dependency-closure"
 
 interface WindowsSigningPolicy {
-	isWindowsApplicationExecutable(filePath: string): boolean
-	signFile(filePath: string): Promise<unknown>
+	inspectAuthenticode(filePath: string): { Subject?: string; Thumbprint?: string }
 }
 
-const { isWindowsApplicationExecutable, signFile } = windowsSigningService as WindowsSigningPolicy
+const requireFromHere = createRequire(path.resolve("scripts/release/release-hooks.ts"))
+const windowsSigningService = requireFromHere("./windows-sign-service.cjs") as WindowsSigningPolicy
+const { inspectAuthenticode } = windowsSigningService as WindowsSigningPolicy
 
-export function normalizeArtifactNames(makeResults: readonly ForgeMakeResult[]): ForgeMakeResult[] {
-	return makeResults.map((result) => {
-		if (result.platform === "win32") {
-			const version = String(result.packageJSON.version ?? "0.0.0")
-			const artifacts = result.artifacts.map((artifact) => {
-				if (!artifact.toLowerCase().endsWith(".msix")) return artifact
-				const target = path.join(
-					path.dirname(artifact),
-					`Cocode-Desktop-${version}-win32-${result.arch}.msix`,
-				)
-				if (artifact === target) return artifact
-				if (existsSync(target)) rmSync(target, { force: true })
-				renameSync(artifact, target)
-				return target
-			})
-			return { ...result, artifacts }
-		}
-		if (result.platform !== "darwin") return { ...result, artifacts: [...result.artifacts] }
-		const version = String(result.packageJSON.version ?? "0.0.0")
-		const artifacts = result.artifacts.map((artifact) => {
-			const extension = artifact.toLowerCase().endsWith(".dmg")
-				? ".dmg"
-				: artifact.toLowerCase().endsWith(".zip")
-				? ".zip"
-				: artifact.toLowerCase().endsWith(".pkg")
-				? ".pkg"
-				: undefined
-			if (!extension) return artifact
-			const target = path.join(
-				path.dirname(artifact),
-				`Cocode-Desktop-${version}-${result.platform}-${result.arch}${extension}`,
-			)
-			if (artifact === target) return artifact
-			if (existsSync(target)) rmSync(target, { force: true })
-			renameSync(artifact, target)
-			return target
-		})
-		return { ...result, artifacts }
+export interface ReleaseArtifactSet {
+	readonly platform: ReleasePlatform
+	readonly arch: ReleaseArchitecture
+	readonly version: string
+	readonly artifacts: readonly string[]
+}
+
+export async function hardenBuilderElectron(context: AfterPackContext): Promise<void> {
+	const target = resolveContextTarget(context)
+	const resourcesRoot = resolvePackagedResourcesRoot(context.appOutDir, target.platform)
+	// electron-builder removes default_app.asar during its normal Electron
+	// extraction cleanup. The local postinstall hardening still protects the
+	// development Electron binary, while Builder's cleanup already prevents the
+	// unconfigured welcome app from shipping in release output.
+	if (!existsSync(path.join(resourcesRoot, "default_app.asar"))) return
+	await runNodeScript("scripts/harden-electron-default-app.mjs", [
+		"--resources-root",
+		resourcesRoot,
+	])
+}
+
+export async function stageBuilderApplication(context: AfterPackContext): Promise<void> {
+	const target = resolveContextTarget(context)
+	assertNativeStagingTarget(target)
+	const resourcesRoot = resolvePackagedResourcesRoot(context.appOutDir, target.platform)
+	const appRoot = path.join(resourcesRoot, "app")
+	verifyBuilderApplicationEntrypoints(appRoot)
+	copyProductionDependencyClosure({
+		sourceRoot: process.cwd(),
+		appRoot,
+		dependencies: MAIN_RUNTIME_DEPENDENCIES,
 	})
+	verifyProductionDependencyClosure(appRoot, MAIN_RUNTIME_DEPENDENCIES)
+
+	const startupFailureHtml = path.resolve("resources/startup-failure.html")
+	if (!existsSync(startupFailureHtml))
+		throw new Error(`Startup failure diagnostic page is missing: ${startupFailureHtml}`)
+	await fs.mkdir(resourcesRoot, { recursive: true })
+	await fs.copyFile(startupFailureHtml, path.join(resourcesRoot, "startup-failure.html"))
+
+	const runtimeArtifact = path.resolve(
+		process.env.COCODE_RUNTIME_ARTIFACT_ROOT ??
+			path.join(process.cwd(), ".cache", "cocode", "release-runtime"),
+	)
+	await runNodeScript("scripts/verify-dsh-runtime.mjs", ["--runtime-root", runtimeArtifact])
+	await fs.rm(path.join(resourcesRoot, "dsh-runtime"), { recursive: true, force: true })
+	await fs.cp(runtimeArtifact, path.join(resourcesRoot, "dsh-runtime"), { recursive: true })
+
+	const tuiArtifact = path.resolve(
+		process.env.COCODE_TUI_ARTIFACT_ROOT ??
+			path.join(process.cwd(), ".cache", "cocode", "tui"),
+	)
+	await verifyTuiArtifact(tuiArtifact)
+	await fs.rm(path.join(resourcesRoot, "tui"), { recursive: true, force: true })
+	await fs.cp(tuiArtifact, path.join(resourcesRoot, "tui"), { recursive: true })
+
+	const nodeExecutable = path.join(resourcesRoot, "cocode-node")
+	await fs.copyFile(process.execPath, nodeExecutable)
+	await fs.chmod(nodeExecutable, 0o755)
+
+	verifyPackagedRuntimeLayout(context.appOutDir, target)
 }
 
-export function prepareMacDmgDependencies(): void {
-	if (process.platform !== "darwin") return
-	const nodeGyp = path.resolve("node_modules/.bin/node-gyp")
-	for (const dependency of ["macos-alias", "fs-xattr"]) {
-		const addon = path.join(
-			"node_modules",
-			dependency,
-			"build",
-			"Release",
-			dependency === "macos-alias" ? "volume.node" : "xattr.node",
-		)
-		if (existsSync(addon)) continue
-		if (!existsSync(nodeGyp))
-			throw new Error(`Cannot build ${dependency}: node-gyp is missing.`)
-		execFileSync(nodeGyp, ["rebuild"], {
-			cwd: path.join("node_modules", dependency),
-			stdio: "inherit",
-		})
+export function verifyBuilderApplicationEntrypoints(appRoot: string): void {
+	const buildRoot = path.join(appRoot, ".vite", "build")
+	const mainPath = path.join(buildRoot, "main.mjs")
+	const preloadPath = path.join(buildRoot, "preload.js")
+	if (!existsSync(mainPath)) throw new Error(`Packaged main entrypoint is missing: ${mainPath}`)
+	if (!existsSync(preloadPath)) {
+		const legacyPreloadPath = path.join(buildRoot, "index.mjs")
+		if (existsSync(legacyPreloadPath))
+			throw new Error(
+				`Packaged preload entrypoint has the wrong name: ${legacyPreloadPath}; expected ${preloadPath}.`,
+			)
+		throw new Error(`Packaged preload entrypoint is missing: ${preloadPath}`)
 	}
-}
-
-export async function verifyPackagedApplication(packageResult: {
-	readonly platform: string
-	readonly arch: string
-	readonly outputPaths: readonly string[]
-}): Promise<void> {
-	if (!isReleaseSigningRequired()) return
-	const target = resolveReleaseTarget()
-	if (packageResult.platform !== target.platform || packageResult.arch !== target.arch) {
+	const unsupportedRequires = [
+		...readFileSync(preloadPath, "utf8").matchAll(/\brequire\(\s*["']([^"']+)["']\s*\)/g),
+	]
+		.map((match) => match[1])
+		.filter((dependency): dependency is string => dependency !== undefined && dependency !== "electron")
+	if (unsupportedRequires.length > 0) {
 		throw new Error(
-			`Packaged target ${packageResult.platform}/${packageResult.arch} does not match ${target.platform}/${target.arch}.`,
+			`Sandboxed preload bundle contains unsupported external require: ${[
+				...new Set(unsupportedRequires),
+			]
+				.sort()
+				.join(", ")}. Bundle preload dependencies instead.`,
 		)
 	}
-	const packagePath = packageResult.outputPaths.find((candidate) => existsSync(candidate))
-	if (!packagePath) throw new Error("Forge did not return a packaged application path.")
-	if (packageResult.platform === "darwin") {
-		const appPath = findFirstByExtension(packagePath, ".app")
-		if (!appPath) throw new Error(`No .app bundle was found under ${packagePath}.`)
-		run("codesign", ["--verify", "--deep", "--strict", "--verbose=2", appPath])
-		return
-	}
-	const files = collectFiles(packagePath).filter(isWindowsApplicationExecutable)
-	if (files.length === 0)
-		throw new Error(`No Windows executable artifacts found under ${packagePath}.`)
-	verifyWindowsSigningLedger(files)
-	let signerSubject: string | undefined
-	for (const file of files) {
-		const signature = verifyWindowsFile(file)
-		signerSubject ??= signature.Subject
-	}
-	assertMsixPublisherMatchesSigner(signerSubject)
 }
 
-export async function notarizeFinalMacArtifacts(
-	makeResults: readonly ForgeMakeResult[],
-): Promise<void> {
-	if (!isReleaseSigningRequired() || process.platform !== "darwin") return
+export async function notarizeBuilderMacApplication(context: AfterPackContext): Promise<void> {
+	const target = resolveContextTarget(context)
+	if (target.platform !== "darwin") return
+	const appPath = resolveMacAppPath(context.appOutDir)
+	verifyMacPackagedArchitecture(appPath, target.arch)
+	if (!isReleaseSigningRequired()) return
 	const credentials = createMacNotarizeOptions()
 	if (!credentials) throw new Error("Mac notarization credentials are missing.")
-	const dmgs = makeResults
-		.flatMap((result) => result.artifacts)
-		.filter((artifact) => /\.(dmg|pkg)$/i.test(artifact))
-	if (dmgs.length === 0)
-		throw new Error("No DMG or PKG artifact was generated for the macOS release.")
-	for (const artifact of dmgs) {
-		await notarize({ appPath: artifact, ...credentials })
-		run("xcrun", ["stapler", "validate", artifact])
-		if (artifact.toLowerCase().endsWith(".dmg")) run("hdiutil", ["imageinfo", artifact])
-		else run("pkgutil", ["--check-signature", artifact])
-	}
+	run("codesign", ["--verify", "--deep", "--strict", "--verbose=2", appPath])
+	await notarize({ appPath, ...credentials } as Parameters<typeof notarize>[0])
+	run("xcrun", ["stapler", "staple", appPath])
+	run("xcrun", ["stapler", "validate", appPath])
+	run("codesign", ["--verify", "--deep", "--strict", "--verbose=2", appPath])
 }
 
-export function addMacPkgArtifact(makeResults: readonly ForgeMakeResult[]): ForgeMakeResult[] {
-	if (process.platform !== "darwin")
-		return makeResults.map((result) => ({ ...result, artifacts: [...result.artifacts] }))
-	const resultIndex = makeResults.findIndex((result) => result.platform === "darwin")
-	if (resultIndex === -1)
-		return makeResults.map((result) => ({ ...result, artifacts: [...result.artifacts] }))
-	const result = makeResults[resultIndex]
-	const outputDirectory = path.dirname(
-		result.artifacts[0] ?? path.resolve(process.env.FORGE_OUT_DIR ?? "out"),
-	)
-	const appRoot = path.resolve(process.env.FORGE_OUT_DIR ?? "out")
-	const appPath = findMacAppWithTui(appRoot)
-	if (!appPath) throw new Error(`No packaged macOS App bundle was found under ${appRoot}.`)
-	const version = String(result.packageJSON.version ?? "0.0.0")
+export async function finalizeBuilderArtifacts(context: BuildResult): Promise<string[]> {
+	if (context.artifactPaths.length === 0) return []
+	const target = resolveBuilderTarget()
+	if (!target) return []
+	const artifacts = context.artifactPaths.filter(existsSync)
+	const additional: string[] = []
+
+	if (target.platform === "darwin") {
+		const appPath = findMacAppWithTui(context.outDir)
+		if (!appPath)
+			throw new Error(`No packaged macOS App bundle was found under ${context.outDir}.`)
+		const pkgPath = await buildAndVerifyMacPkg({
+			appPath,
+			outDir: context.outDir,
+			version: packageMetadata.version,
+			arch: target.arch,
+		})
+		additional.push(pkgPath)
+	}
+
+	const updateMetadata = writeArchitectureUpdateMetadata({
+		outDir: context.outDir,
+		platform: target.platform,
+		arch: target.arch,
+		version: packageMetadata.version,
+		artifacts: [...artifacts, ...additional],
+	})
+	additional.push(...updateMetadata)
+
+	verifyBuilderArtifacts({
+		platform: target.platform,
+		arch: target.arch,
+		version: packageMetadata.version,
+		artifacts: [...artifacts, ...additional],
+	})
+	const checksum = appendChecksumManifest(context.outDir, [...artifacts, ...additional])
+	additional.push(checksum)
+	cleanupWindowsSignLedger()
+	return additional
+}
+
+export async function buildAndVerifyMacPkg(options: {
+	readonly appPath: string
+	readonly outDir: string
+	readonly version: string
+	readonly arch: ReleaseArchitecture
+}): Promise<string> {
 	const outputPath = path.join(
-		outputDirectory,
-		`Cocode-Desktop-${version}-${result.platform}-${result.arch}.pkg`,
+		options.outDir,
+		`Cocode-${options.version}-${options.arch}.pkg`,
 	)
-	run(process.execPath, ["scripts/release/build-mac-pkg.mjs", appPath, outputPath, version])
+	run(process.execPath, [
+		"scripts/release/build-mac-pkg.mjs",
+		options.appPath,
+		outputPath,
+		options.version,
+	])
 	run(process.execPath, ["scripts/release/verify-mac-pkg.mjs", outputPath])
-	return makeResults.map((candidate, index) =>
-		index === resultIndex
-			? { ...candidate, artifacts: [...candidate.artifacts, outputPath] }
-			: { ...candidate, artifacts: [...candidate.artifacts] },
+	if (!isReleaseSigningRequired()) return outputPath
+	const credentials = createMacNotarizeOptions()
+	if (!credentials) throw new Error("Mac notarization credentials are missing.")
+	await notarize({ appPath: outputPath, ...credentials } as Parameters<typeof notarize>[0])
+	run("xcrun", ["stapler", "staple", outputPath])
+	run("xcrun", ["stapler", "validate", outputPath])
+	run("pkgutil", ["--check-signature", outputPath])
+	run(process.execPath, ["scripts/release/verify-mac-pkg.mjs", outputPath])
+	return outputPath
+}
+
+export function writeArchitectureUpdateMetadata(options: {
+	readonly outDir: string
+	readonly platform: ReleasePlatform
+	readonly arch: ReleaseArchitecture
+	readonly version: string
+	readonly artifacts: readonly string[]
+}): string[] {
+	const artifact = selectUpdateArtifact(options.platform, options.artifacts)
+	const sha512 = createHash("sha512").update(readFileSync(artifact)).digest("base64")
+	const fileName = path.basename(artifact)
+	const canonical =
+		options.platform === "darwin" ? `${options.arch}-mac.yml` : `${options.arch}.yml`
+	const requestedAlias =
+		options.platform === "darwin"
+			? `latest-mac-${options.arch}.yml`
+			: `latest-${options.arch}.yml`
+	const metadata = [
+		`version: ${options.version}`,
+		"files:",
+		`  - url: ${yamlString(fileName)}`,
+		`    sha512: ${yamlString(sha512)}`,
+		`path: ${yamlString(fileName)}`,
+		`sha512: ${yamlString(sha512)}`,
+		`releaseName: ${yamlString(`Cocode ${options.version}`)}`,
+		`releaseDate: ${yamlString(new Date().toISOString())}`,
+		"",
+	].join("\n")
+	mkdirSync(options.outDir, { recursive: true })
+	const files = [canonical, requestedAlias].map((name) => path.join(options.outDir, name))
+	for (const file of files) writeFileSync(file, metadata)
+	return files
+}
+
+export function appendChecksumManifest(outDir: string, artifacts: readonly string[]): string {
+	const uniqueArtifacts = [...new Set(artifacts.map((artifact) => path.resolve(artifact)))].filter(
+		existsSync,
 	)
-}
-
-export async function signWindowsPackageArtifacts(
-	makeResults: readonly ForgeMakeResult[],
-): Promise<void> {
-	if (resolveWindowsSignMode() !== "service") return
-	const packages = makeResults
-		.flatMap((result) => result.artifacts)
-		.filter((artifact) => artifact.toLowerCase().endsWith(".msix"))
-	for (const file of packages) {
-		if (!existsSync(file)) throw new Error(`Forge artifact is missing: ${file}`)
-		await signFile(path.resolve(file))
-	}
-}
-
-export function verifyMadeArtifacts(makeResults: readonly ForgeMakeResult[]): void {
-	if (!isReleaseSigningRequired()) return
-	const target = resolveReleaseTarget()
-	for (const result of makeResults) {
-		if (result.platform !== target.platform || result.arch !== target.arch)
-			throw new Error(
-				`Made target ${result.platform}/${result.arch} does not match ${target.platform}/${target.arch}.`,
-			)
-		for (const artifact of result.artifacts) {
-			if (!existsSync(artifact)) throw new Error(`Forge artifact is missing: ${artifact}`)
-			if (target.platform === "darwin" && artifact.toLowerCase().endsWith(".zip"))
-				run("unzip", ["-t", artifact])
-			if (target.platform === "darwin" && artifact.toLowerCase().endsWith(".dmg"))
-				run("hdiutil", ["imageinfo", artifact])
-			if (target.platform === "darwin" && artifact.toLowerCase().endsWith(".pkg"))
-				run("pkgutil", ["--check-signature", artifact])
-			if (
-				target.platform === "win32" &&
-				/\.(exe|msi)$/i.test(artifact) &&
-				process.platform === "win32"
-			)
-				verifyWindowsFile(artifact)
-		}
-		if (target.platform === "win32" && process.platform === "win32") {
-			const packages = result.artifacts.filter((artifact) =>
-				artifact.toLowerCase().endsWith(".msix"),
-			)
-			if (packages.length === 0)
-				throw new Error(`No MSIX artifact was generated for ${result.platform}/${result.arch}.`)
-			for (const artifact of packages)
-				verifyWindowsMsix(artifact, target.arch, result.packageJSON.version)
-		}
-	}
-}
-
-export function cleanupWindowsSignLedger(): void {
-	if (resolveReleaseTarget().platform !== "win32" || resolveWindowsSignMode() !== "service")
-		return
-	const ledgerDir = resolveWindowsSignLedgerDir()
-	if (existsSync(ledgerDir)) rmSync(ledgerDir, { recursive: true, force: true })
-}
-
-export function appendChecksumManifest(makeResults: readonly ForgeMakeResult[]): ForgeMakeResult[] {
-	const outputDirectory = path.resolve(process.env.FORGE_OUT_DIR ?? "out")
-	const artifacts = makeResults.flatMap((result) => result.artifacts).filter(existsSync)
-	const rows = artifacts
+	const rows = uniqueArtifacts
 		.map(
 			(artifact) =>
 				`${createHash("sha256")
 					.update(readFileSync(artifact))
-					.digest("hex")}  ${path.relative(outputDirectory, artifact)}`,
+					.digest("hex")}  ${path.relative(outDir, artifact)}`,
 		)
 		.sort()
-	const target = makeResults[0] ? `-${makeResults[0].platform}-${makeResults[0].arch}` : ""
-	const manifestPath = path.join(outputDirectory, `SHA256SUMS${target}.txt`)
+	const manifestPath = path.join(outDir, "SHA256SUMS")
 	writeFileSync(manifestPath, `${rows.join("\n")}\n`)
-	if (!makeResults[0]) return [...makeResults]
-	return [
-		{ ...makeResults[0], artifacts: [...makeResults[0].artifacts, manifestPath] },
-		...makeResults.slice(1),
-	]
+	return manifestPath
 }
 
-/** Windows GitHub releases ship MSIX only; omit leftover Squirrel feed files. */
-export function selectGitHubReleaseArtifacts(
-	makeResults: readonly ForgeMakeResult[],
-): ForgeMakeResult[] {
-	return makeResults.map((result) => {
-		if (result.platform !== "win32")
-			return { ...result, artifacts: [...result.artifacts] }
-		return {
-			...result,
-			artifacts: result.artifacts.filter((artifact) => {
-				const name = path.basename(artifact).toLowerCase()
-				return name !== "releases" && !name.endsWith(".nupkg")
-			}),
+export function verifyBuilderArtifacts(result: ReleaseArtifactSet): void {
+	for (const artifact of result.artifacts) {
+		if (!existsSync(artifact)) throw new Error(`Builder artifact is missing: ${artifact}`)
+		if (result.platform === "darwin" && artifact.toLowerCase().endsWith(".zip")) {
+			run("unzip", ["-t", artifact])
+			if (isReleaseSigningRequired()) verifySignedMacZip(artifact, result.arch)
 		}
-	})
+		if (result.platform === "darwin" && artifact.toLowerCase().endsWith(".pkg")) {
+			run(process.execPath, ["scripts/release/verify-mac-pkg.mjs", artifact])
+			if (isReleaseSigningRequired()) {
+				run("pkgutil", ["--check-signature", artifact])
+				run("xcrun", ["stapler", "validate", artifact])
+			}
+		}
+		if (
+			result.platform === "win32" &&
+			process.platform === "win32" &&
+			artifact.toLowerCase().endsWith(".exe") &&
+			isReleaseSigningRequired()
+		) {
+			verifyWindowsFile(artifact)
+			verifyWindowsSigningLedger([artifact])
+		}
+	}
+}
+
+export function findMacAppWithTui(root: string): string | undefined {
+	if (!existsSync(root)) return undefined
+	if (!statSync(root).isDirectory()) return undefined
+	if (root.endsWith(".app")) {
+		return existsSync(path.join(root, "Contents", "Resources", "tui", "manifest.json"))
+			? root
+			: undefined
+	}
+	for (const entry of readdirSync(root, { withFileTypes: true })) {
+		if (!entry.isDirectory()) continue
+		const found = findMacAppWithTui(path.join(root, entry.name))
+		if (found) return found
+	}
+	return undefined
 }
 
 export function buildWindowsAuthenticodeVerificationScript(): string {
@@ -276,132 +321,6 @@ export function buildWindowsAuthenticodeVerificationScript(): string {
 	].join("; ")
 }
 
-function verifyWindowsFile(file: string): { Subject?: string; Thumbprint?: string } {
-	const script = buildWindowsAuthenticodeVerificationScript()
-	const output = execFileSync(
-		"powershell.exe",
-		["-NoProfile", "-NonInteractive", "-Command", script],
-		{
-			env: { ...process.env, VERIFY_FILE: file },
-			encoding: "utf8",
-		},
-	).trim()
-	const signature = decodeAuthenticodeOutput(output)
-	const expectedSubject = process.env.WINDOWS_SIGN_CERTIFICATE_SUBJECT?.trim()
-	const expectedThumbprint = normalizeThumbprint(process.env.WINDOWS_SIGN_CERTIFICATE_SHA1)
-	if (expectedSubject && signature.Subject !== expectedSubject)
-		throw new Error(`Unexpected Windows signer subject: ${file}`)
-	if (expectedThumbprint && normalizeThumbprint(signature.Thumbprint) !== expectedThumbprint)
-		throw new Error(`Unexpected Windows signer certificate: ${file}`)
-	return signature
-}
-
-function decodeAuthenticodeOutput(output: string): { Subject?: string; Thumbprint?: string } {
-	const parsed = JSON.parse(output) as {
-		SubjectUtf8?: string
-		Subject?: string
-		Thumbprint?: string
-	}
-	return {
-		Subject: parsed.SubjectUtf8
-			? Buffer.from(parsed.SubjectUtf8, "base64").toString("utf8")
-			: parsed.Subject,
-		Thumbprint: parsed.Thumbprint,
-	}
-}
-
-function assertMsixPublisherMatchesSigner(signerSubject: string | undefined): void {
-	const publisher = process.env.WINDOWS_MSIX_PUBLISHER?.trim()
-	if (!publisher || !signerSubject) return
-	const expected = normalizeMsixPublisher(publisher)
-	if (expected === signerSubject) return
-	throw new Error(
-		`WINDOWS_MSIX_PUBLISHER must exactly match the signing certificate subject.\n  WINDOWS_MSIX_PUBLISHER=${expected}\n  certificate subject=${signerSubject}`,
-	)
-}
-
-function verifyWindowsSigningLedger(files: readonly string[]): void {
-	if (resolveWindowsSignMode() !== "service") return
-	const ledgerDir = resolveWindowsSignLedgerDir()
-	for (const file of files) {
-		const digest = createHash("sha256").update(readFileSync(file)).digest("hex")
-		const ledgerPath = path.join(ledgerDir, `${digest}.json`)
-		if (!existsSync(ledgerPath))
-			throw new Error(`Windows signing ledger entry is missing: ${file}`)
-		const entry = JSON.parse(readFileSync(ledgerPath, "utf8")) as {
-			inputSha256?: string
-			outputSha256?: string
-			status?: string
-		}
-		if (
-			entry.status !== "signed" ||
-			!isSha256(entry.inputSha256) ||
-			entry.outputSha256 !== digest
-		)
-			throw new Error(`Windows signing ledger entry is invalid: ${file}`)
-	}
-}
-
-function verifyWindowsMsix(file: string, arch: string, version: unknown): void {
-	verifyWindowsSigningLedger([file])
-	const signature = verifyWindowsFile(file)
-	const directory = mkdtempSync(path.join(os.tmpdir(), "cocode-msix-"))
-	try {
-		const [manifestPath] = extractWindowsArchiveEntries({
-			archivePath: file,
-			destination: directory,
-			mode: "named",
-			names: ["AppxManifest.xml"],
-		})
-		if (!manifestPath) throw new Error(`MSIX manifest is missing: ${file}`)
-		const manifest = readFileSync(manifestPath, "utf8")
-		const identity = manifest.match(/<Identity\b[^>]*\/?>/i)?.[0]
-		const packageIdentity = decodeXmlAttribute(identity?.match(/\bName="([^"]+)"/i)?.[1])
-		const publisher = decodeXmlAttribute(identity?.match(/\bPublisher="([^"]+)"/i)?.[1])
-		const packageVersion = identity?.match(/\bVersion="([^"]+)"/i)?.[1]
-		const processorArchitecture = identity?.match(/\bProcessorArchitecture="([^"]+)"/i)?.[1]
-		const executable = manifest.match(/\bExecutable="([^"]+\.exe)"/i)?.[1]
-		if (
-			!identity ||
-			!packageIdentity ||
-			!publisher ||
-			!packageVersion ||
-			!processorArchitecture ||
-			!executable
-		)
-			throw new Error(`MSIX manifest is missing required identity fields: ${file}`)
-		const expectedIdentity = process.env.WINDOWS_MSIX_PACKAGE_ID?.trim()
-		if (expectedIdentity && packageIdentity !== expectedIdentity)
-			throw new Error(`MSIX package identity mismatch: ${file}`)
-		if (processorArchitecture.toLowerCase() !== arch.toLowerCase())
-			throw new Error(`MSIX architecture mismatch: ${file}`)
-		if (packageVersion !== resolveMsixPackageVersion(String(version)))
-			throw new Error(`MSIX version mismatch: ${file}`)
-		const [executablePath] = extractWindowsArchiveEntries({
-			archivePath: file,
-			destination: directory,
-			mode: "named",
-			names: [executable.replaceAll("\\", "/")],
-		})
-		if (!executablePath) throw new Error(`MSIX executable entry is missing: ${executable}`)
-		const expectedPublisher = process.env.WINDOWS_MSIX_PUBLISHER?.trim()
-		if (expectedPublisher && normalizeMsixPublisher(expectedPublisher) !== publisher)
-			throw new Error(`MSIX publisher mismatch: ${file}`)
-		if (signature.Subject && signature.Subject !== publisher)
-			throw new Error(`MSIX signer publisher does not match manifest: ${file}`)
-	} finally {
-		rmSync(directory, { recursive: true, force: true })
-	}
-}
-
-function isSha256(value: string | undefined): value is string {
-	return Boolean(value && /^[a-f0-9]{64}$/i.test(value))
-}
-
-// Expand-Archive unpacks every entry and keeps zip-relative paths. The
-// packaged dsh-runtime has tens of thousands of files, some longer than
-// MAX_PATH once extracted under %TEMP%. Verification only needs executables
-// and AppxManifest.xml, extracted to short names via ZipFile.OpenRead.
 export function extractWindowsArchiveEntries(options: {
 	readonly archivePath: string
 	readonly destination: string
@@ -429,11 +348,8 @@ export function extractWindowsArchiveEntries(options: {
 		"    if ($entry.FullName.EndsWith('/')) { continue }",
 		"    $name = $entry.FullName.Replace('\\','/')",
 		"    $include = $false",
-		"    if ($env:ZIP_MODE -eq 'executables') {",
-		"      $include = $name -like '*.exe'",
-		"    } else {",
-		"      foreach ($want in $wanted) { if ($name -eq $want) { $include = $true; break } }",
-		"    }",
+		"    if ($env:ZIP_MODE -eq 'executables') { $include = $name -like '*.exe' }",
+		"    else { foreach ($want in $wanted) { if ($name -eq $want) { $include = $true; break } } }",
 		"    if (-not $include) { continue }",
 		"    $leaf = [IO.Path]::GetFileName($entry.FullName)",
 		"    if ([string]::IsNullOrWhiteSpace($leaf)) { $leaf = 'entry' }",
@@ -444,7 +360,7 @@ export function extractWindowsArchiveEntries(options: {
 		"  }",
 		"} finally { $zip.Dispose() }",
 	].join("\n")
-	const env: NodeJS.ProcessEnv = {
+	const environment: NodeJS.ProcessEnv = {
 		...process.env,
 		ZIP_FILE: archivePath,
 		ZIP_DIR: destination,
@@ -457,13 +373,13 @@ export function extractWindowsArchiveEntries(options: {
 			entriesFile,
 			(options.names ?? []).map((name) => name.replaceAll("\\", "/")).join("\n"),
 		)
-		env.ZIP_ENTRIES_FILE = entriesFile
+		environment.ZIP_ENTRIES_FILE = entriesFile
 	}
 	try {
 		const output = execFileSync(
 			"powershell.exe",
 			["-NoProfile", "-NonInteractive", "-Command", script],
-			{ env, encoding: "utf8" },
+			{ env: environment, encoding: "utf8" },
 		)
 		return output
 			.split(/\r?\n/)
@@ -474,21 +390,205 @@ export function extractWindowsArchiveEntries(options: {
 	}
 }
 
+function resolveBuilderTarget(): ReleaseTarget | undefined {
+	if (process.env.RELEASE_PLATFORM || process.env.RELEASE_ARCH) return resolveReleaseTarget()
+	if (
+		(process.platform === "darwin" || process.platform === "win32") &&
+		(process.arch === "x64" || process.arch === "arm64")
+	) {
+		return { platform: process.platform, arch: process.arch }
+	}
+	return undefined
+}
+
+function resolveContextTarget(context: AfterPackContext): ReleaseTarget {
+	const platform = context.electronPlatformName
+	const arch = Arch[context.arch]
+	if (platform !== "darwin" && platform !== "win32")
+		throw new Error(`Unsupported Builder platform: ${platform}.`)
+	if (arch !== "x64" && arch !== "arm64")
+		throw new Error(`Unsupported Builder architecture: ${arch}.`)
+	return { platform, arch }
+}
+
+function assertNativeStagingTarget(target: ReleaseTarget): void {
+	if (process.env.RELEASE_REQUIRE_NATIVE_ARCH_MATCH !== "1") return
+	if (process.platform !== target.platform || process.arch !== target.arch) {
+		throw new Error(
+			`Native staging requires ${target.platform}/${target.arch}, but this process is ${process.platform}/${process.arch}.`,
+		)
+	}
+}
+
+function resolvePackagedResourcesRoot(appOutDir: string, platform: ReleasePlatform): string {
+	if (platform === "win32") return path.join(appOutDir, "resources")
+	const appPath = resolveMacAppPath(appOutDir)
+	return path.join(appPath, "Contents", "Resources")
+}
+
+function verifyPackagedRuntimeLayout(appOutDir: string, target: ReleaseTarget): void {
+	const resourcesRoot = resolvePackagedResourcesRoot(appOutDir, target.platform)
+	for (const required of [
+		path.join(resourcesRoot, "startup-failure.html"),
+		path.join(resourcesRoot, "cocode-node"),
+		path.join(resourcesRoot, "dsh-runtime", "runtime-manifest.json"),
+		path.join(resourcesRoot, "tui", "manifest.json"),
+		...MAIN_RUNTIME_DEPENDENCIES.map((dependency) =>
+			path.join(resourcesRoot, "app", "node_modules", ...dependency.split("/")),
+		),
+	]) {
+		if (!existsSync(required)) throw new Error(`Packaged runtime asset is missing: ${required}`)
+	}
+	verifyProductionDependencyClosure(
+		path.join(resourcesRoot, "app"),
+		MAIN_RUNTIME_DEPENDENCIES,
+	)
+	if (target.platform === "win32") {
+		verifyPackagedStartupAssets(appOutDir, target)
+	}
+}
+
+async function verifyTuiArtifact(root: string): Promise<void> {
+	const entry = path.join(root, "cocode-tui.mjs")
+	const cliEntry = path.join(root, "cocode-cli.mjs")
+	const cliModule = path.join(root, "cli.mjs")
+	const meta = path.join(root, "cocode-tui.meta.json")
+	const manifestPath = path.join(root, "manifest.json")
+	for (const file of [entry, cliEntry, cliModule, meta, manifestPath]) {
+		try {
+			await fs.access(file)
+		} catch {
+			throw new Error(`TUI artifact is missing: ${file}`)
+		}
+	}
+	const manifest = JSON.parse(await fs.readFile(manifestPath, "utf8")) as {
+		entry?: string
+		sha256?: string
+		runtimeSha256?: string
+		schemaVersion?: number
+	}
+	if (manifest.schemaVersion !== 1 || manifest.entry !== "tui/cocode-cli.mjs") {
+		throw new Error("TUI artifact manifest is invalid.")
+	}
+	const cliHash = createHash("sha256").update(await fs.readFile(cliEntry)).digest("hex")
+	const runtimeHash = createHash("sha256").update(await fs.readFile(entry)).digest("hex")
+	if (cliHash !== manifest.sha256 || runtimeHash !== manifest.runtimeSha256) {
+		throw new Error("TUI artifact hash does not match its manifest.")
+	}
+}
+
+function resolveMacAppPath(appOutDir: string): string {
+	if (appOutDir.endsWith(".app") && existsSync(appOutDir)) return appOutDir
+	const appPath = findFirstByExtension(appOutDir, ".app")
+	if (!appPath) throw new Error(`No .app bundle was found under ${appOutDir}.`)
+	return appPath
+}
+
+function verifySignedMacZip(file: string, arch: ReleaseArchitecture): void {
+	const temporary = mkdtempSync(path.join(os.tmpdir(), "cocode-zip-verify-"))
+	try {
+		run("unzip", ["-q", file, "-d", temporary])
+		const appPath = findFirstByExtension(temporary, ".app")
+		if (!appPath) throw new Error(`ZIP does not contain a macOS App bundle: ${file}`)
+		run("codesign", ["--verify", "--deep", "--strict", "--verbose=2", appPath])
+		run("xcrun", ["stapler", "validate", appPath])
+		verifyMacPackagedArchitecture(appPath, arch)
+	} finally {
+		rmSync(temporary, { recursive: true, force: true })
+	}
+}
+
+function verifyMacPackagedArchitecture(appPath: string, arch: ReleaseArchitecture): void {
+	if (process.platform !== "darwin") return
+	const candidates = [
+		path.join(appPath, "Contents", "MacOS", "Cocode"),
+		path.join(appPath, "Contents", "Resources", "cocode-node"),
+		...collectFiles(appPath).filter(
+			(file) => file.toLowerCase().endsWith(".node") && isMacNativeCandidate(file, arch),
+		),
+	].filter(existsSync)
+	if (candidates.length < 2)
+		throw new Error(`Packaged macOS native files were not found under ${appPath}.`)
+	for (const file of candidates) {
+		const architectures = execFileSync("lipo", ["-archs", file], { encoding: "utf8" })
+			.trim()
+			.split(/\s+/)
+		if (!architectures.includes(arch))
+			throw new Error(`Native packaged file architecture mismatch for ${arch}: ${file}`)
+	}
+}
+
+function isMacNativeCandidate(file: string, arch: ReleaseArchitecture): boolean {
+	const normalized = file.toLowerCase().replaceAll("\\", "/")
+	const markers = normalized.match(/(?:darwin|win32|linux(?:musl)?)[-_](?:x64|arm64)/g)
+	if (!markers) return true
+	return markers.every((marker) => marker === `darwin-${arch}`)
+}
+
+function selectUpdateArtifact(
+	platform: ReleasePlatform,
+	artifacts: readonly string[],
+): string {
+	const extension = platform === "darwin" ? ".zip" : ".exe"
+	const artifact = artifacts.find((candidate) => candidate.toLowerCase().endsWith(extension))
+	if (!artifact)
+		throw new Error(
+			`No ${platform === "darwin" ? "ZIP" : "NSIS"} update artifact was generated.`,
+		)
+	return artifact
+}
+
+function yamlString(value: string): string {
+	return JSON.stringify(value)
+}
+
+function verifyWindowsFile(file: string): { Subject?: string; Thumbprint?: string } {
+	const signature = inspectAuthenticode(file)
+	const expectedSubject = process.env.WINDOWS_SIGN_CERTIFICATE_SUBJECT?.trim()
+	const expectedThumbprint = normalizeThumbprint(process.env.WINDOWS_SIGN_CERTIFICATE_SHA1)
+	if (expectedSubject && signature.Subject !== expectedSubject)
+		throw new Error(`Unexpected Windows signer subject: ${file}`)
+	if (expectedThumbprint && normalizeThumbprint(signature.Thumbprint) !== expectedThumbprint)
+		throw new Error(`Unexpected Windows signer certificate: ${file}`)
+	return signature
+}
+
+function verifyWindowsSigningLedger(files: readonly string[]): void {
+	if (resolveWindowsSignMode() !== "service") return
+	const ledgerDir = resolveWindowsSignLedgerDir()
+	for (const file of files) {
+		const digest = createHash("sha256").update(readFileSync(file)).digest("hex")
+		const ledgerPath = path.join(ledgerDir, `${digest}.json`)
+		if (!existsSync(ledgerPath))
+			throw new Error(`Windows signing ledger entry is missing: ${file}`)
+		const entry = JSON.parse(readFileSync(ledgerPath, "utf8")) as {
+			inputSha256?: string
+			outputSha256?: string
+			status?: string
+		}
+		if (
+			entry.status !== "signed" ||
+			!isSha256(entry.inputSha256) ||
+			entry.outputSha256 !== digest
+		) {
+			throw new Error(`Windows signing ledger entry is invalid: ${file}`)
+		}
+	}
+}
+
+function cleanupWindowsSignLedger(): void {
+	const target = resolveBuilderTarget()
+	if (!target || target.platform !== "win32" || resolveWindowsSignMode() !== "service") return
+	const ledgerDir = resolveWindowsSignLedgerDir()
+	if (existsSync(ledgerDir)) rmSync(ledgerDir, { recursive: true, force: true })
+}
+
 function normalizeThumbprint(value: string | undefined): string {
 	return value?.replace(/\s+/g, "").toUpperCase() || ""
 }
 
-function normalizeMsixPublisher(value: string): string {
-	return value.startsWith("CN=") ? value : `CN=${value}`
-}
-
-function decodeXmlAttribute(value: string | undefined): string | undefined {
-	return value
-		?.replaceAll("&quot;", '"')
-		.replaceAll("&apos;", "'")
-		.replaceAll("&lt;", "<")
-		.replaceAll("&gt;", ">")
-		.replaceAll("&amp;", "&")
+function isSha256(value: string | undefined): value is string {
+	return Boolean(value && /^[a-f0-9]{64}$/i.test(value))
 }
 
 function collectFiles(root: string): string[] {
@@ -505,22 +605,8 @@ function findFirstByExtension(root: string, extension: string): string | undefin
 	if (!statSync(root).isDirectory()) return root.endsWith(extension) ? root : undefined
 	if (root.endsWith(extension)) return root
 	for (const entry of readdirSync(root, { withFileTypes: true })) {
+		if (!entry.isDirectory()) continue
 		const found = findFirstByExtension(path.join(root, entry.name), extension)
-		if (found) return found
-	}
-	return undefined
-}
-
-export function findMacAppWithTui(root: string): string | undefined {
-	if (!existsSync(root)) return undefined
-	if (!statSync(root).isDirectory()) return undefined
-	if (root.endsWith(".app")) {
-		return existsSync(path.join(root, "Contents", "Resources", "tui", "manifest.json"))
-			? root
-			: undefined
-	}
-	for (const entry of readdirSync(root, { withFileTypes: true })) {
-		const found = findMacAppWithTui(path.join(root, entry.name))
 		if (found) return found
 	}
 	return undefined
@@ -528,4 +614,16 @@ export function findMacAppWithTui(root: string): string | undefined {
 
 function run(command: string, args: readonly string[]): void {
 	execFileSync(command, [...args], { stdio: "inherit" })
+}
+
+async function runNodeScript(script: string, args: readonly string[]): Promise<void> {
+	const { spawn } = await import("node:child_process")
+	await new Promise<void>((resolve, reject) => {
+		const child = spawn(process.execPath, [script, ...args], { stdio: "inherit" })
+		child.once("error", reject)
+		child.once("exit", (code) => {
+			if (code === 0) resolve()
+			else reject(new Error(`${script} exited with code ${String(code)}`))
+		})
+	})
 }

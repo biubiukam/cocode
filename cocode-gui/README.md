@@ -99,20 +99,14 @@ corepack pnpm@10.34.5 run release:win:x64
 corepack pnpm@10.34.5 run release:win:arm64
 ```
 
-Signed macOS and Windows MSIX builds can use the public Electron update service.
-Development and Linux builds do not start the updater.
-Windows x64 and ARM64 MSIX packages use the same main product repository with
-architecture-specific `win32-x64/msix` and `win32-arm64/msix` routes.
+Signed macOS ZIP and Windows NSIS builds use `electron-updater` with the shared
+GitHub Releases repository. x64 and ARM64 use independent metadata files, and a
+Draft Release must be published manually only after all platform artifacts pass
+verification. Development and Linux builds do not start the updater.
 
-Squirrel.Windows remains a legacy installation format. Packaged x64 Squirrel
-applications retain their existing update feed, while ARM64 Squirrel builds do
-not start the updater because a shared `RELEASES` asset cannot safely represent
-both architectures. Existing ARM64 Squirrel users must reinstall the MSIX build;
-automatic Squirrel-to-MSIX migration is not included.
-
-Formal Windows releases require stable `WINDOWS_MSIX_PACKAGE_ID` and
-`WINDOWS_MSIX_PUBLISHER` values. The publisher must match the Windows signing
-certificate, and both architectures must use the same package identity.
+Windows x64 and ARM64 releases are per-user NSIS installers. Formal releases
+must use the configured team signing service; the release and update path does
+not include legacy package formats.
 
 The production macOS release can include a signed PKG that installs
 `Cocode.app` and the `cocode` command. Windows installers register the

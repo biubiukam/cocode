@@ -163,7 +163,7 @@ function findApp(root) {
 	return undefined
 }
 
-export function findPackagedMacApp(root = process.env.FORGE_OUT_DIR || "out") {
+export function findPackagedMacApp(root = process.env.RELEASE_OUTPUT_DIR || "release") {
 	return findApp(path.resolve(root))
 }
 

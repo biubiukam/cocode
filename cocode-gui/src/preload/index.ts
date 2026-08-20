@@ -9,6 +9,7 @@ import { tuiBridge } from "./bridges/tui.bridge"
 import { sharedDshBridge } from "./bridges/external-dsh.bridge"
 import { localeBridge } from "./bridges/locale.bridge"
 import { localFilesBridge } from "./bridges/local-files.bridge"
+import { startupBridge } from "./bridges/startup.bridge"
 
 const desktopApi: DesktopApi = {
 	database: databaseBridge,
@@ -22,6 +23,7 @@ const desktopApi: DesktopApi = {
 	externalDsh: sharedDshBridge,
 	locale: localeBridge,
 	localFiles: localFilesBridge,
+	startup: startupBridge,
 }
 
 contextBridge.exposeInMainWorld("desktopApi", desktopApi)

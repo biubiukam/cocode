@@ -278,7 +278,7 @@ function signingTemporaryPath(filePath) {
 	const extension = path.extname(filePath)
 	const stem = path.basename(filePath, extension)
 	// Keep the original extension. Get-AuthenticodeSignature uses it to pick a
-	// verifier; a .tmp suffix makes signed MSIX/MSI look unsigned or unknown.
+	// verifier; a .tmp suffix can make a signed package look unsigned or unknown.
 	return path.join(
 		path.dirname(filePath),
 		`.${stem}.cocode-signing-${process.pid}-${Date.now()}${extension}`,
@@ -294,7 +294,7 @@ function ledgerDirectory(environment = process.env) {
 
 // Entries are keyed by file content, not by path: @electron/packager signs the
 // application inside a temporary staging directory and only afterwards moves it
-// to the Forge output directory, and makers rename their artifacts after signing.
+// to the Builder output directory, while installers may rename artifacts after signing.
 function ledgerPath(contentSha256, environment = process.env) {
 	return path.join(ledgerDirectory(environment), `${contentSha256}.json`)
 }

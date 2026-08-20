@@ -13,7 +13,7 @@ export interface ApplicationUpdateEventSource {
 		event: ApplicationUpdateEventName,
 		listener: (...args: unknown[]) => void,
 	) => unknown
-	checkForUpdates: () => void
+	checkForUpdates: () => void | PromiseLike<unknown>
 }
 
 export interface ApplicationUpdateCoordinatorOptions {
@@ -74,7 +74,12 @@ export function createApplicationUpdateCoordinator({
 		if (disposed) return
 		manualCheckPending = false
 		setState("idle")
-		const releaseName = typeof args[2] === "string" ? args[2] : undefined
+		const releaseName =
+			typeof args[2] === "string"
+				? args[2]
+				: isDownloadedUpdateEvent(args[0])
+				? args[0].releaseName
+				: undefined
 		onDownloaded(releaseName)
 	}
 	const onUpdaterError = (value: unknown): void => {
@@ -99,7 +104,8 @@ export function createApplicationUpdateCoordinator({
 		manualCheckPending = true
 		setState("checking")
 		try {
-			updater.checkForUpdates()
+			const result = updater.checkForUpdates()
+			if (isPromiseLike(result)) void result.then(undefined, onUpdaterError)
 		} catch (error) {
 			onUpdaterError(error)
 		}
@@ -127,4 +133,23 @@ export function createApplicationUpdateCoordinator({
 
 function toError(value: unknown): Error {
 	return value instanceof Error ? value : new Error(String(value))
+}
+
+function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+	return (
+		typeof value === "object" &&
+		value !== null &&
+		"then" in value &&
+		typeof (value as { then?: unknown }).then === "function"
+	)
+}
+
+function isDownloadedUpdateEvent(value: unknown): value is { releaseName?: string } {
+	return (
+		typeof value === "object" &&
+		value !== null &&
+		"releaseName" in value &&
+		(typeof (value as { releaseName?: unknown }).releaseName === "string" ||
+			(value as { releaseName?: unknown }).releaseName == null)
+	)
 }
