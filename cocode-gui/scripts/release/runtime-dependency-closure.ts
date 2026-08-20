@@ -9,7 +9,7 @@ import {
 	realpathSync,
 	rmSync,
 } from "node:fs"
-import { basename, dirname, join } from "node:path"
+import { basename, dirname, extname, join, relative } from "node:path"
 import { pruneIncompatibleNativePackages } from "../lib/workspace-dependencies.mjs"
 
 type NativeStagingTarget = {
@@ -60,10 +60,13 @@ export function copyProductionDependencyClosure(options: {
 		const destination = packageDestination(targetModules, record.destinationSegments)
 		mkdirSync(dirname(destination), { recursive: true })
 		cpSync(record.root, destination, {
-			recursive: true,
-			dereference: true,
-			filter: (source) => basename(source) !== "node_modules",
-		})
+  recursive: true,
+  dereference: true,
+  filter: (source) => {
+    if (basename(source) === "node_modules") return false
+    return options.target?.platform !== "win32" || shouldCopyWindowsProductionEntry(record.root, source)
+  },
+})
 		if (options.target) pruneNativePrebuilds(destination, options.target)
 	}
 	if (options.target)
@@ -80,6 +83,50 @@ export function copyProductionDependencyClosure(options: {
 	}
 
 	return packages.map(({ requestedName }) => requestedName)
+}
+
+const WINDOWS_PRUNABLE_DIRECTORIES = new Set([
+  ".cache",
+  ".github",
+  "coverage",
+  "test",
+  "tests",
+  "__tests__",
+  "examples",
+  "example",
+  "benchmarks",
+  "docs",
+])
+const WINDOWS_PRUNABLE_EXTENSIONS = new Set([
+  ".map",
+  ".pdb",
+  ".obj",
+  ".ilk",
+  ".tlog",
+  ".ts",
+  ".mts",
+  ".cts",
+  ".c",
+  ".cc",
+  ".cpp",
+  ".h",
+  ".hh",
+  ".hpp",
+  ".vcxproj",
+  ".filters",
+  ".sln",
+  ".props",
+  ".targets",
+  ".recipe",
+  ".cmake",
+])
+
+function shouldCopyWindowsProductionEntry(root: string, source: string): boolean {
+  const relativePath = relative(root, source)
+  if (relativePath.length === 0) return true
+  const segments = relativePath.split(/[\\/]+/)
+  if (segments.some((segment) => WINDOWS_PRUNABLE_DIRECTORIES.has(segment))) return false
+  return !WINDOWS_PRUNABLE_EXTENSIONS.has(extname(source).toLowerCase())
 }
 
 function pruneNativePrebuilds(root: string, target: NativeStagingTarget): void {

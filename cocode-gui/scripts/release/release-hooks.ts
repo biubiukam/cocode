@@ -13,7 +13,9 @@ import {
 } from "node:fs"
 import fs from "node:fs/promises"
 import os from "node:os"
+import { win32 as win32Path } from "node:path"
 import { Arch, type AfterPackContext, type BuildResult } from "electron-builder"
+import { createPackageWithOptions, extractAll, getRawHeader } from "@electron/asar"
 import { notarize } from "@electron/notarize"
 import * as path from "pathe"
 import { parse as parseYaml } from "yaml"
@@ -47,6 +49,13 @@ const windowsSigningService = requireFromHere("./windows-sign-service.cjs") as W
 const { inspectAuthenticode, shouldSubmitWindowsFileForSigning, signFile } =
 	windowsSigningService as WindowsSigningPolicy
 
+const asarRequire = createRequire(path.resolve("scripts/release/release-hooks.ts"))
+const { NtExecutable, NtExecutableResource, Resource } = asarRequire("resedit") as {
+	NtExecutable: { from(buffer: Buffer): unknown }
+	NtExecutableResource: { from(executable: unknown): any }
+	Resource: { VersionInfo: { fromEntries(entries: any[]): any } }
+}
+
 export interface ReleaseArtifactSet {
 	readonly platform: ReleasePlatform
 	readonly arch: ReleaseArchitecture
@@ -72,7 +81,8 @@ export async function stageBuilderApplication(context: AfterPackContext): Promis
 	const target = resolveContextTarget(context)
 	assertNativeStagingTarget(target)
 	const resourcesRoot = resolvePackagedResourcesRoot(context.appOutDir, target.platform)
-	const appRoot = path.join(resourcesRoot, "app")
+	const appStage = await openPackagedAppStage(resourcesRoot, target.platform)
+	const appRoot = appStage.appRoot
 	verifyBuilderApplicationEntrypoints(appRoot)
 	copyProductionDependencyClosure({
 		sourceRoot: process.cwd(),
@@ -93,7 +103,7 @@ export async function stageBuilderApplication(context: AfterPackContext): Promis
 			path.join(process.cwd(), ".cache", "cocode", "release-runtime"),
 	)
 	await runNodeScript("scripts/verify-dsh-runtime.mjs", ["--runtime-root", runtimeArtifact])
-	await fs.rm(path.join(resourcesRoot, "dsh-runtime"), { recursive: true, force: true })
+	await fs.rm(path.join(resourcesRoot, "dsh-runtime"), { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 	await fs.cp(runtimeArtifact, path.join(resourcesRoot, "dsh-runtime"), { recursive: true })
 
 	const tuiArtifact = path.resolve(
@@ -101,7 +111,7 @@ export async function stageBuilderApplication(context: AfterPackContext): Promis
 			path.join(process.cwd(), ".cache", "cocode", "tui"),
 	)
 	await verifyTuiArtifact(tuiArtifact)
-	await fs.rm(path.join(resourcesRoot, "tui"), { recursive: true, force: true })
+	await fs.rm(path.join(resourcesRoot, "tui"), { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 	await fs.cp(tuiArtifact, path.join(resourcesRoot, "tui"), { recursive: true })
 
 	const nodeExecutable = path.join(resourcesRoot, packagedNodeExecutableName(target.platform))
@@ -109,10 +119,87 @@ export async function stageBuilderApplication(context: AfterPackContext): Promis
 	await fs.chmod(nodeExecutable, 0o755)
 	if (target.platform === "win32" && process.platform === "win32" && isReleaseSigningRequired())
 		await signPackagedWindowsExecutables(resourcesRoot, signFile)
-
-	verifyPackagedRuntimeLayout(context.appOutDir, target)
+	try {
+		await closePackagedAppStage(appStage)
+		verifyPackagedRuntimeLayout(context.appOutDir, target, appRoot)
+	} finally {
+		await cleanupPackagedAppStage(appStage)
+	}
 }
 
+interface PackagedAppStage {
+	readonly appRoot: string
+	readonly archivePath?: string
+	readonly temporaryRoot?: string
+	readonly resourcesRoot: string
+	readonly platform: ReleasePlatform
+}
+
+async function openPackagedAppStage(
+	resourcesRoot: string,
+	platform: ReleasePlatform,
+): Promise<PackagedAppStage> {
+	if (platform !== "win32") {
+		return { appRoot: path.join(resourcesRoot, "app"), resourcesRoot, platform }
+	}
+	const archivePath = path.join(resourcesRoot, "app.asar")
+	if (!existsSync(archivePath)) {
+		return { appRoot: path.join(resourcesRoot, "app"), resourcesRoot, platform }
+	}
+	const temporaryRoot = mkdtempSync(path.join(os.tmpdir(), "cocode-app-asar-"))
+	extractAll(archivePath, temporaryRoot)
+	const unpackedRoot = archivePath + ".unpacked"
+	if (existsSync(unpackedRoot))
+		await fs.cp(unpackedRoot, temporaryRoot, { recursive: true, force: true, dereference: false })
+	return { appRoot: temporaryRoot, archivePath, temporaryRoot, resourcesRoot, platform }
+}
+
+async function closePackagedAppStage(stage: PackagedAppStage): Promise<void> {
+	if (!stage.archivePath || !stage.temporaryRoot) return
+	const unpackPattern = "**/*.{node,dll,exe}"
+	await fs.rm(stage.archivePath + ".unpacked", { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
+	await fs.rm(stage.archivePath, { force: true })
+	await createPackageWithOptions(stage.temporaryRoot, stage.archivePath, { unpack: unpackPattern })
+	const executable = path.join(path.dirname(stage.resourcesRoot), "Cocode.exe")
+	await updateWindowsAsarIntegrity(executable, stage.archivePath)
+}
+
+async function cleanupPackagedAppStage(stage: PackagedAppStage): Promise<void> {
+	if (!stage.temporaryRoot) return
+	await fs.rm(stage.temporaryRoot, {
+		recursive: true,
+		force: true,
+		maxRetries: 5,
+		retryDelay: 100,
+	})
+}
+
+async function updateWindowsAsarIntegrity(executablePath: string, archivePath: string): Promise<void> {
+	const { headerString } = getRawHeader(archivePath)
+	const hash = createHash("sha256").update(headerString).digest("hex")
+	const executable = NtExecutable.from(await fs.readFile(executablePath)) as any
+	const resource = NtExecutableResource.from(executable)
+	const versionInfo = Resource.VersionInfo.fromEntries(resource.entries)
+	if (versionInfo.length !== 1) throw new Error("Failed to parse version info in " + executablePath)
+	const languages = versionInfo[0].getAllLanguagesForStringValues()
+	if (languages.length !== 1) throw new Error("Failed to locate languages in " + executablePath)
+	resource.entries = resource.entries.filter(
+		(entry: any) => !(entry.type === "INTEGRITY" && entry.id === "ELECTRONASAR"),
+	)
+	resource.entries.push({
+		type: "INTEGRITY",
+		id: "ELECTRONASAR",
+		bin: Buffer.from(
+			JSON.stringify([
+				{ file: win32Path.normalize("resources/app.asar"), alg: "SHA256", value: hash },
+			]),
+		),
+		lang: languages[0].lang,
+		codepage: languages[0].codepage,
+	})
+	resource.outputResource(executable)
+	await fs.writeFile(executablePath, Buffer.from(executable.generate()))
+}
 export async function signPackagedWindowsExecutables(
 	resourcesRoot: string,
 	sign: (filePath: string) => Promise<unknown> = signFile,
@@ -578,29 +665,52 @@ function resolvePackagedResourcesRoot(appOutDir: string, platform: ReleasePlatfo
 	return path.join(appPath, "Contents", "Resources")
 }
 
-function verifyPackagedRuntimeLayout(appOutDir: string, target: ReleaseTarget): void {
+function verifyPackagedRuntimeLayout(
+	appOutDir: string,
+	target: ReleaseTarget,
+	stagedAppRoot?: string,
+): void {
 	const resourcesRoot = resolvePackagedResourcesRoot(appOutDir, target.platform)
-	for (const required of [
-		path.join(resourcesRoot, "startup-failure.html"),
-		path.join(resourcesRoot, packagedNodeExecutableName(target.platform)),
-		path.join(resourcesRoot, "dsh-runtime", "runtime-manifest.json"),
-		path.join(resourcesRoot, "tui", "manifest.json"),
-		...MAIN_RUNTIME_DEPENDENCIES.map((dependency) =>
-			path.join(resourcesRoot, "app", "node_modules", ...dependency.split("/")),
-		),
-	]) {
-		if (!existsSync(required)) throw new Error(`Packaged runtime asset is missing: ${required}`)
+	const appVerification = stagedAppRoot
+		? { appRoot: stagedAppRoot }
+		: materializePackagedAppForVerification(resourcesRoot)
+	try {
+		for (const required of [
+			path.join(resourcesRoot, "startup-failure.html"),
+			path.join(resourcesRoot, packagedNodeExecutableName(target.platform)),
+			path.join(resourcesRoot, "dsh-runtime", "runtime-manifest.json"),
+			path.join(resourcesRoot, "tui", "manifest.json"),
+			...MAIN_RUNTIME_DEPENDENCIES.map((dependency) =>
+				path.join(appVerification.appRoot, "node_modules", ...dependency.split("/")),
+			),
+		]) {
+			if (!existsSync(required)) throw new Error("Packaged runtime asset is missing: " + required)
+		}
+		verifyProductionDependencyClosure(appVerification.appRoot, MAIN_RUNTIME_DEPENDENCIES)
+	} finally {
+		if (appVerification.temporaryRoot)
+			rmSync(appVerification.temporaryRoot, { recursive: true, force: true })
 	}
-	verifyProductionDependencyClosure(
-		path.join(resourcesRoot, "app"),
-		MAIN_RUNTIME_DEPENDENCIES,
-	)
 	if (target.platform === "win32") {
 		verifyPackagedStartupAssets(appOutDir, {
 			...target,
 			nodeExecutableName: packagedNodeExecutableName(target.platform),
 		})
 	}
+}
+
+function materializePackagedAppForVerification(resourcesRoot: string): {
+	readonly appRoot: string
+	readonly temporaryRoot?: string
+} {
+	const unpackedAppRoot = path.join(resourcesRoot, "app")
+	if (existsSync(unpackedAppRoot)) return { appRoot: unpackedAppRoot }
+	const archivePath = path.join(resourcesRoot, "app.asar")
+	if (!existsSync(archivePath))
+		throw new Error("Packaged application root is missing: " + unpackedAppRoot)
+	const temporaryRoot = mkdtempSync(path.join(os.tmpdir(), "cocode-app-verify-"))
+	extractAll(archivePath, temporaryRoot)
+	return { appRoot: temporaryRoot, temporaryRoot }
 }
 
 async function verifyTuiArtifact(root: string): Promise<void> {

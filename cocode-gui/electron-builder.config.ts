@@ -36,7 +36,12 @@ const config: Configuration = {
 	copyright:
 		process.env.RELEASE_COPYRIGHT?.trim() ||
 		`Copyright © ${new Date().getFullYear()} Cocode Contributors`,
-	asar: false,
+	// Windows installers benefit substantially from keeping the GUI dependency
+	// tree in one archive instead of asking NSIS to create tens of thousands of
+	// individual files. Keep the existing macOS layout unchanged because the
+	// custom macOS packaging and verification path expects an unpacked app.
+	asar: target.platform === "win32",
+	asarUnpack: target.platform === "win32" ? ["**/*.node", "**/*.dll", "**/*.exe"] : undefined,
 	forceCodeSigning: isReleaseSigningRequired(),
 	npmRebuild: false,
 	directories: {

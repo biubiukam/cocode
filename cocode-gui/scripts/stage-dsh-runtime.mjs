@@ -23,6 +23,51 @@ if (!destination) {
 	process.exit(2)
 }
 
+const WINDOWS_PRUNABLE_DIRECTORIES = new Set([
+	".cache",
+	".github",
+	"coverage",
+	"test",
+	"tests",
+	"__tests__",
+	"examples",
+	"example",
+	"benchmarks",
+	"docs",
+])
+const WINDOWS_PRUNABLE_EXTENSIONS = new Set([
+	".map",
+	".pdb",
+	".obj",
+	".ilk",
+	".tlog",
+	".ts",
+	".mts",
+	".cts",
+	".c",
+	".cc",
+	".cpp",
+	".h",
+	".hh",
+	".hpp",
+	".vcxproj",
+	".filters",
+	".sln",
+	".props",
+	".targets",
+	".recipe",
+	".cmake",
+])
+const pruneWindowsProductionFiles = process.platform === "win32"
+
+function shouldCopyWindowsProductionEntry(root, entry) {
+	if (!pruneWindowsProductionFiles) return true
+	const relative = path.relative(root, entry)
+	if (relative === "") return true
+	const segments = relative.split("/")
+	if (segments.some((segment) => WINDOWS_PRUNABLE_DIRECTORIES.has(segment))) return false
+	return !WINDOWS_PRUNABLE_EXTENSIONS.has(path.extname(entry).toLowerCase())
+}
 const require = createRequire(import.meta.url)
 const supervisorManifest = require.resolve("@cocode-agency/host-supervisor/package.json")
 const supervisorRoot = path.dirname(supervisorManifest)
@@ -75,7 +120,11 @@ function copyTree(source, target) {
 			// store that `dereference` cannot resolve once a layout switch leaves one
 			// dangling, and materializeDependencyClosure rebuilds the closure anyway.
 			const segments = relative.split("/")
-			return !segments.includes("node_modules") && !segments.includes(".cache")
+			return (
+				!segments.includes("node_modules") &&
+				!segments.includes(".cache") &&
+				shouldCopyWindowsProductionEntry(source, entry)
+			)
 		},
 	})
 	for (const candidate of [
@@ -169,7 +218,9 @@ function copyPackageTree(source, target) {
 			const relative = path.relative(source, entry)
 			if (relative === "") return true
 			return (
-				path.basename(entry) !== "node_modules" && !relative.split("/").includes(".cache")
+				path.basename(entry) !== "node_modules" &&
+				!relative.split("/").includes(".cache") &&
+				shouldCopyWindowsProductionEntry(source, entry)
 			)
 		},
 	})
@@ -193,7 +244,11 @@ function materializeBundledPlugins(root) {
 		const source = path.join(pluginsRoot, entry)
 		const target = path.join(root, "node_modules", ...entry.split("/"))
 		mkdirSync(path.dirname(target), { recursive: true })
-		cpSync(source, target, { recursive: true, dereference: true })
+		cpSync(source, target, {
+			recursive: true,
+			dereference: true,
+			filter: (entry) => shouldCopyWindowsProductionEntry(source, entry),
+		})
 	}
 }
 

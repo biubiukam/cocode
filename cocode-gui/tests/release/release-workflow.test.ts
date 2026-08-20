@@ -72,6 +72,20 @@ test("publishing stages fresh runtime and TUI artifacts before electron-builder"
 	assert.ok(publish.indexOf("prepare:release-assets") < publish.indexOf("electron-builder"))
 })
 
+test("builds mirrored DSH client bundles before fingerprinting the release runtime", () => {
+	const buildRuntime = readFileSync(
+		path.join(repoRoot, "cocode-gui/scripts/build-runtime.mjs"),
+		"utf8",
+	)
+	const stageRuntime = buildRuntime.indexOf("stage-dsh-runtime.mjs")
+	const buildClients = buildRuntime.indexOf('"--build-only"')
+	const fingerprintRuntime = buildRuntime.indexOf("const manifest =")
+
+	assert.ok(stageRuntime >= 0)
+	assert.ok(buildClients > stageRuntime)
+	assert.ok(fingerprintRuntime > buildClients)
+	assert.match(buildRuntime, /watch-dsh-client\.mjs/)
+})
 test("keeps local and release builds from implicitly publishing to GitHub", () => {
 	const packageJson = JSON.parse(readFileSync(guiPackagePath, "utf8")) as {
 		scripts?: Record<string, string>

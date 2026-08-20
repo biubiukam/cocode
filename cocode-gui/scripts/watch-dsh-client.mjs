@@ -209,6 +209,34 @@ function createBuildScheduler(packages, runtimeRoot) {
 	}
 }
 
+async function prepareClientPackages(packages, runtimeRoot) {
+	let syncedPackages = 0
+	const stalePackages = packages.filter((clientPackage) => isClientBundleStale(clientPackage))
+	const freshPackages = packages.filter((clientPackage) => !isClientBundleStale(clientPackage))
+	await Promise.all(
+		stalePackages.map((clientPackage) => rebuildClientPackage(clientPackage, runtimeRoot)),
+	)
+	for (const clientPackage of freshPackages) {
+		syncedPackages += Number(syncClientBundle(clientPackage, runtimeRoot))
+	}
+	for (const clientPackage of stalePackages) {
+		syncedPackages += Number(
+			existsSync(resolveRuntimeClientBundlePath(runtimeRoot, clientPackage.id)),
+		)
+	}
+	if (syncedPackages === 0) {
+		throw new Error("No staged DSH client bundles were found for synchronization.")
+	}
+}
+
+export async function buildDshClientPackages(runtimeRoot) {
+	const packages = clientRoots.flatMap((root) => discoverDshClientPackages(root))
+	if (packages.length === 0)
+		throw new Error("No dsh.client packages were found under packages/client.")
+	await prepareClientPackages(packages, runtimeRoot)
+	return packages
+}
+
 async function startWatcher(runtimeRoot) {
 	const packages = clientRoots.flatMap((root) => discoverDshClientPackages(root))
 	if (packages.length === 0)
@@ -231,23 +259,7 @@ async function startWatcher(runtimeRoot) {
 		watcher.once("error", reject)
 	})
 
-	let syncedPackages = 0
-	const stalePackages = packages.filter((clientPackage) => isClientBundleStale(clientPackage))
-	const freshPackages = packages.filter((clientPackage) => !isClientBundleStale(clientPackage))
-	await Promise.all(
-		stalePackages.map((clientPackage) => rebuildClientPackage(clientPackage, runtimeRoot)),
-	)
-	for (const clientPackage of freshPackages) {
-		syncedPackages += Number(syncClientBundle(clientPackage, runtimeRoot))
-	}
-	for (const clientPackage of stalePackages) {
-		syncedPackages += Number(
-			existsSync(resolveRuntimeClientBundlePath(runtimeRoot, clientPackage.id)),
-		)
-	}
-	if (syncedPackages === 0) {
-		throw new Error("No staged DSH client bundles were found for HMR synchronization.")
-	}
+	await prepareClientPackages(packages, runtimeRoot)
 	await watcherReady
 	return { packages, watcher }
 }
@@ -261,6 +273,11 @@ function readRuntimeRoot() {
 }
 
 async function main() {
+	if (process.argv.includes("--build-only")) {
+		const packages = await buildDshClientPackages(readRuntimeRoot())
+		console.log(`[client-build] ready ${String(packages.length)} DSH client packages`)
+		return
+	}
 	const { packages, watcher } = await startWatcher(readRuntimeRoot())
 	console.log(`[client-watch] watching ${String(packages.length)} DSH client packages`)
 	process.send?.({ type: "ready", packages: packages.length })
@@ -276,7 +293,8 @@ async function main() {
 const invokedPath = process.argv[1]
 if (invokedPath && import.meta.url === pathToFileURL(path.resolve(invokedPath)).href) {
 	main().catch((error) => {
-		console.error("[client-watch] startup failed:", error)
+		const scope = process.argv.includes("--build-only") ? "client-build" : "client-watch"
+		console.error(`[${scope}] startup failed:`, error)
 		process.send?.({
 			type: "error",
 			message: error instanceof Error ? error.message : String(error),

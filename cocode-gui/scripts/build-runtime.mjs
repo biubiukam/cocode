@@ -28,6 +28,18 @@ export function buildRuntime({ clean = false, output = defaultOutput() } = {}) {
 		[path.join(repositoryRoot, "scripts", "stage-dsh-runtime.mjs"), "--destination", output],
 		{ cwd: repositoryRoot, stdio: "inherit" },
 	)
+	execFileSync(
+		process.execPath,
+		[
+			"--import",
+			"tsx/esm",
+			path.join(repositoryRoot, "scripts", "watch-dsh-client.mjs"),
+			"--build-only",
+			"--runtime-root",
+			output,
+		],
+		{ cwd: repositoryRoot, stdio: "inherit" },
+	)
 	const manifest = {
 		schemaVersion: 1,
 		platform: process.platform,

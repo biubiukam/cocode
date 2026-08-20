@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto'
 import { arch, platform } from 'node:os'
 import { join } from 'node:path'
-import { createRequire } from 'node:module'
 import { readYamlUnknown, writeYamlFile } from './io.ts'
 
-const manifest = createRequire(import.meta.url)('../../../package.json') as { version?: string }
+declare const __COCODE_TUI_VERSION__: string
+
+const manifest = { version: __COCODE_TUI_VERSION__ }
 
 export type CocodeClientIdentity = {
   product: 'cocode'

@@ -454,6 +454,41 @@ test("copies a self-contained production dependency closure without pnpm links",
 	}
 })
 
+test("prunes Windows development files without changing macOS staging", () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "cocode-runtime-closure-prune-"))
+  try {
+    const source = path.join(root, "source")
+    const winAppRoot = path.join(root, "win-app")
+    const macAppRoot = path.join(root, "mac-app")
+    writePackage(source, "cocode-gui", { dependencies: { "runtime-root": "1.0.0" } })
+    const runtimeRoot = path.join(source, "node_modules", "runtime-root")
+    writePackage(runtimeRoot, "runtime-root")
+    for (const file of ["runtime.js", "debug.map", "source.ts", "symbols.pdb", "native.cpp", "project.vcxproj"])
+      writeFixture(path.join(runtimeRoot, file), "")
+    writeFixture(path.join(runtimeRoot, "docs", "README.md"), "")
+
+    copyProductionDependencyClosure({
+      sourceRoot: source,
+      appRoot: winAppRoot,
+      dependencies: ["runtime-root"],
+      target: { platform: "win32", arch: "x64" },
+    })
+    assert.ok(existsSync(path.join(winAppRoot, "node_modules", "runtime-root", "runtime.js")))
+    for (const file of ["debug.map", "source.ts", "symbols.pdb", "native.cpp", "project.vcxproj", "docs"])
+      assert.equal(existsSync(path.join(winAppRoot, "node_modules", "runtime-root", file)), false, file)
+
+    copyProductionDependencyClosure({
+      sourceRoot: source,
+      appRoot: macAppRoot,
+      dependencies: ["runtime-root"],
+      target: { platform: "darwin", arch: "arm64" },
+    })
+    for (const file of ["debug.map", "source.ts", "symbols.pdb", "native.cpp", "project.vcxproj", "docs", "runtime.js"])
+      assert.equal(existsSync(path.join(macAppRoot, "node_modules", "runtime-root", file)), true, file)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
 test("keeps only the target platform and architecture native prebuild", () => {
 	for (const arch of ["x64", "arm64"] as const) {
 		const root = mkdtempSync(path.join(os.tmpdir(), "cocode-runtime-closure-native-"))

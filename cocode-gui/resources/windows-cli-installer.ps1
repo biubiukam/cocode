@@ -51,7 +51,7 @@ namespace Cocode {
         [UIntPtr]::Zero,
         "Environment",
         0x0002,
-        5000,
+        1000,
         [ref]$result
     ) # WM_SETTINGCHANGE
 }
@@ -63,7 +63,7 @@ function Write-Utf8WithoutBom([string]$Path, [string]$Contents) {
 
 function Install-CocodeCli {
     $resources = Join-Path $InstallDir "resources"
-    $nodeExecutable = Join-Path $resources "cocode-node"
+    $nodeExecutable = Join-Path $resources "cocode-node.exe"
     $cliEntry = Join-Path $resources "tui\cocode-cli.mjs"
     if (-not (Test-Path -LiteralPath $nodeExecutable -PathType Leaf)) {
         throw "Packaged Cocode Node executable is missing: $nodeExecutable"

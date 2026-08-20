@@ -13,7 +13,8 @@ const dshClientRoot = path.join(projectRoot, "packages/client")
 const cocodeClientRoot = path.join(projectRoot, "packages/cocode")
 const dshSource = (relativePath: string): string => path.join(projectRoot, relativePath)
 const localClient = (relativePath: string): string => path.join(dshClientRoot, relativePath)
-const dshClientBundles = findDshClientBundles()
+const dshClientBundleDiscovery = findDshClientBundles()
+const dshClientBundles = dshClientBundleDiscovery.bundles
 const dshRuntimeUrl = normalizeRuntimeUrl(process.env.COCODE_DSH_RUNTIME_URL)
 
 // https://vitejs.dev/config
@@ -154,8 +155,12 @@ function dshWebDevPlugin(): Plugin {
 	}
 }
 
-function findDshClientBundles(): ReadonlyMap<string, string> {
+function findDshClientBundles(): {
+	readonly bundles: ReadonlyMap<string, string>
+	readonly missing: readonly string[]
+} {
 	const bundles = new Map<string, string>()
+	const missing: string[] = []
 	for (const source of [
 		{ root: dshClientRoot, prefix: "" },
 		{ root: cocodeClientRoot, prefix: "cocode" },
@@ -166,7 +171,7 @@ function findDshClientBundles(): ReadonlyMap<string, string> {
 			const packageRoot = path.join(source.root, entry.name)
 			const manifestPath = path.join(packageRoot, "package.json")
 			const clientBundle = path.join(packageRoot, "lib", "client.js")
-			if (!existsSync(manifestPath) || !existsSync(clientBundle)) continue
+			if (!existsSync(manifestPath)) continue
 			const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as {
 				dsh?: { client?: { platform?: string } }
 			}
@@ -174,15 +179,30 @@ function findDshClientBundles(): ReadonlyMap<string, string> {
 			const directory = source.prefix
 				? path.posix.join(source.prefix, entry.name)
 				: entry.name
+			if (!existsSync(clientBundle)) {
+				missing.push(directory)
+				continue
+			}
 			bundles.set(directory, clientBundle)
 		}
 	}
-	return bundles
+	return { bundles, missing }
 }
 
 function dshClientBundlePlugin(): Plugin {
+	let productionBuild = false
 	return {
 		name: "dsh-local-client-bundles",
+		configResolved(config) {
+			productionBuild = config.command === "build"
+		},
+		buildStart() {
+			if (!productionBuild || dshClientBundleDiscovery.missing.length === 0) return
+			this.error(
+				`Missing DSH client bundles: ${dshClientBundleDiscovery.missing.join(", ")}. ` +
+					"Run pnpm run build:runtime before electron-vite build.",
+			)
+		},
 		configureServer(server) {
 			server.middlewares.use((request, response, next) => {
 				const pathname = new URL(request.url ?? "/", "http://renderer.local").pathname
