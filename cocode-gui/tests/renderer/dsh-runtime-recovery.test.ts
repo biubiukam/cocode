@@ -76,3 +76,89 @@ test("connection business errors do not trigger Host recovery", async () => {
 	controller.stop()
 	assert.equal(recoveryRequests, 0)
 })
+
+test("connection liveness probe detects a half-open Host connection", async () => {
+	let describeCalls = 0
+	const states: string[] = []
+	const waitForAbort = async function* (signal: AbortSignal): AsyncGenerator<never> {
+		await new Promise<void>((resolve) =>
+			signal.addEventListener("abort", () => resolve(), { once: true }),
+		)
+		yield* []
+	}
+	const api = {
+		events: {
+			mux: (_payload: unknown, signal: AbortSignal, onOpen?: () => void) => {
+				onOpen?.()
+				return waitForAbort(signal)
+			},
+			host: (_payload: unknown, signal: AbortSignal, onOpen?: () => void) => {
+				onOpen?.()
+				return waitForAbort(signal)
+			},
+		},
+		host: {
+			describe: async () => {
+				describeCalls += 1
+				if (describeCalls === 1) return { result: { ok: true, value: {} } }
+				throw new TypeError("fetch failed")
+			},
+		},
+	} as never
+	const controller = new ConnectionController(
+		api,
+		{
+			onStateChange: (state) => states.push(state),
+		},
+		{ livenessIntervalMs: 5, livenessTimeoutMs: 10 },
+	)
+	controller.start()
+	await waitUntil(() => states.includes("reconnecting"))
+	controller.stop()
+
+	assert.ok(describeCalls >= 2)
+	assert.deepEqual(states, ["connected", "reconnecting"])
+})
+
+test("Host handshake timeouts request runtime recovery", async () => {
+	let recoveryRequests = 0
+	const waitForAbort = async function* (signal: AbortSignal): AsyncGenerator<never> {
+		await new Promise<void>((resolve) =>
+			signal.addEventListener("abort", () => resolve(), { once: true }),
+		)
+		yield* []
+	}
+	const api = {
+		events: {
+			mux: (_payload: unknown, signal: AbortSignal) => waitForAbort(signal),
+			host: (_payload: unknown, signal: AbortSignal) => waitForAbort(signal),
+		},
+		host: {
+			describe: async () => {
+				throw new DOMException("timed out", "TimeoutError")
+			},
+		},
+	} as never
+	const controller = new ConnectionController(
+		api,
+		{
+			onTransportFailure: () => {
+				recoveryRequests += 1
+			},
+		},
+		{ backoffBaseMs: 1, backoffMaxMs: 1, streamOpenTimeoutMs: 1 },
+	)
+	controller.start()
+	await waitUntil(() => recoveryRequests >= 1)
+	controller.stop()
+
+	assert.ok(recoveryRequests >= 1)
+})
+
+async function waitUntil(predicate: () => boolean, timeoutMs = 250): Promise<void> {
+	const deadline = Date.now() + timeoutMs
+	while (!predicate() && Date.now() < deadline) {
+		await new Promise((resolve) => setTimeout(resolve, 1))
+	}
+	if (!predicate()) throw new Error("timed out waiting for condition")
+}

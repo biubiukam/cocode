@@ -201,6 +201,8 @@ export function apply(ctx: Context): void {
     () => workspaces.startInitialSelection(),
     'runtime: initial Workspace selection',
   )
+  // Drop stale ready if the generation dies mid-resync.
+  let connectEpoch = 0
   const loop = connection.start({
     onMuxEnvelope: (envelope) => {
       sessions.handleMuxEnvelope(envelope)
@@ -216,8 +218,10 @@ export function apply(ctx: Context): void {
       if (frame.type === 'host/remote-event') ctx.remote.$dispatch(frame.event, frame.args)
     },
     onConnected: () => {
+      const epoch = ++connectEpoch
       ctx.emit('connection/reset')
       void Promise.all([sessions.handleConnected(), workspaces.handleConnected()]).then(() => {
+        if (epoch !== connectEpoch) return
         if (typeof document === 'undefined') return
         document.documentElement.dataset.dshRuntimeState = 'ready'
         window.dispatchEvent(new CustomEvent('cocode:dsh-runtime-recovery-state', {
@@ -236,7 +240,20 @@ export function apply(ctx: Context): void {
       // (reconnect replays flow from stream open, ahead of onConnected):
       // the only safe moment to drop generation-scoped interaction state.
       if (state === 'reconnecting') {
+        connectEpoch += 1
         sessions.handleDisconnected()
+        if (typeof document !== 'undefined') {
+          document.documentElement.dataset.dshRuntimeState = 'degraded'
+          window.dispatchEvent(new CustomEvent('cocode:dsh-runtime-recovery-state', {
+            detail: {
+              state: 'degraded',
+              attempt: 0,
+              maxAttempts: 3,
+              recoveryId: 'connection-reconnect',
+              endpointGeneration: getDesktopEndpointGeneration(),
+            },
+          }))
+        }
       }
     },
     onTransportFailure: (reason) => {

@@ -9,6 +9,10 @@ export interface ConnectionConfig {
   backoffFactor?: number
   /** Upper bound for the backoff cap in ms. */
   backoffMaxMs?: number
+  /** Interval between unary Host liveness probes after a generation connects. */
+  livenessIntervalMs?: number
+  /** Maximum time allowed for one Host liveness probe. */
+  livenessTimeoutMs?: number
   /** Cap on waiting for both streams' onOpen before onConnected, in ms. The strict handshake
    *  waits for mux+host stream establishment plus describe; a carrier that never
    *  fires onOpen (misbehaving proxy) must not wedge the connection forever — on timeout the
@@ -20,6 +24,8 @@ const CONNECTION_DEFAULTS: Required<ConnectionConfig> = {
   backoffBaseMs: 500,
   backoffFactor: 2,
   backoffMaxMs: 10_000,
+  livenessIntervalMs: 15_000,
+  livenessTimeoutMs: 5_000,
   streamOpenTimeoutMs: 3_000,
 }
 
@@ -166,6 +172,9 @@ export class ConnectionController {
         // a description for a generation that no longer exists afterward.
         if (this.isGenerationActive(ac)) {
           this.callSink(() => { this.sinks.onConnected?.(descriptionResult.value) })
+          void this.probeLiveness(ac, () => {
+            if (gen === this.generation && !ac.signal.aborted) ac.abort()
+          })
         }
       } catch (error) {
         // Transport failure: treat as generation failure, fall through to the shared backoff.
@@ -184,6 +193,34 @@ export class ConnectionController {
       this.retryWake = idle
       await sleep(this.backoffDelay(this.attempt), idle.signal)
       if (this.retryWake === idle) this.retryWake = null
+    }
+  }
+
+  /**
+   * Detect a half-open carrier: WebSocket close events are not guaranteed when a
+   * suspended client, proxy, or Host disappears silently. A successful unary
+   * describe proves the HTTP path is still usable; a thrown probe ends the
+   * generation and lets the normal reconnect/recovery path handle it.
+   */
+  private async probeLiveness(controller: AbortController, onFailure: () => void): Promise<void> {
+    while (this.isGenerationActive(controller)) {
+      await sleep(this.config.livenessIntervalMs, controller.signal)
+      if (!this.isGenerationActive(controller)) return
+
+      const probe = new AbortController()
+      const timeout = setTimeout(() => probe.abort(), this.config.livenessTimeoutMs)
+      const relayAbort = (): void => { probe.abort() }
+      controller.signal.addEventListener('abort', relayAbort, { once: true })
+      try {
+        const response = await this.api.host.describe({}, probe.signal)
+        if (!response.result.ok) continue
+      } catch {
+        if (!controller.signal.aborted) onFailure()
+        return
+      } finally {
+        clearTimeout(timeout)
+        controller.signal.removeEventListener('abort', relayAbort)
+      }
     }
   }
 
@@ -223,5 +260,7 @@ export class ConnectionController {
 function isRuntimeTransportError(error: unknown): boolean {
   if (!(error instanceof Error)) return true
   if (error.message.startsWith("host.describe failed:")) return false
-  return error.name === "TypeError" || /fetch failed|network|socket|ECONN/i.test(error.message)
+  return error.name === "TypeError"
+    || error.name === "TimeoutError"
+    || /fetch failed|network|socket|ECONN|timeout/i.test(error.message)
 }
