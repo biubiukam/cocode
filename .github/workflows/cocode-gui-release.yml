@@ -1,4 +1,4 @@
-name: Cocode GUI Linux AppImage
+name: Cocode GUI Linux packages
 
 on:
   workflow_dispatch:
@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   build:
-    name: Linux AppImage / ${{ matrix.arch }}
+    name: Linux DEB + RPM / ${{ matrix.arch }}
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -43,7 +43,13 @@ jobs:
         working-directory: .
         run: |
           sudo apt-get update
-          sudo apt-get install --no-install-recommends -y xvfb squashfs-tools binutils
+          sudo apt-get install --no-install-recommends -y xvfb binutils dpkg-dev rpm gnupg
+      - name: Import Linux package signing key
+        env:
+          LINUX_GPG_PRIVATE_KEY: ${{ secrets.LINUX_GPG_PRIVATE_KEY }}
+        run: |
+          test -n "$LINUX_GPG_PRIVATE_KEY"
+          printf '%s' "$LINUX_GPG_PRIVATE_KEY" | gpg --batch --import
       - name: Install Host Supervisor dependencies
         working-directory: cocode-host-supervisor
         run: corepack pnpm@10.34.5 install --frozen-lockfile --ignore-scripts
@@ -54,27 +60,33 @@ jobs:
         run: corepack pnpm@10.34.5 install --frozen-lockfile
       - name: Check build environment
         run: corepack pnpm@10.34.5 run check:env
-      - name: Build Linux AppImage
+      - name: Build signed Linux packages
         env:
           RELEASE_PLATFORM: linux
           RELEASE_ARCH: ${{ matrix.arch }}
+          RELEASE_REQUIRE_SIGNING: "1"
+          LINUX_SIGNING_KEY: ${{ secrets.LINUX_SIGNING_KEY }}
+          LINUX_SIGNING_PASSPHRASE: ${{ secrets.LINUX_SIGNING_PASSPHRASE }}
         run: corepack pnpm@10.34.5 run release:linux:${{ matrix.arch }}
-      - name: Verify AppImage and updater metadata
-        run: corepack pnpm@10.34.5 run verify:linux-appimage -- --arch "${{ matrix.arch }}"
-      - name: Smoke launch AppImage
+      - name: Verify Linux packages, signatures and updater metadata
         env:
-          ARCH: ${{ matrix.arch }}
+          RELEASE_REQUIRE_SIGNING: "1"
+          LINUX_SIGNING_KEY: ${{ secrets.LINUX_SIGNING_KEY }}
         run: |
-          APPIMAGE="release/linux/${ARCH}"/*.AppImage
-          chmod +x "$APPIMAGE"
-          timeout 30s xvfb-run -a "$APPIMAGE" --disable-gpu --no-sandbox
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            corepack pnpm@10.34.5 run verify:linux:arm64
+          else
+            corepack pnpm@10.34.5 run verify:linux-packages -- --arch "${{ matrix.arch }}"
+          fi
       - name: Upload Linux release artifact
         uses: actions/upload-artifact@v4
         with:
           name: cocode-linux-${{ matrix.arch }}-${{ github.sha }}
           if-no-files-found: error
           path: |
-            cocode-gui/release/linux/${{ matrix.arch }}/*.AppImage
+            cocode-gui/release/linux/${{ matrix.arch }}/*.deb
+            cocode-gui/release/linux/${{ matrix.arch }}/*.rpm
+            cocode-gui/release/linux/${{ matrix.arch }}/*.asc
             cocode-gui/release/linux/${{ matrix.arch }}/latest-linux*.yml
             cocode-gui/release/linux/${{ matrix.arch }}/SHA256SUMS-${{ matrix.arch }}
             cocode-gui/release/linux/${{ matrix.arch }}/linux-release-manifest-${{ matrix.arch }}.json
